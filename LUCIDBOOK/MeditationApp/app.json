@@ -1,0 +1,27 @@
+{
+  "expo": {
+    "name": "APP",
+    "slug": "meditation-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "platforms": [
+      "android"
+    ],
+    "android": {
+      "package": "com.meditation.app",
+      "versionCode": 1,
+      "compileSdkVersion": 34,
+      "targetSdkVersion": 34,
+      "permissions": [],
+      "adaptiveIcon": {
+        "backgroundColor": "#A7F3D0"
+      }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "5b34e4bd-469d-4498-b20e-c03b83710226"
+      }
+    }
+  }
+}
