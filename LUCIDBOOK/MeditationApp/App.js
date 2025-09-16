@@ -10,12 +10,15 @@ import {
   Dimensions,
   StatusBar,
 } from 'react-native';
+import PracticeScreen from './practice';
 
 const { width } = Dimensions.get('window');
 
 const MeditationApp = () => {
   const [selectedMood, setSelectedMood] = useState(null);
   const [activeTab, setActiveTab] = useState('home');
+  const [currentView, setCurrentView] = useState('home'); // 'home' or 'practice'
+  const [practiceType, setPracticeType] = useState('');
 
   const moods = [
     { name: 'Good', emoji: '😊', color: '#fecaca' },
@@ -27,9 +30,27 @@ const MeditationApp = () => {
   ];
 
   const dailyPractices = [
-    { name: '呼吸穩定力練習', completed: true, duration: '', icon: '🧘‍♀️' },
-    { name: '五感察覺練習', completed: false, duration: '3~5 分鐘', icon: '🤱' },
-    { name: '情緒傾聽練習', completed: false, duration: '3~5 分鐘', icon: '🎵' }
+    { 
+      name: '呼吸覺定力練習', 
+      completed: false, 
+      duration: '5分鐘', 
+      icon: '🧘‍♀️',
+      practiceType: '呼吸覺定力練習'
+    },
+    { 
+      name: '五感察覺練習', 
+      completed: false, 
+      duration: '8分鐘', 
+      icon: '🌟',
+      practiceType: '五感察覺練習'
+    },
+    { 
+      name: '情緒舒緩練習', 
+      completed: false, 
+      duration: '10分鐘', 
+      icon: '💆‍♀️',
+      practiceType: '情緒舒緩練習'
+    }
   ];
 
   const topics = [
@@ -38,6 +59,28 @@ const MeditationApp = () => {
     { name: '課業焦慮', color: '#f9fafb', icon: '📚' },
     { name: '社交恐懼', color: '#eff6ff', icon: '❄️' }
   ];
+
+  // 导航到练习页面
+  const navigateToPractice = (type) => {
+    setPracticeType(type);
+    setCurrentView('practice');
+  };
+
+  // 返回主页
+  const navigateToHome = () => {
+    setCurrentView('home');
+    setPracticeType('');
+  };
+
+  // 如果当前视图是练习页面，显示练习组件
+  if (currentView === 'practice') {
+    return (
+      <PracticeScreen 
+        practiceType={practiceType}
+        onBack={navigateToHome}
+      />
+    );
+  }
 
   const MoodButton = ({ mood, index, isSelected, onPress }) => (
     <View style={styles.moodContainer}>
@@ -56,7 +99,10 @@ const MeditationApp = () => {
   );
 
   const PracticeCard = ({ practice, index }) => (
-    <TouchableOpacity style={styles.practiceCard}>
+    <TouchableOpacity 
+      style={styles.practiceCard}
+      onPress={() => navigateToPractice(practice.practiceType)}
+    >
       <View style={styles.practiceIcon}>
         <Text style={styles.practiceIconText}>{practice.icon}</Text>
       </View>
@@ -120,7 +166,7 @@ const MeditationApp = () => {
         {/* Daily Practice Section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>每日練習</Text>
-          <Text style={styles.sectionSubtitle}>今日練習進度 (1/3)</Text>
+          <Text style={styles.sectionSubtitle}>今日練習進度 (0/3)</Text>
           
           <View style={styles.practiceList}>
             {dailyPractices.map((practice, index) => (
@@ -444,7 +490,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-around',
     paddingVertical: 12,
     paddingHorizontal: 16,
-    paddingBottom: 34, // For iPhone safe area
+    paddingBottom: 34,
   },
   navButton: {
     padding: 12,

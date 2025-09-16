@@ -5,9 +5,16 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
-    "platforms": [
-      "android"
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#A7F3D0"
+    },
+    "assetBundlePatterns": [
+      "**/*"
     ],
+    "platforms": ["android", "web"],
     "android": {
       "package": "com.meditation.app",
       "versionCode": 1,
@@ -17,6 +24,10 @@
       "adaptiveIcon": {
         "backgroundColor": "#A7F3D0"
       }
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
     },
     "extra": {
       "eas": {
