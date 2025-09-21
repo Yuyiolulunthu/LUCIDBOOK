@@ -139,43 +139,46 @@ const MeditationApp = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   const moods = [
-    { name: 'Good', emoji: '😊', color: '#fecaca' },
-    { name: 'Ecstatic', emoji: '😸', color: '#e5e7eb' },
-    { name: 'Depressed', emoji: '😔', color: '#fef3c7' },
-    { name: 'Normal', emoji: '😐', color: '#fca5a5' },
-    { name: 'Tearful', emoji: '😢', color: '#d1d5db' },
-    { name: 'Annoyed', emoji: '😤', color: '#f87171' }
+    { name: 'Good', emoji: '😊', color: '#E0F2FE' },
+    { name: 'Ecstatic', emoji: '😸', color: '#FEF3C7' },
+    { name: 'Depressed', emoji: '😔', color: '#FEF3C7' },
+    { name: 'Normal', emoji: '😐', color: '#E0F2FE' },
+    { name: 'Tearful', emoji: '😢', color: '#F1F5F9' },
+    { name: 'Annoyed', emoji: '😤', color: '#E6FFFA' }
   ];
 
   const dailyPractices = [
     { 
       name: '呼吸覺定力練習', 
-      completed: false, 
+      completed: true, 
       duration: '5分鐘', 
       icon: '🧘‍♀️',
-      practiceType: '呼吸覺定力練習'
+      practiceType: '呼吸覺定力練習',
+      iconBg: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
     },
     { 
       name: '五感察覺練習', 
       completed: false, 
       duration: '8分鐘', 
       icon: '🌟',
-      practiceType: '五感察覺練習'
+      practiceType: '五感察覺練習',
+      iconBg: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)'
     },
     { 
       name: '情緒舒緩練習', 
       completed: false, 
       duration: '10分鐘', 
       icon: '💆‍♀️',
-      practiceType: '情緒舒緩練習'
+      practiceType: '情緒舒緩練習',
+      iconBg: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)'
     }
   ];
 
   const topics = [
-    { name: '拖延症', color: '#f0fdfa', icon: '⏰' },
-    { name: '感情問題', color: '#fdf2f8', icon: '💕' },
-    { name: '課業焦慮', color: '#f9fafb', icon: '📚' },
-    { name: '社交恐懼', color: '#eff6ff', icon: '❄️' }
+    { name: '拖延症', color: '#FEF3C7', icon: '⏰' },
+    { name: '感情問題', color: '#FCE7F3', icon: '💕' },
+    { name: '課業焦慮', color: '#EFF6FF', icon: '📚' },
+    { name: '社交恐懼', color: '#F0F9FF', icon: '❄️' }
   ];
 
   // 導航到登入頁面
@@ -263,27 +266,36 @@ const MeditationApp = () => {
   );
 
   const PracticeCard = ({ practice, index }) => (
-    <TouchableOpacity 
-      style={styles.practiceCard}
-      onPress={() => navigateToPractice(practice.practiceType)}
-    >
-      <View style={styles.practiceIcon}>
-        <Text style={styles.practiceIconText}>{practice.icon}</Text>
+    <View style={styles.practiceCardContainer}>
+      {/* Progress Indicator */}
+      <View style={styles.progressIndicator}>
+        <View style={[styles.progressDot, practice.completed && styles.progressDotCompleted]} />
+        {index < dailyPractices.length - 1 && <View style={styles.progressLine} />}
       </View>
-      <View style={styles.practiceContent}>
-        <Text style={styles.practiceName}>{practice.name}</Text>
-        {practice.completed ? (
-          <View style={styles.completedContainer}>
-            <Text style={styles.completedText}>✓ 完成！</Text>
-          </View>
-        ) : (
-          <View style={styles.durationContainer}>
-            <Text style={styles.durationText}>🕐 {practice.duration}</Text>
-          </View>
-        )}
-      </View>
-      <Text style={styles.arrow}>›</Text>
-    </TouchableOpacity>
+      
+      {/* Practice Card */}
+      <TouchableOpacity 
+        style={styles.practiceCard}
+        onPress={() => navigateToPractice(practice.practiceType)}
+      >
+        <View style={[styles.practiceIcon, { backgroundColor: practice.completed ? '#10B981' : '#E0F2FE' }]}>
+          <Text style={styles.practiceIconText}>{practice.icon}</Text>
+        </View>
+        <View style={styles.practiceContent}>
+          <Text style={styles.practiceName}>{practice.name}</Text>
+          {practice.completed ? (
+            <View style={styles.completedContainer}>
+              <Text style={styles.completedText}>✓ 完成！</Text>
+            </View>
+          ) : (
+            <View style={styles.durationContainer}>
+              <Text style={styles.durationText}>🕐 {practice.duration}</Text>
+            </View>
+          )}
+        </View>
+        <Text style={styles.arrow}>›</Text>
+      </TouchableOpacity>
+    </View>
   );
 
   const TopicButton = ({ topic }) => (
@@ -710,7 +722,32 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   practiceList: {
-    gap: 12,
+    paddingLeft: 24,
+  },
+  practiceCardContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+  },
+  progressIndicator: {
+    alignItems: 'center',
+    marginRight: 16,
+    marginTop: 32,
+  },
+  progressDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#93C5FD',
+    marginBottom: 8,
+  },
+  progressDotCompleted: {
+    backgroundColor: '#10B981',
+  },
+  progressLine: {
+    width: 2,
+    height: 60,
+    backgroundColor: '#E0F2FE',
   },
   practiceCard: {
     backgroundColor: 'white',
@@ -723,12 +760,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 2,
     elevation: 2,
-    marginBottom: 12,
+    flex: 1,
   },
   practiceIcon: {
     width: 64,
     height: 64,
-    backgroundColor: '#FED7AA',
     borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
