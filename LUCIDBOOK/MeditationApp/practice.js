@@ -13,7 +13,6 @@ import {
 } from 'react-native';
 import { Audio } from 'expo-av';
 
-// 练习课程组件
 export default function PracticeScreen({ practiceType = "呼吸覺定力練習", onBack }) {
   const [currentStep, setCurrentStep] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -21,14 +20,12 @@ export default function PracticeScreen({ practiceType = "呼吸覺定力練習",
   const [position, setPosition] = useState(0);
   const [duration, setDuration] = useState(0);
   
-  // 表单数据状态
   const [formData, setFormData] = useState({
     feeling: '',
     noticed: '',
     reflection: ''
   });
 
-  // 本地音频文件路径
   const getAudioFile = () => {
     try {
       const audioFiles = {
@@ -43,7 +40,6 @@ export default function PracticeScreen({ practiceType = "呼吸覺定力練習",
     }
   };
 
-  // 载入音频文件
   const loadAudio = async () => {
     if (sound) {
       await sound.unloadAsync();
@@ -59,13 +55,11 @@ export default function PracticeScreen({ practiceType = "呼吸覺定力練習",
       const { sound: newSound } = await Audio.Sound.createAsync(audioFile);
       setSound(newSound);
       
-      // 获取音频长度
       const status = await newSound.getStatusAsync();
       if (status.isLoaded) {
         setDuration(status.durationMillis || 0);
       }
       
-      // 设置播放状态更新监听
       newSound.setOnPlaybackStatusUpdate((status) => {
         if (status.isLoaded) {
           setPosition(status.positionMillis || 0);
@@ -77,7 +71,6 @@ export default function PracticeScreen({ practiceType = "呼吸覺定力練習",
     }
   };
 
-  // 播放/暂停音频
   const togglePlayback = async () => {
     if (!sound) {
       await loadAudio();
@@ -98,7 +91,6 @@ export default function PracticeScreen({ practiceType = "呼吸覺定力練習",
     }
   };
 
-  // 清理音频资源
   useEffect(() => {
     return () => {
       if (sound) {
@@ -107,35 +99,35 @@ export default function PracticeScreen({ practiceType = "呼吸覺定力練習",
     };
   }, [sound]);
 
-  // 根据练习类型获取内容
   const getPracticeContent = () => {
     const practices = {
       "呼吸覺定力練習": {
         steps: [
           {
-            title: "準備好來開始\n 今天的《呼吸穩定力練習》了嗎？",
+            title: "準備好來開始\n今天的《呼吸穩定力練習》了嗎？",
             content: "",
-            icon: "",
             hasImage: true,
-            imageType: "meditation"
+            imageType: "welcome",
+            imageName: "呼吸穩定.png"
           },
           {
             title: "嗨！歡迎你開始今天的\n《呼吸穩定力》練習",
             content: "",
-            icon: "Hi"
+            icon: "Hi",
+            showGreeting: true
           },
           {
-            title: "這個練習能協助你\n 平靜、專注，\n也是提升覺察力的重要基礎",
+            title: "這個練習能協助你\n平靜、專注，\n也是提升覺察力的重要基礎",
             content: ""
           },
           {
             title: "請你找個舒服的位置，",
             content: "坐下，或躺下",
             hasImage: true,
-            imageType: "position"
+            imageType: "positions"
           },
           {
-            title: "很好，再接下來的分鐘，\n 邀請你跟著聲音指示\n一起呼吸～",
+            title: "很好，再接下來的5分鐘，\n邀請你跟著聲音指示\n一起呼吸～",
             content: ""
           },
           {
@@ -158,43 +150,45 @@ export default function PracticeScreen({ practiceType = "呼吸覺定力練習",
       "五感察覺練習": {
         steps: [
           {
-            title: "五感察覺",
-            content: "準備開始五感察覺練習",
-            icon: "👁️"
+            title: "準備好來開始\n今天的《五感察覺練習》了嗎？",
+            content: "",
+            hasImage: true,
+            imageType: "welcome",
+            imageName: "五感察覺.png"
           },
           {
-            title: "觀察練習",
-            content: "用眼睛觀察周圍的環境，注意顏色、形狀、光線的變化。",
-            icon: "👁️"
+            title: "嗨！歡迎你開始今天的\n《五感察覺》練習",
+            content: "",
+            icon: "Hi",
+            showGreeting: true
           },
           {
-            title: "聆聽練習", 
-            content: "閉上眼睛，仔細聆聽周圍的聲音，包括遠近不同的聲響。",
-            icon: "👂"
+            title: "這個練習能協助你\n提升感官覺察力，\n連結當下的體驗",
+            content: ""
           },
           {
-            title: "觸覺練習",
-            content: "感受身體與座椅、衣物的接觸，注意溫度和質感。",
-            icon: "✋"
+            title: "請你找個舒服的位置，",
+            content: "坐下，或躺下",
+            hasImage: true,
+            imageType: "positions"
           },
           {
-            title: "整合練習",
-            content: "將五感的察覺整合在一起，保持當下的覺知。",
-            icon: "🌟"
+            title: "很好，再接下來的8分鐘，\n邀請你跟著聲音指示\n進行五感察覺～",
+            content: ""
           },
           {
-            title: "音頻練習",
-            content: "跟隨音頻進行五感整合練習",
+            title: "",
+            content: "讓我們開始進行練習。",
             hasAudio: true
           },
           {
-            title: "記錄感受",
-            content: "請記錄你在五感察覺練習中的體驗",
+            title: "你做得很好，",
+            content: "今天你練習了8分鐘的五感察覺\n請利用以下空間記錄下今日的練習",
             hasForm: true
           },
           {
-            title: "練習完成",
-            content: "五感察覺練習已完成，查看你的記錄",
+            title: "恭喜你完成了今天的",
+            content: "《五感察覺練習》，\n讓我們來整理你的回饋吧！",
             hasSummary: true
           }
         ]
@@ -202,43 +196,45 @@ export default function PracticeScreen({ practiceType = "呼吸覺定力練習",
       "情緒舒緩練習": {
         steps: [
           {
-            title: "情緒舒緩",
-            content: "準備開始情緒舒緩練習",
-            icon: "💭"
+            title: "準備好來開始\n今天的《情緒舒緩練習》了嗎？",
+            content: "",
+            hasImage: true,
+            imageType: "welcome",
+            imageName: "情緒理解.png"
           },
           {
-            title: "情緒識別",
-            content: "溫和地觀察目前的情緒狀態，不要評判，只是單純地覺察。",
-            icon: "💭"
+            title: "嗨！歡迎你開始今天的\n《情緒舒緩》練習",
+            content: "",
+            icon: "Hi",
+            showGreeting: true
           },
           {
-            title: "身體掃描",
-            content: "從頭到腳感受身體各部位的緊張或放鬆，釋放累積的壓力。",
-            icon: "🧘"
+            title: "這個練習能協助你\n舒緩情緒壓力，\n找到內心的平靜",
+            content: ""
           },
           {
-            title: "釋放練習",
-            content: "想像將負面情緒隨著呼氣釋放出去，感受內心的平靜。",
-            icon: "🌬️"
+            title: "請你找個舒服的位置，",
+            content: "坐下，或躺下",
+            hasImage: true,
+            imageType: "positions"
           },
           {
-            title: "正念結束",
-            content: "帶著平靜和接納的心境結束練習，感謝自己的努力。",
-            icon: "🕯️"
+            title: "很好，再接下來的10分鐘，\n邀請你跟著聲音指示\n進行情緒舒緩～",
+            content: ""
           },
           {
-            title: "引導音頻",
-            content: "跟隨音頻進行情緒舒緩練習",
+            title: "",
+            content: "讓我們開始進行練習。",
             hasAudio: true
           },
           {
-            title: "情緒記錄",
-            content: "請記錄你的情緒變化和感受",
+            title: "你做得很好，",
+            content: "今天你練習了10分鐘的情緒舒緩\n請利用以下空間記錄下今日的練習",
             hasForm: true
           },
           {
-            title: "練習總結",
-            content: "情緒舒緩練習已完成，回顧你的記錄",
+            title: "恭喜你完成了今天的",
+            content: "《情緒舒緩練習》，\n讓我們來整理你的回饋吧！",
             hasSummary: true
           }
         ]
@@ -252,14 +248,12 @@ export default function PracticeScreen({ practiceType = "呼吸覺定力練習",
   const totalSteps = practiceData.steps.length;
   const progressPercentage = ((currentStep + 1) / totalSteps) * 100;
 
-  // 当进入音频步骤时载入音频
   useEffect(() => {
     if (currentStepData.hasAudio && !sound) {
       loadAudio();
     }
   }, [currentStep]);
 
-  // 格式化时间显示
   const formatTime = (milliseconds) => {
     const totalSeconds = Math.floor(milliseconds / 1000);
     const minutes = Math.floor(totalSeconds / 60);
@@ -296,29 +290,35 @@ export default function PracticeScreen({ practiceType = "呼吸覺定力練習",
               style={styles.inputBox} 
               multiline 
               placeholder="寫下你的感受內容"
-              placeholderTextColor="#2E86AB"
+              placeholderTextColor="rgba(0, 0, 0, 0.4)"
               value={formData.feeling}
               onChangeText={(text) => updateFormData('feeling', text)}
             />
           </View>
+          
+          <View style={styles.separator} />
+          
           <View style={styles.inputField}>
             <Text style={styles.inputLabel}>練習中的發現，我發現：</Text>
             <TextInput 
               style={styles.inputBox} 
               multiline 
               placeholder="記錄練習時的發現"
-              placeholderTextColor="#2E86AB"
+              placeholderTextColor="rgba(0, 0, 0, 0.4)"
               value={formData.noticed}
               onChangeText={(text) => updateFormData('noticed', text)}
             />
           </View>
+          
+          <View style={styles.separator} />
+          
           <View style={styles.inputField}>
             <Text style={styles.inputLabel}>我想對情緒有自己一點時間，{'\n'}好好呼吸、與自己共處的自己說：</Text>
             <TextInput 
               style={styles.largeInputBox} 
               multiline 
               placeholder="寫下想對自己說的話"
-              placeholderTextColor="#2E86AB"
+              placeholderTextColor="rgba(0, 0, 0, 0.4)"
               value={formData.reflection}
               onChangeText={(text) => updateFormData('reflection', text)}
             />
@@ -334,16 +334,23 @@ export default function PracticeScreen({ practiceType = "呼吸覺定力練習",
             <Text style={styles.summaryTitle}>練習的感覺：</Text>
             <Text style={styles.summaryContent}>{formData.feeling || "未填寫內容"}</Text>
           </View>
+          
+          <View style={styles.separator} />
+          
           <View style={styles.summaryCard}>
             <Text style={styles.summaryTitle}>練習中的發現：</Text>
             <Text style={styles.summaryContent}>{formData.noticed || "未填寫內容"}</Text>
           </View>
+          
+          <View style={styles.separator} />
+          
           <View style={styles.summaryCard}>
             <Text style={styles.summaryTitle}>想和自己說的話：</Text>
             <Text style={styles.summaryContent}>{formData.reflection || "未填寫內容"}</Text>
           </View>
-          <TouchableOpacity style={styles.exportButton} onPress={onBack}>
-            <Text style={styles.exportButtonText}>結束今日練習</Text>
+          
+          <TouchableOpacity style={styles.finishButton} onPress={onBack}>
+            <Text style={styles.finishButtonText}>結束今日練習</Text>
           </TouchableOpacity>
         </View>
       );
@@ -360,9 +367,9 @@ export default function PracticeScreen({ practiceType = "呼吸覺定力練習",
                 resizeMode="cover"
               />
               <View style={styles.albumOverlay}>
-                <Text style={styles.albumText}>{'\n'}</Text>
               </View>
             </View>
+            
             <View style={styles.timeContainer}>
               <Text style={styles.timeText}>{formatTime(position)}</Text>
               <View style={styles.progressSlider}>
@@ -371,6 +378,7 @@ export default function PracticeScreen({ practiceType = "呼吸覺定力練習",
               </View>
               <Text style={styles.timeText}>{formatTime(duration) || '5:50'}</Text>
             </View>
+            
             <View style={styles.audioControls}>
               <TouchableOpacity style={styles.controlButtonContainer}>
                 <Text style={styles.controlButton}>⏮</Text>
@@ -382,6 +390,7 @@ export default function PracticeScreen({ practiceType = "呼吸覺定力練習",
                 <Text style={styles.controlButton}>⏭</Text>
               </TouchableOpacity>
             </View>
+            
             <Text style={styles.audioDescription}>
               呼吸，貼近下意識的節拍，{'\n'}邀請你跟著聲音指示{'\n'}一起呼吸～
             </Text>
@@ -393,15 +402,17 @@ export default function PracticeScreen({ practiceType = "呼吸覺定力練習",
     if (currentStepData.hasImage) {
       return (
         <View style={styles.imageSection}>
-          {currentStepData.imageType === "meditation" ? (
-            <View style={styles.meditationImage}>
-              <Image 
-                source={require('./assets/images/meditation-pose.png')}
-                style={styles.meditationImageFile}
-                resizeMode="contain"
-              />
+          {currentStepData.imageType === "welcome" ? (
+            <View style={styles.welcomeImageContainer}>
+              <View style={styles.welcomeImageWhiteBox}>
+                <Image 
+                  source={require('./assets/images/呼吸穩定.png')}
+                  style={styles.welcomeImage}
+                  resizeMode="contain"
+                />
+              </View>
             </View>
-          ) : currentStepData.imageType === "position" ? (
+          ) : currentStepData.imageType === "positions" ? (
             <View style={styles.positionImagesContainer}>
               <View style={styles.positionImageTop}>
                 <Image 
@@ -423,6 +434,16 @@ export default function PracticeScreen({ practiceType = "呼吸覺定力練習",
       );
     }
 
+    if (currentStepData.showGreeting) {
+      return (
+        <View style={styles.greetingSection}>
+          <View style={styles.greetingCircle}>
+            <Text style={styles.greetingText}>Hi</Text>
+          </View>
+        </View>
+      );
+    }
+
     if (currentStepData.content) {
       return (
         <Text style={styles.contentText}>{currentStepData.content}</Text>
@@ -435,9 +456,8 @@ export default function PracticeScreen({ practiceType = "呼吸覺定力練習",
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
       <SafeAreaView style={styles.container}>
-        <StatusBar barStyle="light-content" backgroundColor="#2E86AB" />
+        <StatusBar barStyle="light-content" backgroundColor="rgba(46, 134, 171, 0.7)" />
         
-        {/* 顶部导航 */}
         <View style={styles.header}>
           <TouchableOpacity onPress={onBack}>
             <Text style={styles.closeButton}>✕</Text>
@@ -448,34 +468,20 @@ export default function PracticeScreen({ practiceType = "呼吸覺定力練習",
           </TouchableOpacity>
         </View>
 
-        {/* 进度条 */}
         <View style={styles.progressContainer}>
           <View style={styles.progressBarContainer}>
             <View style={[styles.progressBarFill, { width: `${progressPercentage}%` }]} />
           </View>
         </View>
 
-        {/* 主要内容区域 */}
         <View style={styles.contentContainer}>
-          
-          {/* 步骤图示和标题 */}
           <View style={styles.stepHeader}>
-            {currentStepData.icon && (
-              <View style={styles.iconContainer}>
-                <Text style={styles.stepIcon}>{currentStepData.icon}</Text>
-              </View>
-            )}
             <Text style={styles.stepTitle}>{currentStepData.title}</Text>
-            {currentStepData.duration && (
-              <Text style={styles.stepDuration}>{currentStepData.duration}</Text>
-            )}
           </View>
 
-          {/* 动态内容 */}
           {renderStepContent()}
         </View>
 
-        {/* 底部导航 */}
         <View style={styles.bottomNav}>
           <TouchableOpacity 
             onPress={prevStep}
@@ -510,11 +516,10 @@ export default function PracticeScreen({ practiceType = "呼吸覺定力練習",
   );
 }
 
-// 样式定义
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#2E86AB',
+    backgroundColor: 'rgba(46, 134, 171, 0.7)',
   },
   header: {
     flexDirection: 'row',
@@ -525,17 +530,17 @@ const styles = StyleSheet.create({
   },
   closeButton: {
     fontSize: 20,
-    color: '#FFFFFF',
+    color: 'rgba(0, 0, 0, 0.6)',
     fontWeight: 'bold',
   },
   headerTitle: {
     fontSize: 16,
-    color: '#FFFFFF',
+    color: 'rgba(0, 0, 0, 0.6)',
     fontWeight: 'bold',
   },
   menuButton: {
     fontSize: 20,
-    color: '#FFFFFF',
+    color: 'rgba(0, 0, 0, 0.6)',
     fontWeight: 'bold',
   },
   progressContainer: {
@@ -544,12 +549,12 @@ const styles = StyleSheet.create({
   },
   progressBarContainer: {
     height: 4,
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    backgroundColor: 'rgba(0, 0, 0, 0.2)',
     borderRadius: 2,
   },
   progressBarFill: {
     height: '100%',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
     borderRadius: 2,
   },
   contentContainer: {
@@ -559,61 +564,67 @@ const styles = StyleSheet.create({
   },
   stepHeader: {
     alignItems: 'center',
-    marginBottom: 60,
+    marginBottom: 40,
   },
-  iconContainer: {
+  stepTitle: {
+    fontSize: 20,
+    color: 'rgba(0, 0, 0, 0.6)',
+    fontWeight: 'bold',
+    textAlign: 'center',
+    lineHeight: 28,
+  },
+  contentText: {
+    fontSize: 16,
+    color: 'rgba(0, 0, 0, 0.6)',
+    lineHeight: 24,
+    textAlign: 'center',
+    marginBottom: 30,
+  },
+  
+  // Greeting section
+  greetingSection: {
+    alignItems: 'center',
+    marginBottom: 30,
+  },
+  greetingCircle: {
     width: 80,
     height: 80,
     borderRadius: 40,
     backgroundColor: '#FFFFFF',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 40,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 8,
   },
-  stepIcon: {
-    fontSize: 32,
-  },
-  stepTitle: {
-    fontSize: 20,
-    color: '#FFFFFF',
+  greetingText: {
+    fontSize: 24,
+    color: 'rgba(0, 0, 0, 0.6)',
     fontWeight: 'bold',
-    marginBottom: 5,
-    textAlign: 'center',
-  },
-  stepDuration: {
-    fontSize: 14,
-    color: '#E8E0D6',
-  },
-  contentText: {
-    fontSize: 16,
-    color: '#FFFFFF',
-    lineHeight: 24,
-    textAlign: 'center',
-    marginBottom: 30,
   },
   
-  // 图片相关样式
+  // Image sections
   imageSection: {
     alignItems: 'center',
     marginBottom: 30,
   },
-  meditationImage: {
+  welcomeImageContainer: {
+    alignItems: 'center',
+  },
+  welcomeImageWhiteBox: {
     width: 200,
-    height: 200,
-    borderRadius: 16,
+    height: 150,
     backgroundColor: '#FFFFFF',
+    borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
     overflow: 'hidden',
   },
-  meditationImageFile: {
-    width: '100%',
-    height: '100%',
+  welcomeImage: {
+    width: '90%',
+    height: '90%',
   },
   positionImagesContainer: {
     width: 280,
@@ -647,12 +658,12 @@ const styles = StyleSheet.create({
     height: '100%',
   },
 
-  // 音频播放器样式
+  // Audio player
   audioPlayer: {
     marginBottom: 30,
   },
   audioCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'rgba(230, 230, 230, 1.0)',
     borderRadius: 16,
     padding: 40,
     alignItems: 'center',
@@ -696,21 +707,21 @@ const styles = StyleSheet.create({
   },
   timeText: {
     fontSize: 14,
-    color: '#2E86AB',
+    color: 'rgba(0, 0, 0, 0.6)',
     width: 40,
     fontWeight: '500',
   },
   progressSlider: {
     flex: 1,
     height: 6,
-    backgroundColor: '#E8E0D6',
+    backgroundColor: 'rgba(0, 0, 0, 0.2)',
     borderRadius: 3,
     marginHorizontal: 15,
     position: 'relative',
   },
   progressBar: {
     height: '100%',
-    backgroundColor: '#2E86AB',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
     borderRadius: 3,
   },
   progressHandle: {
@@ -719,7 +730,7 @@ const styles = StyleSheet.create({
     width: 18,
     height: 18,
     borderRadius: 9,
-    backgroundColor: '#2E86AB',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
@@ -739,7 +750,7 @@ const styles = StyleSheet.create({
   },
   controlButton: {
     fontSize: 28,
-    color: '#2E86AB',
+    color: 'rgba(0, 0, 0, 0.6)',
   },
   playButtonContainer: {
     width: 60,
@@ -750,17 +761,17 @@ const styles = StyleSheet.create({
   },
   playButton: {
     fontSize: 36,
-    color: '#2E86AB',
+    color: 'rgba(0, 0, 0, 0.6)',
   },
   audioDescription: {
     fontSize: 12,
-    color: '#2E86AB',
+    color: 'rgba(0, 0, 0, 0.6)',
     textAlign: 'center',
     lineHeight: 18,
     opacity: 0.8,
   },
 
-  // 表单样式
+  // Form styles
   formSection: {
     marginBottom: 30,
   },
@@ -769,7 +780,7 @@ const styles = StyleSheet.create({
   },
   inputLabel: {
     fontSize: 14,
-    color: '#FFFFFF',
+    color: 'rgba(0, 0, 0, 0.6)',
     marginBottom: 8,
     lineHeight: 20,
   },
@@ -779,7 +790,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 12,
-    color: '#8B6F47',
+    color: 'rgba(0, 0, 0, 0.6)',
     textAlignVertical: 'top',
   },
   largeInputBox: {
@@ -788,11 +799,16 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 12,
-    color: '#8B6F47',
+    color: 'rgba(0, 0, 0, 0.6)',
     textAlignVertical: 'top',
   },
+  separator: {
+    height: 1,
+    backgroundColor: '#DBDBDB',
+    marginVertical: 15,
+  },
 
-  // 总结页面样式
+  // Summary styles
   summarySection: {
     marginBottom: 30,
   },
@@ -805,29 +821,29 @@ const styles = StyleSheet.create({
   summaryTitle: {
     fontSize: 14,
     fontWeight: 'bold',
-    color: '#8B6F47',
+    color: 'rgba(0, 0, 0, 0.6)',
     marginBottom: 8,
   },
   summaryContent: {
     fontSize: 14,
-    color: '#6B5B47',
+    color: 'rgba(0, 0, 0, 0.6)',
     lineHeight: 20,
   },
-  exportButton: {
-    backgroundColor: '#D4A574',
+  finishButton: {
+    backgroundColor: 'rgba(46, 134, 171, 0.8)',
     paddingVertical: 12,
     paddingHorizontal: 24,
     borderRadius: 25,
     alignSelf: 'center',
     marginTop: 15,
   },
-  exportButtonText: {
+  finishButtonText: {
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: 'bold',
   },
 
-  // 底部导航样式
+  // Bottom navigation
   bottomNav: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -846,7 +862,7 @@ const styles = StyleSheet.create({
   },
   navButtonText: {
     fontSize: 24,
-    color: '#FFFFFF',
+    color: 'rgba(0, 0, 0, 0.6)',
   },
   progressIndicator: {
     flexDirection: 'row',
@@ -856,11 +872,11 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    backgroundColor: 'rgba(0, 0, 0, 0.2)',
     marginHorizontal: 4,
   },
   progressDotActive: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
     width: 12,
     height: 12,
     borderRadius: 6,
