@@ -899,7 +899,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: '#FEF3C7',
+    backgroundColor: '#9cc1e0',
     flexDirection: 'row',
     justifyContent: 'space-around',
     paddingVertical: 12,
@@ -911,7 +911,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   navButtonActive: {
-    backgroundColor: '#FDE68A',
+    backgroundColor: '#9cc1e0',
   },
   navIcon: {
     fontSize: 24,
