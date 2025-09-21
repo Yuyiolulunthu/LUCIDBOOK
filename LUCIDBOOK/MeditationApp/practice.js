@@ -296,7 +296,7 @@ export default function PracticeScreen({ practiceType = "呼吸覺定力練習",
               style={styles.inputBox} 
               multiline 
               placeholder="寫下你的感受內容"
-              placeholderTextColor="#AD9E90"
+              placeholderTextColor="#2E86AB"
               value={formData.feeling}
               onChangeText={(text) => updateFormData('feeling', text)}
             />
@@ -307,7 +307,7 @@ export default function PracticeScreen({ practiceType = "呼吸覺定力練習",
               style={styles.inputBox} 
               multiline 
               placeholder="記錄練習時的發現"
-              placeholderTextColor="#AD9E90"
+              placeholderTextColor="#2E86AB"
               value={formData.noticed}
               onChangeText={(text) => updateFormData('noticed', text)}
             />
@@ -318,7 +318,7 @@ export default function PracticeScreen({ practiceType = "呼吸覺定力練習",
               style={styles.largeInputBox} 
               multiline 
               placeholder="寫下想對自己說的話"
-              placeholderTextColor="#AD9E90"
+              placeholderTextColor="#2E86AB"
               value={formData.reflection}
               onChangeText={(text) => updateFormData('reflection', text)}
             />
@@ -435,7 +435,7 @@ export default function PracticeScreen({ practiceType = "呼吸覺定力練習",
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
       <SafeAreaView style={styles.container}>
-        <StatusBar barStyle="light-content" backgroundColor="#AD9E90" />
+        <StatusBar barStyle="light-content" backgroundColor="#2E86AB" />
         
         {/* 顶部导航 */}
         <View style={styles.header}>
@@ -514,7 +514,7 @@ export default function PracticeScreen({ practiceType = "呼吸覺定力練習",
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#AD9E90',
+    backgroundColor: '#2E86AB',
   },
   header: {
     flexDirection: 'row',
@@ -696,7 +696,7 @@ const styles = StyleSheet.create({
   },
   timeText: {
     fontSize: 14,
-    color: '#AD9E90',
+    color: '#2E86AB',
     width: 40,
     fontWeight: '500',
   },
@@ -710,7 +710,7 @@ const styles = StyleSheet.create({
   },
   progressBar: {
     height: '100%',
-    backgroundColor: '#AD9E90',
+    backgroundColor: '#2E86AB',
     borderRadius: 3,
   },
   progressHandle: {
@@ -719,7 +719,7 @@ const styles = StyleSheet.create({
     width: 18,
     height: 18,
     borderRadius: 9,
-    backgroundColor: '#AD9E90',
+    backgroundColor: '#2E86AB',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
@@ -739,7 +739,7 @@ const styles = StyleSheet.create({
   },
   controlButton: {
     fontSize: 28,
-    color: '#AD9E90',
+    color: '#2E86AB',
   },
   playButtonContainer: {
     width: 60,
@@ -750,11 +750,11 @@ const styles = StyleSheet.create({
   },
   playButton: {
     fontSize: 36,
-    color: '#AD9E90',
+    color: '#2E86AB',
   },
   audioDescription: {
     fontSize: 12,
-    color: '#AD9E90',
+    color: '#2E86AB',
     textAlign: 'center',
     lineHeight: 18,
     opacity: 0.8,
