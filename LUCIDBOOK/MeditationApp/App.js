@@ -9,16 +9,134 @@ import {
   SafeAreaView,
   Dimensions,
   StatusBar,
+  Alert,
 } from 'react-native';
 import PracticeScreen from './practice';
 
 const { width } = Dimensions.get('window');
 
+// 登入頁面組件
+const LoginScreen = ({ onLogin, onBack }) => {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleLogin = async () => {
+    if (!email || !password) {
+      Alert.alert('錯誤', '請輸入電子郵件和密碼');
+      return;
+    }
+
+    setIsLoading(true);
+    // 模擬登入延遲
+    setTimeout(() => {
+      setIsLoading(false);
+      if (email && password) {
+        onLogin({ email, name: email.split('@')[0] });
+      } else {
+        Alert.alert('登入失敗', '請檢查您的電子郵件和密碼');
+      }
+    }, 1000);
+  };
+
+  const handleGuestLogin = () => {
+    onLogin({ email: 'guest@example.com', name: 'Guest' });
+  };
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor="#F9FAFB" />
+      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+        {/* Header with back button */}
+        <View style={styles.loginHeader}>
+          <TouchableOpacity onPress={onBack} style={styles.backButton}>
+            <Text style={styles.backButtonText}>← 返回</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Login Content */}
+        <View style={styles.loginContainer}>
+          <View style={styles.logoContainer}>
+            <Text style={styles.logoEmoji}>🧘‍♀️</Text>
+            <Text style={styles.logoText}>心靈冥想</Text>
+            <Text style={styles.logoSubtext}>找到內心的平靜</Text>
+          </View>
+
+          <View style={styles.formContainer}>
+            <Text style={styles.formTitle}>登入您的帳戶</Text>
+            
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>電子郵件</Text>
+              <TextInput
+                style={styles.textInput}
+                value={email}
+                onChangeText={setEmail}
+                placeholder="請輸入您的電子郵件"
+                placeholderTextColor="#9CA3AF"
+                keyboardType="email-address"
+                autoCapitalize="none"
+              />
+            </View>
+
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>密碼</Text>
+              <TextInput
+                style={styles.textInput}
+                value={password}
+                onChangeText={setPassword}
+                placeholder="請輸入您的密碼"
+                placeholderTextColor="#9CA3AF"
+                secureTextEntry
+              />
+            </View>
+
+            <TouchableOpacity style={styles.forgotPassword}>
+              <Text style={styles.forgotPasswordText}>忘記密碼？</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={[styles.loginButton, isLoading && styles.loginButtonDisabled]}
+              onPress={handleLogin}
+              disabled={isLoading}
+            >
+              <Text style={styles.loginButtonText}>
+                {isLoading ? '登入中...' : '登入'}
+              </Text>
+            </TouchableOpacity>
+
+            <View style={styles.divider}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.dividerText}>或</Text>
+              <View style={styles.dividerLine} />
+            </View>
+
+            <TouchableOpacity 
+              style={styles.guestButton}
+              onPress={handleGuestLogin}
+            >
+              <Text style={styles.guestButtonText}>以訪客身份繼續</Text>
+            </TouchableOpacity>
+
+            <View style={styles.signupContainer}>
+              <Text style={styles.signupText}>還沒有帳戶？</Text>
+              <TouchableOpacity>
+                <Text style={styles.signupLink}>立即註冊</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
+  );
+};
+
 const MeditationApp = () => {
   const [selectedMood, setSelectedMood] = useState(null);
   const [activeTab, setActiveTab] = useState('home');
-  const [currentView, setCurrentView] = useState('home'); // 'home' or 'practice'
+  const [currentView, setCurrentView] = useState('home'); // 'home', 'practice', 'login'
   const [practiceType, setPracticeType] = useState('');
+  const [user, setUser] = useState(null); // 用戶狀態
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   const moods = [
     { name: 'Good', emoji: '😊', color: '#fecaca' },
@@ -60,19 +178,65 @@ const MeditationApp = () => {
     { name: '社交恐懼', color: '#eff6ff', icon: '❄️' }
   ];
 
-  // 导航到练习页面
+  // 導航到登入頁面
+  const navigateToLogin = () => {
+    setCurrentView('login');
+  };
+
+  // 導航到練習頁面
   const navigateToPractice = (type) => {
+    if (!isLoggedIn) {
+      Alert.alert('請先登入', '您需要登入才能開始練習', [
+        { text: '取消', style: 'cancel' },
+        { text: '登入', onPress: navigateToLogin }
+      ]);
+      return;
+    }
     setPracticeType(type);
     setCurrentView('practice');
   };
 
-  // 返回主页
+  // 處理登入
+  const handleLogin = (userData) => {
+    setUser(userData);
+    setIsLoggedIn(true);
+    setCurrentView('home');
+    Alert.alert('登入成功', `歡迎回來，${userData.name}！`);
+  };
+
+  // 處理登出
+  const handleLogout = () => {
+    Alert.alert('確認登出', '您確定要登出嗎？', [
+      { text: '取消', style: 'cancel' },
+      { 
+        text: '登出', 
+        style: 'destructive',
+        onPress: () => {
+          setUser(null);
+          setIsLoggedIn(false);
+          setCurrentView('home');
+        }
+      }
+    ]);
+  };
+
+  // 返回主頁
   const navigateToHome = () => {
     setCurrentView('home');
     setPracticeType('');
   };
 
-  // 如果当前视图是练习页面，显示练习组件
+  // 如果當前視圖是登入頁面
+  if (currentView === 'login') {
+    return (
+      <LoginScreen 
+        onLogin={handleLogin}
+        onBack={navigateToHome}
+      />
+    );
+  }
+
+  // 如果當前視圖是練習頁面，顯示練習組件
   if (currentView === 'practice') {
     return (
       <PracticeScreen 
@@ -143,11 +307,29 @@ const MeditationApp = () => {
               placeholderTextColor="#9CA3AF"
             />
           </View>
+          
+          {/* Login/Logout Button */}
+          <View style={styles.userSection}>
+            {isLoggedIn ? (
+              <View style={styles.userInfo}>
+                <Text style={styles.userName}>歡迎，{user?.name}</Text>
+                <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
+                  <Text style={styles.logoutButtonText}>登出</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <TouchableOpacity onPress={navigateToLogin} style={styles.loginPromptButton}>
+                <Text style={styles.loginPromptText}>登入</Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
 
         {/* Greeting and Mood Section */}
         <View style={styles.section}>
-          <Text style={styles.greeting}>哈囉！XXX player</Text>
+          <Text style={styles.greeting}>
+            哈囉！{isLoggedIn ? user?.name : 'Guest'} player
+          </Text>
           <Text style={styles.subGreeting}>想來紀錄一下你目前的心情嗎？</Text>
           
           <View style={styles.moodGrid}>
@@ -230,7 +412,13 @@ const MeditationApp = () => {
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.navButton, activeTab === 'profile' && styles.navButtonActive]}
-          onPress={() => setActiveTab('profile')}
+          onPress={() => {
+            if (isLoggedIn) {
+              setActiveTab('profile');
+            } else {
+              navigateToLogin();
+            }
+          }}
         >
           <Text style={styles.navIcon}>👤</Text>
         </TouchableOpacity>
@@ -263,6 +451,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 2,
     elevation: 2,
+    marginBottom: 12,
   },
   searchIcon: {
     fontSize: 16,
@@ -274,6 +463,195 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#374151',
   },
+  userSection: {
+    alignItems: 'center',
+  },
+  userInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+    backgroundColor: 'white',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  userName: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#111827',
+  },
+  logoutButton: {
+    backgroundColor: '#EF4444',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  logoutButtonText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  loginPromptButton: {
+    backgroundColor: '#3B82F6',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 25,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  loginPromptText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  // Login Screen Styles
+  loginHeader: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 8,
+  },
+  backButton: {
+    alignSelf: 'flex-start',
+  },
+  backButtonText: {
+    fontSize: 16,
+    color: '#3B82F6',
+  },
+  loginContainer: {
+    flex: 1,
+    paddingHorizontal: 16,
+  },
+  logoContainer: {
+    alignItems: 'center',
+    marginTop: 40,
+    marginBottom: 40,
+  },
+  logoEmoji: {
+    fontSize: 80,
+    marginBottom: 16,
+  },
+  logoText: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#111827',
+    marginBottom: 8,
+  },
+  logoSubtext: {
+    fontSize: 16,
+    color: '#6B7280',
+  },
+  formContainer: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    padding: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  formTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#111827',
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  inputContainer: {
+    marginBottom: 16,
+  },
+  inputLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#374151',
+    marginBottom: 8,
+  },
+  textInput: {
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 16,
+    color: '#111827',
+    backgroundColor: '#F9FAFB',
+  },
+  forgotPassword: {
+    alignSelf: 'flex-end',
+    marginBottom: 24,
+  },
+  forgotPasswordText: {
+    fontSize: 14,
+    color: '#3B82F6',
+  },
+  loginButton: {
+    backgroundColor: '#3B82F6',
+    borderRadius: 8,
+    paddingVertical: 16,
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  loginButtonDisabled: {
+    backgroundColor: '#9CA3AF',
+  },
+  loginButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#E5E7EB',
+  },
+  dividerText: {
+    paddingHorizontal: 16,
+    fontSize: 14,
+    color: '#6B7280',
+  },
+  guestButton: {
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 8,
+    paddingVertical: 16,
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  guestButtonText: {
+    color: '#374151',
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  signupContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  signupText: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginRight: 4,
+  },
+  signupLink: {
+    fontSize: 14,
+    color: '#3B82F6',
+    fontWeight: '500',
+  },
+  // Original styles continue...
   section: {
     paddingHorizontal: 16,
     marginBottom: 24,
