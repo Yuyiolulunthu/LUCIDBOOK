@@ -142,12 +142,12 @@ const MeditationApp = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   const moods = [
-    { name: 'Good', emoji: '😊', color: 'rgba(199, 239, 238, 0.15)' },
-    { name: 'Ecstatic', emoji: '🤩', color: 'rgba(199, 239, 238, 0.15)' },
-    { name: 'Depressed', emoji: '😔', color: 'rgba(199, 239, 238, 0.15)' },
-    { name: 'Normal', emoji: '😐', color: 'rgba(199, 239, 238, 0.15)' },
-    { name: 'Tearful', emoji: '😢', color: 'rgba(199, 239, 238, 0.15)' },
-    { name: 'Annoyed', emoji: '😤', color: 'rgba(199, 239, 238, 0.15)' }
+    { name: 'Good', image: require('./assets/images/happy.png'), color: 'rgba(199, 239, 238, 0.15)' },
+    { name: 'Ecstatic', image: require('./assets/images/nervous.png'), color: 'rgba(199, 239, 238, 0.15)' },
+    { name: 'Depressed', image: require('./assets/images/sad.png'), color: 'rgba(199, 239, 238, 0.15)' },
+    { name: 'Normal', image: require('./assets/images/normal.png'), color: 'rgba(199, 239, 238, 0.15)' },
+    { name: 'Tearful', image: require('./assets/images/dead.png'), color: 'rgba(199, 239, 238, 0.15)' },
+    { name: 'Annoyed', image: require('./assets/images/angry.png'), color: 'rgba(199, 239, 238, 0.15)' }
   ];
 
   const dailyPractices = [
@@ -159,7 +159,7 @@ const MeditationApp = () => {
       practiceType: '呼吸覺定力練習',
       backgroundColor: '#FFFFFF',
       badgeColor: 'rgba(90, 206, 135, 0.8)',
-      emoji: '🧘‍♀️',
+      image: require('./assets/images/呼吸穩定.png'),
       practiceNumber: 1,
       progressValue: 1.0
     },
@@ -171,7 +171,7 @@ const MeditationApp = () => {
       practiceType: '情緒舒緩練習',
       backgroundColor: '#FFFFFF',
       badgeColor: 'rgba(0, 232, 227, 0.2)',
-      emoji: '💆‍♀️',
+      image: require('./assets/images/情緒理解.png'),
       practiceNumber: 2,
       progressValue: 0.4
     },
@@ -183,7 +183,7 @@ const MeditationApp = () => {
       practiceType: '五感察覺練習',
       backgroundColor: '#FFFFFF',
       badgeColor: 'rgba(0, 232, 227, 0.2)',
-      emoji: '🌟',
+      image: require('./assets/images/五感察覺.png'),
       practiceNumber: 3,
       progressValue: 0.2
     }
@@ -750,6 +750,9 @@ const styles = StyleSheet.create({
   moodEmoji: {
     fontSize: 20,
   },
+  practiceEmoji: {
+    fontSize: 32,
+  },
   moodImage: {
     width: 30,
     height: 30,
@@ -823,6 +826,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
+  },
+  practiceImage: {
+    width: 75,
+    height: 95,
   },
   practiceImage: {
     width: 75,
