@@ -382,7 +382,7 @@ export default function PracticeScreen({ practiceType = "呼吸覺定力練習",
 
     if (formType === 'moment') {
       return (
-        <ScrollView style={styles.emotionFormContainer} showsVerticalScrollIndicator={false}>
+        <View style={styles.emotionFormContainer}>
           <View style={styles.emotionInputField}>
             <Text style={styles.emotionInputLabel}>是什麼時刻？</Text>
             <TextInput 
@@ -406,13 +406,13 @@ export default function PracticeScreen({ practiceType = "呼吸覺定力練習",
               onChangeText={(text) => updateFormData('whatHappened', text)}
             />
           </View>
-        </ScrollView>
+        </View>
       );
     }
 
     if (formType === 'emotions') {
       return (
-        <ScrollView style={styles.emotionFormContainer} showsVerticalScrollIndicator={false}>
+        <View style={styles.emotionFormContainer}>
           <View style={styles.emotionsGrid}>
             {emotionsList.map((emotion, index) => (
               <TouchableOpacity
@@ -442,13 +442,13 @@ export default function PracticeScreen({ practiceType = "呼吸覺定力練習",
               </Text>
             </View>
           )}
-        </ScrollView>
+        </View>
       );
     }
 
     if (formType === 'bodyFeeling') {
       return (
-        <ScrollView style={styles.emotionFormContainer} showsVerticalScrollIndicator={false}>
+        <View style={styles.emotionFormContainer}>
           <View style={styles.emotionInputField}>
             <TextInput 
               style={styles.emotionLargeInputBox} 
@@ -459,13 +459,13 @@ export default function PracticeScreen({ practiceType = "呼吸覺定力練習",
               onChangeText={(text) => updateFormData('bodyFeeling', text)}
             />
           </View>
-        </ScrollView>
+        </View>
       );
     }
 
     if (formType === 'meaning') {
       return (
-        <ScrollView style={styles.emotionFormContainer} showsVerticalScrollIndicator={false}>
+        <View style={styles.emotionFormContainer}>
           <View style={styles.choiceContainer}>
             <TouchableOpacity
               style={[
@@ -526,13 +526,13 @@ export default function PracticeScreen({ practiceType = "呼吸覺定力練習",
               />
             </View>
           )}
-        </ScrollView>
+        </View>
       );
     }
 
     if (formType === 'coping') {
       return (
-        <ScrollView style={styles.emotionFormContainer} showsVerticalScrollIndicator={false}>
+        <View style={styles.emotionFormContainer}>
           <View style={styles.choiceContainer}>
             <TouchableOpacity
               style={[
@@ -590,7 +590,7 @@ export default function PracticeScreen({ practiceType = "呼吸覺定力練習",
               </Text>
             </View>
           )}
-        </ScrollView>
+        </View>
       );
     }
 
@@ -598,7 +598,7 @@ export default function PracticeScreen({ practiceType = "呼吸覺定力練習",
       // 根據之前的選擇顯示不同的後續問題
       if (formData.copingChoice === 'enjoy') {
         return (
-          <ScrollView style={styles.emotionFormContainer} showsVerticalScrollIndicator={false}>
+          <View style={styles.emotionFormContainer}>
             <View style={styles.followUpCard}>
               <Text style={styles.followUpTitle}>我想跟這個好的感覺說什麼：</Text>
               <TextInput 
@@ -610,13 +610,13 @@ export default function PracticeScreen({ practiceType = "呼吸覺定力練習",
                 onChangeText={(text) => updateFormData('enjoyMessage', text)}
               />
             </View>
-          </ScrollView>
+          </View>
         );
       }
 
       if (formData.copingChoice === 'accept') {
         return (
-          <ScrollView style={styles.emotionFormContainer} showsVerticalScrollIndicator={false}>
+          <View style={styles.emotionFormContainer}>
             <View style={styles.followUpCard}>
               <Text style={styles.followUpTitle}>用一句話，提醒自己：</Text>
               <View style={styles.exampleBox}>
@@ -634,13 +634,13 @@ export default function PracticeScreen({ practiceType = "呼吸覺定力練習",
                 onChangeText={(text) => updateFormData('acceptReminder', text)}
               />
             </View>
-          </ScrollView>
+          </View>
         );
       }
 
       if (formData.copingChoice === 'regulate') {
         return (
-          <ScrollView style={styles.emotionFormContainer} showsVerticalScrollIndicator={false}>
+          <View style={styles.emotionFormContainer}>
             <View style={styles.followUpCard}>
               <Text style={styles.followUpTitle}>選擇一個調節方式：</Text>
               
@@ -776,7 +776,7 @@ export default function PracticeScreen({ practiceType = "呼吸覺定力練習",
                 </View>
               )}
             </View>
-          </ScrollView>
+          </View>
         );
       }
 
@@ -803,6 +803,8 @@ export default function PracticeScreen({ practiceType = "呼吸覺定力練習",
         contentContainerStyle={styles.diaryScrollContent}
         showsVerticalScrollIndicator={true}
         bounces={true}
+        scrollEnabled={true}
+        keyboardShouldPersistTaps="handled"
       >
         <View style={styles.diaryHeader}>
           <Text style={styles.diaryDate}>{getCurrentDate()}</Text>
@@ -1103,8 +1105,7 @@ export default function PracticeScreen({ practiceType = "呼吸覺定力練習",
   };
 
   return (
-    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-      <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container}>
         <StatusBar barStyle="light-content" backgroundColor="rgba(46, 134, 171, 0.7)" />
         
         <View style={styles.header}>
@@ -1170,7 +1171,6 @@ export default function PracticeScreen({ practiceType = "呼吸覺定力練習",
           </TouchableOpacity>
         </View>
       </SafeAreaView>
-    </TouchableWithoutFeedback>
   );
 }
 
