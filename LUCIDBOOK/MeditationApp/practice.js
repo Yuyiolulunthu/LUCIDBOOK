@@ -1124,10 +1124,8 @@ export default function PracticeScreen({ practiceType = "呼吸覺定力練習",
         </View>
 
         {currentStepData.hasEmotionSummary ? (
-          // 日記頁面 - 使用專用容器
-          <View style={styles.diaryContainer}>
-            {renderStepContent()}
-          </View>
+          // 日記頁面 - 直接渲染 ScrollView，不包裹在 View 中
+          renderStepContent()
         ) : (
           // 其他頁面 - 使用 contentContainer
           <View style={styles.contentContainer}>
@@ -1222,14 +1220,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 100,
   },
-  diaryContainer: {
-    flex: 1,
-  },
   // Diary ScrollView styles
   diaryScrollView: {
     flex: 1,
   },
   diaryScrollContent: {
+    flexGrow: 1,
     paddingHorizontal: 20,
     paddingTop: 20,
     paddingBottom: 150,
