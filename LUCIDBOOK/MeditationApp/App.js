@@ -168,7 +168,7 @@ const MeditationApp = () => {
       description: '傾聽內心的聲音，溫柔地與自己對話，找回平靜與力量',
       completed: false, 
       duration: '3 ~ 5 min', 
-      practiceType: '情緒舒緩練習',
+      practiceType: '情緒理解力練習',  // ← 這裡要改
       backgroundColor: '#FFFFFF',
       badgeColor: 'rgba(0, 232, 227, 0.2)',
       image: require('./assets/images/情緒理解.png'),
