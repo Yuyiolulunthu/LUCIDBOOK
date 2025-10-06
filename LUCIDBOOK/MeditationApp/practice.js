@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { Audio } from 'expo-av';
 
-export default function PracticeScreen({ practiceType = "呼吸覺定力練習", onBack }) {
+export default function PracticeScreen({ practiceType = "呼吸穩定力練習", onBack }) {
   const [currentStep, setCurrentStep] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [sound, setSound] = useState(null);
@@ -1130,6 +1130,28 @@ export default function PracticeScreen({ practiceType = "呼吸覺定力練習",
         ) : (
           // 其他頁面 - 使用 contentContainer
           <View style={styles.contentContainer}>
+            {/* 左右區域點擊導航 */}
+            {currentStep > 0 && (
+              <TouchableOpacity 
+                style={[
+                  styles.leftTapArea,
+                  (currentStepData.hasForm || currentStepData.hasEmotionForm) && styles.tapAreaRestricted
+                ]}
+                onPress={prevStep}
+                activeOpacity={1}
+              />
+            )}
+            {currentStep < practiceData.steps.length - 1 && (
+              <TouchableOpacity 
+                style={[
+                  styles.rightTapArea,
+                  (currentStepData.hasForm || currentStepData.hasEmotionForm) && styles.tapAreaRestricted
+                ]}
+                onPress={nextStep}
+                activeOpacity={1}
+              />
+            )}
+
             <View style={styles.stepHeader}>
               <Text style={styles.stepTitle}>{currentStepData.title}</Text>
               {currentStepData.content && !currentStepData.hasEmotionForm && (
@@ -1177,7 +1199,7 @@ export default function PracticeScreen({ practiceType = "呼吸覺定力練習",
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: 'rgba(46, 134, 171, 0.7)',
+    backgroundColor: '#92C3D8',
   },
   header: {
     flexDirection: 'row',
@@ -1219,6 +1241,28 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 20,
     paddingBottom: 100,
+    position: 'relative',
+    justifyContent: 'center',
+  },
+  leftTapArea: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: '40%',
+    zIndex: 10,
+  },
+  rightTapArea: {
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    bottom: 0,
+    width: '40%',
+    zIndex: 10,
+  },
+  tapAreaRestricted: {
+    bottom: 'auto',
+    height: 200,
   },
   // Diary ScrollView styles
   diaryScrollView: {
@@ -1241,6 +1285,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     textAlign: 'center',
     lineHeight: 28,
+    paddingHorizontal: 0,
   },
   contentText: {
     fontSize: 16,
@@ -1248,6 +1293,7 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     textAlign: 'center',
     marginTop: 10,
+    paddingHorizontal: 0,
   },
   
   // Greeting section
