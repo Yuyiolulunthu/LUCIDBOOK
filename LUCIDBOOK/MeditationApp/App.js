@@ -1,4 +1,8 @@
-import React, { useState } from 'react';
+// ==========================================
+// 檔案名稱: App.js
+// ==========================================
+
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,141 +10,59 @@ import {
   TouchableOpacity,
   ScrollView,
   StyleSheet,
-  SafeAreaView,
   Dimensions,
   StatusBar,
   Image,
   Alert,
 } from 'react-native';
+import { NavigationContainer } from '@react-navigation/native';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import LoginScreen from './LoginScreen';
+import RegisterScreen from './RegisterScreen';
 import PracticeScreen from './practice';
+import ApiService from './api';
 
-const { width, height } = Dimensions.get('window');
+const { width } = Dimensions.get('window');
+const Stack = createNativeStackNavigator();
 
-// 登入頁面組件
-const LoginScreen = ({ onLogin, onBack }) => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-
-  const handleLogin = async () => {
-    if (!email || !password) {
-      Alert.alert('錯誤', '請輸入電子郵件和密碼');
-      return;
-    }
-
-    setIsLoading(true);
-    // 模擬登入延遲
-    setTimeout(() => {
-      setIsLoading(false);
-      if (email && password) {
-        onLogin({ email, name: email.split('@')[0] });
-      } else {
-        Alert.alert('登入失敗', '請檢查您的電子郵件和密碼');
-      }
-    }, 1000);
-  };
-
-  const handleGuestLogin = () => {
-    onLogin({ email: 'guest@example.com', name: 'Guest' });
-  };
-
-  return (
-    <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="rgba(22, 109, 181, 0.95)" />
-      
-      <View style={styles.loginHeaderContainer}>
-        <TouchableOpacity onPress={onBack} style={styles.backButton}>
-          <Text style={styles.backButtonText}>← 返回</Text>
-        </TouchableOpacity>
-      </View>
-
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        <View style={styles.loginContainer}>
-          <View style={styles.logoContainer}>
-            <Image 
-              source={require('./assets/images/lucidbook.png')}
-              style={styles.logoImage}
-              resizeMode="contain"
-            />
-            <Text style={styles.logoText}>LucidBook</Text>
-            <Text style={styles.logoSubtext}>找到內心的平靜</Text>
-          </View>
-
-          <View style={styles.formContainer}>
-            <Text style={styles.formTitle}>登入您的帳戶</Text>
-            
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>電子郵件</Text>
-              <TextInput
-                style={styles.textInput}
-                value={email}
-                onChangeText={setEmail}
-                placeholder="請輸入您的電子郵件"
-                placeholderTextColor="#9CA3AF"
-                keyboardType="email-address"
-                autoCapitalize="none"
-              />
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>密碼</Text>
-              <TextInput
-                style={styles.textInput}
-                value={password}
-                onChangeText={setPassword}
-                placeholder="請輸入您的密碼"
-                placeholderTextColor="#9CA3AF"
-                secureTextEntry
-              />
-            </View>
-
-            <TouchableOpacity style={styles.forgotPassword}>
-              <Text style={styles.forgotPasswordText}>忘記密碼？</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={[styles.loginButton, isLoading && styles.loginButtonDisabled]}
-              onPress={handleLogin}
-              disabled={isLoading}
-            >
-              <Text style={styles.loginButtonText}>
-                {isLoading ? '登入中...' : '登入'}
-              </Text>
-            </TouchableOpacity>
-
-            <View style={styles.divider}>
-              <View style={styles.dividerLine} />
-              <Text style={styles.dividerText}>或</Text>
-              <View style={styles.dividerLine} />
-            </View>
-
-            <TouchableOpacity 
-              style={styles.guestButton}
-              onPress={handleGuestLogin}
-            >
-              <Text style={styles.guestButtonText}>以訪客身份繼續</Text>
-            </TouchableOpacity>
-
-            <View style={styles.signupContainer}>
-              <Text style={styles.signupText}>還沒有帳戶？</Text>
-              <TouchableOpacity>
-                <Text style={styles.signupLink}>立即註冊</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </ScrollView>
-    </View>
-  );
-};
-
-const MeditationApp = () => {
+// ==========================================
+// 主畫面組件
+// ==========================================
+const HomeScreen = ({ navigation }) => {
   const [selectedMood, setSelectedMood] = useState(null);
   const [activeTab, setActiveTab] = useState('home');
-  const [currentView, setCurrentView] = useState('home');
-  const [practiceType, setPracticeType] = useState('');
   const [user, setUser] = useState(null);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+  // 🔥 在 App 啟動時檢查是否已登入
+  useEffect(() => {
+    checkLoginStatus();
+  }, []);
+
+  // 🔥 監聽 navigation focus 事件，回到此頁面時重新檢查登入狀態
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      checkLoginStatus();
+    });
+    return unsubscribe;
+  }, [navigation]);
+
+  const checkLoginStatus = async () => {
+    try {
+      const loggedIn = await ApiService.isLoggedIn();
+      if (loggedIn) {
+        const response = await ApiService.getUserProfile();
+        setUser({
+          id: response.user.id,
+          name: response.user.name,
+          email: response.user.email
+        });
+        setIsLoggedIn(true);
+      }
+    } catch (error) {
+      console.log('未登入或 Token 已過期');
+    }
+  };
 
   const moods = [
     { name: '超讚!', image: require('./assets/images/perfect.png'), color: 'rgba(199, 239, 238, 0.15)' },
@@ -154,26 +76,26 @@ const MeditationApp = () => {
     { 
       name: '呼吸穩定力練習', 
       description: '邀請你給自己一段時間，讓我們陪你，一步一步讓我們一起靜下來慢呼吸',
-      completed: true, 
+      completed: false, 
       duration: '5分鐘', 
-      practiceType: '呼吸覺定力練習',
+      practiceType: '呼吸穩定力練習',
       backgroundColor: '#FFFFFF',
       badgeColor: 'rgba(90, 206, 135, 0.8)',
       image: require('./assets/images/呼吸穩定.png'),
       practiceNumber: 1,
-      progressValue: 1.0
+      progressValue: 0.0
     },
     { 
       name: '情緒理解力練習', 
       description: '傾聽內心的聲音，溫柔地與自己對話，找回平靜與力量',
       completed: false, 
       duration: '3 ~ 5 min', 
-      practiceType: '情緒理解力練習',  // ← 這裡要改
+      practiceType: '情緒理解力練習',
       backgroundColor: '#FFFFFF',
       badgeColor: 'rgba(0, 232, 227, 0.2)',
       image: require('./assets/images/情緒理解.png'),
       practiceNumber: 2,
-      progressValue: 0.4
+      progressValue: 0.0
     },
     { 
       name: '五感覺察力練習', 
@@ -185,11 +107,10 @@ const MeditationApp = () => {
       badgeColor: 'rgba(0, 232, 227, 0.2)',
       image: require('./assets/images/五感察覺.png'),
       practiceNumber: 3,
-      progressValue: 0.2
+      progressValue: 0.0
     }
   ];
 
-  // 更多主題按鈕，支持水平滑動
   const topics = [
     { name: '拖延症', color: 'rgba(103, 169, 224, 0.95)' },
     { name: '感情問題', color: 'rgba(103, 169, 224, 0.95)' },
@@ -201,25 +122,24 @@ const MeditationApp = () => {
     { name: '情緒平衡', color: 'rgba(103, 169, 224, 0.95)' }
   ];
 
-  // 登入相關函數 - 只在Guest時顯示彈窗
   const showLoginPrompt = () => {
-    if (!isLoggedIn || (user && user.name === 'Guest')) {
+    if (!isLoggedIn || (user && user.isGuest)) {
       Alert.alert(
         '需要登入',
         '請登入以享受完整的冥想體驗',
         [
           { text: '取消', style: 'cancel' },
-          { text: '登入', onPress: () => setCurrentView('login') }
+          { text: '登入', onPress: () => navigation.navigate('Login', {
+            onLoginSuccess: (userData) => {
+              setUser(userData);
+              setIsLoggedIn(true);
+            }
+          })}
         ]
       );
+      return true;
     }
-  };
-
-  const handleLogin = (userData) => {
-    setUser(userData);
-    setIsLoggedIn(true);
-    setCurrentView('home');
-    Alert.alert('登入成功', `歡迎回來，${userData.name}！`);
+    return false;
   };
 
   const handleLogout = () => {
@@ -228,48 +148,33 @@ const MeditationApp = () => {
       { 
         text: '登出', 
         style: 'destructive',
-        onPress: () => {
+        onPress: async () => {
+          await ApiService.logout();
           setUser(null);
           setIsLoggedIn(false);
-          setCurrentView('home');
+          Alert.alert('已登出', '期待下次再見！');
         }
       }
     ]);
   };
 
   const navigateToPractice = (type) => {
-    if (!isLoggedIn || (user && user.name === 'Guest')) {
-      showLoginPrompt();
-      return;
-    }
-    setPracticeType(type);
-    setCurrentView('practice');
+    if (showLoginPrompt()) return;
+    
+    navigation.navigate('Practice', { 
+      practiceType: type,
+      onPracticeComplete: async (practiceType, duration = 5) => {
+        if (isLoggedIn && !user?.isGuest) {
+          try {
+            await ApiService.completePractice(practiceType, duration);
+            console.log('✅ 練習記錄已儲存');
+          } catch (error) {
+            console.error('記錄練習失敗:', error);
+          }
+        }
+      }
+    });
   };
-
-  const navigateToHome = () => {
-    setCurrentView('home');
-    setPracticeType('');
-  };
-
-  // 如果當前視圖是登入頁面
-  if (currentView === 'login') {
-    return (
-      <LoginScreen 
-        onLogin={handleLogin}
-        onBack={navigateToHome}
-      />
-    );
-  }
-
-  // 如果當前視圖是練習頁面
-  if (currentView === 'practice') {
-    return (
-      <PracticeScreen 
-        practiceType={practiceType}
-        onBack={navigateToHome}
-      />
-    );
-  }
 
   const MoodButton = ({ mood, index, isSelected, onPress }) => (
     <View style={styles.moodContainer}>
@@ -291,7 +196,7 @@ const MeditationApp = () => {
     </View>
   );
 
-  const PracticeCard = ({ practice, index }) => (
+  const PracticeCard = ({ practice }) => (
     <View style={styles.practiceCardContainer}>
       <View style={styles.practiceRow}>
         <View style={[styles.practiceNumberBadge, { backgroundColor: practice.badgeColor }]}>
@@ -355,7 +260,6 @@ const MeditationApp = () => {
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="rgba(22, 109, 181, 0.95)" />
       
-      {/* Header - 移除SafeAreaView，直接擴展到頂部 */}
       <View style={styles.headerContainer}>
         <View style={styles.searchContainer}>
           <Text style={styles.searchIcon}>🔍</Text>
@@ -368,11 +272,17 @@ const MeditationApp = () => {
       </View>
 
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {/* Greeting and Mood Section */}
         <View style={styles.section}>
-          <Text style={styles.greeting}>
-            哈囉！{isLoggedIn ? user?.name : 'Guest'} player
-          </Text>
+          <View style={styles.greetingRow}>
+            <Text style={styles.greeting}>
+              哈囉！{isLoggedIn ? user?.name : 'Guest'} player
+            </Text>
+            {isLoggedIn && !user?.isGuest && (
+              <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
+                <Text style={styles.logoutText}>登出</Text>
+              </TouchableOpacity>
+            )}
+          </View>
           <Text style={styles.subGreeting}>想來紀錄一下你目前的心情嗎？</Text>
           
           <View style={styles.moodGrid}>
@@ -388,33 +298,28 @@ const MeditationApp = () => {
           </View>
         </View>
 
-        {/* Daily Practice Section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>每日練習</Text>
           <Text style={styles.sectionSubtitle}>今日練習進度 (0/3)</Text>
           
           <View style={styles.practiceList}>
             {dailyPractices.map((practice, index) => (
-              <PracticeCard key={index} practice={practice} index={index} />
+              <PracticeCard key={index} practice={practice} />
             ))}
           </View>
         </View>
 
-        {/* Recommended Courses */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>推薦練習課程</Text>
           <Text style={styles.sectionSubtitle}>熱門主題</Text>
           
-          {/* 垂直排列的主題按鈕，支持水平滑動 */}
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.topicsScrollContainer}>
             <View style={styles.topicsGrid}>
-              {/* 第一列 */}
               <View style={styles.topicsRow}>
                 {topics.slice(0, 2).map((topic, index) => (
                   <TopicButton key={index} topic={topic} />
                 ))}
               </View>
-              {/* 第二列 */}
               <View style={styles.topicsRow}>
                 {topics.slice(2, 4).map((topic, index) => (
                   <TopicButton key={index + 2} topic={topic} />
@@ -422,7 +327,6 @@ const MeditationApp = () => {
               </View>
             </View>
             
-            {/* 更多主題按鈕 */}
             <View style={styles.topicsGrid}>
               <View style={styles.topicsRow}>
                 {topics.slice(4, 6).map((topic, index) => (
@@ -437,9 +341,7 @@ const MeditationApp = () => {
             </View>
           </ScrollView>
 
-          {/* Journey Progress Card 和 加號按鈕的容器 */}
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.journeyScrollContainer}>
-            {/* 繼續探索旅途卡片 - 更小尺寸 */}
             <View style={styles.journeyCardWrapper}>
               <View style={styles.journeyImageSection}>
                 <Image 
@@ -459,7 +361,6 @@ const MeditationApp = () => {
               </View>
             </View>
             
-            {/* 獨立的加號按鈕 */}
             <TouchableOpacity style={styles.independentAddButton}>
               <Text style={styles.independentAddIcon}>+</Text>
             </TouchableOpacity>
@@ -469,7 +370,6 @@ const MeditationApp = () => {
         <View style={styles.bottomPadding} />
       </ScrollView>
 
-      {/* Bottom Navigation */}
       <View style={styles.bottomNav}>
         <TouchableOpacity
           style={[styles.navButton, activeTab === 'home' && styles.navButtonActive]}
@@ -504,7 +404,7 @@ const MeditationApp = () => {
         <TouchableOpacity
           style={[styles.navButton, activeTab === 'profile' && styles.navButtonActive]}
           onPress={() => {
-            if (isLoggedIn && user?.name !== 'Guest') {
+            if (isLoggedIn && !user?.isGuest) {
               setActiveTab('profile');
             } else {
               showLoginPrompt();
@@ -522,17 +422,54 @@ const MeditationApp = () => {
   );
 };
 
+// ==========================================
+// 練習畫面包裝組件
+// ==========================================
+const PracticeScreenWrapper = ({ route, navigation }) => {
+  const { practiceType, onPracticeComplete } = route.params;
+
+  const handleBack = () => {
+    if (onPracticeComplete) {
+      onPracticeComplete(practiceType);
+    }
+    navigation.goBack();
+  };
+
+  return <PracticeScreen practiceType={practiceType} onBack={handleBack} />;
+};
+
+// ==========================================
+// 主應用程式（包含導航）
+// ==========================================
+export default function App() {
+  return (
+    <NavigationContainer>
+      <Stack.Navigator 
+        initialRouteName="Home"
+        screenOptions={{ headerShown: false }}
+      >
+        <Stack.Screen name="Home" component={HomeScreen} />
+        <Stack.Screen name="Login" component={LoginScreen} />
+        <Stack.Screen name="Register" component={RegisterScreen} />
+        <Stack.Screen name="Practice" component={PracticeScreenWrapper} />
+      </Stack.Navigator>
+    </NavigationContainer>
+  );
+}
+
+// ==========================================
+// 樣式
+// ==========================================
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F9FAFB',
-    paddingTop: 0, // 移除頂部間距，讓內容延伸到狀態欄
+    paddingTop: 0,
   },
-  // Header 擴展到頂部，移除白色空白
   headerContainer: {
     backgroundColor: 'rgba(22, 109, 181, 0.95)',
     paddingHorizontal: 16,
-    paddingTop: 50, // 為狀態欄留出空間
+    paddingTop: 50,
     paddingBottom: 16,
   },
   scrollView: {
@@ -561,160 +498,32 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#374151',
   },
-  // Login Screen 縮小版Header
-  loginHeaderContainer: {
-    backgroundColor: 'rgba(22, 109, 181, 0.95)',
-    paddingHorizontal: 16,
-    paddingTop: 50, // 為狀態欄留出空間
-    paddingBottom: 8,  // 縮小底部間距
-  },
-  // Login Screen Styles
-  backButton: {
-    alignSelf: 'flex-start',
-    paddingVertical: 8,
-  },
-  backButtonText: {
-    fontSize: 16,
-    color: 'white',
-    fontWeight: '500',
-  },
-  loginContainer: {
-    flex: 1,
-    paddingHorizontal: 16,
-  },
-  logoContainer: {
-    alignItems: 'center',
-    marginTop: 20,    // 縮小頂部間距
-    marginBottom: 30, // 縮小底部間距
-  },
-  logoImage: {
-    width: 80,        // 圖片寬度
-    height: 80,       // 圖片高度
-    marginBottom: 16,
-  },
-  logoText: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#111827',
-    marginBottom: 8,
-  },
-  logoSubtext: {
-    fontSize: 16,
-    color: '#6B7280',
-  },
-  formContainer: {
-    backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  formTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#111827',
-    textAlign: 'center',
-    marginBottom: 24,
-  },
-  inputContainer: {
-    marginBottom: 16,
-  },
-  inputLabel: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#374151',
-    marginBottom: 8,
-  },
-  textInput: {
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 16,
-    color: '#111827',
-    backgroundColor: '#F9FAFB',
-  },
-  forgotPassword: {
-    alignSelf: 'flex-end',
-    marginBottom: 24,
-  },
-  forgotPasswordText: {
-    fontSize: 14,
-    color: 'rgba(22, 109, 181, 0.95)',
-  },
-  loginButton: {
-    backgroundColor: 'rgba(22, 109, 181, 0.95)',
-    borderRadius: 8,
-    paddingVertical: 16,
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  loginButtonDisabled: {
-    backgroundColor: '#9CA3AF',
-  },
-  loginButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  divider: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: '#E5E7EB',
-  },
-  dividerText: {
-    paddingHorizontal: 16,
-    fontSize: 14,
-    color: '#6B7280',
-  },
-  guestButton: {
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
-    borderRadius: 8,
-    paddingVertical: 16,
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  guestButtonText: {
-    color: '#374151',
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  signupContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  signupText: {
-    fontSize: 14,
-    color: '#6B7280',
-    marginRight: 4,
-  },
-  signupLink: {
-    fontSize: 14,
-    color: 'rgba(22, 109, 181, 0.95)',
-    fontWeight: '500',
-  },
-  // 主要內容樣式
   section: {
     paddingHorizontal: 16,
     marginBottom: 24,
+  },
+  greetingRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+    marginTop: 16,
   },
   greeting: {
     fontSize: 20,
     fontWeight: '500',
     color: '#111827',
-    marginBottom: 8,
-    marginTop: 16,
+  },
+  logoutButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    borderRadius: 6,
+  },
+  logoutText: {
+    fontSize: 14,
+    color: '#EF4444',
+    fontWeight: '500',
   },
   subGreeting: {
     fontSize: 16,
@@ -729,12 +538,12 @@ const styles = StyleSheet.create({
   },
   moodContainer: {
     alignItems: 'center',
-    width: (width - 32 - 40) / 5,  // 調整寬度計算
+    width: (width - 32 - 40) / 5,
     marginBottom: 12,
   },
   moodButton: {
-    width: 60,   // 放大按鈕
-    height: 60,  // 放大按鈕
+    width: 60,
+    height: 60,
     borderRadius: 30,
     justifyContent: 'center',
     alignItems: 'center',
@@ -746,11 +555,11 @@ const styles = StyleSheet.create({
     borderColor: '#3B82F6',
   },
   moodImage: {
-    width: 45,   // 放大表情符號圖片
-    height: 45,  // 放大表情符號圖片
+    width: 45,
+    height: 45,
   },
   moodText: {
-    fontSize: 13,  // 放大文字
+    fontSize: 13,
     color: '#6B7280',
     textAlign: 'center',
     fontWeight: '500',
@@ -896,7 +705,6 @@ const styles = StyleSheet.create({
     color: '#111827',
     marginLeft: 2,
   },
-  // 新的主題按鈕布局 - 垂直排列，支持水平滑動
   topicsScrollContainer: {
     marginBottom: 16,
   },
@@ -906,7 +714,7 @@ const styles = StyleSheet.create({
   topicsRow: {
     flexDirection: 'row',
     marginBottom: 8,
-    justifyContent: 'space-between',  // 統一間距
+    justifyContent: 'space-between',
   },
   topicButton: {
     paddingHorizontal: 16,
@@ -914,30 +722,28 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     minWidth: 80,
     alignItems: 'center',
-    flex: 1,           // 平均分配空間
-    marginHorizontal: 4, // 統一橫向間距
+    flex: 1,
+    marginHorizontal: 4,
   },
   topicText: {
     fontSize: 14,
     color: '#FFFFFF',
     fontWeight: '500',
   },
-  // 探索旅途區域 - 支持水平滑動
   journeyScrollContainer: {
     marginBottom: 16,
   },
-  // 更小的繼續探索旅途卡片
   journeyCardWrapper: {
     backgroundColor: '#F3F4F6',
     borderRadius: 12,
     overflow: 'hidden',
-    height: 100,  // 進一步縮小高度
-    width: 280,   // 縮小寬度
+    height: 100,
+    width: 280,
     flexDirection: 'row',
     marginRight: 20,
   },
   journeyImageSection: {
-    width: 140,   // 放大圖片區域寬度
+    width: 140,
     height: '100%',
   },
   journeyMainImage: {
@@ -946,12 +752,12 @@ const styles = StyleSheet.create({
   },
   journeyTextSection: {
     position: 'absolute',
-    left: 150,   // 改為左側位置，在圖片右邊
-    top: 25,     // 垂直居中
-    alignItems: 'flex-start',  // 改為左對齊
+    left: 150,
+    top: 25,
+    alignItems: 'flex-start',
   },
   journeyTitle: {
-    fontSize: 12,   // 進一步縮小字體
+    fontSize: 12,
     fontWeight: '500',
     color: '#111827',
     marginBottom: 4,
@@ -962,7 +768,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   progressBar: {
-    width: 80,    // 縮小進度條
+    width: 80,
     height: 4,
     backgroundColor: 'rgba(255, 255, 255, 0.5)',
     borderRadius: 2,
@@ -975,10 +781,9 @@ const styles = StyleSheet.create({
     borderRadius: 2,
   },
   progressText: {
-    fontSize: 10,   // 縮小字體
+    fontSize: 10,
     color: '#374151',
   },
-  // 獨立的加號按鈕
   independentAddButton: {
     width: 80,
     height: 100,
@@ -1020,10 +825,8 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
   },
   navIcon: {
-    width: 34,    // 圖片寬度
-    height: 34,   // 圖片高度
-    tintColor: '#FFFFFF',  // 白色色調
+    width: 34,
+    height: 34,
+    tintColor: '#FFFFFF',
   },
 });
-
-export default MeditationApp;

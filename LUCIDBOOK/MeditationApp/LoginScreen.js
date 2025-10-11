@@ -1,0 +1,391 @@
+// ==========================================
+// 檔案名稱: LoginScreen.js
+// ==========================================
+
+import React, { useState } from 'react';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  ScrollView,
+  StyleSheet,
+  StatusBar,
+  Image,
+  Alert,
+  ActivityIndicator,
+} from 'react-native';
+import ApiService from './api';
+
+const LoginScreen = ({ navigation, onLoginSuccess }) => {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+
+  const handleLogin = async () => {
+    if (!email || !password) {
+      Alert.alert('錯誤', '請輸入電子郵件和密碼');
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      Alert.alert('錯誤', '請輸入有效的電子郵件格式');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      // 🔥 使用真實 API 登入
+      const response = await ApiService.login(email, password);
+      
+      Alert.alert('成功', '登入成功！', [
+        {
+          text: '確定',
+          onPress: () => {
+            if (onLoginSuccess) {
+              onLoginSuccess({
+                id: response.user.id,
+                name: response.user.name,
+                email: response.user.email
+              });
+            }
+            if (navigation) {
+              navigation.goBack();
+            }
+          }
+        }
+      ]);
+    } catch (error) {
+      Alert.alert('登入失敗', error.message || '請檢查您的電子郵件和密碼');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleGuestLogin = () => {
+    if (onLoginSuccess) {
+      onLoginSuccess({ 
+        email: 'guest@example.com', 
+        name: 'Guest', 
+        isGuest: true 
+      });
+    }
+    if (navigation) {
+      navigation.goBack();
+    }
+  };
+
+  const handleForgotPassword = () => {
+    Alert.prompt(
+      '忘記密碼',
+      '請輸入您的電子郵件，我們將發送重設密碼連結',
+      async (inputEmail) => {
+        if (!inputEmail) return;
+        
+        try {
+          await ApiService.forgotPassword(inputEmail);
+          Alert.alert('成功', '重設密碼郵件已發送，請查收信箱');
+        } catch (error) {
+          Alert.alert('錯誤', error.message || '發送失敗，請稍後再試');
+        }
+      },
+      'plain-text',
+      email
+    );
+  };
+
+  const goToRegister = () => {
+    if (navigation) {
+      navigation.navigate('Register');
+    }
+  };
+
+  const goBack = () => {
+    if (navigation) {
+      navigation.goBack();
+    }
+  };
+
+  return (
+    <View style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor="rgba(22, 109, 181, 0.95)" />
+      
+      <View style={styles.loginHeaderContainer}>
+        <TouchableOpacity onPress={goBack} style={styles.backButton}>
+          <Text style={styles.backButtonText}>← 返回</Text>
+        </TouchableOpacity>
+      </View>
+
+      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+        <View style={styles.loginContainer}>
+          <View style={styles.logoContainer}>
+            <Image 
+              source={require('./assets/images/lucidbook.png')}
+              style={styles.logoImage}
+              resizeMode="contain"
+            />
+            <Text style={styles.logoText}>LucidBook</Text>
+            <Text style={styles.logoSubtext}>找到內心的平靜</Text>
+          </View>
+
+          <View style={styles.formContainer}>
+            <Text style={styles.formTitle}>登入您的帳戶</Text>
+            
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>電子郵件</Text>
+              <TextInput
+                style={styles.textInput}
+                value={email}
+                onChangeText={setEmail}
+                placeholder="請輸入您的電子郵件"
+                placeholderTextColor="#9CA3AF"
+                keyboardType="email-address"
+                autoCapitalize="none"
+                editable={!isLoading}
+              />
+            </View>
+
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>密碼</Text>
+              <View style={styles.passwordContainer}>
+                <TextInput
+                  style={styles.passwordInput}
+                  value={password}
+                  onChangeText={setPassword}
+                  placeholder="請輸入您的密碼"
+                  placeholderTextColor="#9CA3AF"
+                  secureTextEntry={!showPassword}
+                  editable={!isLoading}
+                />
+                <TouchableOpacity 
+                  style={styles.eyeButton}
+                  onPress={() => setShowPassword(!showPassword)}
+                >
+                  <Text style={styles.eyeIcon}>{showPassword ? '👁️' : '🙈'}</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <TouchableOpacity 
+              style={styles.forgotPassword}
+              onPress={handleForgotPassword}
+              disabled={isLoading}
+            >
+              <Text style={styles.forgotPasswordText}>忘記密碼？</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={[styles.loginButton, isLoading && styles.loginButtonDisabled]}
+              onPress={handleLogin}
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <ActivityIndicator color="white" />
+              ) : (
+                <Text style={styles.loginButtonText}>登入</Text>
+              )}
+            </TouchableOpacity>
+
+            <View style={styles.divider}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.dividerText}>或</Text>
+              <View style={styles.dividerLine} />
+            </View>
+
+            <TouchableOpacity 
+              style={styles.guestButton}
+              onPress={handleGuestLogin}
+              disabled={isLoading}
+            >
+              <Text style={styles.guestButtonText}>以訪客身份繼續</Text>
+            </TouchableOpacity>
+
+            <View style={styles.signupContainer}>
+              <Text style={styles.signupText}>還沒有帳戶？</Text>
+              <TouchableOpacity onPress={goToRegister}>
+                <Text style={styles.signupLink}>立即註冊</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </ScrollView>
+    </View>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#F9FAFB',
+  },
+  loginHeaderContainer: {
+    backgroundColor: 'rgba(22, 109, 181, 0.95)',
+    paddingHorizontal: 16,
+    paddingTop: 50,
+    paddingBottom: 8,
+  },
+  backButton: {
+    alignSelf: 'flex-start',
+    paddingVertical: 8,
+  },
+  backButtonText: {
+    fontSize: 16,
+    color: 'white',
+    fontWeight: '500',
+  },
+  scrollView: {
+    flex: 1,
+  },
+  loginContainer: {
+    flex: 1,
+    paddingHorizontal: 16,
+    paddingBottom: 40,
+  },
+  logoContainer: {
+    alignItems: 'center',
+    marginTop: 20,
+    marginBottom: 30,
+  },
+  logoImage: {
+    width: 80,
+    height: 80,
+    marginBottom: 16,
+  },
+  logoText: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#111827',
+    marginBottom: 8,
+  },
+  logoSubtext: {
+    fontSize: 16,
+    color: '#6B7280',
+  },
+  formContainer: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    padding: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  formTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#111827',
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  inputContainer: {
+    marginBottom: 16,
+  },
+  inputLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#374151',
+    marginBottom: 8,
+  },
+  textInput: {
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 16,
+    color: '#111827',
+    backgroundColor: '#F9FAFB',
+  },
+  passwordContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 8,
+    backgroundColor: '#F9FAFB',
+  },
+  passwordInput: {
+    flex: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 16,
+    color: '#111827',
+  },
+  eyeButton: {
+    padding: 12,
+  },
+  eyeIcon: {
+    fontSize: 20,
+  },
+  forgotPassword: {
+    alignSelf: 'flex-end',
+    marginBottom: 24,
+  },
+  forgotPasswordText: {
+    fontSize: 14,
+    color: 'rgba(22, 109, 181, 0.95)',
+  },
+  loginButton: {
+    backgroundColor: 'rgba(22, 109, 181, 0.95)',
+    borderRadius: 8,
+    paddingVertical: 16,
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  loginButtonDisabled: {
+    backgroundColor: '#9CA3AF',
+  },
+  loginButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#E5E7EB',
+  },
+  dividerText: {
+    paddingHorizontal: 16,
+    fontSize: 14,
+    color: '#6B7280',
+  },
+  guestButton: {
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 8,
+    paddingVertical: 16,
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  guestButtonText: {
+    color: '#374151',
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  signupContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  signupText: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginRight: 4,
+  },
+  signupLink: {
+    fontSize: 14,
+    color: 'rgba(22, 109, 181, 0.95)',
+    fontWeight: '500',
+  },
+});
+
+export default LoginScreen;
