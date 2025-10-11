@@ -55,11 +55,11 @@ export default function PracticeScreen({ practiceType = "呼吸穩定力練習",
   const getAudioFile = () => {
     try {
       const audioFiles = {
-        "呼吸覺定力練習": require('./assets/audio/breathing-meditation.mp3'),
+        "呼吸穩定力練習": require('./assets/audio/breathing-meditation.mp3'),
         "五感察覺練習": require('./assets/audio/five-senses.wav'),
         "情緒理解力練習": require('./assets/audio/emotion-relief.wav'),
       };
-      return audioFiles[practiceType] || audioFiles["呼吸覺定力練習"];
+      return audioFiles[practiceType] || audioFiles["呼吸穩定力練習"];
     } catch (error) {
       console.log('音频文件路径错误:', error);
       return null;
@@ -127,7 +127,7 @@ export default function PracticeScreen({ practiceType = "呼吸穩定力練習",
 
   const getPracticeContent = () => {
     const practices = {
-      "呼吸覺定力練習": {
+      "呼吸穩定力練習": {
         steps: [
           {
             title: "準備好來開始\n今天的《呼吸穩定力練習》了嗎？",
@@ -290,7 +290,7 @@ export default function PracticeScreen({ practiceType = "呼吸穩定力練習",
         ]
       }
     };
-    return practices[practiceType] || practices["呼吸覺定力練習"];
+    return practices[practiceType] || practices["呼吸穩定力練習"];
   };
 
   const practiceData = getPracticeContent();

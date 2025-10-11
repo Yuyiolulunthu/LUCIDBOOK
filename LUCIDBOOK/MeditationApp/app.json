@@ -1,37 +1,40 @@
 {
   "expo": {
-    "name": "APP",
-    "slug": "meditation-app",
+    "name": "LUCIDBOOK",
+    "slug": "lucidbook",
     "version": "1.0.0",
     "orientation": "portrait",
+    "icon": "./assets/images/lucidbook.png",
     "userInterfaceStyle": "light",
-    "icon": "./assets/icon.png",
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./assets/images/lucidbook.png",
       "resizeMode": "contain",
-      "backgroundColor": "#A7F3D0"
+      "backgroundColor": "#ffffff"
     },
     "assetBundlePatterns": [
       "**/*"
     ],
-    "platforms": ["android", "web"],
-    "android": {
-      "package": "com.meditation.app",
-      "versionCode": 1,
-      "compileSdkVersion": 34,
-      "targetSdkVersion": 34,
-      "permissions": [],
-      "adaptiveIcon": {
-        "backgroundColor": "#A7F3D0"
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.lucidbook",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/lucidbook.png",
+        "backgroundColor": "#ffffff"
+      },
+      "package": "com.lucidbook",
+      "versionCode": 1
+    },
     "web": {
-      "favicon": "./assets/favicon.png",
-      "bundler": "metro"
+      "favicon": "./assets/images/lucidbook.png"
     },
     "extra": {
       "eas": {
-        "projectId": "5b34e4bd-469d-4498-b20e-c03b83710226"
+        "projectId": "e13cf8b6-91d7-4821-ae3c-a3866c2f14d4"
       }
     }
   }
