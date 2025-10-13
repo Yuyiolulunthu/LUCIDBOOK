@@ -155,20 +155,150 @@ class ApiService {
   }
 
   // ==========================================
-  // 練習相關 API
+  // ⭐ 練習相關 API（時間追蹤 + 重複練習）
   // ==========================================
 
-  /** 紀錄練習完成 */
-  async completePractice(practiceType, duration) {
-    return this.request('/practice/complete.php', {
+  /** 
+   * ⭐ 開始練習 - 創建或恢復練習記錄
+   * 會檢查是否有未完成的同天同類型練習
+   * @param {string} practiceType - 練習類型
+   * @returns {Promise<{practiceId, currentPage, totalPages, formData}>}
+   */
+  async startPractice(practiceType) {
+    return this.request('/practice/start.php', {
       method: 'POST',
-      body: JSON.stringify({ practiceType, duration }),
+      body: JSON.stringify({ 
+        practice_type: practiceType 
+      }),
     });
   }
 
-  /** 取得練習歷史 */
+  /**
+   * ⭐ 完成練習 - 記錄實際投入時間
+   * @param {number} practiceId - 練習記錄 ID
+   * @param {object} data - 練習數據
+   * @param {number} data.duration - 實際投入時間（分鐘）
+   * @param {string} data.feeling - 感受
+   * @param {string} data.noticed - 發現
+   * @param {string} data.reflection - 反思
+   * @param {object} data.emotionData - 情緒日記資料（情緒理解力練習用）
+   */
+  async completePractice(practiceId, data) {
+    return this.request('/practice/complete.php', {
+      method: 'POST',
+      body: JSON.stringify({
+        practice_id: practiceId,
+        duration_seconds: data.duration_seconds || 0,  // ⭐ 新增：精確秒數
+        duration: data.duration,
+        feeling: data.feeling || null,
+        noticed: data.noticed || null,
+        reflection: data.reflection || null,
+        emotion_data: data.emotion_data || null,  // ⭐ 修正：改為 emotion_data
+      }),
+    });
+  }
+
+  /**
+   * ⭐ 更新練習進度（中途保存）
+   * @param {number} practiceId - 練習記錄 ID
+   * @param {number} currentPage - 當前頁面
+   * @param {number} totalPages - 總頁數
+   * @param {object} formData - 表單資料
+   */
+  async updatePracticeProgress(practiceId, currentPage, totalPages, formData) {
+    return this.request('/practice/update-progress.php', {
+      method: 'POST',
+      body: JSON.stringify({
+        practice_id: practiceId,
+        current_page: currentPage,  // ⭐ 修正：改為 current_page
+        total_pages: totalPages,    // ⭐ 修正：改為 total_pages
+        form_data: formData,        // ⭐ 修正：改為 form_data
+      }),
+    });
+  }
+  /** 
+   * 取得練習歷史
+   * @returns {Promise<{practices: Array}>}
+   */
   async getPracticeHistory() {
     return this.request('/practice/history.php', {
+      method: 'GET',
+    });
+  }
+
+  /** 
+   * 取得今日練習狀態
+   * @returns {Promise<{practices: Object}>}
+   */
+  async getTodayPracticeStatus() {
+    return this.request('/practice/today-status.php', {
+      method: 'GET',
+    });
+  }
+
+  // ==========================================
+  // ⭐ 情緒日記相關 API
+  // ==========================================
+
+  /** 
+   * ⭐ 儲存情緒日記
+   * @param {object} diaryData - 情緒日記資料
+   */
+  async saveEmotionDiary(diaryData) {
+    return this.request('/emotion-diary/save.php', {
+      method: 'POST',
+      body: JSON.stringify(diaryData),
+    });
+  }
+
+  /** 
+   * 取得今日情緒日記
+   * @returns {Promise<{diary: Object}>}
+   */
+  async getTodayEmotionDiary() {
+    return this.request('/emotion-diary/today.php', {
+      method: 'GET',
+    });
+  }
+
+  // ==========================================
+  // ⭐ 心情相關 API
+  // ==========================================
+
+  /** 
+   * 記錄今日心情
+   * @param {number} moodLevel - 心情等級（1-5）
+   * @param {string} moodName - 心情名稱
+   * @param {string} note - 備註
+   */
+  async recordMood(moodLevel, moodName, note = '') {
+    return this.request('/mood/record.php', {
+      method: 'POST',
+      body: JSON.stringify({ 
+        mood_level: moodLevel, 
+        mood_name: moodName, 
+        note 
+      }),
+    });
+  }
+
+  /** 
+   * ⭐ 取得今日心情
+   * @returns {Promise<{mood: Object}>}
+   */
+  async getTodayMood() {
+    return this.request('/mood/today.php', {
+      method: 'GET',
+    });
+  }
+
+  /** 
+   * 取得心情歷史
+   * @param {string} startDate - 開始日期（YYYY-MM-DD）
+   * @param {string} endDate - 結束日期（YYYY-MM-DD）
+   */
+  async getMoodHistory(startDate, endDate) {
+    return this.request(`/mood/history.php?start=${startDate}&end=${endDate}`, {
       method: 'GET',
     });
   }
@@ -190,6 +320,45 @@ class ApiService {
       return false;
     }
   }
+
+  // ==========================================
+  // 🔄 舊版 API 相容性（向後兼容）
+  // ==========================================
+
+  /** 
+   * @deprecated 請改用 completePractice(practiceId, data)
+   * 舊版完成練習方法（使用 practiceType）
+   */
+  async completePracticeWithData(practiceType, duration, formData) {
+    console.warn('⚠️ completePracticeWithData 已棄用，建議使用 completePractice');
+    return this.request('/practice/complete.php', {
+      method: 'POST',
+      body: JSON.stringify({ 
+        practiceType, 
+        duration,
+        feeling: formData.feeling,
+        noticed: formData.noticed,
+        reflection: formData.reflection
+      }),
+    });
+  }
+
+  /** 
+   * @deprecated 請改用 updatePracticeProgress(practiceId, ...)
+   * 舊版儲存進度方法（使用 practiceType）
+   */
+  async savePracticeProgress(practiceType, currentPage, totalPages, formData) {
+    console.warn('⚠️ savePracticeProgress 已棄用，建議使用 updatePracticeProgress');
+    return this.request('/practice/save-progress.php', {
+      method: 'POST',
+      body: JSON.stringify({ 
+        practice_type: practiceType,
+        current_page: currentPage,
+        total_pages: totalPages,
+        form_data: formData
+      }),
+    });
+  }
 }
 
 // 匯出單例
@@ -203,38 +372,48 @@ export default apiService;
 /*
 import ApiService from './api';
 
-// 註冊
-const handleRegister = async () => {
-  try {
-    const response = await ApiService.register('張三', 'test@example.com', '123456');
-    console.log('✅ 註冊成功:', response);
-  } catch (error) {
-    console.error('❌ 註冊失敗:', error.message);
-  }
-};
+// ========== 新版練習流程 ==========
 
-// 登入
-const handleLogin = async () => {
-  try {
-    const response = await ApiService.login('test@example.com', '123456');
-    console.log('✅ 登入成功:', response);
-  } catch (error) {
-    console.error('❌ 登入失敗:', error.message);
-  }
-};
+// 1. 開始練習
+const startResponse = await ApiService.startPractice('呼吸穩定力練習');
+const practiceId = startResponse.practiceId;
 
-// 取得用戶資料
-const fetchUserProfile = async () => {
-  try {
-    const response = await ApiService.getUserProfile();
-    console.log('👤 用戶資料:', response.user);
-  } catch (error) {
-    console.error('❌ 獲取資料失敗:', error.message);
-  }
-};
+// 2. 更新進度（可選，中途保存）
+await ApiService.updatePracticeProgress(
+  practiceId, 
+  5,  // 當前頁面
+  10, // 總頁數
+  { feeling: '很放鬆', noticed: '呼吸變慢了' }
+);
 
-// 測試 API
-const testAPI = async () => {
-  await ApiService.testConnection();
-};
+// 3. 完成練習
+await ApiService.completePractice(practiceId, {
+  duration: 8, // 實際投入 8 分鐘
+  feeling: '很放鬆',
+  noticed: '呼吸變慢了',
+  reflection: '今天練習很順利',
+  emotionData: { // 情緒理解力練習才需要
+    moment: '下午',
+    whatHappened: '工作壓力大',
+    selectedEmotions: ['焦慮', '疲憊'],
+    // ...其他情緒日記欄位
+  }
+});
+
+// ========== 其他功能 ==========
+
+// 獲取練習歷史
+const history = await ApiService.getPracticeHistory();
+console.log('練習記錄:', history.practices);
+
+// 獲取今日心情
+const todayMood = await ApiService.getTodayMood();
+console.log('今日心情:', todayMood.mood);
+
+// 記錄心情
+await ApiService.recordMood(5, '超讚!', '今天心情很好');
+
+// 獲取今日練習狀態
+const status = await ApiService.getTodayPracticeStatus();
+console.log('今日練習狀態:', status.practices);
 */

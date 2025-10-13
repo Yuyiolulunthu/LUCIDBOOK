@@ -1,5 +1,5 @@
 // ==========================================
-// 檔案名稱: App.js
+// 檔案名稱: App.js - 完整更新版（修正進度顯示）
 // ==========================================
 
 import React, { useState, useEffect } from 'react';
@@ -19,8 +19,11 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import LoginScreen from './LoginScreen';
 import RegisterScreen from './RegisterScreen';
-import PracticeScreen from './practice';
+import DailyScreen from './DailyScreen';
 import ApiService from './api';
+import BreathingPractice from './practice/BreathingPractice';
+import EmotionPractice from './practice/EmotionPractice';
+import FiveSensesPractice from './practice/FiveSensesPractice';
 
 const { width } = Dimensions.get('window');
 const Stack = createNativeStackNavigator();
@@ -30,22 +33,92 @@ const Stack = createNativeStackNavigator();
 // ==========================================
 const HomeScreen = ({ navigation }) => {
   const [selectedMood, setSelectedMood] = useState(null);
+  const [todayMoodRecord, setTodayMoodRecord] = useState(null);
   const [activeTab, setActiveTab] = useState('home');
   const [user, setUser] = useState(null);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [todayPracticeStatus, setTodayPracticeStatus] = useState({});
+  const [practiceProgress, setPracticeProgress] = useState({ completed: 0, total: 3 });
 
-  // 🔥 在 App 啟動時檢查是否已登入
+  // 心情定義
+  const moods = [
+    { name: '超讚!', image: require('./assets/images/perfect.png'), color: 'rgba(199, 239, 238, 0.15)', level: 5 },
+    { name: '還不錯', image: require('./assets/images/not bad.png'), color: 'rgba(199, 239, 238, 0.15)', level: 4 },
+    { name: '普普通通', image: require('./assets/images/normal.png'), color: 'rgba(199, 239, 238, 0.15)', level: 3 },
+    { name: '不太好', image: require('./assets/images/not good.png'), color: 'rgba(199, 239, 238, 0.15)', level: 2 },
+    { name: '很糟!', image: require('./assets/images/terrible.png'), color: 'rgba(199, 239, 238, 0.15)', level: 1 }
+  ];
+
+  // 每日練習定義
+  const dailyPractices = [
+    { 
+      name: '呼吸穩定力練習', 
+      description: '邀請你給自己一段時間，讓我們陪你，一步一步讓我們一起靜下來慢呼吸',
+      duration: '5分鐘', 
+      practiceType: '呼吸穩定力練習',
+      backgroundColor: '#FFFFFF',
+      completedBadgeColor: 'rgba(90, 206, 135, 0.8)',
+      uncompletedBadgeColor: 'rgba(0, 232, 227, 0.2)',
+      image: require('./assets/images/呼吸穩定.png'),
+      practiceNumber: 1,
+    },
+    { 
+      name: '情緒理解力練習', 
+      description: '傾聽內心的聲音，溫柔地與自己對話，找回平靜與力量',
+      duration: '3 ~ 5 min', 
+      practiceType: '情緒理解力練習',
+      backgroundColor: '#FFFFFF',
+      completedBadgeColor: 'rgba(90, 206, 135, 0.8)',
+      uncompletedBadgeColor: 'rgba(0, 232, 227, 0.2)',
+      image: require('./assets/images/情緒理解.png'),
+      practiceNumber: 2,
+    },
+    { 
+      name: '五感覺察力練習', 
+      description: '「五感覺察」是一個簡單卻重要的情緒調節技巧，也是改變內在的基礎',
+      duration: '3 ~ 5 min', 
+      practiceType: '五感察覺練習',
+      backgroundColor: '#FFFFFF',
+      completedBadgeColor: 'rgba(90, 206, 135, 0.8)',
+      uncompletedBadgeColor: 'rgba(0, 232, 227, 0.2)',
+      image: require('./assets/images/五感察覺.png'),
+      practiceNumber: 3,
+    }
+  ];
+
+  const topics = [
+    { name: '拖延症', color: 'rgba(103, 169, 224, 0.95)' },
+    { name: '感情問題', color: 'rgba(103, 169, 224, 0.95)' },
+    { name: '課業焦慮', color: 'rgba(103, 169, 224, 0.95)' },
+    { name: '社交恐懼', color: 'rgba(103, 169, 224, 0.95)' },
+    { name: '睡眠改善', color: 'rgba(103, 169, 224, 0.95)' },
+    { name: '專注提升', color: 'rgba(103, 169, 224, 0.95)' },
+    { name: '壓力管理', color: 'rgba(103, 169, 224, 0.95)' },
+    { name: '情緒平衡', color: 'rgba(103, 169, 224, 0.95)' }
+  ];
+
+  // 在 App 啟動時檢查登入狀態
   useEffect(() => {
     checkLoginStatus();
   }, []);
 
-  // 🔥 監聽 navigation focus 事件，回到此頁面時重新檢查登入狀態
+  // 監聽 navigation focus 事件
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
       checkLoginStatus();
+      if (isLoggedIn) {
+        loadTodayData();
+      }
     });
     return unsubscribe;
-  }, [navigation]);
+  }, [navigation, isLoggedIn]);
+
+  // 登入後載入今日數據
+  useEffect(() => {
+    if (isLoggedIn && user && !user.isGuest) {
+      loadTodayData();
+    }
+  }, [isLoggedIn, user]);
 
   const checkLoginStatus = async () => {
     try {
@@ -64,63 +137,37 @@ const HomeScreen = ({ navigation }) => {
     }
   };
 
-  const moods = [
-    { name: '超讚!', image: require('./assets/images/perfect.png'), color: 'rgba(199, 239, 238, 0.15)' },
-    { name: '還不錯', image: require('./assets/images/not bad.png'), color: 'rgba(199, 239, 238, 0.15)' },
-    { name: '普普通通', image: require('./assets/images/normal.png'), color: 'rgba(199, 239, 238, 0.15)' },
-    { name: '不太好', image: require('./assets/images/not good.png'), color: 'rgba(199, 239, 238, 0.15)' },
-    { name: '很糟!', image: require('./assets/images/terrible.png'), color: 'rgba(199, 239, 238, 0.15)' }
-  ];
+  // 載入今日數據（心情 + 練習狀態）
+  const loadTodayData = async () => {
+    try {
+      // 載入今日心情
+      const moodResponse = await ApiService.getTodayMood();
+      if (moodResponse.success && moodResponse.mood) {
+        setTodayMoodRecord(moodResponse.mood);
+        const moodIndex = moods.findIndex(m => m.name === moodResponse.mood.mood_name);
+        if (moodIndex !== -1) {
+          setSelectedMood(moodIndex);
+        }
+      } else {
+        setTodayMoodRecord(null);
+        setSelectedMood(null);
+      }
 
-  const dailyPractices = [
-    { 
-      name: '呼吸穩定力練習', 
-      description: '邀請你給自己一段時間，讓我們陪你，一步一步讓我們一起靜下來慢呼吸',
-      completed: false, 
-      duration: '5分鐘', 
-      practiceType: '呼吸穩定力練習',
-      backgroundColor: '#FFFFFF',
-      badgeColor: 'rgba(90, 206, 135, 0.8)',
-      image: require('./assets/images/呼吸穩定.png'),
-      practiceNumber: 1,
-      progressValue: 0.0
-    },
-    { 
-      name: '情緒理解力練習', 
-      description: '傾聽內心的聲音，溫柔地與自己對話，找回平靜與力量',
-      completed: false, 
-      duration: '3 ~ 5 min', 
-      practiceType: '情緒理解力練習',
-      backgroundColor: '#FFFFFF',
-      badgeColor: 'rgba(0, 232, 227, 0.2)',
-      image: require('./assets/images/情緒理解.png'),
-      practiceNumber: 2,
-      progressValue: 0.0
-    },
-    { 
-      name: '五感覺察力練習', 
-      description: '「五感覺察」是一個簡單卻重要的情緒調節技巧，也是改變內在的基礎',
-      completed: false, 
-      duration: '3 ~ 5 min', 
-      practiceType: '五感察覺練習',
-      backgroundColor: '#FFFFFF',
-      badgeColor: 'rgba(0, 232, 227, 0.2)',
-      image: require('./assets/images/五感察覺.png'),
-      practiceNumber: 3,
-      progressValue: 0.0
+      // 🔥 載入今日練習狀態
+      const practiceResponse = await ApiService.getTodayPracticeStatus();
+      if (practiceResponse.success) {
+        setTodayPracticeStatus(practiceResponse.practices || {});
+        
+        // 🔥 計算完成進度（只計算 completed = true 的練習）
+        const completedPractices = Object.values(practiceResponse.practices || {}).filter(
+          p => p.completed === true
+        );
+        setPracticeProgress({ completed: completedPractices.length, total: 3 });
+      }
+    } catch (error) {
+      console.error('載入今日數據失敗:', error);
     }
-  ];
-
-  const topics = [
-    { name: '拖延症', color: 'rgba(103, 169, 224, 0.95)' },
-    { name: '感情問題', color: 'rgba(103, 169, 224, 0.95)' },
-    { name: '課業焦慮', color: 'rgba(103, 169, 224, 0.95)' },
-    { name: '社交恐懼', color: 'rgba(103, 169, 224, 0.95)' },
-    { name: '睡眠改善', color: 'rgba(103, 169, 224, 0.95)' },
-    { name: '專注提升', color: 'rgba(103, 169, 224, 0.95)' },
-    { name: '壓力管理', color: 'rgba(103, 169, 224, 0.95)' },
-    { name: '情緒平衡', color: 'rgba(103, 169, 224, 0.95)' }
-  ];
+  };
 
   const showLoginPrompt = () => {
     if (!isLoggedIn || (user && user.isGuest)) {
@@ -152,28 +199,74 @@ const HomeScreen = ({ navigation }) => {
           await ApiService.logout();
           setUser(null);
           setIsLoggedIn(false);
+          setSelectedMood(null);
+          setTodayMoodRecord(null);
+          setTodayPracticeStatus({});
+          setPracticeProgress({ completed: 0, total: 3 });
           Alert.alert('已登出', '期待下次再見！');
         }
       }
     ]);
   };
 
-  const navigateToPractice = (type) => {
+  // 處理心情選擇
+  const handleMoodSelect = async (mood, index) => {
+    if (showLoginPrompt()) return;
+
+    try {
+      setSelectedMood(index);
+      
+      const response = await ApiService.recordMood(mood.level, mood.name, '');
+      
+      if (response.success) {
+        setTodayMoodRecord({
+          mood_level: mood.level,
+          mood_name: mood.name,
+          recorded_at: new Date().toISOString()
+        });
+        console.log('✅ 心情記錄成功');
+      }
+    } catch (error) {
+      console.error('記錄心情失敗:', error);
+      Alert.alert('錯誤', '心情記錄失敗，請稍後再試');
+      if (todayMoodRecord) {
+        const originalIndex = moods.findIndex(m => m.name === todayMoodRecord.mood_name);
+        setSelectedMood(originalIndex !== -1 ? originalIndex : null);
+      } else {
+        setSelectedMood(null);
+      }
+    }
+  };
+
+  const navigateToPractice = (practice) => {
     if (showLoginPrompt()) return;
     
     navigation.navigate('Practice', { 
-      practiceType: type,
-      onPracticeComplete: async (practiceType, duration = 5) => {
-        if (isLoggedIn && !user?.isGuest) {
-          try {
-            await ApiService.completePractice(practiceType, duration);
-            console.log('✅ 練習記錄已儲存');
-          } catch (error) {
-            console.error('記錄練習失敗:', error);
-          }
-        }
+      practiceType: practice.practiceType,
+      onPracticeComplete: async (practiceType) => {
+        // ⭐ 練習完成後重新載入今日數據
+        console.log('✅ 練習完成，重新載入數據');
+        await loadTodayData();
       }
     });
+  };
+
+  // 🔥 判斷練習是否已完成（只有 completed = true 才算完成）
+  const isPracticeCompleted = (practiceType) => {
+    const practice = todayPracticeStatus[practiceType];
+    return practice && practice.completed === true;
+  };
+
+  // 🔥 獲取練習進度百分比
+  const getPracticeProgress = (practiceType) => {
+    const practice = todayPracticeStatus[practiceType];
+    if (!practice) return 0;
+    
+    // 如果已完成，返回 100
+    if (practice.completed) return 100;
+    
+    // 否則返回實際進度
+    return practice.progress || 0;
   };
 
   const MoodButton = ({ mood, index, isSelected, onPress }) => (
@@ -196,59 +289,78 @@ const HomeScreen = ({ navigation }) => {
     </View>
   );
 
-  const PracticeCard = ({ practice }) => (
-    <View style={styles.practiceCardContainer}>
-      <View style={styles.practiceRow}>
-        <View style={[styles.practiceNumberBadge, { backgroundColor: practice.badgeColor }]}>
-          <Text style={styles.practiceNumberText}>練習{practice.practiceNumber}</Text>
-        </View>
-        
-        <View style={styles.practiceRightContent}>
-          <View style={styles.practiceDescription}>
-            <Text style={styles.practiceDescriptionText}>{practice.description}</Text>
+  const PracticeCard = ({ practice }) => {
+    const isCompleted = isPracticeCompleted(practice.practiceType);
+    const progress = getPracticeProgress(practice.practiceType);
+    
+    console.log(`📊 ${practice.practiceType} - 完成狀態:`, isCompleted, '進度:', progress);
+
+    return (
+      <View style={styles.practiceCardContainer}>
+        <View style={styles.practiceRow}>
+          <View style={[
+            styles.practiceNumberBadge, 
+            { backgroundColor: isCompleted ? practice.completedBadgeColor : practice.uncompletedBadgeColor }
+          ]}>
+            <Text style={styles.practiceNumberText}>練習{practice.practiceNumber}</Text>
           </View>
-          <TouchableOpacity 
-            style={[styles.practiceCard, { backgroundColor: practice.backgroundColor }]}
-            onPress={() => navigateToPractice(practice.practiceType)}
-          >
-            <View style={styles.practiceImageContainer}>
-              <Image 
-                source={practice.image}
-                style={styles.practiceImage}
-                resizeMode="contain"
-              />
+          
+          <View style={styles.practiceRightContent}>
+            <View style={styles.practiceDescription}>
+              <Text style={styles.practiceDescriptionText}>{practice.description}</Text>
             </View>
-            <View style={styles.practiceContent}>
-              <Text style={styles.practiceName}>《{practice.name}》</Text>
-              {practice.completed ? (
-                <View style={styles.completedContainer}>
-                  <Text style={styles.completedIcon}>✓</Text>
-                  <Text style={styles.completedText}>完成！</Text>
-                </View>
-              ) : (
-                <>
-                  <View style={styles.progressContainer}>
-                    <View style={styles.progressBarBackground}>
-                      <View style={[styles.progressBarForeground, { width: `${practice.progressValue * 100}%` }]} />
-                    </View>
-                  </View>
-                  <View style={styles.durationContainer}>
-                    <Text style={styles.durationIcon}>🕐</Text>
-                    <Text style={styles.durationText}>{practice.duration}</Text>
-                  </View>
-                </>
-              )}
-            </View>
-            <View style={styles.playButtonContainer}>
-              <View style={styles.playButton}>
-                <Text style={styles.playButtonText}>▶</Text>
+            <TouchableOpacity 
+              style={[styles.practiceCard, { backgroundColor: practice.backgroundColor }]}
+              onPress={() => navigateToPractice(practice)}
+            >
+              <View style={styles.practiceImageContainer}>
+                <Image 
+                  source={practice.image}
+                  style={styles.practiceImage}
+                  resizeMode="contain"
+                />
               </View>
-            </View>
-          </TouchableOpacity>
+              <View style={styles.practiceContent}>
+                <Text style={styles.practiceName}>《{practice.name}》</Text>
+                {isCompleted ? (
+                  <View style={styles.completedContainer}>
+                    <Text style={styles.completedIcon}>✓</Text>
+                    <Text style={styles.completedText}>完成！</Text>
+                  </View>
+                ) : (
+                  <>
+                    {progress > 0 ? (
+                      <View style={styles.progressContainer}>
+                        <View style={styles.progressBarBackground}>
+                          <View style={[styles.progressBarForeground, { width: `${progress}%` }]} />
+                        </View>
+                        <Text style={styles.progressPercentText}>{progress}%</Text>
+                      </View>
+                    ) : (
+                      <View style={styles.progressContainer}>
+                        <View style={styles.progressBarBackground}>
+                          <View style={[styles.progressBarForeground, { width: '0%' }]} />
+                        </View>
+                      </View>
+                    )}
+                    <View style={styles.durationContainer}>
+                      <Text style={styles.durationIcon}>🕐</Text>
+                      <Text style={styles.durationText}>{practice.duration}</Text>
+                    </View>
+                  </>
+                )}
+              </View>
+              <View style={styles.playButtonContainer}>
+                <View style={styles.playButton}>
+                  <Text style={styles.playButtonText}>▶</Text>
+                </View>
+              </View>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
-    </View>
-  );
+    );
+  };
 
   const TopicButton = ({ topic }) => (
     <TouchableOpacity style={[styles.topicButton, { backgroundColor: topic.color }]}>
@@ -292,7 +404,7 @@ const HomeScreen = ({ navigation }) => {
                 mood={mood}
                 index={index}
                 isSelected={selectedMood === index}
-                onPress={() => setSelectedMood(index)}
+                onPress={() => handleMoodSelect(mood, index)}
               />
             ))}
           </View>
@@ -300,7 +412,9 @@ const HomeScreen = ({ navigation }) => {
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>每日練習</Text>
-          <Text style={styles.sectionSubtitle}>今日練習進度 (0/3)</Text>
+          <Text style={styles.sectionSubtitle}>
+            今日練習進度 ({practiceProgress.completed}/{practiceProgress.total})
+          </Text>
           
           <View style={styles.practiceList}>
             {dailyPractices.map((practice, index) => (
@@ -393,7 +507,11 @@ const HomeScreen = ({ navigation }) => {
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.navButton, activeTab === 'tasks' && styles.navButtonActive]}
-          onPress={() => setActiveTab('tasks')}
+          onPress={() => {
+            if (showLoginPrompt()) return;
+            setActiveTab('tasks');
+            navigation.navigate('Daily');
+          }}
         >
           <Image 
             source={require('./assets/images/daily.png')}
@@ -428,18 +546,26 @@ const HomeScreen = ({ navigation }) => {
 const PracticeScreenWrapper = ({ route, navigation }) => {
   const { practiceType, onPracticeComplete } = route.params;
 
-  const handleBack = () => {
+  const handleBack = async () => {
     if (onPracticeComplete) {
-      onPracticeComplete(practiceType);
+      await onPracticeComplete(practiceType);
     }
     navigation.goBack();
   };
 
-  return <PracticeScreen practiceType={practiceType} onBack={handleBack} />;
+  if (practiceType === '呼吸穩定力練習') {
+    return <BreathingPractice onBack={handleBack} />;
+  } else if (practiceType === '情緒理解力練習') {
+    return <EmotionPractice onBack={handleBack} />;
+  } else if (practiceType === '五感察覺練習') {
+    return <FiveSensesPractice onBack={handleBack} />;
+  }
+
+  return null;
 };
 
 // ==========================================
-// 主應用程式（包含導航）
+// 主應用程式
 // ==========================================
 export default function App() {
   return (
@@ -452,14 +578,13 @@ export default function App() {
         <Stack.Screen name="Login" component={LoginScreen} />
         <Stack.Screen name="Register" component={RegisterScreen} />
         <Stack.Screen name="Practice" component={PracticeScreenWrapper} />
+        <Stack.Screen name="Daily" component={DailyScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );
 }
 
-// ==========================================
-// 樣式
-// ==========================================
+// 樣式（新增 progressPercentText）
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -551,7 +676,7 @@ const styles = StyleSheet.create({
   },
   moodButtonSelected: {
     transform: [{ scale: 1.1 }],
-    borderWidth: 2,
+    borderWidth: 3,
     borderColor: '#3B82F6',
   },
   moodImage: {
@@ -654,8 +779,11 @@ const styles = StyleSheet.create({
   progressContainer: {
     marginTop: 8,
     marginBottom: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   progressBarBackground: {
+    flex: 1,
     height: 4,
     backgroundColor: '#E5E7EB',
     borderRadius: 2,
@@ -665,6 +793,13 @@ const styles = StyleSheet.create({
     height: '100%',
     backgroundColor: '#10B981',
     borderRadius: 2,
+  },
+  progressPercentText: {
+    fontSize: 12,
+    color: '#10B981',
+    marginLeft: 8,
+    fontWeight: '500',
+    minWidth: 35,
   },
   practiceName: {
     fontSize: 16,
