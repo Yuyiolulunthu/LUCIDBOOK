@@ -1,3 +1,4 @@
+//BreathingPractice
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
@@ -12,6 +13,8 @@ import {
   Image,
   ScrollView,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { Audio } from 'expo-av';
 import ApiService from '../api';
@@ -24,7 +27,6 @@ export default function BreathingPractice({ onBack, navigation }) {
   const [duration, setDuration] = useState(0);
   const [practiceId, setPracticeId] = useState(null);
   
-  // 時間追蹤
   const [startTime, setStartTime] = useState(null);
   const [pauseTime, setPauseTime] = useState(null);
   const [accumulatedTime, setAccumulatedTime] = useState(0);
@@ -35,6 +37,8 @@ export default function BreathingPractice({ onBack, navigation }) {
     noticed: '',
     reflection: '',
   });
+
+  const scrollViewRef = useRef(null);
 
   const steps = [
     {
@@ -70,7 +74,8 @@ export default function BreathingPractice({ onBack, navigation }) {
     {
       title: "你做得很好，",
       content: "今天你練習了5分鐘的呼吸\n請利用以下空間記錄下今日的練習",
-      hasForm: true
+      hasForm: true,
+      isSecondToLast: true
     },
     {
       title: "恭喜你完成了今天的",
@@ -83,17 +88,12 @@ export default function BreathingPractice({ onBack, navigation }) {
   const currentStepData = steps[currentStep];
   const progressPercentage = ((currentStep + 1) / totalSteps) * 100;
 
-  // ========================================
-  // 初始化練習
-  // ========================================
   useEffect(() => {
     initializePractice();
     
-    // 監聽畫面焦點變化（用於暫停/恢復計時）
     const unsubscribeFocus = navigation?.addListener('focus', () => {
       isFocused.current = true;
       if (pauseTime) {
-        // 恢復計時
         setStartTime(Date.now());
         setPauseTime(null);
       }
@@ -102,7 +102,6 @@ export default function BreathingPractice({ onBack, navigation }) {
     const unsubscribeBlur = navigation?.addListener('blur', () => {
       isFocused.current = false;
       if (startTime && !pauseTime) {
-        // 暫停計時
         const elapsed = Math.floor((Date.now() - startTime) / 1000);
         setAccumulatedTime(prev => prev + elapsed);
         setPauseTime(Date.now());
@@ -120,39 +119,35 @@ export default function BreathingPractice({ onBack, navigation }) {
 
   const initializePractice = async () => {
     try {
-      // 檢查是否有未完成的同天同類型練習
       const response = await ApiService.startPractice('呼吸穩定力練習');
       
       if (response.practiceId) {
-      setPracticeId(response.practiceId);
-      ``
-            // ⭐ 恢復進度
-            if (response.currentPage && response.currentPage > 0) {
-                console.log(`✅ 恢復進度到第 ${response.currentPage} 頁`);
-                setCurrentStep(response.currentPage);
-            }
-            
-            if (response.formData) {
-                try {
-                const parsedData = typeof response.formData === 'string' 
-                    ? JSON.parse(response.formData) 
-                    : response.formData;
-                setFormData(parsedData);
-                console.log('✅ 恢復表單數據:', parsedData);
-                } catch (e) {
-                console.log('⚠️ 解析表單數據失敗:', e);
-                }
-            }
-            
-            setStartTime(Date.now());
-            }
-        } catch (error) {
-            console.error('初始化練習失敗:', error);
+        setPracticeId(response.practiceId);
+        
+        if (response.currentPage && response.currentPage > 0) {
+          console.log(`✅ 恢復進度到第 ${response.currentPage} 頁`);
+          setCurrentStep(response.currentPage);
         }
-    };
-  // ========================================
-  // 計算總投入時間（秒）
-  // ========================================
+        
+        if (response.formData) {
+          try {
+            const parsedData = typeof response.formData === 'string' 
+              ? JSON.parse(response.formData) 
+              : response.formData;
+            setFormData(parsedData);
+            console.log('✅ 恢復表單數據:', parsedData);
+          } catch (e) {
+            console.log('⚠️ 解析表單數據失敗:', e);
+          }
+        }
+        
+        setStartTime(Date.now());
+      }
+    } catch (error) {
+      console.error('初始化練習失敗:', error);
+    }
+  };
+
   const calculateTotalTime = () => {
     let total = accumulatedTime;
     if (startTime && !pauseTime && isFocused.current) {
@@ -161,9 +156,6 @@ export default function BreathingPractice({ onBack, navigation }) {
     return total;
   };
 
-  // ========================================
-  // 自動儲存進度
-  // ========================================
   useEffect(() => {
     saveProgress();
   }, [currentStep, formData]);
@@ -183,9 +175,6 @@ export default function BreathingPractice({ onBack, navigation }) {
     }
   };
 
-  // ========================================
-  // 音頻相關
-  // ========================================
   const loadAudio = async () => {
     if (sound) {
       await sound.unloadAsync();
@@ -253,18 +242,17 @@ export default function BreathingPractice({ onBack, navigation }) {
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   };
 
-  // ========================================
-  // 導航控制
-  // ========================================
   const nextStep = () => {
     if (currentStep < steps.length - 1) {
       setCurrentStep(currentStep + 1);
+      scrollViewRef.current?.scrollTo({ y: 0, animated: false });
     }
   };
 
   const prevStep = () => {
     if (currentStep > 0) {
       setCurrentStep(currentStep - 1);
+      scrollViewRef.current?.scrollTo({ y: 0, animated: false });
     }
   };
 
@@ -275,9 +263,6 @@ export default function BreathingPractice({ onBack, navigation }) {
     }));
   };
 
-  // ========================================
-  // 完成練習
-  // ========================================
   const handleComplete = async () => {
     if (!practiceId) {
       Alert.alert('錯誤', '練習記錄不存在');
@@ -285,11 +270,9 @@ export default function BreathingPractice({ onBack, navigation }) {
     }
 
     try {
-    
-    const totalSeconds = calculateTotalTime();
-    const totalMinutes = Math.max(1, Math.ceil(totalSeconds / 60));
+      const totalSeconds = calculateTotalTime();
+      const totalMinutes = Math.max(1, Math.ceil(totalSeconds / 60));
 
-      // 完成練習
       await ApiService.completePractice(practiceId, {
         duration: totalMinutes,
         duration_seconds: totalSeconds, 
@@ -298,7 +281,18 @@ export default function BreathingPractice({ onBack, navigation }) {
         reflection: formData.reflection,
       });
 
-      Alert.alert('完成', `恭喜完成練習！總時間：${totalMinutes}分鐘${totalSeconds % 60}秒`, [
+      // ⭐ 修正：正確顯示時間
+      const mins = Math.floor(totalSeconds / 60);
+      const secs = totalSeconds % 60;
+      let timeStr = '';
+      if (mins > 0) {
+        timeStr = `${mins}分鐘`;
+      }
+      if (secs > 0 || mins === 0) {
+        timeStr += `${secs}秒`;
+      }
+
+      Alert.alert('完成', `恭喜完成練習！總時間：${timeStr}分鐘${totalSeconds % 60}秒`, [
         {
           text: '確定',
           onPress: () => {
@@ -320,14 +314,20 @@ export default function BreathingPractice({ onBack, navigation }) {
     Keyboard.dismiss();
   };
 
-  // ========================================
-  // 渲染步驟內容
-  // ========================================
   const renderStepContent = () => {
     if (currentStepData.hasForm) {
       return (
-        <TouchableWithoutFeedback onPress={dismissKeyboard}>
-          <ScrollView style={styles.formSection} showsVerticalScrollIndicator={false}>
+        <KeyboardAvoidingView 
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={{ flex: 1 }}
+          keyboardVerticalOffset={100}
+        >
+          <ScrollView 
+            ref={scrollViewRef}
+            style={styles.formSection} 
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingBottom: 40 }}
+          >
             <View style={styles.inputField}>
               <Text style={styles.inputLabel}>練習後，我感覺：</Text>
               <TextInput 
@@ -367,8 +367,17 @@ export default function BreathingPractice({ onBack, navigation }) {
                 onChangeText={(text) => updateFormData('reflection', text)}
               />
             </View>
+
+            {currentStepData.isSecondToLast && (
+              <TouchableOpacity 
+                style={styles.completeButton} 
+                onPress={nextStep}
+              >
+                <Text style={styles.completeButtonText}>我完成練習了！</Text>
+              </TouchableOpacity>
+            )}
           </ScrollView>
-        </TouchableWithoutFeedback>
+        </KeyboardAvoidingView>
       );
     }
 
@@ -377,21 +386,21 @@ export default function BreathingPractice({ onBack, navigation }) {
         <ScrollView style={styles.summarySection} showsVerticalScrollIndicator={false}>
           <View style={styles.summaryCard}>
             <Text style={styles.summaryTitle}>練習的感覺：</Text>
-            <Text style={styles.summaryContent}>{formData.feeling || "未填寫內容"}</Text>
+            <Text style={styles.summaryContent}>{formData.feeling || "無記錄"}</Text>
           </View>
           
           <View style={styles.separator} />
           
           <View style={styles.summaryCard}>
             <Text style={styles.summaryTitle}>練習中的發現：</Text>
-            <Text style={styles.summaryContent}>{formData.noticed || "未填寫內容"}</Text>
+            <Text style={styles.summaryContent}>{formData.noticed || "無記錄"}</Text>
           </View>
           
           <View style={styles.separator} />
           
           <View style={styles.summaryCard}>
             <Text style={styles.summaryTitle}>想和自己說的話：</Text>
-            <Text style={styles.summaryContent}>{formData.reflection || "未填寫內容"}</Text>
+            <Text style={styles.summaryContent}>{formData.reflection || "無記錄"}</Text>
           </View>
           
           <TouchableOpacity style={styles.finishButton} onPress={handleComplete}>
@@ -496,6 +505,9 @@ export default function BreathingPractice({ onBack, navigation }) {
     return null;
   };
 
+  const isLastStep = currentStep === steps.length - 1;
+  const isSecondToLast = currentStepData.isSecondToLast;
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="rgba(46, 134, 171, 0.7)" />
@@ -518,22 +530,6 @@ export default function BreathingPractice({ onBack, navigation }) {
 
       <TouchableWithoutFeedback onPress={dismissKeyboard}>
         <View style={styles.contentContainer}>
-          {/* 左右區域點擊導航 */}
-          {currentStep > 0 && !currentStepData.hasForm && (
-            <TouchableOpacity 
-              style={styles.leftTapArea}
-              onPress={prevStep}
-              activeOpacity={1}
-            />
-          )}
-          {currentStep < steps.length - 1 && !currentStepData.hasForm && (
-            <TouchableOpacity 
-              style={styles.rightTapArea}
-              onPress={nextStep}
-              activeOpacity={1}
-            />
-          )}
-
           <View style={styles.stepHeader}>
             <Text style={styles.stepTitle}>{currentStepData.title}</Text>
             {currentStepData.content && !currentStepData.hasAudio && !currentStepData.hasImage && (
@@ -545,36 +541,43 @@ export default function BreathingPractice({ onBack, navigation }) {
         </View>
       </TouchableWithoutFeedback>
 
-      {/* 底部導航欄 - 顏色改為 #4F7F96 */}
-      <View style={styles.bottomNav}>
-        <TouchableOpacity 
-          onPress={prevStep}
-          disabled={currentStep === 0}
-          style={[styles.navButton, currentStep === 0 && styles.navButtonDisabled]}
-        >
-          <Text style={styles.navButtonText}>〈</Text>
-        </TouchableOpacity>
-        
-        <View style={styles.progressIndicator}>
-          {steps.map((_, index) => (
-            <View 
-              key={index}
-              style={[
-                styles.progressDot,
-                index === currentStep && styles.progressDotActive
-              ]}
-            />
-          ))}
+      {!isLastStep && (
+        <View style={styles.bottomNav}>
+          <TouchableOpacity 
+            onPress={prevStep}
+            disabled={currentStep === 0}
+            style={[
+              styles.navArrowButton,
+              currentStep === 0 && styles.navButtonDisabled
+            ]}
+          >
+            <Text style={styles.navArrowText}>〈</Text>
+          </TouchableOpacity>
+          
+          <View style={styles.progressIndicator}>
+            {steps.map((_, index) => (
+              <View 
+                key={index}
+                style={[
+                  styles.progressDot,
+                  index === currentStep && styles.progressDotActive
+                ]}
+              />
+            ))}
+          </View>
+          
+          <TouchableOpacity 
+            onPress={nextStep}
+            disabled={isSecondToLast}
+            style={[
+              styles.navArrowButton,
+              isSecondToLast && styles.navButtonDisabled
+            ]}
+          >
+            <Text style={styles.navArrowText}>〉</Text>
+          </TouchableOpacity>
         </View>
-        
-        <TouchableOpacity 
-          onPress={nextStep}
-          disabled={currentStep === steps.length - 1}
-          style={[styles.navButton, currentStep === steps.length - 1 && styles.navButtonDisabled]}
-        >
-          <Text style={styles.navButtonText}>〉</Text>
-        </TouchableOpacity>
-      </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -624,24 +627,7 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 20,
     paddingBottom: 100,
-    position: 'relative',
     justifyContent: 'center',
-  },
-  leftTapArea: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
-    width: '40%',
-    zIndex: 10,
-  },
-  rightTapArea: {
-    position: 'absolute',
-    right: 0,
-    top: 0,
-    bottom: 0,
-    width: '40%',
-    zIndex: 10,
   },
   stepHeader: {
     alignItems: 'center',
@@ -859,6 +845,22 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(219, 219, 219, 0.5)',
     marginVertical: 15,
   },
+  completeButton: {
+    backgroundColor: '#f5f5f5',
+    paddingVertical: 14,
+    paddingHorizontal: 32,
+    borderRadius: 25,
+    alignSelf: 'center',
+    marginTop: 30,
+    marginBottom: 20,
+    borderWidth: 2,
+    borderColor: '#4F7F96',
+  },
+  completeButtonText: {
+    color: '#4F7F96',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
   summarySection: {
     flex: 1,
     marginBottom: 20,
@@ -893,7 +895,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
   },
-  // ⭐ 底部導航欄 - 顏色改為 #4F7F96, 100%
   bottomNav: {
     position: 'absolute',
     bottom: 0,
@@ -905,20 +906,28 @@ const styles = StyleSheet.create({
     paddingHorizontal: 30,
     paddingVertical: 20,
     paddingBottom: 36,
-    backgroundColor: '#4F7F96', // ⭐ 修改顏色
+    backgroundColor: 'transparent',
   },
-  navButton: {
-    width: 40,
-    height: 40,
+  navArrowButton: {
+    width: 50,
+    height: 50,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 25,
     justifyContent: 'center',
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 3,
   },
   navButtonDisabled: {
     opacity: 0.3,
   },
-  navButtonText: {
+  navArrowText: {
     fontSize: 24,
-    color: '#FFFFFF', // 修改為白色以配合深色背景
+    color: '#4F7F96',
+    fontWeight: 'bold',
   },
   progressIndicator: {
     flexDirection: 'row',
@@ -928,11 +937,11 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: 'rgba(255, 255, 255, 0.3)', // 修改為白色半透明
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
     marginHorizontal: 4,
   },
   progressDotActive: {
-    backgroundColor: '#FFFFFF', // 當前點改為白色
+    backgroundColor: '#FFFFFF',
     width: 12,
     height: 12,
     borderRadius: 6,

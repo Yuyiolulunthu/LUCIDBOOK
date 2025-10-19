@@ -1,3 +1,4 @@
+//EmotionPractice
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
@@ -12,11 +13,12 @@ import {
   Image,
   ScrollView,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import ApiService from '../api';
 
-export default function EmotionPractice({ onBack }) {
-  // ⭐ 新增：時間追蹤和 practiceId
+export default function EmotionPractice({ onBack, navigation }) {
   const [practiceId, setPracticeId] = useState(null);
   const [startTime, setStartTime] = useState(null);
   const [elapsedTime, setElapsedTime] = useState(0);
@@ -37,6 +39,8 @@ export default function EmotionPractice({ onBack }) {
     exerciseText: '',
     happyThingText: '',
   });
+
+  const scrollViewRef = useRef(null);
 
   const emotionsList = [
     '開心', '興奮', '滿足', '感恩', '平靜',
@@ -99,7 +103,8 @@ export default function EmotionPractice({ onBack }) {
              formData.copingChoice === 'regulate' ? "我不喜歡，想調節它" : "",
       content: "",
       hasEmotionForm: true,
-      formType: "copingFollow"
+      formType: "copingFollow",
+      isSecondToLast: true
     },
     {
       title: "",
@@ -118,7 +123,6 @@ export default function EmotionPractice({ onBack }) {
   const currentStepData = steps[currentStep];
   const progressPercentage = ((currentStep + 1) / totalSteps) * 100;
 
-  // ⭐ 初始化：開始練習或恢復進度
   useEffect(() => {
     initializePractice();
   }, []);
@@ -126,37 +130,34 @@ export default function EmotionPractice({ onBack }) {
   const initializePractice = async () => {
     try {
       const response = await ApiService.startPractice('情緒理解力練習');
-      setPracticeId(response.practiceId);
       
       if (response.practiceId) {
         setPracticeId(response.practiceId);
         
-            // ⭐ 恢復進度
-            if (response.currentPage && response.currentPage > 0) {
-                console.log(`✅ 恢復進度到第 ${response.currentPage} 頁`);
-                setCurrentStep(response.currentPage);
-            }
-            
-            if (response.formData) {
-                try {
-                const parsedData = typeof response.formData === 'string' 
-                    ? JSON.parse(response.formData) 
-                    : response.formData;
-                setFormData(parsedData);
-                console.log('✅ 恢復表單數據:', parsedData);
-                } catch (e) {
-                console.log('⚠️ 解析表單數據失敗:', e);
-                }
-            }
-            
-            setStartTime(Date.now());
-            }
-        } catch (error) {
-            console.error('初始化練習失敗:', error);
+        if (response.currentPage && response.currentPage > 0) {
+          console.log(`✅ 恢復進度到第 ${response.currentPage} 頁`);
+          setCurrentStep(response.currentPage);
         }
-    };
+        
+        if (response.formData) {
+          try {
+            const parsedData = typeof response.formData === 'string' 
+              ? JSON.parse(response.formData) 
+              : response.formData;
+            setFormData(parsedData);
+            console.log('✅ 恢復表單數據:', parsedData);
+          } catch (e) {
+            console.log('⚠️ 解析表單數據失敗:', e);
+          }
+        }
+        
+        setStartTime(Date.now());
+      }
+    } catch (error) {
+      console.error('初始化練習失敗:', error);
+    }
+  };
 
-  // ⭐ 時間追蹤（秒級）
   useEffect(() => {
     let timer;
     if (startTime) {
@@ -170,7 +171,6 @@ export default function EmotionPractice({ onBack }) {
     };
   }, [startTime]);
 
-  // ⭐ 自動儲存進度
   useEffect(() => {
     saveProgress();
   }, [currentStep, formData]);
@@ -190,30 +190,29 @@ export default function EmotionPractice({ onBack }) {
     }
   };
 
-  // ⭐ 修正：頁面跳轉邏輯
   const nextStep = () => {
     let nextStepIndex = currentStep + 1;
     
     if (nextStepIndex >= steps.length) return;
     
-    // 檢查是否需要跳過某些頁面
     while (nextStepIndex < steps.length) {
       const nextStepData = steps[nextStepIndex];
       
       if (nextStepData.showOnlyFor) {
         if (nextStepData.showOnlyFor.includes(formData.copingChoice)) {
-          break; // 符合條件，顯示這一頁
+          break;
         } else {
-          nextStepIndex++; // 跳過這一頁
+          nextStepIndex++;
           continue;
         }
       }
       
-      break; // 沒有限制，正常顯示
+      break;
     }
     
     if (nextStepIndex < steps.length) {
       setCurrentStep(nextStepIndex);
+      scrollViewRef.current?.scrollTo({ y: 0, animated: false });
     }
   };
 
@@ -222,7 +221,6 @@ export default function EmotionPractice({ onBack }) {
     
     let prevStepIndex = currentStep - 1;
     
-    // 向前也要檢查是否需要跳過
     while (prevStepIndex >= 0) {
       const prevStepData = steps[prevStepIndex];
       
@@ -240,6 +238,7 @@ export default function EmotionPractice({ onBack }) {
     
     if (prevStepIndex >= 0) {
       setCurrentStep(prevStepIndex);
+      scrollViewRef.current?.scrollTo({ y: 0, animated: false });
     }
   };
 
@@ -289,12 +288,22 @@ export default function EmotionPractice({ onBack }) {
     return content[formData.copingChoice] || content['accept'];
   };
 
-  // ⭐ 修正：完成練習（使用新版 API + 實際時間）
   const handleComplete = async () => {
     try {
       const totalSeconds = elapsedTime;
       const totalMinutes = Math.max(1, Math.ceil(totalSeconds / 60));
       
+      // ⭐ 新增：獲取今日心情
+      let todayMoodName = null;
+      try {
+        const moodResponse = await ApiService.getTodayMood();
+        if (moodResponse && moodResponse.mood) {
+          todayMoodName = moodResponse.mood.mood_name;
+        }
+      } catch (e) {
+        console.log('獲取今日心情失敗:', e);
+      }
+
       let regulateText = '';
       if (formData.regulateChoice === 'selfTalk') {
         regulateText = formData.selfTalkText;
@@ -321,62 +330,95 @@ export default function EmotionPractice({ onBack }) {
       await ApiService.completePractice(practiceId, {
         duration: totalMinutes,
         duration_seconds: totalSeconds,
+        feeling: todayMoodName,
         emotion_data: emotionData,
         reflection: regulateText || formData.acceptReminder || formData.enjoyMessage || '完成情緒理解力練習',
       });
-      
-      Alert.alert('完成', `恭喜完成練習！總時間：${totalMinutes}分鐘${totalSeconds % 60}秒`, [
-          {
-              text: '確定',
-              onPress: () => onBack()
-          }
-          ]);
-      } catch (error) {
-          console.error('儲存情緒日記失敗:', error);
-          Alert.alert('錯誤', '無法保存練習記錄');
-      }
-      };
 
-    const dismissKeyboard = () => {
-        Keyboard.dismiss();
-    };
+      // ⭐ 修正：正確顯示時間
+      const mins = Math.floor(totalSeconds / 60);
+      const secs = totalSeconds % 60;
+      let timeStr = '';
+      if (mins > 0) {
+        timeStr = `${mins}分鐘`;
+      }
+      if (secs > 0 || mins === 0) {
+        timeStr += `${secs}秒`;
+      }
+      
+      Alert.alert('完成', `恭喜完成練習！總時間：${timeStr}`, [
+        {
+          text: '確定',
+          onPress: () => {
+            if (onBack) {
+              onBack();
+            } else if (navigation) {
+              navigation.goBack();
+            }
+          }
+        }
+      ]);
+    } catch (error) {
+      console.error('儲存情緒日記失敗:', error);
+      Alert.alert('錯誤', '無法保存練習記錄');
+    }
+  };
+
+  const dismissKeyboard = () => {
+    Keyboard.dismiss();
+  };
 
   const renderEmotionForm = () => {
     const { formType } = currentStepData;
 
     if (formType === 'moment') {
       return (
-        <View style={styles.emotionFormContainer}>
-          <View style={styles.emotionInputField}>
-            <Text style={styles.emotionInputLabel}>是什麼時刻？</Text>
-            <TextInput 
-              style={styles.emotionInputBox} 
-              multiline 
-              placeholder="例如：今天早上、昨天下午..."
-              placeholderTextColor="rgba(0, 0, 0, 0.4)"
-              value={formData.moment}
-              onChangeText={(text) => updateFormData('moment', text)}
-            />
-          </View>
-          
-          <View style={styles.emotionInputField}>
-            <Text style={styles.emotionInputLabel}>發生了什麼事呢？</Text>
-            <TextInput 
-              style={styles.emotionLargeInputBox} 
-              multiline 
-              placeholder="寫下當時發生的事情..."
-              placeholderTextColor="rgba(0, 0, 0, 0.4)"
-              value={formData.whatHappened}
-              onChangeText={(text) => updateFormData('whatHappened', text)}
-            />
-          </View>
-        </View>
+        <KeyboardAvoidingView 
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={{ flex: 1 }}
+          keyboardVerticalOffset={100}
+        >
+          <ScrollView 
+            ref={scrollViewRef}
+            style={styles.emotionFormContainer}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingBottom: 40 }}
+          >
+            <View style={styles.emotionInputField}>
+              <Text style={styles.emotionInputLabel}>是什麼時刻？</Text>
+              <TextInput 
+                style={styles.emotionInputBox} 
+                multiline 
+                placeholder="例如：今天早上、昨天下午..."
+                placeholderTextColor="rgba(0, 0, 0, 0.4)"
+                value={formData.moment}
+                onChangeText={(text) => updateFormData('moment', text)}
+              />
+            </View>
+            
+            <View style={styles.emotionInputField}>
+              <Text style={styles.emotionInputLabel}>發生了什麼事呢？</Text>
+              <TextInput 
+                style={styles.emotionLargeInputBox} 
+                multiline 
+                placeholder="寫下當時發生的事情..."
+                placeholderTextColor="rgba(0, 0, 0, 0.4)"
+                value={formData.whatHappened}
+                onChangeText={(text) => updateFormData('whatHappened', text)}
+              />
+            </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
       );
     }
 
     if (formType === 'emotions') {
       return (
-        <ScrollView style={styles.emotionFormContainer} showsVerticalScrollIndicator={false}>
+        <ScrollView 
+          ref={scrollViewRef}
+          style={styles.emotionFormContainer} 
+          showsVerticalScrollIndicator={false}
+        >
           <View style={styles.emotionsGrid}>
             {emotionsList.map((emotion, index) => (
               <TouchableOpacity
@@ -412,91 +454,117 @@ export default function EmotionPractice({ onBack }) {
 
     if (formType === 'bodyFeeling') {
       return (
-        <View style={styles.emotionFormContainer}>
-          <View style={styles.emotionInputField}>
-            <TextInput 
-              style={styles.emotionLargeInputBox} 
-              multiline 
-              placeholder="例如：胸口悶悶的、肩膀緊繃、胃不舒服..."
-              placeholderTextColor="rgba(0, 0, 0, 0.4)"
-              value={formData.bodyFeeling}
-              onChangeText={(text) => updateFormData('bodyFeeling', text)}
-            />
-          </View>
-        </View>
+        <KeyboardAvoidingView 
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={{ flex: 1 }}
+          keyboardVerticalOffset={100}
+        >
+          <ScrollView 
+            ref={scrollViewRef}
+            style={styles.emotionFormContainer}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingBottom: 40 }}
+          >
+            <View style={styles.emotionInputField}>
+              <TextInput 
+                style={styles.emotionLargeInputBox} 
+                multiline 
+                placeholder="例如：胸口悶悶的、肩膀緊繃、胃不舒服..."
+                placeholderTextColor="rgba(0, 0, 0, 0.4)"
+                value={formData.bodyFeeling}
+                onChangeText={(text) => updateFormData('bodyFeeling', text)}
+              />
+            </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
       );
     }
 
     if (formType === 'meaning') {
       return (
-        <ScrollView style={styles.emotionFormContainer} showsVerticalScrollIndicator={false}>
-          <View style={styles.choiceContainer}>
-            <TouchableOpacity
-              style={[
-                styles.choiceButton,
-                formData.meaningChoice === 'why' && styles.choiceButtonSelected
-              ]}
-              onPress={() => updateFormData('meaningChoice', 'why')}
-            >
-              <Text style={[
-                styles.choiceButtonText,
-                formData.meaningChoice === 'why' && styles.choiceButtonTextSelected
-              ]}>
-                這個情緒為什麼會出現？
-              </Text>
-            </TouchableOpacity>
+        <KeyboardAvoidingView 
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={{ flex: 1 }}
+          keyboardVerticalOffset={100}
+        >
+          <ScrollView 
+            ref={scrollViewRef}
+            style={styles.emotionFormContainer} 
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingBottom: 40 }}
+          >
+            <View style={styles.choiceContainer}>
+              <TouchableOpacity
+                style={[
+                  styles.choiceButton,
+                  formData.meaningChoice === 'why' && styles.choiceButtonSelected
+                ]}
+                onPress={() => updateFormData('meaningChoice', 'why')}
+              >
+                <Text style={[
+                  styles.choiceButtonText,
+                  formData.meaningChoice === 'why' && styles.choiceButtonTextSelected
+                ]}>
+                  這個情緒為什麼會出現？
+                </Text>
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              style={[
-                styles.choiceButton,
-                formData.meaningChoice === 'need' && styles.choiceButtonSelected
-              ]}
-              onPress={() => updateFormData('meaningChoice', 'need')}
-            >
-              <Text style={[
-                styles.choiceButtonText,
-                formData.meaningChoice === 'need' && styles.choiceButtonTextSelected
-              ]}>
-                這個情緒反映我有什麼需求、期待沒被滿足嗎？
-              </Text>
-            </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.choiceButton,
+                  formData.meaningChoice === 'need' && styles.choiceButtonSelected
+                ]}
+                onPress={() => updateFormData('meaningChoice', 'need')}
+              >
+                <Text style={[
+                  styles.choiceButtonText,
+                  formData.meaningChoice === 'need' && styles.choiceButtonTextSelected
+                ]}>
+                  這個情緒反映我有什麼需求、期待沒被滿足嗎？
+                </Text>
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              style={[
-                styles.choiceButton,
-                formData.meaningChoice === 'message' && styles.choiceButtonSelected
-              ]}
-              onPress={() => updateFormData('meaningChoice', 'message')}
-            >
-              <Text style={[
-                styles.choiceButtonText,
-                formData.meaningChoice === 'message' && styles.choiceButtonTextSelected
-              ]}>
-                它是否想告訴我一些訊息？或提醒我什麼？
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          {formData.meaningChoice && (
-            <View style={styles.emotionInputField}>
-              <Text style={styles.emotionInputLabel}>{getMeaningPrompt()}</Text>
-              <TextInput 
-                style={styles.emotionLargeInputBox} 
-                multiline 
-                placeholder="寫下你的想法..."
-                placeholderTextColor="rgba(0, 0, 0, 0.4)"
-                value={formData.meaningText}
-                onChangeText={(text) => updateFormData('meaningText', text)}
-              />
+              <TouchableOpacity
+                style={[
+                  styles.choiceButton,
+                  formData.meaningChoice === 'message' && styles.choiceButtonSelected
+                ]}
+                onPress={() => updateFormData('meaningChoice', 'message')}
+              >
+                <Text style={[
+                  styles.choiceButtonText,
+                  formData.meaningChoice === 'message' && styles.choiceButtonTextSelected
+                ]}>
+                  它是否想告訴我一些訊息？或提醒我什麼？
+                </Text>
+              </TouchableOpacity>
             </View>
-          )}
-        </ScrollView>
+
+            {formData.meaningChoice && (
+              <View style={styles.emotionInputField}>
+                <Text style={styles.emotionInputLabel}>{getMeaningPrompt()}</Text>
+                <TextInput 
+                  style={styles.emotionLargeInputBox} 
+                  multiline 
+                  placeholder="寫下你的想法..."
+                  placeholderTextColor="rgba(0, 0, 0, 0.4)"
+                  value={formData.meaningText}
+                  onChangeText={(text) => updateFormData('meaningText', text)}
+                />
+              </View>
+            )}
+          </ScrollView>
+        </KeyboardAvoidingView>
       );
     }
 
     if (formType === 'coping') {
       return (
-        <ScrollView style={styles.emotionFormContainer} showsVerticalScrollIndicator={false}>
+        <ScrollView 
+          ref={scrollViewRef}
+          style={styles.emotionFormContainer} 
+          showsVerticalScrollIndicator={false}
+        >
           <View style={styles.choiceContainer}>
             <TouchableOpacity
               style={[
@@ -561,182 +629,236 @@ export default function EmotionPractice({ onBack }) {
     if (formType === 'copingFollow') {
       if (formData.copingChoice === 'enjoy') {
         return (
-          <View style={styles.emotionFormContainer}>
-            <View style={styles.followUpCard}>
-              <Text style={styles.followUpTitle}>我想跟這個好的感覺說什麼：</Text>
-              <TextInput 
-                style={styles.emotionLargeInputBox} 
-                multiline 
-                placeholder="寫下你想對這份美好感受說的話..."
-                placeholderTextColor="rgba(0, 0, 0, 0.4)"
-                value={formData.enjoyMessage}
-                onChangeText={(text) => updateFormData('enjoyMessage', text)}
-              />
-            </View>
-          </View>
+          <KeyboardAvoidingView 
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={{ flex: 1 }}
+            keyboardVerticalOffset={100}
+          >
+            <ScrollView 
+              ref={scrollViewRef}
+              style={styles.emotionFormContainer}
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{ paddingBottom: 40 }}
+            >
+              <View style={styles.followUpCard}>
+                <Text style={styles.followUpTitle}>我想跟這個好的感覺說什麼：</Text>
+                <TextInput 
+                  style={styles.emotionLargeInputBox} 
+                  multiline 
+                  placeholder="寫下你想對這份美好感受說的話..."
+                  placeholderTextColor="rgba(0, 0, 0, 0.4)"
+                  value={formData.enjoyMessage}
+                  onChangeText={(text) => updateFormData('enjoyMessage', text)}
+                />
+              </View>
+              
+              <TouchableOpacity 
+                style={styles.completeButton} 
+                onPress={nextStep}
+              >
+                <Text style={styles.completeButtonText}>我完成練習了！</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </KeyboardAvoidingView>
         );
       }
 
       if (formData.copingChoice === 'accept') {
         return (
-          <ScrollView style={styles.emotionFormContainer} showsVerticalScrollIndicator={false}>
-            <View style={styles.followUpCard}>
-              <Text style={styles.followUpTitle}>用一句話，提醒自己：</Text>
-              <View style={styles.exampleBox}>
-                <Text style={styles.exampleTitle}>💡 參考例句：</Text>
-                <Text style={styles.exampleText}>「我有這個感覺是 OK 的，很正常」</Text>
-                <Text style={styles.exampleText}>「我允許自己有這個感覺」</Text>
-                <Text style={styles.exampleText}>「沒關係，EMO一下也OK，不舒服的感覺會慢慢過去的」</Text>
+          <KeyboardAvoidingView 
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={{ flex: 1 }}
+            keyboardVerticalOffset={100}
+          >
+            <ScrollView 
+              ref={scrollViewRef}
+              style={styles.emotionFormContainer} 
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{ paddingBottom: 40 }}
+            >
+              <View style={styles.followUpCard}>
+                <Text style={styles.followUpTitle}>用一句話，提醒自己：</Text>
+                <View style={styles.exampleBox}>
+                  <Text style={styles.exampleTitle}>💡 參考例句：</Text>
+                  <Text style={styles.exampleText}>「我有這個感覺是 OK 的，很正常」</Text>
+                  <Text style={styles.exampleText}>「我允許自己有這個感覺」</Text>
+                  <Text style={styles.exampleText}>「沒關係，EMO一下也OK，不舒服的感覺會慢慢過去的」</Text>
+                </View>
+                <TextInput 
+                  style={styles.emotionLargeInputBox} 
+                  multiline 
+                  placeholder="寫下你想提醒自己的話..."
+                  placeholderTextColor="rgba(0, 0, 0, 0.4)"
+                  value={formData.acceptReminder}
+                  onChangeText={(text) => updateFormData('acceptReminder', text)}
+                />
               </View>
-              <TextInput 
-                style={styles.emotionLargeInputBox} 
-                multiline 
-                placeholder="寫下你想提醒自己的話..."
-                placeholderTextColor="rgba(0, 0, 0, 0.4)"
-                value={formData.acceptReminder}
-                onChangeText={(text) => updateFormData('acceptReminder', text)}
-              />
-            </View>
-          </ScrollView>
+              
+              <TouchableOpacity 
+                style={styles.completeButton} 
+                onPress={nextStep}
+              >
+                <Text style={styles.completeButtonText}>我完成練習了！</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </KeyboardAvoidingView>
         );
       }
 
       if (formData.copingChoice === 'regulate') {
         return (
-          <ScrollView style={styles.emotionFormContainer} showsVerticalScrollIndicator={false}>
-            <View style={styles.followUpCard}>
-              <Text style={styles.followUpTitle}>選擇一個調節方式：</Text>
-              
-              <View style={styles.regulateChoiceContainer}>
-                <TouchableOpacity
-                  style={[
-                    styles.regulateChoiceButton,
-                    formData.regulateChoice === 'selfTalk' && styles.regulateChoiceButtonSelected
-                  ]}
-                  onPress={() => updateFormData('regulateChoice', 'selfTalk')}
-                >
-                  <Text style={styles.regulateChoiceEmoji}>💬</Text>
-                  <Text style={[
-                    styles.regulateChoiceText,
-                    formData.regulateChoice === 'selfTalk' && styles.regulateChoiceTextSelected
-                  ]}>
-                    自我對話
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[
-                    styles.regulateChoiceButton,
-                    formData.regulateChoice === 'breathing' && styles.regulateChoiceButtonSelected
-                  ]}
-                  onPress={() => updateFormData('regulateChoice', 'breathing')}
-                >
-                  <Text style={styles.regulateChoiceEmoji}>🫁</Text>
-                  <Text style={[
-                    styles.regulateChoiceText,
-                    formData.regulateChoice === 'breathing' && styles.regulateChoiceTextSelected
-                  ]}>
-                    腹式呼吸
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[
-                    styles.regulateChoiceButton,
-                    formData.regulateChoice === 'exercise' && styles.regulateChoiceButtonSelected
-                  ]}
-                  onPress={() => updateFormData('regulateChoice', 'exercise')}
-                >
-                  <Text style={styles.regulateChoiceEmoji}>🏃</Text>
-                  <Text style={[
-                    styles.regulateChoiceText,
-                    formData.regulateChoice === 'exercise' && styles.regulateChoiceTextSelected
-                  ]}>
-                    做做運動
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[
-                    styles.regulateChoiceButton,
-                    formData.regulateChoice === 'happyThing' && styles.regulateChoiceButtonSelected
-                  ]}
-                  onPress={() => updateFormData('regulateChoice', 'happyThing')}
-                >
-                  <Text style={styles.regulateChoiceEmoji}>✨</Text>
-                  <Text style={[
-                    styles.regulateChoiceText,
-                    formData.regulateChoice === 'happyThing' && styles.regulateChoiceTextSelected
-                  ]}>
-                    讓心情變好的事
-                  </Text>
-                </TouchableOpacity>
-              </View>
-
-              {formData.regulateChoice === 'selfTalk' && (
-                <View style={styles.regulateInputSection}>
-                  <Text style={styles.regulatePrompt}>
-                    如果你的內在有一個支持你的聲音，它現在會說什麼？
-                  </Text>
-                  <TextInput 
-                    style={styles.emotionLargeInputBox} 
-                    multiline 
-                    placeholder="寫下那個支持你的聲音會說的話..."
-                    placeholderTextColor="rgba(0, 0, 0, 0.4)"
-                    value={formData.selfTalkText}
-                    onChangeText={(text) => updateFormData('selfTalkText', text)}
-                  />
-                </View>
-              )}
-
-              {formData.regulateChoice === 'breathing' && (
-                <View style={styles.regulateInputSection}>
-                  <View style={styles.breathingCard}>
-                    <Text style={styles.breathingTitle}>腹式呼吸練習</Text>
-                    <Text style={styles.breathingDesc}>
-                      讓我們一起進行腹式呼吸，調節自律神經，幫助你平靜下來。
+          <KeyboardAvoidingView 
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={{ flex: 1 }}
+            keyboardVerticalOffset={100}
+          >
+            <ScrollView 
+              ref={scrollViewRef}
+              style={styles.emotionFormContainer} 
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{ paddingBottom: 40 }}
+            >
+              <View style={styles.followUpCard}>
+                <Text style={styles.followUpTitle}>選擇一個調節方式：</Text>
+                
+                <View style={styles.regulateChoiceContainer}>
+                  <TouchableOpacity
+                    style={[
+                      styles.regulateChoiceButton,
+                      formData.regulateChoice === 'selfTalk' && styles.regulateChoiceButtonSelected
+                    ]}
+                    onPress={() => updateFormData('regulateChoice', 'selfTalk')}
+                  >
+                    <Text style={styles.regulateChoiceEmoji}>💬</Text>
+                    <Text style={[
+                      styles.regulateChoiceText,
+                      formData.regulateChoice === 'selfTalk' && styles.regulateChoiceTextSelected
+                    ]}>
+                      自我對話
                     </Text>
-                    <TouchableOpacity 
-                      style={styles.breathingButton}
-                      onPress={() => console.log('開始腹式呼吸練習')}
-                    >
-                      <Text style={styles.breathingButtonText}>開始練習</Text>
-                    </TouchableOpacity>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.regulateChoiceButton,
+                      formData.regulateChoice === 'breathing' && styles.regulateChoiceButtonSelected
+                    ]}
+                    onPress={() => updateFormData('regulateChoice', 'breathing')}
+                  >
+                    <Text style={styles.regulateChoiceEmoji}>🫁</Text>
+                    <Text style={[
+                      styles.regulateChoiceText,
+                      formData.regulateChoice === 'breathing' && styles.regulateChoiceTextSelected
+                    ]}>
+                      腹式呼吸
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.regulateChoiceButton,
+                      formData.regulateChoice === 'exercise' && styles.regulateChoiceButtonSelected
+                    ]}
+                    onPress={() => updateFormData('regulateChoice', 'exercise')}
+                  >
+                    <Text style={styles.regulateChoiceEmoji}>🏃</Text>
+                    <Text style={[
+                      styles.regulateChoiceText,
+                      formData.regulateChoice === 'exercise' && styles.regulateChoiceTextSelected
+                    ]}>
+                      做做運動
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.regulateChoiceButton,
+                      formData.regulateChoice === 'happyThing' && styles.regulateChoiceButtonSelected
+                    ]}
+                    onPress={() => updateFormData('regulateChoice', 'happyThing')}
+                  >
+                    <Text style={styles.regulateChoiceEmoji}>✨</Text>
+                    <Text style={[
+                      styles.regulateChoiceText,
+                      formData.regulateChoice === 'happyThing' && styles.regulateChoiceTextSelected
+                    ]}>
+                      讓心情變好的事
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                {formData.regulateChoice === 'selfTalk' && (
+                  <View style={styles.regulateInputSection}>
+                    <Text style={styles.regulatePrompt}>
+                      如果你的內在有一個支持你的聲音，它現在會說什麼？
+                    </Text>
+                    <TextInput 
+                      style={styles.emotionLargeInputBox} 
+                      multiline 
+                      placeholder="寫下那個支持你的聲音會說的話..."
+                      placeholderTextColor="rgba(0, 0, 0, 0.4)"
+                      value={formData.selfTalkText}
+                      onChangeText={(text) => updateFormData('selfTalkText', text)}
+                    />
                   </View>
-                </View>
-              )}
+                )}
 
-              {formData.regulateChoice === 'exercise' && (
-                <View style={styles.regulateInputSection}>
-                  <Text style={styles.regulatePrompt}>你想做什麼運動？</Text>
-                  <TextInput 
-                    style={styles.emotionLargeInputBox} 
-                    multiline 
-                    placeholder="例如：散步、伸展、跑步、瑜伽..."
-                    placeholderTextColor="rgba(0, 0, 0, 0.4)"
-                    value={formData.exerciseText}
-                    onChangeText={(text) => updateFormData('exerciseText', text)}
-                  />
-                </View>
-              )}
+                {formData.regulateChoice === 'breathing' && (
+                  <View style={styles.regulateInputSection}>
+                    <View style={styles.breathingCard}>
+                      <Text style={styles.breathingTitle}>腹式呼吸練習</Text>
+                      <Text style={styles.breathingDesc}>
+                        讓我們一起進行腹式呼吸，調節自律神經，幫助你平靜下來。
+                      </Text>
+                      <TouchableOpacity 
+                        style={styles.breathingButton}
+                        onPress={() => console.log('開始腹式呼吸練習')}
+                      >
+                        <Text style={styles.breathingButtonText}>開始練習</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                )}
 
-              {formData.regulateChoice === 'happyThing' && (
-                <View style={styles.regulateInputSection}>
-                  <Text style={styles.regulatePrompt}>
-                    做一件讓自己心情變好的事情，是什麼呢？
-                  </Text>
-                  <TextInput 
-                    style={styles.emotionLargeInputBox} 
-                    multiline 
-                    placeholder="例如：聽音樂、看喜劇、吃美食、聯絡朋友..."
-                    placeholderTextColor="rgba(0, 0, 0, 0.4)"
-                    value={formData.happyThingText}
-                    onChangeText={(text) => updateFormData('happyThingText', text)}
-                  />
-                </View>
-              )}
-            </View>
-          </ScrollView>
+                {formData.regulateChoice === 'exercise' && (
+                  <View style={styles.regulateInputSection}>
+                    <Text style={styles.regulatePrompt}>你想做什麼運動？</Text>
+                    <TextInput 
+                      style={styles.emotionLargeInputBox} 
+                      multiline 
+                      placeholder="例如：散步、伸展、跑步、瑜伽..."
+                      placeholderTextColor="rgba(0, 0, 0, 0.4)"
+                      value={formData.exerciseText}
+                      onChangeText={(text) => updateFormData('exerciseText', text)}
+                    />
+                  </View>
+                )}
+
+                {formData.regulateChoice === 'happyThing' && (
+                  <View style={styles.regulateInputSection}>
+                    <Text style={styles.regulatePrompt}>
+                      做一件讓自己心情變好的事情，是什麼呢？
+                    </Text>
+                    <TextInput 
+                      style={styles.emotionLargeInputBox} 
+                      multiline 
+                      placeholder="例如：聽音樂、看喜劇、吃美食、聯絡朋友..."
+                      placeholderTextColor="rgba(0, 0, 0, 0.4)"
+                      value={formData.happyThingText}
+                      onChangeText={(text) => updateFormData('happyThingText', text)}
+                    />
+                  </View>
+                )}
+              </View>
+              
+              <TouchableOpacity 
+                style={styles.completeButton} 
+                onPress={nextStep}
+              >
+                <Text style={styles.completeButtonText}>我完成練習了！</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </KeyboardAvoidingView>
         );
       }
 
@@ -771,14 +893,15 @@ export default function EmotionPractice({ onBack }) {
         <View style={styles.diarySection}>
           <Text style={styles.diarySectionTitle}>📍 那個時刻</Text>
           <Text style={styles.diaryText}>
-            {formData.moment && `${formData.moment}，`}
-            {formData.whatHappened || '今天發生了一些事...'}
+            {formData.moment || formData.whatHappened 
+              ? `${formData.moment ? formData.moment + '，' : ''}${formData.whatHappened || ''}`
+              : '無記錄'}
           </Text>
         </View>
 
         <View style={styles.diarySection}>
           <Text style={styles.diarySectionTitle}>💭 我的情緒</Text>
-          {formData.selectedEmotions.length > 0 ? (
+          {formData.selectedEmotions && formData.selectedEmotions.length > 0 ? (
             <View style={styles.diaryEmotionsContainer}>
               {formData.selectedEmotions.map((emotion, index) => (
                 <View key={index} style={styles.diaryEmotionTag}>
@@ -787,66 +910,82 @@ export default function EmotionPractice({ onBack }) {
               ))}
             </View>
           ) : (
-            <Text style={styles.diaryText}>還沒記錄情緒</Text>
+            <Text style={styles.diaryText}>無記錄</Text>
           )}
         </View>
 
         <View style={styles.diarySection}>
           <Text style={styles.diarySectionTitle}>🫀 身體的感覺</Text>
           <Text style={styles.diaryText}>
-            {formData.bodyFeeling || '沒有特別的身體感覺'}
+            {formData.bodyFeeling || '無記錄'}
           </Text>
         </View>
 
         <View style={styles.diarySection}>
           <Text style={styles.diarySectionTitle}>🔍 情緒的意義</Text>
-          <Text style={styles.diaryQuestionText}>{getMeaningPrompt()}</Text>
+          {formData.meaningChoice && (
+            <Text style={styles.diaryQuestionText}>{getMeaningPrompt()}</Text>
+          )}
           <Text style={styles.diaryText}>
-            {formData.meaningText || '還在思考中...'}
+            {formData.meaningText || '無記錄'}
           </Text>
         </View>
 
         <View style={styles.diarySection}>
           <Text style={styles.diarySectionTitle}>🌟 我的選擇</Text>
-          <Text style={styles.diaryHighlight}>
-            {formData.copingChoice === 'enjoy' && '我喜歡，要享受它！'}
-            {formData.copingChoice === 'accept' && '我雖然不喜歡，但我接納它'}
-            {formData.copingChoice === 'regulate' && '我不喜歡，想調節它'}
-          </Text>
-          
-          {formData.copingChoice === 'enjoy' && formData.enjoyMessage && (
-            <View style={styles.diaryQuoteBox}>
-              <Text style={styles.diaryQuoteText}>{formData.enjoyMessage}</Text>
-            </View>
-          )}
-          
-          {formData.copingChoice === 'accept' && formData.acceptReminder && (
-            <View style={styles.diaryQuoteBox}>
-              <Text style={styles.diaryQuoteText}>{formData.acceptReminder}</Text>
-            </View>
-          )}
-          
-          {formData.copingChoice === 'regulate' && (
+          {formData.copingChoice ? (
             <>
-              <Text style={styles.diaryMethodText}>
-                調節方式：
-                {formData.regulateChoice === 'selfTalk' && '自我對話'}
-                {formData.regulateChoice === 'breathing' && '腹式呼吸'}
-                {formData.regulateChoice === 'exercise' && '運動'}
-                {formData.regulateChoice === 'happyThing' && '做讓心情變好的事'}
+              <Text style={styles.diaryHighlight}>
+                {formData.copingChoice === 'enjoy' && '我喜歡，要享受它！'}
+                {formData.copingChoice === 'accept' && '我雖然不喜歡，但我接納它'}
+                {formData.copingChoice === 'regulate' && '我不喜歡，想調節它'}
               </Text>
-              {formData.selfTalkText && (
+              
+              {formData.copingChoice === 'enjoy' && (
                 <View style={styles.diaryQuoteBox}>
-                  <Text style={styles.diaryQuoteText}>{formData.selfTalkText}</Text>
+                  <Text style={styles.diaryQuoteText}>
+                    {formData.enjoyMessage || '無記錄'}
+                  </Text>
                 </View>
               )}
-              {formData.exerciseText && (
-                <Text style={styles.diaryText}>運動計畫：{formData.exerciseText}</Text>
+              
+              {formData.copingChoice === 'accept' && (
+                <View style={styles.diaryQuoteBox}>
+                  <Text style={styles.diaryQuoteText}>
+                    {formData.acceptReminder || '無記錄'}
+                  </Text>
+                </View>
               )}
-              {formData.happyThingText && (
-                <Text style={styles.diaryText}>開心的事：{formData.happyThingText}</Text>
+              
+              {formData.copingChoice === 'regulate' && (
+                <>
+                  <Text style={styles.diaryMethodText}>
+                    調節方式：
+                    {formData.regulateChoice === 'selfTalk' && '自我對話'}
+                    {formData.regulateChoice === 'breathing' && '腹式呼吸'}
+                    {formData.regulateChoice === 'exercise' && '運動'}
+                    {formData.regulateChoice === 'happyThing' && '做讓心情變好的事'}
+                    {!formData.regulateChoice && '無記錄'}
+                  </Text>
+                  {formData.selfTalkText && (
+                    <View style={styles.diaryQuoteBox}>
+                      <Text style={styles.diaryQuoteText}>{formData.selfTalkText}</Text>
+                    </View>
+                  )}
+                  {formData.exerciseText && (
+                    <Text style={styles.diaryText}>運動計畫：{formData.exerciseText}</Text>
+                  )}
+                  {formData.happyThingText && (
+                    <Text style={styles.diaryText}>開心的事：{formData.happyThingText}</Text>
+                  )}
+                  {!formData.selfTalkText && !formData.exerciseText && !formData.happyThingText && (
+                    <Text style={styles.diaryText}>無記錄</Text>
+                  )}
+                </>
               )}
             </>
+          ) : (
+            <Text style={styles.diaryText}>無記錄</Text>
           )}
         </View>
 
@@ -926,26 +1065,15 @@ export default function EmotionPractice({ onBack }) {
     return null;
   };
 
-  // ⭐ 修正：智能判斷是否可以使用左右滑動
-  const canUseTapNavigation = () => {
-    if (currentStepData.hasEmotionSummary) return false;
-    
-    const formTypesWithInput = ['moment', 'bodyFeeling', 'meaning', 'copingFollow'];
-    if (currentStepData.hasEmotionForm && formTypesWithInput.includes(currentStepData.formType)) {
-      return false;
-    }
-    
-    if (currentStepData.formType === 'coping') return false;
-    
-    return true;
-  };
+  const isLastStep = currentStep === steps.length - 1;
+  const isSecondToLast = currentStepData.isSecondToLast;
 
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="rgba(46, 134, 171, 0.7)" />
       
       <View style={styles.header}>
-        <TouchableOpacity onPress={onBack}>
+        <TouchableOpacity onPress={onBack || (() => navigation?.goBack())}>
           <Text style={styles.closeButton}>✕</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>《情緒理解力練習》</Text>
@@ -965,22 +1093,6 @@ export default function EmotionPractice({ onBack }) {
       ) : (
         <TouchableWithoutFeedback onPress={dismissKeyboard}>
           <View style={styles.contentContainer}>
-            {/* ⭐ 左右區域點擊導航（智能判斷） */}
-            {canUseTapNavigation() && currentStep > 0 && (
-              <TouchableOpacity 
-                style={styles.leftTapArea}
-                onPress={prevStep}
-                activeOpacity={1}
-              />
-            )}
-            {canUseTapNavigation() && currentStep < steps.length - 1 && (
-              <TouchableOpacity 
-                style={styles.rightTapArea}
-                onPress={nextStep}
-                activeOpacity={1}
-              />
-            )}
-
             <View style={styles.stepHeader}>
               <Text style={styles.stepTitle}>{currentStepData.title}</Text>
               {currentStepData.content && !currentStepData.hasEmotionForm && (
@@ -993,35 +1105,43 @@ export default function EmotionPractice({ onBack }) {
         </TouchableWithoutFeedback>
       )}
 
-      <View style={styles.bottomNav}>
-        <TouchableOpacity 
-          onPress={prevStep}
-          disabled={currentStep === 0}
-          style={[styles.navButton, currentStep === 0 && styles.navButtonDisabled]}
-        >
-          <Text style={styles.navButtonText}>〈</Text>
-        </TouchableOpacity>
-        
-        <View style={styles.progressIndicator}>
-          {steps.map((_, index) => (
-            <View 
-              key={index}
-              style={[
-                styles.progressDot,
-                index === currentStep && styles.progressDotActive
-              ]}
-            />
-          ))}
+      {!isLastStep && (
+        <View style={styles.bottomNav}>
+          <TouchableOpacity 
+            onPress={prevStep}
+            disabled={currentStep === 0}
+            style={[
+              styles.navArrowButton,
+              currentStep === 0 && styles.navButtonDisabled
+            ]}
+          >
+            <Text style={styles.navArrowText}>〈</Text>
+          </TouchableOpacity>
+          
+          <View style={styles.progressIndicator}>
+            {steps.map((_, index) => (
+              <View 
+                key={index}
+                style={[
+                  styles.progressDot,
+                  index === currentStep && styles.progressDotActive
+                ]}
+              />
+            ))}
+          </View>
+          
+          <TouchableOpacity 
+            onPress={nextStep}
+            disabled={isSecondToLast}
+            style={[
+              styles.navArrowButton,
+              isSecondToLast && styles.navButtonDisabled
+            ]}
+          >
+            <Text style={styles.navArrowText}>〉</Text>
+          </TouchableOpacity>
         </View>
-        
-        <TouchableOpacity 
-          onPress={nextStep}
-          disabled={currentStep === steps.length - 1}
-          style={[styles.navButton, currentStep === steps.length - 1 && styles.navButtonDisabled]}
-        >
-          <Text style={styles.navButtonText}>〉</Text>
-        </TouchableOpacity>
-      </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -1071,24 +1191,7 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 20,
     paddingBottom: 100,
-    position: 'relative',
     justifyContent: 'center',
-  },
-  leftTapArea: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
-    width: '40%',
-    zIndex: 10,
-  },
-  rightTapArea: {
-    position: 'absolute',
-    right: 0,
-    top: 0,
-    bottom: 0,
-    width: '40%',
-    zIndex: 10,
   },
   stepHeader: {
     alignItems: 'center',
@@ -1216,7 +1319,7 @@ const styles = StyleSheet.create({
   },
   emotionChipTextSelected: {
     fontWeight: 'bold',
-    color: '#8C8275)',
+    color: '#8C8275',
   },
   selectedEmotionsContainer: {
     backgroundColor: 'rgba(255, 255, 255, 0.95)',
@@ -1440,6 +1543,22 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 12,
   },
+  completeButton: {
+    backgroundColor: '#f5f5f5',
+    paddingVertical: 14,
+    paddingHorizontal: 32,
+    borderRadius: 25,
+    alignSelf: 'center',
+    marginTop: 30,
+    marginBottom: 20,
+    borderWidth: 2,
+    borderColor: '#8C8275',
+  },
+  completeButtonText: {
+    color: '#8C8275',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
   diaryScrollView: {
     flex: 1,
   },
@@ -1574,20 +1693,28 @@ const styles = StyleSheet.create({
     paddingHorizontal: 30,
     paddingVertical: 20,
     paddingBottom: 36,
-    backgroundColor: '#8C8275',
+    backgroundColor: 'transparent',
   },
-  navButton: {
-    width: 40,
-    height: 40,
+  navArrowButton: {
+    width: 50,
+    height: 50,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 25,
     justifyContent: 'center',
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 3,
   },
   navButtonDisabled: {
     opacity: 0.3,
   },
-  navButtonText: {
+  navArrowText: {
     fontSize: 24,
-    color: 'rgba(0, 0, 0, 0.6)',
+    color: '#8C8275',
+    fontWeight: 'bold',
   },
   progressIndicator: {
     flexDirection: 'row',
@@ -1597,11 +1724,11 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: 'rgba(0, 0, 0, 0.2)',
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
     marginHorizontal: 4,
   },
   progressDotActive: {
-    backgroundColor: '#8C8275',
+    backgroundColor: '#FFFFFF',
     width: 12,
     height: 12,
     borderRadius: 6,

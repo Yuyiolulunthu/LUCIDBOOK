@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   TextInput,
   StatusBar,
+  Modal,
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import ApiService from './api';
@@ -30,6 +31,10 @@ const DailyScreen = ({ navigation }) => {
     totalSeconds: 0,
     practiceTypes: 0,
   });
+  
+  // ⭐ 新增：詳情模態框狀態
+  const [detailModalVisible, setDetailModalVisible] = useState(false);
+  const [selectedPractice, setSelectedPractice] = useState(null);
 
   useEffect(() => {
     fetchAllData();
@@ -53,7 +58,6 @@ const DailyScreen = ({ navigation }) => {
       ]);
       
       console.log('📊 API 返回的練習記錄:', practiceResponse);
-      console.log('😊 API 返回的今日心情:', moodResponse);
       console.log('✅ API 返回的今日狀態:', statusResponse);
       
       if (practiceResponse.practices) {
@@ -82,9 +86,8 @@ const DailyScreen = ({ navigation }) => {
   const calculateTodayProgress = (practices) => {
     const requiredPractices = ['呼吸穩定力練習', '情緒理解力練習', '五感覺察練習'];
     
-    // ⭐ 使用台灣時區的今天日期
     const now = new Date();
-    const offset = 8 * 60; // 台灣 UTC+8
+    const offset = 8 * 60;
     const localTime = new Date(now.getTime() + offset * 60 * 1000);
     const today = localTime.toISOString().split('T')[0];
     
@@ -93,27 +96,26 @@ const DailyScreen = ({ navigation }) => {
     const completedTypes = new Set();
     
     practices.forEach(practice => {
-        const isCompleted = String(practice.completed) === '1' || practice.completed === 1;
-        if (!isCompleted) {
+      const isCompleted = String(practice.completed) === '1' || practice.completed === 1;
+      if (!isCompleted) {
         return;
-        }
-        
-        // ⭐ 資料庫時間已經是台灣時區，直接取日期部分
-        const practiceDate = practice.completed_at ? 
+      }
+      
+      const practiceDate = practice.completed_at ? 
         practice.completed_at.split(' ')[0] : null;
-        
-        console.log('🔍 檢查練習:', {
+      
+      console.log('🔍 檢查練習:', {
         type: practice.practice_type,
         practiceDate,
         today,
         isToday: practiceDate === today,
         isRequired: requiredPractices.includes(practice.practice_type)
-        });
-        
-        if (practiceDate === today && requiredPractices.includes(practice.practice_type)) {
+      });
+      
+      if (practiceDate === today && requiredPractices.includes(practice.practice_type)) {
         completedTypes.add(practice.practice_type);
         console.log('✅ 加入今日完成:', practice.practice_type);
-        }
+      }
     });
     
     const completedCount = completedTypes.size;
@@ -172,7 +174,6 @@ const DailyScreen = ({ navigation }) => {
     const completedPractices = practices.length;
     const completionRate = Math.min((completedPractices / expectedPractices) * 100, 100);
 
-    // ⭐ 修正：累計秒數
     const totalSeconds = practices.reduce((sum, p) => {
       return sum + (parseInt(p.duration_seconds) || parseInt(p.duration) * 60 || 0);
     }, 0);
@@ -191,7 +192,6 @@ const DailyScreen = ({ navigation }) => {
   const formatDateToLocal = (dateString) => {
     if (!dateString) return '';
     
-    // 資料庫返回格式：'2025-10-13 16:34:53'（已經是台灣時間）
     const parts = dateString.split(/[- :]/);
     const year = parseInt(parts[0]);
     const month = parseInt(parts[1]) - 1;
@@ -199,7 +199,6 @@ const DailyScreen = ({ navigation }) => {
     const hours = parseInt(parts[3]);
     const minutes = parseInt(parts[4]);
     
-    // 判斷上午/下午
     const period = hours >= 12 ? '下午' : '上午';
     const displayHours = hours % 12 || 12;
     
@@ -214,14 +213,12 @@ const DailyScreen = ({ navigation }) => {
     return `${parseInt(month)}月${parseInt(day)}日, ${year} ${timePart}`;
   };
 
-  // ⭐ 新增：格式化總時間（顯示到秒）
   const formatTotalTime = (seconds) => {
     const days = Math.floor(seconds / 86400);
     const hours = Math.floor((seconds % 86400) / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
     const secs = seconds % 60;
     
-    // 如果總時間 < 1天，顯示秒數
     if (days === 0) {
       let result = '';
       if (hours > 0) result += `${hours}小時`;
@@ -229,7 +226,6 @@ const DailyScreen = ({ navigation }) => {
       if (secs > 0 || (hours === 0 && minutes === 0)) result += `${secs}秒`;
       return result || '0秒';
     } else {
-      // >= 1天，不顯示秒數
       let result = '';
       if (days > 0) result += `${days}天`;
       if (hours > 0) result += `${hours}小時`;
@@ -238,10 +234,62 @@ const DailyScreen = ({ navigation }) => {
     }
   };
 
-  const extractReflectionSnippet = (reflection) => {
-    if (!reflection) return '暫無記錄';
+  // ⭐ 修改：根據練習類型和優先順序提取摘要
+  const extractReflectionSnippet = (practice) => {
+    let summary = '';
     
-    const cleaned = reflection.trim();
+    if (practice.practice_type === '呼吸穩定力練習') {
+      // 優先順序: reflection > noticed > feeling > "空"
+      if (practice.reflection && practice.reflection.trim()) {
+        summary = practice.reflection.trim();
+      } else if (practice.noticed && practice.noticed.trim()) {
+        summary = practice.noticed.trim();
+      } else if (practice.feeling && practice.feeling.trim()) {
+        summary = practice.feeling.trim();
+      } else {
+        return '暫無記錄';
+      }
+    } else if (practice.practice_type === '情緒理解力練習') {
+      // 解析 emotion_data
+      let emotionData = null;
+      if (practice.emotion_data) {
+        try {
+          emotionData = typeof practice.emotion_data === 'string' 
+            ? JSON.parse(practice.emotion_data) 
+            : practice.emotion_data;
+        } catch (e) {
+          console.log('解析 emotion_data 失敗:', e);
+        }
+      }
+      
+      // 優先順序: what_happened > body_feeling > coping_choice > "空"
+      if (emotionData?.what_happened && emotionData.what_happened.trim()) {
+        summary = emotionData.what_happened.trim();
+      } else if (emotionData?.body_feeling && emotionData.body_feeling.trim()) {
+        summary = emotionData.body_feeling.trim();
+      } else if (emotionData?.coping_choice) {
+        const copingMap = {
+          'enjoy': '我喜歡，要享受它！',
+          'accept': '我雖然不喜歡，但我接納它',
+          'regulate': '我不喜歡，想調節它'
+        };
+        summary = copingMap[emotionData.coping_choice] || emotionData.coping_choice;
+      } else {
+        return '暫無記錄';
+      }
+    } else {
+      // 其他練習類型
+      if (practice.reflection && practice.reflection.trim()) {
+        summary = practice.reflection.trim();
+      } else if (practice.noticed && practice.noticed.trim()) {
+        summary = practice.noticed.trim();
+      } else {
+        return '暫無記錄';
+      }
+    }
+    
+    // 截斷長文本
+    const cleaned = summary.trim();
     const sentences = cleaned.split(/[。！？]/);
     const firstSentence = sentences[0].trim();
     
@@ -250,6 +298,180 @@ const DailyScreen = ({ navigation }) => {
     }
     
     return firstSentence;
+  };
+
+  // ⭐ 新增：點擊記錄卡片，顯示詳情
+  const handlePracticeCardPress = (practice) => {
+    setSelectedPractice(practice);
+    setDetailModalVisible(true);
+  };
+
+  // ⭐ 新增：渲染練習詳情模態框
+  const renderPracticeDetailModal = () => {
+    if (!selectedPractice) return null;
+    
+    const isBreathing = selectedPractice.practice_type === '呼吸穩定力練習';
+    const isEmotion = selectedPractice.practice_type === '情緒理解力練習';
+    
+    // 顏色配置
+    const primaryColor = isBreathing ? 'rgba(46, 134, 171, 0.75)' : 'rgba(150, 134, 118, 1)';
+    const lightBg = isBreathing ? 'rgba(46, 134, 171, 0.1)' : 'rgba(150, 134, 118, 0.1)';
+    
+    // 解析情緒數據
+    let emotionData = null;
+    if (isEmotion && selectedPractice.emotion_data) {
+      try {
+        emotionData = typeof selectedPractice.emotion_data === 'string'
+          ? JSON.parse(selectedPractice.emotion_data)
+          : selectedPractice.emotion_data;
+      } catch (e) {
+        console.log('解析 emotion_data 失敗:', e);
+        emotionData = {}; // 確保有一個空對象
+      }
+    }
+    
+    // 格式化時間
+    const formatDuration = (durationSeconds) => {
+      const seconds = parseInt(durationSeconds) || 0;
+      if (seconds === 0) {
+        const mins = parseInt(selectedPractice.duration) || 0;
+        return `${mins}分`;
+      }
+      const mins = Math.floor(seconds / 60);
+      const secs = seconds % 60;
+      if (mins === 0) return `${secs}秒`;
+      return `${mins}分${secs}秒`;
+    };
+    
+    return (
+      <Modal
+        visible={detailModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setDetailModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <View style={[styles.modalHeader, { backgroundColor: primaryColor }]}>
+              <Text style={styles.modalTitle}>{selectedPractice.practice_type}</Text>
+              <TouchableOpacity 
+                onPress={() => setDetailModalVisible(false)}
+                style={styles.modalCloseButton}
+              >
+                <Text style={styles.modalCloseText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            
+            <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={false}>
+              {/* 基本資訊 */}
+              <View style={styles.detailSection}>
+                <Text style={styles.detailLabel}>📅 完成日期</Text>
+                <Text style={styles.detailValue}>{formatDate(selectedPractice.completed_at)}</Text>
+              </View>
+              
+              <View style={styles.detailSection}>
+                <Text style={styles.detailLabel}>⏱️ 投入時間</Text>
+                <Text style={styles.detailValue}>{formatDuration(selectedPractice.duration_seconds)}</Text>
+              </View>
+              
+              <View style={styles.detailSection}>
+                <Text style={styles.detailLabel}>💭 當天心情</Text>
+                <Text style={styles.detailValue}>{selectedPractice.feeling || '無記錄'}</Text>
+              </View>
+              
+              {/* ⭐ 呼吸穩定力練習的記錄 - 所有卡片都顯示 */}
+              {isBreathing && (
+                <>
+                  <View style={[styles.detailCard, { backgroundColor: lightBg }]}>
+                    <Text style={styles.detailCardTitle}>練習後的感覺</Text>
+                    <Text style={styles.detailCardContent}>
+                      {selectedPractice.feeling || '無記錄'}
+                    </Text>
+                  </View>
+                  
+                  <View style={[styles.detailCard, { backgroundColor: lightBg }]}>
+                    <Text style={styles.detailCardTitle}>練習中的發現</Text>
+                    <Text style={styles.detailCardContent}>
+                      {selectedPractice.noticed || '無記錄'}
+                    </Text>
+                  </View>
+                  
+                  <View style={[styles.detailCard, { backgroundColor: lightBg }]}>
+                    <Text style={styles.detailCardTitle}>想對自己說的話</Text>
+                    <Text style={styles.detailCardContent}>
+                      {selectedPractice.reflection || '無記錄'}
+                    </Text>
+                  </View>
+                </>
+              )}
+              
+              {/* ⭐ 情緒理解力練習的記錄 - 所有卡片都顯示 */}
+              {isEmotion && (
+                <>
+                  <View style={[styles.detailCard, { backgroundColor: lightBg }]}>
+                    <Text style={styles.detailCardTitle}>📍 那個時刻</Text>
+                    <Text style={styles.detailCardContent}>
+                      {emotionData?.moment || emotionData?.what_happened
+                        ? `${emotionData.moment || ''}${emotionData.moment && emotionData.what_happened ? '，' : ''}${emotionData.what_happened || ''}`
+                        : '無記錄'}
+                    </Text>
+                  </View>
+                  
+                  <View style={[styles.detailCard, { backgroundColor: lightBg }]}>
+                    <Text style={styles.detailCardTitle}>💭 我的情緒</Text>
+                    {emotionData?.selected_emotions && emotionData.selected_emotions.length > 0 ? (
+                      <View style={styles.emotionTagsContainer}>
+                        {emotionData.selected_emotions.map((emotion, index) => (
+                          <View key={index} style={[styles.emotionTag, { borderColor: primaryColor }]}>
+                            <Text style={[styles.emotionTagText, { color: primaryColor }]}>{emotion}</Text>
+                          </View>
+                        ))}
+                      </View>
+                    ) : (
+                      <Text style={styles.detailCardContent}>無記錄</Text>
+                    )}
+                  </View>
+                  
+                  <View style={[styles.detailCard, { backgroundColor: lightBg }]}>
+                    <Text style={styles.detailCardTitle}>🫀 身體的感覺</Text>
+                    <Text style={styles.detailCardContent}>
+                      {emotionData?.body_feeling || '無記錄'}
+                    </Text>
+                  </View>
+                  
+                  <View style={[styles.detailCard, { backgroundColor: lightBg }]}>
+                    <Text style={styles.detailCardTitle}>🔍 情緒的意義</Text>
+                    <Text style={styles.detailCardContent}>
+                      {emotionData?.meaning_text || '無記錄'}
+                    </Text>
+                  </View>
+                  
+                  <View style={[styles.detailCard, { backgroundColor: lightBg }]}>
+                    <Text style={styles.detailCardTitle}>🌟 我的選擇</Text>
+                    {emotionData?.coping_choice ? (
+                      <>
+                        <Text style={[styles.detailCardContent, { fontWeight: '600', color: primaryColor, marginBottom: 8 }]}>
+                          {emotionData.coping_choice === 'enjoy' && '我喜歡，要享受它！'}
+                          {emotionData.coping_choice === 'accept' && '我雖然不喜歡，但我接納它'}
+                          {emotionData.coping_choice === 'regulate' && '我不喜歡，想調節它'}
+                        </Text>
+                        <Text style={styles.detailCardContent}>
+                          {emotionData.enjoy_message || emotionData.accept_reminder || emotionData.regulate_text || '無記錄'}
+                        </Text>
+                      </>
+                    ) : (
+                      <Text style={styles.detailCardContent}>無記錄</Text>
+                    )}
+                  </View>
+                </>
+              )}
+              
+              <View style={{ height: 40 }} />
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+    );
   };
 
   const SemiCircleProgress = ({ completedCount }) => {
@@ -342,51 +564,51 @@ const DailyScreen = ({ navigation }) => {
     const practiceDate = localDate.split(' ')[0];
     const isToday = practiceDate === todayStr;
 
-    // ⭐ 修正：正確格式化秒數
     const formatDuration = (durationSeconds) => {
-        // 優先使用 duration_seconds
-        const seconds = parseInt(durationSeconds) || 0;
-        
-        if (seconds === 0) {
-        // 如果沒有秒數，使用 duration（分鐘）
+      const seconds = parseInt(durationSeconds) || 0;
+      
+      if (seconds === 0) {
         const mins = parseInt(practice.duration) || 0;
         return `${mins}分`;
-        }
-        
-        const mins = Math.floor(seconds / 60);
-        const secs = seconds % 60;
-        
-        if (mins === 0) {
+      }
+      
+      const mins = Math.floor(seconds / 60);
+      const secs = seconds % 60;
+      
+      if (mins === 0) {
         return `${secs}秒`;
-        }
-        
-        return `${mins}分${secs}秒`;
+      }
+      
+      return `${mins}分${secs}秒`;
     };
     
     return (
-        <View style={styles.recordCard}>
+      <TouchableOpacity 
+        style={styles.recordCard}
+        onPress={() => handlePracticeCardPress(practice)}
+        activeOpacity={0.7}
+      >
         <View style={styles.recordHeader}>
-            <Text style={styles.practiceTypeName}>{practice.practice_type}</Text>
-            <Text style={styles.practiceDuration}>
+          <Text style={styles.practiceTypeName}>{practice.practice_type}</Text>
+          <Text style={styles.practiceDuration}>
             {formatDuration(practice.duration_seconds)}
-            </Text>
+          </Text>
         </View>
         
         <View style={styles.recordInfo}>
-            <Text style={styles.recordDate}>
+          <Text style={styles.recordDate}>
             {formatDate(practice.completed_at)}
             {isToday && todayMood && `, 心情: ${todayMood.mood_name}`}
             {!isToday && practice.feeling && `, 心情: ${practice.feeling}`}
-            </Text>
+          </Text>
         </View>
 
         <View style={styles.recordReflection}>
-            <Text style={styles.reflectionLabel}>給自己的一段話:</Text>
-            <Text style={styles.reflectionText}>
-            {extractReflectionSnippet(practice.reflection || practice.noticed)}
-            </Text>
+          <Text style={styles.reflectionText}>
+            {extractReflectionSnippet(practice)}
+          </Text>
         </View>
-        </View>
+      </TouchableOpacity>
     );
   };
 
@@ -477,6 +699,9 @@ const DailyScreen = ({ navigation }) => {
 
         <View style={styles.bottomPadding} />
       </ScrollView>
+
+      {/* ⭐ 詳情模態框 */}
+      {renderPracticeDetailModal()}
 
       <View style={styles.bottomNav}>
         <TouchableOpacity
@@ -748,11 +973,6 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 6,
   },
-  reflectionLabel: {
-    fontSize: 12,
-    color: '#6B7280',
-    marginBottom: 4,
-  },
   reflectionText: {
     fontSize: 13,
     color: '#374151',
@@ -784,6 +1004,91 @@ const styles = StyleSheet.create({
     width: 34,
     height: 34,
     tintColor: '#FFFFFF',
+  },
+  // ⭐ 新增：詳情模態框樣式
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContainer: {
+    backgroundColor: '#f5f5f5',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '85%',
+    overflow: 'hidden',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    flex: 1,
+  },
+  modalCloseButton: {
+    padding: 4,
+  },
+  modalCloseText: {
+    fontSize: 24,
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+  },
+  modalContent: {
+    paddingHorizontal: 20,
+    paddingTop: 20,
+  },
+  detailSection: {
+    marginBottom: 16,
+  },
+  detailLabel: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginBottom: 4,
+    fontWeight: '500',
+  },
+  detailValue: {
+    fontSize: 16,
+    color: '#111827',
+    fontWeight: '600',
+  },
+  detailCard: {
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 16,
+  },
+  detailCardTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#111827',
+    marginBottom: 8,
+  },
+  detailCardContent: {
+    fontSize: 14,
+    color: '#374151',
+    lineHeight: 22,
+  },
+  emotionTagsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 8,
+  },
+  emotionTag: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    marginRight: 8,
+    marginBottom: 8,
+  },
+  emotionTagText: {
+    fontSize: 13,
+    fontWeight: '500',
   },
 });
 
