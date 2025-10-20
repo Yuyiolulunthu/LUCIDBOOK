@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, {useState, useEffect } from 'react';
+
 import {
   View,
   Text,
@@ -12,9 +13,11 @@ import {
   Platform,
   Modal,
 } from 'react-native';
-import ApiService from '../api';
+import ApiService from '../api'
+;
 
 const SelfAwarenessPractice = ({ onBack }) => {
+  const [practiceId, setPracticeId] = useState(null);
   const [currentStep, setCurrentStep] = useState(0);
   const [answers, setAnswers] = useState({
     event: '',
@@ -153,14 +156,67 @@ const SelfAwarenessPractice = ({ onBack }) => {
   useEffect(() => {
     recordStartTime();
   }, []);
+  
+useEffect(() => {
+  startPractice();
+}, []);
+
+
+const startPractice = async () => {
+  try {
+    const response = await ApiService.startPractice('自我覺察力練習');
+    console.log('🧩 startPractice 回傳內容:', response);
+
+    if (response.practiceId) {
+      setPracticeId(response.practiceId);
+      console.log('✅ 已設定練習 ID:', response.practiceId);
+    } else {
+      console.warn('⚠️ 沒有拿到 practiceId，後端回傳:', response);
+    }
+  } catch (error) {
+    console.error('❌ 啟動練習失敗:', error);
+  }
+};
+
+const completePractice = async () => {
+  try {
+    console.log('🚀 準備完成練習，practiceId =', practiceId);
+
+    if (!practiceId) {
+      Alert.alert('錯誤', '尚未建立練習記錄，請重新進入此頁。');
+      return;
+    }
+
+    const result = await ApiService.completePractice(practiceId, {
+      duration: 10,
+      feeling: '放鬆',
+      noticed: '更能觀察自己的思緒',
+      reflection: '覺察讓我平靜',
+    });
+
+    console.log('🎯 完成練習回傳:', result);
+
+    if (result.success) {
+      Alert.alert('完成', '已成功記錄練習結果！');
+    }
+  } catch (error) {
+    console.error('❌ 完成練習失敗:', error);
+    Alert.alert('錯誤', `完成練習失敗：${error.message}`);
+  }
+};
 
   const recordStartTime = async () => {
-    try {
-      await ApiService.startPractice('自我覺察力練習');
-    } catch (error) {
-      console.error('記錄練習開始失敗:', error);
-    }
-  };
+  try {
+    const response = await ApiService.startPractice('自我覺察力練習');
+    const pid = response.practiceId || response.id || response.practice_id || 9999; // fallback
+    setPracticeId(pid);
+    console.log('✅ 練習開始 ID:', pid);
+  } catch (error) {
+    console.error('記錄練習開始失敗:', error);
+  }
+};
+
+
 
   const handleNext = () => {
     if (currentStep < steps.length - 1) {
@@ -176,25 +232,36 @@ const SelfAwarenessPractice = ({ onBack }) => {
     }
   };
 
-  const completePractice = async () => {
-    try {
-      const response = await ApiService.completePractice('自我覺察力練習', {
-        answers: answers,
-      });
-      
-      if (response.success) {
-        setIsCompleted(true);
-        Alert.alert(
-          '練習完成',
-          '你已經完成了今天的自我覺察力練習！',
-          [{ text: '返回', onPress: onBack }]
-        );
-      }
-    } catch (error) {
-      console.error('完成練習失敗:', error);
-      Alert.alert('錯誤', '無法保存練習記錄，請稍後再試');
-    }
-  };
+      //   const completePractice = async () => {
+      //   try {
+      //     if (!practiceId) {
+      //       Alert.alert('錯誤', '尚未建立練習記錄，請重新開始。');
+      //       return;
+      //     }
+
+      //     const response = await ApiService.completePractice(practiceId, {
+      //       duration: 10,  // 可改成實際時間
+      //       feeling: answers.finalFeeling || '',
+      //       noticed: answers.event || '',
+      //       reflection: answers.newResponse || '',
+      //     });
+
+      //     if (response.success) {
+      //       setIsCompleted(true);
+      //       Alert.alert(
+      //         '練習完成',
+      //         '你已經完成了今天的自我覺察力練習！',
+      //         [{ text: '返回', onPress: onBack }]
+      //       );
+      //     } else {
+      //       throw new Error(response.message || '伺服器未回傳 success');
+      //     }
+      //   } catch (error) {
+      //     console.error('完成練習失敗:', error);
+      //     Alert.alert('錯誤', '無法保存練習記錄，請稍後再試');
+      //   }
+      // };
+
 
   const updateAnswer = (key, value) => {
     setAnswers(prev => ({
@@ -346,15 +413,20 @@ const SelfAwarenessPractice = ({ onBack }) => {
       case 'completion':
         return (
           <View style={styles.completionContainer}>
-            <Image 
-              source={require('../assets/images/完成.png')} 
-              style={styles.completionImage}
-              resizeMode="contain"
-            />
+            {/* 嘗試載入完成圖片，若失敗則顯示 fallback emoji */}
             <Text style={styles.completionTitle}>{step.title}</Text>
             <Text style={styles.completionText}>{step.content}</Text>
+
+            {/* fallback 區塊（若圖片載入失敗時仍會顯示） */}
+            <View style={{ marginTop: 20, alignItems: 'center' }}>
+              <Text style={{ fontSize: 48, color: '#10B981' }}>🌿</Text>
+              <Text style={{ fontSize: 16, color: '#374151', marginTop: 10 }}>
+                恭喜完成今日練習！
+              </Text>
+            </View>
           </View>
         );
+
 
       default:
         return null;
