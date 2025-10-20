@@ -1,5 +1,5 @@
 // ==========================================
-// 檔案名稱: App.js - 完整更新版（修正進度顯示）
+// 檔案名稱: App.js - 包含 T2 自我覺察力練習
 // ==========================================
 
 import React, { useState, useEffect } from 'react';
@@ -24,6 +24,7 @@ import ApiService from './api';
 import BreathingPractice from './practice/BreathingPractice';
 import EmotionPractice from './practice/EmotionPractice';
 import FiveSensesPractice from './practice/FiveSensesPractice';
+import SelfAwarenessPractice from './practice/SelfAwarenessPractice';
 
 const { width } = Dimensions.get('window');
 const Stack = createNativeStackNavigator();
@@ -38,7 +39,7 @@ const HomeScreen = ({ navigation }) => {
   const [user, setUser] = useState(null);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [todayPracticeStatus, setTodayPracticeStatus] = useState({});
-  const [practiceProgress, setPracticeProgress] = useState({ completed: 0, total: 3 });
+  const [practiceProgress, setPracticeProgress] = useState({ completed: 0, total: 4 }); // 改為 4 個練習
 
   // 心情定義
   const moods = [
@@ -49,7 +50,7 @@ const HomeScreen = ({ navigation }) => {
     { name: '很糟!', image: require('./assets/images/terrible.png'), color: 'rgba(199, 239, 238, 0.15)', level: 1 }
   ];
 
-  // 每日練習定義
+  // 每日練習定義（加入第四個練習）
   const dailyPractices = [
     { 
       name: '呼吸穩定力練習', 
@@ -74,7 +75,20 @@ const HomeScreen = ({ navigation }) => {
       practiceNumber: 2,
     },
     { 
-      name: '五感覺察力練習', 
+      name: '自我覺察力練習', 
+      description: '適度的自我批評可以讓我們進步，但過度會造成內耗。這個練習幫你以溫暖的方式回應內在聲音',
+      duration: '7分鐘', 
+      practiceType: '自我覺察力練習',
+      backgroundColor: '#FFFFFF',
+      completedBadgeColor: 'rgba(90, 206, 135, 0.8)',
+      uncompletedBadgeColor: 'rgba(0, 232, 227, 0.2)',
+      image: require('./assets/images/自我覺察.png'),
+      practiceNumber: 3,
+      difficulty: 2, // 難度：2星
+      tags: ['自責', '自我懷疑', '內耗'], // 適用時機標籤
+    },
+    { 
+      name: '五感練習', 
       description: '「五感覺察」是一個簡單卻重要的情緒調節技巧，也是改變內在的基礎',
       duration: '3 ~ 5 min', 
       practiceType: '五感察覺練習',
@@ -82,7 +96,7 @@ const HomeScreen = ({ navigation }) => {
       completedBadgeColor: 'rgba(90, 206, 135, 0.8)',
       uncompletedBadgeColor: 'rgba(0, 232, 227, 0.2)',
       image: require('./assets/images/五感察覺.png'),
-      practiceNumber: 3,
+      practiceNumber: 4,
     }
   ];
 
@@ -131,9 +145,14 @@ const HomeScreen = ({ navigation }) => {
           email: response.user.email
         });
         setIsLoggedIn(true);
+      } else {
+        setIsLoggedIn(false);
+        setUser(null);
       }
     } catch (error) {
       console.log('未登入或 Token 已過期');
+      setIsLoggedIn(false);
+      setUser(null);
     }
   };
 
@@ -153,16 +172,16 @@ const HomeScreen = ({ navigation }) => {
         setSelectedMood(null);
       }
 
-      // 🔥 載入今日練習狀態
+      // 載入今日練習狀態
       const practiceResponse = await ApiService.getTodayPracticeStatus();
       if (practiceResponse.success) {
         setTodayPracticeStatus(practiceResponse.practices || {});
         
-        // 🔥 計算完成進度（只計算 completed = true 的練習）
+        // 計算完成進度（只計算 completed = true 的練習）
         const completedPractices = Object.values(practiceResponse.practices || {}).filter(
           p => p.completed === true
         );
-        setPracticeProgress({ completed: completedPractices.length, total: 3 });
+        setPracticeProgress({ completed: completedPractices.length, total: 4 }); // 總共 4 個練習
       }
     } catch (error) {
       console.error('載入今日數據失敗:', error);
@@ -181,7 +200,7 @@ const HomeScreen = ({ navigation }) => {
               setUser(userData);
               setIsLoggedIn(true);
             }
-          })}
+          }) }
         ]
       );
       return true;
@@ -202,7 +221,7 @@ const HomeScreen = ({ navigation }) => {
           setSelectedMood(null);
           setTodayMoodRecord(null);
           setTodayPracticeStatus({});
-          setPracticeProgress({ completed: 0, total: 3 });
+          setPracticeProgress({ completed: 0, total: 4 });
           Alert.alert('已登出', '期待下次再見！');
         }
       }
@@ -244,28 +263,24 @@ const HomeScreen = ({ navigation }) => {
     navigation.navigate('Practice', { 
       practiceType: practice.practiceType,
       onPracticeComplete: async (practiceType) => {
-        // ⭐ 練習完成後重新載入今日數據
+        // 練習完成後重新載入今日數據
         console.log('✅ 練習完成，重新載入數據');
         await loadTodayData();
       }
     });
   };
 
-  // 🔥 判斷練習是否已完成（只有 completed = true 才算完成）
+  // 判斷練習是否已完成（只有 completed = true 才算完成）
   const isPracticeCompleted = (practiceType) => {
     const practice = todayPracticeStatus[practiceType];
     return practice && practice.completed === true;
   };
 
-  // 🔥 獲取練習進度百分比
+  // 獲取練習進度百分比
   const getPracticeProgress = (practiceType) => {
     const practice = todayPracticeStatus[practiceType];
     if (!practice) return 0;
-    
-    // 如果已完成，返回 100
     if (practice.completed) return 100;
-    
-    // 否則返回實際進度
     return practice.progress || 0;
   };
 
@@ -292,36 +307,52 @@ const HomeScreen = ({ navigation }) => {
   const PracticeCard = ({ practice }) => {
     const isCompleted = isPracticeCompleted(practice.practiceType);
     const progress = getPracticeProgress(practice.practiceType);
-    
-    console.log(`📊 ${practice.practiceType} - 完成狀態:`, isCompleted, '進度:', progress);
-
     return (
       <View style={styles.practiceCardContainer}>
         <View style={styles.practiceRow}>
-          <View style={[
-            styles.practiceNumberBadge, 
-            { backgroundColor: isCompleted ? practice.completedBadgeColor : practice.uncompletedBadgeColor }
-          ]}>
+          <View
+            style={[
+              styles.practiceNumberBadge,
+              { backgroundColor: isCompleted ? practice.completedBadgeColor : practice.uncompletedBadgeColor }
+            ]}
+          >
             <Text style={styles.practiceNumberText}>練習{practice.practiceNumber}</Text>
           </View>
-          
+
           <View style={styles.practiceRightContent}>
             <View style={styles.practiceDescription}>
               <Text style={styles.practiceDescriptionText}>{practice.description}</Text>
+              {practice.tags && (
+                <View style={styles.tagsContainer}>
+                  {practice.tags.map((tag, index) => (
+                    <View key={index} style={styles.tagBadge}>
+                      <Text style={styles.tagText}>{tag}</Text>
+                    </View>
+                  ))}
+                </View>
+              )}
             </View>
-            <TouchableOpacity 
+
+            <TouchableOpacity
               style={[styles.practiceCard, { backgroundColor: practice.backgroundColor }]}
               onPress={() => navigateToPractice(practice)}
             >
               <View style={styles.practiceImageContainer}>
-                <Image 
-                  source={practice.image}
-                  style={styles.practiceImage}
-                  resizeMode="contain"
-                />
+                <Image source={practice.image} style={styles.practiceImage} resizeMode="contain" />
               </View>
+
               <View style={styles.practiceContent}>
-                <Text style={styles.practiceName}>《{practice.name}》</Text>
+                <View style={styles.practiceHeader}>
+                  <Text style={styles.practiceName}>《{practice.name}》</Text>
+                  {practice.difficulty && (
+                    <View style={styles.difficultyContainer}>
+                      {[...Array(practice.difficulty)].map((_, i) => (
+                        <Text key={i} style={styles.difficultyStar}>⭐</Text>
+                      ))}
+                    </View>
+                  )}
+                </View>
+
                 {isCompleted ? (
                   <View style={styles.completedContainer}>
                     <Text style={styles.completedIcon}>✓</Text>
@@ -329,20 +360,14 @@ const HomeScreen = ({ navigation }) => {
                   </View>
                 ) : (
                   <>
-                    {progress > 0 ? (
-                      <View style={styles.progressContainer}>
-                        <View style={styles.progressBarBackground}>
-                          <View style={[styles.progressBarForeground, { width: `${progress}%` }]} />
-                        </View>
+                    <View style={styles.progressContainer}>
+                      <View style={styles.progressBarBackground}>
+                        <View style={[styles.progressBarForeground, { width: `${progress}%` }]} />
+                      </View>
+                      {progress > 0 ? (
                         <Text style={styles.progressPercentText}>{progress}%</Text>
-                      </View>
-                    ) : (
-                      <View style={styles.progressContainer}>
-                        <View style={styles.progressBarBackground}>
-                          <View style={[styles.progressBarForeground, { width: '0%' }]} />
-                        </View>
-                      </View>
-                    )}
+                      ) : null}
+                    </View>
                     <View style={styles.durationContainer}>
                       <Text style={styles.durationIcon}>🕐</Text>
                       <Text style={styles.durationText}>{practice.duration}</Text>
@@ -350,6 +375,7 @@ const HomeScreen = ({ navigation }) => {
                   </>
                 )}
               </View>
+
               <View style={styles.playButtonContainer}>
                 <View style={styles.playButton}>
                   <Text style={styles.playButtonText}>▶</Text>
@@ -371,7 +397,7 @@ const HomeScreen = ({ navigation }) => {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="rgba(22, 109, 181, 0.95)" />
-      
+
       <View style={styles.headerContainer}>
         <View style={styles.searchContainer}>
           <Text style={styles.searchIcon}>🔍</Text>
@@ -396,7 +422,7 @@ const HomeScreen = ({ navigation }) => {
             )}
           </View>
           <Text style={styles.subGreeting}>想來紀錄一下你目前的心情嗎？</Text>
-          
+
           <View style={styles.moodGrid}>
             {moods.map((mood, index) => (
               <MoodButton
@@ -415,7 +441,7 @@ const HomeScreen = ({ navigation }) => {
           <Text style={styles.sectionSubtitle}>
             今日練習進度 ({practiceProgress.completed}/{practiceProgress.total})
           </Text>
-          
+
           <View style={styles.practiceList}>
             {dailyPractices.map((practice, index) => (
               <PracticeCard key={index} practice={practice} />
@@ -426,7 +452,7 @@ const HomeScreen = ({ navigation }) => {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>推薦練習課程</Text>
           <Text style={styles.sectionSubtitle}>熱門主題</Text>
-          
+
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.topicsScrollContainer}>
             <View style={styles.topicsGrid}>
               <View style={styles.topicsRow}>
@@ -440,7 +466,7 @@ const HomeScreen = ({ navigation }) => {
                 ))}
               </View>
             </View>
-            
+
             <View style={styles.topicsGrid}>
               <View style={styles.topicsRow}>
                 {topics.slice(4, 6).map((topic, index) => (
@@ -458,7 +484,7 @@ const HomeScreen = ({ navigation }) => {
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.journeyScrollContainer}>
             <View style={styles.journeyCardWrapper}>
               <View style={styles.journeyImageSection}>
-                <Image 
+                <Image
                   source={require('./assets/images/植物.png')}
                   style={styles.journeyMainImage}
                   resizeMode="cover"
@@ -474,7 +500,7 @@ const HomeScreen = ({ navigation }) => {
                 </View>
               </View>
             </View>
-            
+
             <TouchableOpacity style={styles.independentAddButton}>
               <Text style={styles.independentAddIcon}>+</Text>
             </TouchableOpacity>
@@ -489,7 +515,7 @@ const HomeScreen = ({ navigation }) => {
           style={[styles.navButton, activeTab === 'home' && styles.navButtonActive]}
           onPress={() => setActiveTab('home')}
         >
-          <Image 
+          <Image
             source={require('./assets/images/home.png')}
             style={styles.navIcon}
             resizeMode="contain"
@@ -499,7 +525,7 @@ const HomeScreen = ({ navigation }) => {
           style={[styles.navButton, activeTab === 'courses' && styles.navButtonActive]}
           onPress={() => setActiveTab('courses')}
         >
-          <Image 
+          <Image
             source={require('./assets/images/explore.png')}
             style={styles.navIcon}
             resizeMode="contain"
@@ -513,7 +539,7 @@ const HomeScreen = ({ navigation }) => {
             navigation.navigate('Daily');
           }}
         >
-          <Image 
+          <Image
             source={require('./assets/images/daily.png')}
             style={styles.navIcon}
             resizeMode="contain"
@@ -529,7 +555,7 @@ const HomeScreen = ({ navigation }) => {
             }
           }}
         >
-          <Image 
+          <Image
             source={require('./assets/images/profile.png')}
             style={styles.navIcon}
             resizeMode="contain"
@@ -544,7 +570,8 @@ const HomeScreen = ({ navigation }) => {
 // 練習畫面包裝組件
 // ==========================================
 const PracticeScreenWrapper = ({ route, navigation }) => {
-  const { practiceType, onPracticeComplete } = route.params;
+  const params = route?.params || {};
+  const { practiceType, onPracticeComplete } = params;
 
   const handleBack = async () => {
     if (onPracticeComplete) {
@@ -559,6 +586,8 @@ const PracticeScreenWrapper = ({ route, navigation }) => {
     return <EmotionPractice onBack={handleBack} />;
   } else if (practiceType === '五感察覺練習') {
     return <FiveSensesPractice onBack={handleBack} />;
+  } else if (practiceType === '自我覺察力練習') {
+    return <SelfAwarenessPractice onBack={handleBack} />;
   }
 
   return null;
@@ -570,7 +599,7 @@ const PracticeScreenWrapper = ({ route, navigation }) => {
 export default function App() {
   return (
     <NavigationContainer>
-      <Stack.Navigator 
+      <Stack.Navigator
         initialRouteName="Home"
         screenOptions={{ headerShown: false }}
       >
@@ -584,7 +613,7 @@ export default function App() {
   );
 }
 
-// 樣式（新增 progressPercentText）
+// 樣式定義（整理後的完整版本）
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -608,7 +637,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 8,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: { width: 0, height: 1},
     shadowOpacity: 0.1,
     shadowRadius: 2,
     elevation: 2,
@@ -633,6 +662,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 8,
     marginTop: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1},
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
   greeting: {
     fontSize: 20,
@@ -733,17 +767,30 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     lineHeight: 20,
   },
+  tagsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 8,
+  },
+  tagBadge: {
+    backgroundColor: 'rgba(103, 169, 224, 0.1)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginRight: 6,
+    marginBottom: 4,
+  },
+  tagText: {
+    fontSize: 11,
+    color: 'rgba(103, 169, 224, 0.95)',
+    fontWeight: '500',
+  },
   practiceCard: {
     borderRadius: 12,
     padding: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
   },
   practiceImageContainer: {
     width: 60,
@@ -760,6 +807,26 @@ const styles = StyleSheet.create({
   },
   practiceContent: {
     flex: 1,
+  },
+  practiceHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  practiceName: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#111827',
+    flex: 1,
+  },
+  difficultyContainer: {
+    flexDirection: 'row',
+    marginLeft: 8,
+  },
+  difficultyStar: {
+    fontSize: 10,
+    marginLeft: 2,
   },
   completedContainer: {
     flexDirection: 'row',
@@ -800,12 +867,6 @@ const styles = StyleSheet.create({
     marginLeft: 8,
     fontWeight: '500',
     minWidth: 35,
-  },
-  practiceName: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#111827',
-    marginBottom: 4,
   },
   durationContainer: {
     flexDirection: 'row',
