@@ -19,6 +19,7 @@ import {
   Keyboard,
   TouchableWithoutFeedback,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import ApiService from './api';
 
 const LoginScreen = ({ navigation, onLoginSuccess }) => {
@@ -44,16 +45,22 @@ const LoginScreen = ({ navigation, onLoginSuccess }) => {
       // 🔥 使用真實 API 登入
       const response = await ApiService.login(email, password);
       
+      const userData = {
+        id: response.user.id,
+        name: response.user.name,
+        email: response.user.email,
+        isGuest: false
+      };
+
+      // 儲存到 AsyncStorage
+      await AsyncStorage.setItem('userData', JSON.stringify(userData));
+      
       Alert.alert('成功', '登入成功！', [
         {
           text: '確定',
           onPress: () => {
             if (onLoginSuccess) {
-              onLoginSuccess({
-                id: response.user.id,
-                name: response.user.name,
-                email: response.user.email
-              });
+              onLoginSuccess(userData);
             }
             if (navigation) {
               navigation.goBack();
@@ -68,16 +75,25 @@ const LoginScreen = ({ navigation, onLoginSuccess }) => {
     }
   };
 
-  const handleGuestLogin = () => {
-    if (onLoginSuccess) {
-      onLoginSuccess({ 
-        email: 'guest@example.com', 
-        name: 'Guest', 
-        isGuest: true 
-      });
-    }
-    if (navigation) {
-      navigation.goBack();
+  const handleGuestLogin = async () => {
+    const guestData = { 
+      email: 'guest@example.com', 
+      name: '訪客', 
+      isGuest: true 
+    };
+
+    try {
+      // 儲存訪客資料到 AsyncStorage
+      await AsyncStorage.setItem('userData', JSON.stringify(guestData));
+      
+      if (onLoginSuccess) {
+        onLoginSuccess(guestData);
+      }
+      if (navigation) {
+        navigation.goBack();
+      }
+    } catch (error) {
+      console.error('訪客登入失敗:', error);
     }
   };
 

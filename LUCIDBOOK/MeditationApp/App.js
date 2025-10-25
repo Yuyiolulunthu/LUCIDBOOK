@@ -22,6 +22,7 @@ import RegisterScreen from './RegisterScreen';
 import DailyScreen from './DailyScreen';
 import ForgotPasswordScreen from './ForgotPasswordScreen';
 import ResetPasswordScreen from './ResetPasswordScreen';
+import ProfileScreen from './ProfileScreen';
 
 import ApiService from './api';
 import PracticeScreen from './PracticeScreen';
@@ -586,6 +587,8 @@ export default function App() {
               gestureEnabled: true 
             }} 
           />
+
+        <Stack.Screen name="Profile" component={ProfileScreen} options={{ headerShown: false }}/>
 
       </Stack.Navigator>
     </NavigationContainer>

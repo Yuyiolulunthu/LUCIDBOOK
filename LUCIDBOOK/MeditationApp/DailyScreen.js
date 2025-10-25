@@ -1,9 +1,9 @@
 // ==========================================
-// 檔案名稱: DailyScreen.js
+// 檔案名稱: DailyScreen.js (優化版)
 // 放置位置: 專案根目錄
 // ==========================================
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -25,11 +25,13 @@ const { width } = Dimensions.get('window');
 
 const DailyScreen = ({ navigation }) => {
   const [timeRange, setTimeRange] = useState('weeks');
-  const [practiceData, setPracticeData] = useState([]);
+  const [allPracticeData, setAllPracticeData] = useState([]); // 存儲所有數據
+  const [displayData, setDisplayData] = useState([]); // 顯示的過濾數據
   const [loading, setLoading] = useState(true);
   const [todayMood, setTodayMood] = useState(null);
   const [todayCompletedPractices, setTodayCompletedPractices] = useState(0);
   const [todayStatus, setTodayStatus] = useState({});
+  const [user, setUser] = useState(null); // 添加用戶狀態
   const [stats, setStats] = useState({
     completionRate: 0,
     totalPractices: 0,
@@ -39,35 +41,55 @@ const DailyScreen = ({ navigation }) => {
   
   const [detailModalVisible, setDetailModalVisible] = useState(false);
   const [selectedPractice, setSelectedPractice] = useState(null);
+  
+  // 使用 ref 來追蹤是否已經載入過數據
+  const hasLoadedData = useRef(false);
 
-  useEffect(() => {
-    fetchAllData();
-  }, [timeRange]);
-
+  // 初始載入和頁面聚焦時載入數據
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
       fetchAllData();
     });
+    
+    // 首次載入
+    if (!hasLoadedData.current) {
+      fetchAllData();
+    }
+    
     return unsubscribe;
-  }, [navigation, timeRange]);
+  }, [navigation]);
+
+  // 當時間範圍改變時，只重新過濾數據，不重新請求 API
+  useEffect(() => {
+    if (hasLoadedData.current && allPracticeData.length > 0) {
+      filterAndUpdateData();
+    }
+  }, [timeRange]);
 
   const fetchAllData = async () => {
     try {
       setLoading(true);
       
-      const [practiceResponse, moodResponse, statusResponse] = await Promise.all([
+      const [practiceResponse, moodResponse, statusResponse, userResponse] = await Promise.all([
         ApiService.getPracticeHistory(),
         ApiService.getTodayMood(),
         ApiService.getTodayPracticeStatus(),
+        ApiService.getUserProfile(), // 添加獲取用戶資料
       ]);
       
       console.log('📊 API 返回的練習記錄:', practiceResponse);
       console.log('✅ API 返回的今日狀態:', statusResponse);
+      console.log('👤 API 返回的用戶資料:', userResponse);
       
       if (practiceResponse.practices) {
-        const filteredData = filterByTimeRange(practiceResponse.practices);
+        // 儲存完整的數據
+        setAllPracticeData(practiceResponse.practices);
+        hasLoadedData.current = true;
+        
+        // 過濾並顯示當前時間範圍的數據
+        const filteredData = filterByTimeRange(practiceResponse.practices, timeRange);
         console.log('📊 過濾後的記錄:', filteredData);
-        setPracticeData(filteredData);
+        setDisplayData(filteredData);
         calculateStats(filteredData);
         calculateTodayProgress(practiceResponse.practices);
       }
@@ -80,11 +102,22 @@ const DailyScreen = ({ navigation }) => {
         setTodayStatus(statusResponse.practices);
       }
       
+      if (userResponse && userResponse.user) {
+        setUser(userResponse.user); // 設置用戶資料
+      }
+      
     } catch (error) {
       console.error('❌ 獲取數據失敗:', error);
     } finally {
       setLoading(false);
     }
+  };
+
+  // 快速過濾和更新數據（不需要 API 請求）
+  const filterAndUpdateData = () => {
+    const filteredData = filterByTimeRange(allPracticeData, timeRange);
+    setDisplayData(filteredData);
+    calculateStats(filteredData);
   };
 
   const calculateTodayProgress = (practices) => {
@@ -127,11 +160,11 @@ const DailyScreen = ({ navigation }) => {
     setTodayCompletedPractices(completedCount);
   };
 
-  const filterByTimeRange = (practices) => {
+  const filterByTimeRange = (practices, range) => {
     const now = new Date();
     let startDate;
 
-    switch (timeRange) {
+    switch (range) {
       case 'weeks':
         startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
         break;
@@ -271,7 +304,7 @@ const DailyScreen = ({ navigation }) => {
         const copingMap = {
           'enjoy': '我喜歡，要享受它！',
           'accept': '我雖然不喜歡，但我接納它',
-          'regulate': '我不喜歡，想調節它'
+          'regulate': '我不喜歡,想調節它'
         };
         summary = copingMap[emotionData.coping_choice] || emotionData.coping_choice;
       } else {
@@ -306,168 +339,206 @@ const DailyScreen = ({ navigation }) => {
       return firstSentence.substring(0, 30) + '...';
     }
     
-    return firstSentence;
+    return firstSentence || '暫無記錄';
   };
 
-  const handlePracticeCardPress = (practice) => {
+  const openDetailModal = (practice) => {
     setSelectedPractice(practice);
     setDetailModalVisible(true);
   };
 
-  const renderPracticeDetailModal = () => {
+  const closeDetailModal = () => {
+    setDetailModalVisible(false);
+    setSelectedPractice(null);
+  };
+
+  const renderDetailModal = () => {
     if (!selectedPractice) return null;
-    
-    const isBreathing = selectedPractice.practice_type === '呼吸穩定力練習';
-    const isEmotion = selectedPractice.practice_type === '情緒理解力練習';
-    
-    const primaryColor = isBreathing ? 'rgba(46, 134, 171, 0.75)' : 'rgba(150, 134, 118, 1)';
-    const lightBg = isBreathing ? 'rgba(46, 134, 171, 0.1)' : 'rgba(150, 134, 118, 0.1)';
-    
+
+    const durationMinutes = Math.round(
+      (parseInt(selectedPractice.duration_seconds) || 
+       parseInt(selectedPractice.duration) * 60 || 0) / 60
+    );
+
     let emotionData = null;
-    if (isEmotion && selectedPractice.emotion_data) {
+    if (selectedPractice.emotion_data) {
       try {
         emotionData = typeof selectedPractice.emotion_data === 'string'
           ? JSON.parse(selectedPractice.emotion_data)
           : selectedPractice.emotion_data;
       } catch (e) {
         console.log('解析 emotion_data 失敗:', e);
-        emotionData = {};
       }
     }
-    
-    const formatDuration = (durationSeconds) => {
-      const seconds = parseInt(durationSeconds) || 0;
-      if (seconds === 0) {
-        const mins = parseInt(selectedPractice.duration) || 0;
-        return `${mins}分`;
-      }
-      const mins = Math.floor(seconds / 60);
-      const secs = seconds % 60;
-      if (mins === 0) return `${secs}秒`;
-      return `${mins}分${secs}秒`;
+
+    const getModalHeaderColor = () => {
+      if (selectedPractice.practice_type === '呼吸穩定力練習') return '#619CCE';
+      if (selectedPractice.practice_type === '情緒理解力練習') return '#8BC78A';
+      if (selectedPractice.practice_type === '正念安定力練習') return '#E5A569';
+      return '#619CCE';
     };
-    
+
+    const getEmotionColor = (emotion) => {
+      const colorMap = {
+        '快樂': '#FFE66D',
+        '信任': '#A8DADC',
+        '期待': '#F4A261',
+        '警覺': '#FF6B6B',
+        '悲傷': '#457B9D',
+        '厭惡': '#2A9D8F',
+        '生氣': '#E76F51',
+        '害怕': '#264653',
+      };
+      return colorMap[emotion] || '#E5E7EB';
+    };
+
     return (
       <Modal
         visible={detailModalVisible}
-        animationType="slide"
         transparent={true}
-        onRequestClose={() => setDetailModalVisible(false)}
+        animationType="slide"
+        onRequestClose={closeDetailModal}
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
-            <View style={[styles.modalHeader, { backgroundColor: primaryColor }]}>
+            <View style={[styles.modalHeader, { backgroundColor: getModalHeaderColor() }]}>
               <Text style={styles.modalTitle}>{selectedPractice.practice_type}</Text>
-              <TouchableOpacity 
-                onPress={() => setDetailModalVisible(false)}
-                style={styles.modalCloseButton}
-              >
-                <Text style={styles.modalCloseText}>✕</Text>
+              <TouchableOpacity onPress={closeDetailModal} style={styles.modalCloseButton}>
+                <Text style={styles.modalCloseText}>×</Text>
               </TouchableOpacity>
             </View>
-            
-            <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={false}>
+
+            <ScrollView style={styles.modalContent}>
               <View style={styles.detailSection}>
-                <Text style={styles.detailLabel}>📅 完成日期</Text>
-                <Text style={styles.detailValue}>{formatDate(selectedPractice.completed_at)}</Text>
+                <Text style={styles.detailLabel}>完成時間</Text>
+                <Text style={styles.detailValue}>
+                  {formatDate(selectedPractice.completed_at)}
+                </Text>
               </View>
-              
+
               <View style={styles.detailSection}>
-                <Text style={styles.detailLabel}>⏱️ 投入時間</Text>
-                <Text style={styles.detailValue}>{formatDuration(selectedPractice.duration_seconds)}</Text>
+                <Text style={styles.detailLabel}>練習時長</Text>
+                <Text style={styles.detailValue}>{durationMinutes} 分鐘</Text>
               </View>
-              
-              <View style={styles.detailSection}>
-                <Text style={styles.detailLabel}>💭 當天心情</Text>
-                <Text style={styles.detailValue}>{selectedPractice.feeling || '無記錄'}</Text>
-              </View>
-              
-              {isBreathing && (
+
+              {selectedPractice.practice_type === '呼吸穩定力練習' && (
                 <>
-                  <View style={[styles.detailCard, { backgroundColor: lightBg }]}>
-                    <Text style={styles.detailCardTitle}>練習後的感覺</Text>
-                    <Text style={styles.detailCardContent}>
-                      {selectedPractice.feeling || '無記錄'}
-                    </Text>
-                  </View>
-                  
-                  <View style={[styles.detailCard, { backgroundColor: lightBg }]}>
-                    <Text style={styles.detailCardTitle}>練習中的發現</Text>
-                    <Text style={styles.detailCardContent}>
-                      {selectedPractice.noticed || '無記錄'}
-                    </Text>
-                  </View>
-                  
-                  <View style={[styles.detailCard, { backgroundColor: lightBg }]}>
-                    <Text style={styles.detailCardTitle}>想對自己說的話</Text>
-                    <Text style={styles.detailCardContent}>
-                      {selectedPractice.reflection || '無記錄'}
-                    </Text>
-                  </View>
+                  {selectedPractice.attention && (
+                    <View style={[styles.detailCard, { backgroundColor: '#F0F9FF' }]}>
+                      <Text style={styles.detailCardTitle}>1. 注意力放在哪裡？</Text>
+                      <Text style={styles.detailCardContent}>{selectedPractice.attention}</Text>
+                    </View>
+                  )}
+
+                  {selectedPractice.noticed && (
+                    <View style={[styles.detailCard, { backgroundColor: '#F0FDF4' }]}>
+                      <Text style={styles.detailCardTitle}>2. 你注意到了什麼？</Text>
+                      <Text style={styles.detailCardContent}>{selectedPractice.noticed}</Text>
+                    </View>
+                  )}
+
+                  {selectedPractice.feeling && (
+                    <View style={[styles.detailCard, { backgroundColor: '#FFF7ED' }]}>
+                      <Text style={styles.detailCardTitle}>3. 身體感覺</Text>
+                      <Text style={styles.detailCardContent}>{selectedPractice.feeling}</Text>
+                    </View>
+                  )}
+
+                  {selectedPractice.reflection && (
+                    <View style={[styles.detailCard, { backgroundColor: '#FEF3C7' }]}>
+                      <Text style={styles.detailCardTitle}>4. 練習後的想法</Text>
+                      <Text style={styles.detailCardContent}>{selectedPractice.reflection}</Text>
+                    </View>
+                  )}
                 </>
               )}
-              
-              {isEmotion && (
+
+              {selectedPractice.practice_type === '情緒理解力練習' && emotionData && (
                 <>
-                  <View style={[styles.detailCard, { backgroundColor: lightBg }]}>
-                    <Text style={styles.detailCardTitle}>📍 那個時刻</Text>
-                    <Text style={styles.detailCardContent}>
-                      {emotionData?.moment || emotionData?.what_happened
-                        ? `${emotionData.moment || ''}${emotionData.moment && emotionData.what_happened ? '，' : ''}${emotionData.what_happened || ''}`
-                        : '無記錄'}
-                    </Text>
-                  </View>
-                  
-                  <View style={[styles.detailCard, { backgroundColor: lightBg }]}>
-                    <Text style={styles.detailCardTitle}>💭 我的情緒</Text>
-                    {emotionData?.selected_emotions && emotionData.selected_emotions.length > 0 ? (
+                  {emotionData.what_happened && (
+                    <View style={[styles.detailCard, { backgroundColor: '#F0F9FF' }]}>
+                      <Text style={styles.detailCardTitle}>1. 發生了什麼事？</Text>
+                      <Text style={styles.detailCardContent}>{emotionData.what_happened}</Text>
+                    </View>
+                  )}
+
+                  {emotionData.emotions && emotionData.emotions.length > 0 && (
+                    <View style={[styles.detailCard, { backgroundColor: '#F0FDF4' }]}>
+                      <Text style={styles.detailCardTitle}>2. 你的情緒</Text>
                       <View style={styles.emotionTagsContainer}>
-                        {emotionData.selected_emotions.map((emotion, index) => (
-                          <View key={index} style={[styles.emotionTag, { borderColor: primaryColor }]}>
-                            <Text style={[styles.emotionTagText, { color: primaryColor }]}>{emotion}</Text>
+                        {emotionData.emotions.map((emotion, index) => (
+                          <View
+                            key={index}
+                            style={[
+                              styles.emotionTag,
+                              {
+                                backgroundColor: getEmotionColor(emotion),
+                                borderColor: getEmotionColor(emotion),
+                              },
+                            ]}
+                          >
+                            <Text style={[styles.emotionTagText, { color: '#1F2937' }]}>
+                              {emotion}
+                            </Text>
                           </View>
                         ))}
                       </View>
-                    ) : (
-                      <Text style={styles.detailCardContent}>無記錄</Text>
-                    )}
-                  </View>
-                  
-                  <View style={[styles.detailCard, { backgroundColor: lightBg }]}>
-                    <Text style={styles.detailCardTitle}>🫀 身體的感覺</Text>
-                    <Text style={styles.detailCardContent}>
-                      {emotionData?.body_feeling || '無記錄'}
-                    </Text>
-                  </View>
-                  
-                  <View style={[styles.detailCard, { backgroundColor: lightBg }]}>
-                    <Text style={styles.detailCardTitle}>🔍 情緒的意義</Text>
-                    <Text style={styles.detailCardContent}>
-                      {emotionData?.meaning_text || '無記錄'}
-                    </Text>
-                  </View>
-                  
-                  <View style={[styles.detailCard, { backgroundColor: lightBg }]}>
-                    <Text style={styles.detailCardTitle}>🌟 我的選擇</Text>
-                    {emotionData?.coping_choice ? (
-                      <>
-                        <Text style={[styles.detailCardContent, { fontWeight: '600', color: primaryColor, marginBottom: 8 }]}>
-                          {emotionData.coping_choice === 'enjoy' && '我喜歡，要享受它！'}
-                          {emotionData.coping_choice === 'accept' && '我雖然不喜歡，但我接納它'}
-                          {emotionData.coping_choice === 'regulate' && '我不喜歡，想調節它'}
-                        </Text>
-                        <Text style={styles.detailCardContent}>
-                          {emotionData.enjoy_message || emotionData.accept_reminder || emotionData.regulate_text || '無記錄'}
-                        </Text>
-                      </>
-                    ) : (
-                      <Text style={styles.detailCardContent}>無記錄</Text>
-                    )}
-                  </View>
+                    </View>
+                  )}
+
+                  {emotionData.body_feeling && (
+                    <View style={[styles.detailCard, { backgroundColor: '#FFF7ED' }]}>
+                      <Text style={styles.detailCardTitle}>3. 身體的感覺</Text>
+                      <Text style={styles.detailCardContent}>{emotionData.body_feeling}</Text>
+                    </View>
+                  )}
+
+                  {emotionData.coping_choice && (
+                    <View style={[styles.detailCard, { backgroundColor: '#FEF3C7' }]}>
+                      <Text style={styles.detailCardTitle}>4. 你的選擇</Text>
+                      <Text style={styles.detailCardContent}>
+                        {emotionData.coping_choice === 'enjoy' && '我喜歡，要享受它！'}
+                        {emotionData.coping_choice === 'accept' && '我雖然不喜歡，但我接納它'}
+                        {emotionData.coping_choice === 'regulate' && '我不喜歡，想調節它'}
+                      </Text>
+                    </View>
+                  )}
+
+                  {emotionData.coping_strategy && (
+                    <View style={[styles.detailCard, { backgroundColor: '#FCE7F3' }]}>
+                      <Text style={styles.detailCardTitle}>5. 調節策略</Text>
+                      <Text style={styles.detailCardContent}>{emotionData.coping_strategy}</Text>
+                    </View>
+                  )}
                 </>
               )}
-              
-              <View style={{ height: 40 }} />
+
+              {selectedPractice.practice_type === '正念安定力練習' && (
+                <>
+                  {selectedPractice.attention && (
+                    <View style={[styles.detailCard, { backgroundColor: '#F0F9FF' }]}>
+                      <Text style={styles.detailCardTitle}>1. 注意力放在哪裡？</Text>
+                      <Text style={styles.detailCardContent}>{selectedPractice.attention}</Text>
+                    </View>
+                  )}
+
+                  {selectedPractice.noticed && (
+                    <View style={[styles.detailCard, { backgroundColor: '#F0FDF4' }]}>
+                      <Text style={styles.detailCardTitle}>2. 你注意到了什麼？</Text>
+                      <Text style={styles.detailCardContent}>{selectedPractice.noticed}</Text>
+                    </View>
+                  )}
+
+                  {selectedPractice.reflection && (
+                    <View style={[styles.detailCard, { backgroundColor: '#FEF3C7' }]}>
+                      <Text style={styles.detailCardTitle}>3. 練習後的想法</Text>
+                      <Text style={styles.detailCardContent}>{selectedPractice.reflection}</Text>
+                    </View>
+                  )}
+                </>
+              )}
+
+              <View style={styles.bottomPadding} />
             </ScrollView>
           </View>
         </View>
@@ -475,40 +546,56 @@ const DailyScreen = ({ navigation }) => {
     );
   };
 
-  const SemiCircleProgress = ({ completedCount }) => {
-    const size = 200;
-    const strokeWidth = 16;
-    const radius = (size - strokeWidth) / 2;
-    const center = size / 2;
+  const renderSemiCircle = () => {
+    const percentage = todayCompletedPractices / 3;
+    const angle = Math.PI * percentage;
 
-    const startAngle = 270;
-    const endAngle = 90;
-    
-    const percentage = (completedCount / 3) * 100;
-    const progressAngle = startAngle + (180 * percentage / 100);
+    const radius = 100;
+    const centerX = 120;
+    const centerY = 120;
+
+    const startX = centerX - radius;
+    const startY = centerY;
+
+    const endX = centerX + radius * Math.cos(Math.PI - angle);
+    const endY = centerY - radius * Math.sin(Math.PI - angle);
+
+    const largeArcFlag = angle > Math.PI / 2 ? 1 : 0;
+
+    let strokeColor;
+    if (todayCompletedPractices === 3) {
+      strokeColor = '#FFD700';
+    } else if (todayCompletedPractices === 2) {
+      strokeColor = '#FFA500';
+    } else if (todayCompletedPractices === 1) {
+      strokeColor = '#87CEEB';
+    } else {
+      strokeColor = '#E0E0E0';
+    }
 
     return (
       <View style={styles.semiCircleContainer}>
-        <Svg width={size} height={size / 2 + strokeWidth / 2 + 10}>
+        <Svg height="120" width="240" viewBox="0 0 240 120">
           <Path
-            d={describeArc(center, center, radius, startAngle, endAngle)}
+            d={`M ${startX} ${startY} A ${radius} ${radius} 0 0 1 ${centerX + radius} ${startY}`}
             fill="none"
-            stroke="rgba(97, 156, 206, 0.3)"
-            strokeWidth={strokeWidth}
+            stroke="#E0E0E0"
+            strokeWidth="16"
             strokeLinecap="round"
           />
-          {percentage > 0 && (
+          {angle > 0 && (
             <Path
-              d={describeArc(center, center, radius, startAngle, Math.min(progressAngle, endAngle))}
+              d={`M ${startX} ${startY} A ${radius} ${radius} 0 ${largeArcFlag} 1 ${endX} ${endY}`}
               fill="none"
-              stroke="rgba(22, 109, 181, 0.95)"
-              strokeWidth={strokeWidth}
+              stroke={strokeColor}
+              strokeWidth="16"
               strokeLinecap="round"
             />
           )}
         </Svg>
+
         <View style={styles.semiCircleContent}>
-          <Image 
+          <Image
             source={require('./assets/images/champion.png')}
             style={styles.championImage}
             resizeMode="contain"
@@ -518,135 +605,41 @@ const DailyScreen = ({ navigation }) => {
     );
   };
 
-  const describeArc = (x, y, radius, startAngle, endAngle) => {
-    const start = polarToCartesian(x, y, radius, startAngle);
-    const end = polarToCartesian(x, y, radius, endAngle);
-    
-    const largeArcFlag = endAngle - startAngle <= 180 ? '0' : '1';
-    
-    return [
-      'M', start.x, start.y,
-      'A', radius, radius, 0, largeArcFlag, 1, end.x, end.y
-    ].join(' ');
-  };
-
-  const polarToCartesian = (centerX, centerY, radius, angleInDegrees) => {
-    const angleInRadians = ((angleInDegrees - 90) * Math.PI) / 180.0;
-    return {
-      x: centerX + radius * Math.cos(angleInRadians),
-      y: centerY + radius * Math.sin(angleInRadians)
-    };
-  };
-
-  const TimeRangeButton = ({ label, value }) => {
-    const isActive = timeRange === value;
-    return (
-      <TouchableOpacity
-        style={[styles.timeButton, isActive && styles.timeButtonActive]}
-        onPress={() => setTimeRange(value)}
-      >
-        <Text style={[styles.timeButtonText, isActive && styles.timeButtonTextActive]}>
-          {label}
-        </Text>
-      </TouchableOpacity>
-    );
-  };
-
-  const PracticeRecordCard = ({ practice }) => {
-    const now = new Date();
-    const offset = 8 * 60;
-    const localTime = new Date(now.getTime() + offset * 60 * 1000);
-    const today = localTime.toISOString().split('T')[0];
-    const practiceDate = practice.completed_at ? practice.completed_at.split(' ')[0] : '';
-    const isToday = practiceDate === today;
-    
-    const formatDuration = (durationSeconds) => {
-      const seconds = parseInt(durationSeconds) || 0;
-      if (seconds === 0) {
-        const mins = parseInt(practice.duration) || 0;
-        return `${mins}分`;
-      }
-      
-      const mins = Math.floor(seconds / 60);
-      const secs = seconds % 60;
-      
-      if (mins === 0) {
-        return `${secs}秒`;
-      }
-      
-      return `${mins}分${secs}秒`;
-    };
-    
-    return (
-      <TouchableOpacity 
-        style={styles.recordCard}
-        onPress={() => handlePracticeCardPress(practice)}
-        activeOpacity={0.7}
-      >
-        <View style={styles.recordHeader}>
-          <Text style={styles.practiceTypeName}>{practice.practice_type}</Text>
-          <Text style={styles.practiceDuration}>
-            {formatDuration(practice.duration_seconds)}
-          </Text>
-        </View>
-        
-        <View style={styles.recordInfo}>
-          <Text style={styles.recordDate}>
-            {formatDate(practice.completed_at)}
-            {isToday && todayMood && `, 心情: ${todayMood.mood_name}`}
-            {!isToday && practice.feeling && `, 心情: ${practice.feeling}`}
-          </Text>
-        </View>
-
-        <View style={styles.recordReflection}>
-          <Text style={styles.reflectionText}>
-            {extractReflectionSnippet(practice)}
-          </Text>
-        </View>
-      </TouchableOpacity>
-    );
-  };
-
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="rgba(22, 109, 181, 0.95)" />
-        <Text style={styles.loadingText}>載入中...</Text>
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color="#619CCE" />
+        <Text style={{ marginTop: 16, color: '#6B7280' }}>載入中...</Text>
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="rgba(22, 109, 181, 0.95)" />
-      
-      {/* ⭐ 上選單 - 藍色背景 */}
-      <View style={styles.blueHeader}>
+      <StatusBar barStyle="light-content" backgroundColor="#619CCE" />
+
+      <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <View style={styles.avatarContainer}>
-            <Image 
-              source={require('./assets/images/person.png')}
-              style={styles.profileAvatar}
-              resizeMode="cover"
-            />
-          </View>
+          <Image
+            source={require('./assets/images/person.png')}
+            style={styles.profileAvatar}
+            resizeMode="cover"
+          />
           <View style={styles.headerTextContainer}>
-            <Text style={styles.greetingText}>早安！祝您有美好的一天</Text>
-            <Text style={styles.userName}>張三 player</Text>
+            <Text style={styles.greetingText}>你好</Text>
+            <Text style={styles.userName}>{user?.name || '張三'} player</Text>
           </View>
         </View>
         <View style={styles.headerRight}>
-          {/* ⭐ 通知圖標 - 保留原始圖片（含紅點），放大到 32x32 */}
           <TouchableOpacity style={styles.headerIconButton}>
-            <Image 
+            <Image
               source={require('./assets/images/new_notify.png')}
               style={styles.headerIconLarge}
               resizeMode="contain"
             />
           </TouchableOpacity>
-          {/* ⭐ 設定圖標 - 放大到 32x32 */}
           <TouchableOpacity style={styles.headerIconButton}>
-            <Image 
+            <Image
               source={require('./assets/images/setting.png')}
               style={styles.headerIconLarge}
               resizeMode="contain"
@@ -655,74 +648,120 @@ const DailyScreen = ({ navigation }) => {
         </View>
       </View>
 
-      <View style={styles.titleContainer}>
-        <TouchableOpacity 
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Text style={styles.backButtonText}>←</Text>
-        </TouchableOpacity>
-        <Text style={styles.pageTitle}>日記成果</Text>
-        <TouchableOpacity style={styles.menuButton}>
-          <View style={styles.menuLine} />
-          <View style={styles.menuLine} />
-          <View style={styles.menuLine} />
-        </TouchableOpacity>
-      </View>
-
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+      <ScrollView style={styles.scrollView}>
         <View style={styles.progressSection}>
-          <SemiCircleProgress completedCount={todayCompletedPractices} />
+          {renderSemiCircle()}
         </View>
 
         <View style={styles.statsContainer}>
           <View style={styles.statBox}>
-            <Text style={styles.statValue}>{stats.totalPractices}</Text>
-            <Text style={styles.statLabel}>總練心數</Text>
+            <Text style={styles.statValue}>{stats.completionRate}%</Text>
+            <Text style={styles.statLabel}>完成率</Text>
           </View>
           <View style={styles.statBox}>
-            <Text style={styles.statValue}>
-              {formatTotalTime(stats.totalSeconds)}
-            </Text>
-            <Text style={styles.statLabel}>練心時間</Text>
+            <Text style={styles.statValue}>{stats.totalPractices}</Text>
+            <Text style={styles.statLabel}>總練習</Text>
+          </View>
+          <View style={styles.statBox}>
+            <Text style={styles.statValue}>{formatTotalTime(stats.totalSeconds)}</Text>
+            <Text style={styles.statLabel}>總時長</Text>
           </View>
           <View style={styles.statBox}>
             <Text style={styles.statValue}>{stats.practiceTypes}</Text>
-            <Text style={styles.statLabel}>心理能力</Text>
+            <Text style={styles.statLabel}>練習種類</Text>
           </View>
         </View>
 
         <View style={styles.timeRangeContainer}>
           <View style={styles.timeRangeBackground}>
-            <TimeRangeButton label="Weeks" value="weeks" />
-            <TimeRangeButton label="Months" value="months" />
-            <TimeRangeButton label="Years" value="years" />
+            <TouchableOpacity
+              style={[styles.timeButton, timeRange === 'weeks' && styles.timeButtonActive]}
+              onPress={() => setTimeRange('weeks')}
+            >
+              <Text
+                style={[
+                  styles.timeButtonText,
+                  timeRange === 'weeks' && styles.timeButtonTextActive,
+                ]}
+              >
+                7天
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.timeButton, timeRange === 'months' && styles.timeButtonActive]}
+              onPress={() => setTimeRange('months')}
+            >
+              <Text
+                style={[
+                  styles.timeButtonText,
+                  timeRange === 'months' && styles.timeButtonTextActive,
+                ]}
+              >
+                30天
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.timeButton, timeRange === 'years' && styles.timeButtonActive]}
+              onPress={() => setTimeRange('years')}
+            >
+              <Text
+                style={[
+                  styles.timeButtonText,
+                  timeRange === 'years' && styles.timeButtonTextActive,
+                ]}
+              >
+                365天
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
 
         <View style={styles.recordsSection}>
-          <Text style={styles.recordsTitle}>練習紀錄</Text>
-          
-          {practiceData.length === 0 ? (
+          <Text style={styles.recordsTitle}>練習記錄</Text>
+          {displayData.length === 0 ? (
             <View style={styles.emptyState}>
-              <Text style={styles.emptyText}>
-                {timeRange === 'weeks' ? '本週' : timeRange === 'months' ? '本月' : '今年'}尚無練習記錄
-              </Text>
+              <Text style={styles.emptyText}>此時間範圍內暫無記錄</Text>
             </View>
           ) : (
-            practiceData.map((practice, index) => (
-              <PracticeRecordCard key={practice.id || index} practice={practice} />
-            ))
+            displayData.map((practice, index) => {
+              const durationMinutes = Math.round(
+                (parseInt(practice.duration_seconds) || 
+                 parseInt(practice.duration) * 60 || 0) / 60
+              );
+
+              return (
+                <TouchableOpacity
+                  key={index}
+                  style={styles.recordCard}
+                  onPress={() => openDetailModal(practice)}
+                >
+                  <View style={styles.recordHeader}>
+                    <Text style={styles.practiceTypeName}>{practice.practice_type}</Text>
+                    <Text style={styles.practiceDuration}>{durationMinutes} 分鐘</Text>
+                  </View>
+
+                  <View style={styles.recordInfo}>
+                    <Text style={styles.recordDate}>
+                      {formatDate(practice.completed_at)}
+                    </Text>
+                  </View>
+
+                  <View style={styles.recordReflection}>
+                    <Text style={styles.reflectionText} numberOfLines={2}>
+                      {extractReflectionSnippet(practice)}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            })
           )}
         </View>
 
         <View style={styles.bottomPadding} />
       </ScrollView>
 
-      {renderPracticeDetailModal()}
-
-      {/* 底部導航欄 */}
-      <BottomNavigation navigation={navigation} activeTab="record" />
+      {renderDetailModal()}
+      <BottomNavigation navigation={navigation} currentRoute="Daily" />
     </View>
   );
 };
@@ -731,25 +770,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F9FAFB',
-    paddingTop: 0,
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#F9FAFB',
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 16,
-    color: '#6B7280',
-  },
-  // ⭐ 藍色上選單
-  blueHeader: {
-    backgroundColor: 'rgba(22, 109, 181, 0.95)',
-    paddingHorizontal: 16,
-    paddingTop: 50,
+  header: {
+    backgroundColor: '#619CCE',
+    paddingTop: 48,
     paddingBottom: 16,
+    paddingHorizontal: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -758,12 +784,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
-  },
-  avatarContainer: {
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
-    borderRadius: 8,
-    overflow: 'hidden',
   },
   profileAvatar: {
     width: 48,
@@ -794,7 +814,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginLeft: 4,
   },
-  // ⭐ 放大的圖標 - 32x32，不加 tintColor（保留原始顏色）
   headerIconLarge: {
     width: 32,
     height: 32,
@@ -982,7 +1001,6 @@ const styles = StyleSheet.create({
   bottomPadding: {
     height: 100,
   },
-  // 模態框樣式
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
