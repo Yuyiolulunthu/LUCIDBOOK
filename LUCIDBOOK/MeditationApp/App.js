@@ -1,5 +1,5 @@
 // ==========================================
-// 檔案名稱: App.js - 包含 T2 自我覺察力練習
+// 檔案名稱: App.js 
 // ==========================================
 
 import React, { useState, useEffect } from 'react';
@@ -84,8 +84,7 @@ const HomeScreen = ({ navigation }) => {
       uncompletedBadgeColor: 'rgba(0, 232, 227, 0.2)',
       image: require('./assets/images/自我覺察.png'),
       practiceNumber: 3,
-      difficulty: 2, // 難度：2星
-      tags: ['自責', '自我懷疑', '內耗'], // 適用時機標籤
+      // tags: ['自責', '自我懷疑', '內耗'], // 適用時機標籤
     },
     { 
       name: '五感練習', 
@@ -398,30 +397,50 @@ const HomeScreen = ({ navigation }) => {
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="rgba(22, 109, 181, 0.95)" />
 
-      <View style={styles.headerContainer}>
-        <View style={styles.searchContainer}>
-          <Text style={styles.searchIcon}>🔍</Text>
-          <TextInput
-            style={styles.searchInput}
-            placeholder="搜尋"
-            placeholderTextColor="#9CA3AF"
-          />
+      {/* ⭐ 上選單 - 藍色背景 */}
+      <View style={styles.blueHeader}>
+        <View style={styles.headerLeft}>
+          <View style={styles.avatarContainer}>
+            <Image 
+              source={require('./assets/images/person.png')}
+              style={styles.profileAvatar}
+              resizeMode="cover"
+            />
+          </View>
+          <View style={styles.headerTextContainer}>
+            <Text style={styles.greetingText}>早安！祝您有美好的一天</Text>
+            <Text style={styles.userName}>{user?.name || '張三'} player</Text>
+          </View>
+        </View>
+        <View style={styles.headerRight}>
+          {/* ⭐ 通知圖標 - 保留原始圖片（含紅點），放大到 32x32 */}
+          <TouchableOpacity style={styles.headerIconButton}>
+            <Image 
+              source={require('./assets/images/new_notify.png')}
+              style={styles.headerIconLarge}
+              resizeMode="contain"
+            />
+          </TouchableOpacity>
+          {/* ⭐ 設定圖標 - 放大到 32x32 */}
+          <TouchableOpacity 
+            style={styles.headerIconButton}
+            onPress={() => {
+              Alert.alert('設定', '設定功能開發中');
+            }}
+          >
+            <Image 
+              source={require('./assets/images/setting.png')}
+              style={styles.headerIconLarge}
+              resizeMode="contain"
+            />
+          </TouchableOpacity>
         </View>
       </View>
 
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+        {/* ⭐ 心情選擇區 - 保持原樣 */}
         <View style={styles.section}>
-          <View style={styles.greetingRow}>
-            <Text style={styles.greeting}>
-              哈囉！{isLoggedIn ? user?.name : 'Guest'} player
-            </Text>
-            {isLoggedIn && !user?.isGuest && (
-              <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
-                <Text style={styles.logoutText}>登出</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-          <Text style={styles.subGreeting}>想來紀錄一下你目前的心情嗎？</Text>
+          <Text style={styles.subGreeting}>來記錄一下目前的心情吧？</Text>
 
           <View style={styles.moodGrid}>
             {moods.map((mood, index) => (
@@ -436,6 +455,7 @@ const HomeScreen = ({ navigation }) => {
           </View>
         </View>
 
+        {/* ⭐ 每日練習 - 保持舊版樣式 */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>每日練習</Text>
           <Text style={styles.sectionSubtitle}>
@@ -449,6 +469,7 @@ const HomeScreen = ({ navigation }) => {
           </View>
         </View>
 
+        {/* ⭐ 推薦練習課程 - 保持舊版樣式 */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>推薦練習課程</Text>
           <Text style={styles.sectionSubtitle}>熱門主題</Text>
@@ -510,215 +531,261 @@ const HomeScreen = ({ navigation }) => {
         <View style={styles.bottomPadding} />
       </ScrollView>
 
-      <View style={styles.bottomNav}>
-        <TouchableOpacity
-          style={[styles.navButton, activeTab === 'home' && styles.navButtonActive]}
-          onPress={() => setActiveTab('home')}
-        >
-          <Image
-            source={require('./assets/images/home.png')}
-            style={styles.navIcon}
-            resizeMode="contain"
-          />
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.navButton, activeTab === 'courses' && styles.navButtonActive]}
-          onPress={() => setActiveTab('courses')}
-        >
-          <Image
-            source={require('./assets/images/explore.png')}
-            style={styles.navIcon}
-            resizeMode="contain"
-          />
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.navButton, activeTab === 'tasks' && styles.navButtonActive]}
-          onPress={() => {
-            if (showLoginPrompt()) return;
-            setActiveTab('tasks');
-            navigation.navigate('Daily');
-          }}
-        >
-          <Image
-            source={require('./assets/images/daily.png')}
-            style={styles.navIcon}
-            resizeMode="contain"
-          />
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.navButton, activeTab === 'profile' && styles.navButtonActive]}
-          onPress={() => {
-            if (isLoggedIn && !user?.isGuest) {
-              setActiveTab('profile');
-            } else {
-              showLoginPrompt();
-            }
-          }}
-        >
-          <Image
-            source={require('./assets/images/profile.png')}
-            style={styles.navIcon}
-            resizeMode="contain"
-          />
-        </TouchableOpacity>
+      {/* ⭐ 底部導航欄 - 使用原始 menu.png，占滿寬度，圖標顏色修正 */}
+      <View style={styles.bottomNavContainer}>
+        <Image 
+          source={require('./assets/images/menu.png')}
+          style={styles.menuImage}
+          resizeMode="stretch"
+        />
+        <View style={styles.bottomNav}>
+          <TouchableOpacity 
+            style={styles.navButton}
+            onPress={() => setActiveTab('home')}
+          >
+            <Image 
+              source={require('./assets/images/new_home.png')}
+              style={[
+                styles.navIcon,
+                activeTab === 'home' && styles.navIconActive
+              ]}
+              resizeMode="contain"
+            />
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={styles.navButton}
+            onPress={() => setActiveTab('explore')}
+          >
+            <Image 
+              source={require('./assets/images/new_explore.png')}
+              style={[
+                styles.navIcon,
+                activeTab === 'explore' && styles.navIconActive
+              ]}
+              resizeMode="contain"
+            />
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={styles.centerNavButton}
+            onPress={() => {
+              Alert.alert('每日打卡', '功能開發中');
+            }}
+          >
+            <Image 
+              source={require('./assets/images/daily_clock.png')}
+              style={styles.centerNavIcon}
+              resizeMode="contain"
+            />
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={styles.navButton}
+            onPress={() => navigation.navigate('Daily')}
+          >
+            <Image 
+              source={require('./assets/images/record.png')}
+              style={[
+                styles.navIcon,
+                activeTab === 'record' && styles.navIconActive
+              ]}
+              resizeMode="contain"
+            />
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={styles.navButton}
+            onPress={() => {
+              if (isLoggedIn && user && !user.isGuest) {
+                handleLogout();
+              } else {
+                navigation.navigate('Login', {
+                  onLoginSuccess: (userData) => {
+                    setUser(userData);
+                    setIsLoggedIn(true);
+                  }
+                });
+              }
+            }}
+          >
+            <Image 
+              source={require('./assets/images/new_profile.png')}
+              style={[
+                styles.navIcon,
+                activeTab === 'profile' && styles.navIconActive
+              ]}
+              resizeMode="contain"
+            />
+          </TouchableOpacity>
+        </View>
       </View>
     </View>
   );
 };
 
 // ==========================================
-// 練習畫面包裝組件
+// 練習路由容器
 // ==========================================
-const PracticeScreenWrapper = ({ route, navigation }) => {
-  const params = route?.params || {};
-  const { practiceType, onPracticeComplete } = params;
+const PracticeNavigator = ({ route, navigation }) => {
+  const { practiceType, onPracticeComplete } = route.params;
 
-  const handleBack = async () => {
-    if (onPracticeComplete) {
-      await onPracticeComplete(practiceType);
-    }
-    navigation.goBack();
-  };
-
-  if (practiceType === '呼吸穩定力練習') {
-    return <BreathingPractice onBack={handleBack} />;
-  } else if (practiceType === '情緒理解力練習') {
-    return <EmotionPractice onBack={handleBack} />;
-  } else if (practiceType === '五感察覺練習') {
-    return <FiveSensesPractice onBack={handleBack} />;
-  } else if (practiceType === '自我覺察力練習') {
-    return <SelfAwarenessPractice onBack={handleBack} />;
+  switch (practiceType) {
+    case '呼吸穩定力練習':
+      return <BreathingPractice navigation={navigation} onComplete={onPracticeComplete} />;
+    case '情緒理解力練習':
+      return <EmotionPractice navigation={navigation} onComplete={onPracticeComplete} />;
+    case '五感察覺練習':
+      return <FiveSensesPractice navigation={navigation} onComplete={onPracticeComplete} />;
+    case '自我覺察力練習':
+      return <SelfAwarenessPractice navigation={navigation} onComplete={onPracticeComplete} />;
+    default:
+      return <View><Text>未知的練習類型</Text></View>;
   }
-
-  return null;
 };
 
 // ==========================================
-// 主應用程式
+// 主應用程式入口
 // ==========================================
 export default function App() {
   return (
     <NavigationContainer>
-      <Stack.Navigator
-        initialRouteName="Home"
-        screenOptions={{ headerShown: false }}
-      >
-        <Stack.Screen name="Home" component={HomeScreen} />
-        <Stack.Screen name="Login" component={LoginScreen} />
-        <Stack.Screen name="Register" component={RegisterScreen} />
-        <Stack.Screen name="Practice" component={PracticeScreenWrapper} />
-        <Stack.Screen name="Daily" component={DailyScreen} />
+      <Stack.Navigator initialRouteName="Home">
+        <Stack.Screen 
+          name="Home" 
+          component={HomeScreen} 
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen 
+          name="Login" 
+          component={LoginScreen} 
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen 
+          name="Register" 
+          component={RegisterScreen} 
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen 
+          name="Daily" 
+          component={DailyScreen} 
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen 
+          name="Practice" 
+          component={PracticeNavigator} 
+          options={{ headerShown: false }}
+        />
       </Stack.Navigator>
     </NavigationContainer>
   );
 }
 
-// 樣式定義（整理後的完整版本）
+// ==========================================
+// 樣式定義
+// ==========================================
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F9FAFB',
-    paddingTop: 0,
   },
-  headerContainer: {
+  // ⭐ 藍色上選單
+  blueHeader: {
     backgroundColor: 'rgba(22, 109, 181, 0.95)',
     paddingHorizontal: 16,
-    paddingTop: 50,
+    paddingTop: 45,
     paddingBottom: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  avatarContainer: {
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  profileAvatar: {
+    width: 48,
+    height: 48,
+  },
+  headerTextContainer: {
+    marginLeft: 12,
+    flex: 1,
+  },
+  greetingText: {
+    fontSize: 13,
+    color: '#FFFFFF',
+    marginBottom: 2,
+  },
+  userName: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerIconButton: {
+    width: 44,
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 4,
+  },
+  // ⭐ 放大的圖標 - 32x32，不加 tintColor（保留原始顏色）
+  headerIconLarge: {
+    width: 32,
+    height: 32,
   },
   scrollView: {
     flex: 1,
   },
-  searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'white',
-    borderRadius: 20,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1},
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  searchIcon: {
-    fontSize: 14,
-    marginRight: 8,
-    color: '#9CA3AF',
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 14,
-    color: '#374151',
-  },
   section: {
-    paddingHorizontal: 16,
-    marginBottom: 24,
-  },
-  greetingRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 10,
+    backgroundColor: '#FFFFFF',
     marginBottom: 8,
-    marginTop: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1},
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  greeting: {
-    fontSize: 20,
-    fontWeight: '500',
-    color: '#111827',
-  },
-  logoutButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    backgroundColor: 'rgba(239, 68, 68, 0.1)',
-    borderRadius: 6,
-  },
-  logoutText: {
-    fontSize: 14,
-    color: '#EF4444',
-    fontWeight: '500',
   },
   subGreeting: {
     fontSize: 16,
-    color: '#6B7280',
+    color: '#374151',
     marginBottom: 16,
   },
   moodGrid: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    flexWrap: 'wrap',
-    marginBottom: 8,
+    justifyContent: 'space-around',
+    marginBottom: 16,
   },
   moodContainer: {
     alignItems: 'center',
-    width: (width - 32 - 40) / 5,
-    marginBottom: 12,
   },
   moodButton: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 8,
   },
   moodButtonSelected: {
     transform: [{ scale: 1.1 }],
-    borderWidth: 3,
+    borderWidth: 2,
     borderColor: '#3B82F6',
   },
   moodImage: {
-    width: 45,
-    height: 45,
+    width: 40,
+    height: 40,
   },
   moodText: {
-    fontSize: 13,
+    fontSize: 12,
     color: '#6B7280',
     textAlign: 'center',
     fontWeight: '500',
@@ -746,7 +813,7 @@ const styles = StyleSheet.create({
   },
   practiceNumberBadge: {
     borderRadius: 15,
-    paddingHorizontal: 12,
+    paddingHorizontal: 8,
     paddingVertical: 6,
     marginRight: 12,
     marginTop: 8,
@@ -791,6 +858,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 3
   },
   practiceImageContainer: {
     width: 60,
@@ -1001,28 +1073,67 @@ const styles = StyleSheet.create({
   bottomPadding: {
     height: 80,
   },
+  // ⭐ 底部導航欄 - 使用 menu.png 占滿寬度
+  bottomNavContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 94,
+  },
+  menuImage: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    width: '100%',
+    height: 115,
+    opacity: 0.90,        
+    shadowColor: '#000',   
+    shadowOffset: { width: 0, height: -3 }, 
+    shadowOpacity: 0.15,   
+    shadowRadius: 5,       
+    elevation: 8,        
+  },
   bottomNav: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: 'rgba(22, 109, 181, 0.95)',
     flexDirection: 'row',
     justifyContent: 'space-around',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    paddingBottom: 24,
+    alignItems: 'center',
+    paddingBottom: 20,
+    paddingHorizontal: 20,
   },
   navButton: {
     padding: 8,
-    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  navButtonActive: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-  },
+  // ⭐ 圖標顏色修正：默認藍色，激活時加 40% 透明度的 #40A1DD
   navIcon: {
     width: 34,
     height: 34,
-    tintColor: '#FFFFFF',
+    // 不加 tintColor，保留原始圖片顏色（藍色）
+  },
+  navIconActive: {
+    opacity: 0.4,
+    tintColor: '#40A1DD',
+  },
+  centerNavButton: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: 'transparent',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  centerNavIcon: {
+    width: 60,
+    height: 60,
+    bottom: 16,
+    left: 2.5,
   },
 });
