@@ -1,3 +1,8 @@
+// ==========================================
+// 檔案名稱: DailyScreen.js
+// 放置位置: 專案根目錄
+// ==========================================
+
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -32,7 +37,6 @@ const DailyScreen = ({ navigation }) => {
     practiceTypes: 0,
   });
   
-  // ⭐ 新增：詳情模態框狀態
   const [detailModalVisible, setDetailModalVisible] = useState(false);
   const [selectedPractice, setSelectedPractice] = useState(null);
 
@@ -234,12 +238,10 @@ const DailyScreen = ({ navigation }) => {
     }
   };
 
-  // ⭐ 修改：根據練習類型和優先順序提取摘要
   const extractReflectionSnippet = (practice) => {
     let summary = '';
     
     if (practice.practice_type === '呼吸穩定力練習') {
-      // 優先順序: reflection > noticed > feeling > "空"
       if (practice.reflection && practice.reflection.trim()) {
         summary = practice.reflection.trim();
       } else if (practice.noticed && practice.noticed.trim()) {
@@ -250,7 +252,6 @@ const DailyScreen = ({ navigation }) => {
         return '暫無記錄';
       }
     } else if (practice.practice_type === '情緒理解力練習') {
-      // 解析 emotion_data
       let emotionData = null;
       if (practice.emotion_data) {
         try {
@@ -262,7 +263,6 @@ const DailyScreen = ({ navigation }) => {
         }
       }
       
-      // 優先順序: what_happened > body_feeling > coping_choice > "空"
       if (emotionData?.what_happened && emotionData.what_happened.trim()) {
         summary = emotionData.what_happened.trim();
       } else if (emotionData?.body_feeling && emotionData.body_feeling.trim()) {
@@ -278,7 +278,6 @@ const DailyScreen = ({ navigation }) => {
         return '暫無記錄';
       }
     } else {
-      // 其他練習類型
       if (practice.reflection && practice.reflection.trim()) {
         summary = practice.reflection.trim();
       } else if (practice.noticed && practice.noticed.trim()) {
@@ -288,7 +287,6 @@ const DailyScreen = ({ navigation }) => {
       }
     }
     
-    // 截斷長文本
     const cleaned = summary.trim();
     const sentences = cleaned.split(/[。！？]/);
     const firstSentence = sentences[0].trim();
@@ -300,24 +298,20 @@ const DailyScreen = ({ navigation }) => {
     return firstSentence;
   };
 
-  // ⭐ 新增：點擊記錄卡片，顯示詳情
   const handlePracticeCardPress = (practice) => {
     setSelectedPractice(practice);
     setDetailModalVisible(true);
   };
 
-  // ⭐ 新增：渲染練習詳情模態框
   const renderPracticeDetailModal = () => {
     if (!selectedPractice) return null;
     
     const isBreathing = selectedPractice.practice_type === '呼吸穩定力練習';
     const isEmotion = selectedPractice.practice_type === '情緒理解力練習';
     
-    // 顏色配置
     const primaryColor = isBreathing ? 'rgba(46, 134, 171, 0.75)' : 'rgba(150, 134, 118, 1)';
     const lightBg = isBreathing ? 'rgba(46, 134, 171, 0.1)' : 'rgba(150, 134, 118, 0.1)';
     
-    // 解析情緒數據
     let emotionData = null;
     if (isEmotion && selectedPractice.emotion_data) {
       try {
@@ -326,11 +320,10 @@ const DailyScreen = ({ navigation }) => {
           : selectedPractice.emotion_data;
       } catch (e) {
         console.log('解析 emotion_data 失敗:', e);
-        emotionData = {}; // 確保有一個空對象
+        emotionData = {};
       }
     }
     
-    // 格式化時間
     const formatDuration = (durationSeconds) => {
       const seconds = parseInt(durationSeconds) || 0;
       if (seconds === 0) {
@@ -363,7 +356,6 @@ const DailyScreen = ({ navigation }) => {
             </View>
             
             <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={false}>
-              {/* 基本資訊 */}
               <View style={styles.detailSection}>
                 <Text style={styles.detailLabel}>📅 完成日期</Text>
                 <Text style={styles.detailValue}>{formatDate(selectedPractice.completed_at)}</Text>
@@ -379,7 +371,6 @@ const DailyScreen = ({ navigation }) => {
                 <Text style={styles.detailValue}>{selectedPractice.feeling || '無記錄'}</Text>
               </View>
               
-              {/* ⭐ 呼吸穩定力練習的記錄 - 所有卡片都顯示 */}
               {isBreathing && (
                 <>
                   <View style={[styles.detailCard, { backgroundColor: lightBg }]}>
@@ -405,7 +396,6 @@ const DailyScreen = ({ navigation }) => {
                 </>
               )}
               
-              {/* ⭐ 情緒理解力練習的記錄 - 所有卡片都顯示 */}
               {isEmotion && (
                 <>
                   <View style={[styles.detailCard, { backgroundColor: lightBg }]}>
@@ -521,52 +511,46 @@ const DailyScreen = ({ navigation }) => {
     const start = polarToCartesian(x, y, radius, startAngle);
     const end = polarToCartesian(x, y, radius, endAngle);
     
-    let angleDiff = endAngle - startAngle;
-    if (angleDiff < 0) angleDiff += 360;
-    
-    const largeArcFlag = angleDiff > 180 ? "1" : "0";
+    const largeArcFlag = endAngle - startAngle <= 180 ? '0' : '1';
     
     return [
-      "M", start.x, start.y,
-      "A", radius, radius, 0, largeArcFlag, 1, end.x, end.y
-    ].join(" ");
+      'M', start.x, start.y,
+      'A', radius, radius, 0, largeArcFlag, 1, end.x, end.y
+    ].join(' ');
   };
 
   const polarToCartesian = (centerX, centerY, radius, angleInDegrees) => {
-    const angleInRadians = (angleInDegrees - 90) * Math.PI / 180.0;
+    const angleInRadians = ((angleInDegrees - 90) * Math.PI) / 180.0;
     return {
-      x: centerX + (radius * Math.cos(angleInRadians)),
-      y: centerY + (radius * Math.sin(angleInRadians))
+      x: centerX + radius * Math.cos(angleInRadians),
+      y: centerY + radius * Math.sin(angleInRadians)
     };
   };
 
-  const TimeRangeButton = ({ label, value }) => (
-    <TouchableOpacity
-      style={[
-        styles.timeButton,
-        timeRange === value && styles.timeButtonActive
-      ]}
-      onPress={() => setTimeRange(value)}
-    >
-      <Text style={[
-        styles.timeButtonText,
-        timeRange === value && styles.timeButtonTextActive
-      ]}>
-        {label}
-      </Text>
-    </TouchableOpacity>
-  );
+  const TimeRangeButton = ({ label, value }) => {
+    const isActive = timeRange === value;
+    return (
+      <TouchableOpacity
+        style={[styles.timeButton, isActive && styles.timeButtonActive]}
+        onPress={() => setTimeRange(value)}
+      >
+        <Text style={[styles.timeButtonText, isActive && styles.timeButtonTextActive]}>
+          {label}
+        </Text>
+      </TouchableOpacity>
+    );
+  };
 
   const PracticeRecordCard = ({ practice }) => {
-    const localDate = formatDateToLocal(practice.completed_at);
-    const today = new Date();
-    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-    const practiceDate = localDate.split(' ')[0];
-    const isToday = practiceDate === todayStr;
-
+    const now = new Date();
+    const offset = 8 * 60;
+    const localTime = new Date(now.getTime() + offset * 60 * 1000);
+    const today = localTime.toISOString().split('T')[0];
+    const practiceDate = practice.completed_at ? practice.completed_at.split(' ')[0] : '';
+    const isToday = practiceDate === today;
+    
     const formatDuration = (durationSeconds) => {
       const seconds = parseInt(durationSeconds) || 0;
-      
       if (seconds === 0) {
         const mins = parseInt(practice.duration) || 0;
         return `${mins}分`;
@@ -625,14 +609,38 @@ const DailyScreen = ({ navigation }) => {
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="rgba(22, 109, 181, 0.95)" />
       
-      <View style={styles.headerContainer}>
-        <View style={styles.searchContainer}>
-          <Text style={styles.searchIcon}>🔍</Text>
-          <TextInput
-            style={styles.searchInput}
-            placeholder="搜尋"
-            placeholderTextColor="#9CA3AF"
-          />
+      {/* ⭐ 上選單 - 藍色背景 */}
+      <View style={styles.blueHeader}>
+        <View style={styles.headerLeft}>
+          <View style={styles.avatarContainer}>
+            <Image 
+              source={require('./assets/images/person.png')}
+              style={styles.profileAvatar}
+              resizeMode="cover"
+            />
+          </View>
+          <View style={styles.headerTextContainer}>
+            <Text style={styles.greetingText}>早安！祝您有美好的一天</Text>
+            <Text style={styles.userName}>張三 player</Text>
+          </View>
+        </View>
+        <View style={styles.headerRight}>
+          {/* ⭐ 通知圖標 - 保留原始圖片（含紅點），放大到 32x32 */}
+          <TouchableOpacity style={styles.headerIconButton}>
+            <Image 
+              source={require('./assets/images/new_notify.png')}
+              style={styles.headerIconLarge}
+              resizeMode="contain"
+            />
+          </TouchableOpacity>
+          {/* ⭐ 設定圖標 - 放大到 32x32 */}
+          <TouchableOpacity style={styles.headerIconButton}>
+            <Image 
+              source={require('./assets/images/setting.png')}
+              style={styles.headerIconLarge}
+              resizeMode="contain"
+            />
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -700,53 +708,88 @@ const DailyScreen = ({ navigation }) => {
         <View style={styles.bottomPadding} />
       </ScrollView>
 
-      {/* ⭐ 詳情模態框 */}
       {renderPracticeDetailModal()}
 
-      <View style={styles.bottomNav}>
-        <TouchableOpacity
-          style={[styles.navButton, activeTab === 'home' && styles.navButtonActive]}
-          onPress={() => {
-            setActiveTab('home');
-            navigation.navigate('Home');
-          }}
-        >
-          <Image 
-            source={require('./assets/images/home.png')}
-            style={styles.navIcon}
-            resizeMode="contain"
-          />
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.navButton, activeTab === 'courses' && styles.navButtonActive]}
-          onPress={() => setActiveTab('courses')}
-        >
-          <Image 
-            source={require('./assets/images/explore.png')}
-            style={styles.navIcon}
-            resizeMode="contain"
-          />
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.navButton, activeTab === 'tasks' && styles.navButtonActive]}
-          onPress={() => setActiveTab('tasks')}
-        >
-          <Image 
-            source={require('./assets/images/daily.png')}
-            style={styles.navIcon}
-            resizeMode="contain"
-          />
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.navButton, activeTab === 'profile' && styles.navButtonActive]}
-          onPress={() => setActiveTab('profile')}
-        >
-          <Image 
-            source={require('./assets/images/profile.png')}
-            style={styles.navIcon}
-            resizeMode="contain"
-          />
-        </TouchableOpacity>
+      {/* ⭐ 底部導航欄 - 使用 menu.png 占滿寬度 */}
+      <View style={styles.bottomNavContainer}>
+        <Image 
+          source={require('./assets/images/menu.png')}
+          style={styles.menuImage}
+          resizeMode="stretch"
+        />
+        <View style={styles.bottomNav}>
+          <TouchableOpacity 
+            style={styles.navButton}
+            onPress={() => {
+              setActiveTab('home');
+              navigation.navigate('Home');
+            }}
+          >
+            <Image 
+              source={require('./assets/images/new_home.png')}
+              style={[
+                styles.navIcon,
+                activeTab === 'home' && styles.navIconActive
+              ]}
+              resizeMode="contain"
+            />
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={styles.navButton}
+            onPress={() => setActiveTab('explore')}
+          >
+            <Image 
+              source={require('./assets/images/new_explore.png')}
+              style={[
+                styles.navIcon,
+                activeTab === 'explore' && styles.navIconActive
+              ]}
+              resizeMode="contain"
+            />
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={styles.centerNavButton}
+            onPress={() => {
+              // 每日打卡功能
+            }}
+          >
+            <Image 
+              source={require('./assets/images/daily_clock.png')}
+              style={styles.centerNavIcon}
+              resizeMode="contain"
+            />
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={styles.navButton}
+            onPress={() => setActiveTab('record')}
+          >
+            <Image 
+              source={require('./assets/images/record.png')}
+              style={[
+                styles.navIcon,
+                activeTab === 'record' && styles.navIconActive
+              ]}
+              resizeMode="contain"
+            />
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={styles.navButton}
+            onPress={() => setActiveTab('profile')}
+          >
+            <Image 
+              source={require('./assets/images/new_profile.png')}
+              style={[
+                styles.navIcon,
+                activeTab === 'profile' && styles.navIconActive
+              ]}
+              resizeMode="contain"
+            />
+          </TouchableOpacity>
+        </View>
       </View>
     </View>
   );
@@ -769,34 +812,60 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#6B7280',
   },
-  headerContainer: {
+  // ⭐ 藍色上選單
+  blueHeader: {
     backgroundColor: 'rgba(22, 109, 181, 0.95)',
     paddingHorizontal: 16,
     paddingTop: 50,
     paddingBottom: 16,
-  },
-  searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'white',
-    borderRadius: 20,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+    justifyContent: 'space-between',
   },
-  searchIcon: {
-    fontSize: 14,
-    marginRight: 8,
-    color: '#9CA3AF',
-  },
-  searchInput: {
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
     flex: 1,
-    fontSize: 14,
-    color: '#374151',
+  },
+  avatarContainer: {
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  profileAvatar: {
+    width: 48,
+    height: 48,
+  },
+  headerTextContainer: {
+    marginLeft: 12,
+    flex: 1,
+  },
+  greetingText: {
+    fontSize: 13,
+    color: '#FFFFFF',
+    marginBottom: 2,
+  },
+  userName: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerIconButton: {
+    width: 44,
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 4,
+  },
+  // ⭐ 放大的圖標 - 32x32，不加 tintColor（保留原始顏色）
+  headerIconLarge: {
+    width: 32,
+    height: 32,
   },
   titleContainer: {
     backgroundColor: '#FFFFFF',
@@ -981,31 +1050,70 @@ const styles = StyleSheet.create({
   bottomPadding: {
     height: 100,
   },
+  // ⭐ 底部導航欄 - 使用 menu.png 占滿寬度
+  bottomNavContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 94,
+  },
+  menuImage: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    width: '100%',
+    height: 115,
+    opacity: 0.90,        
+    shadowColor: '#000',   
+    shadowOffset: { width: 0, height: -3 }, 
+    shadowOpacity: 0.15,   
+    shadowRadius: 5,       
+    elevation: 8,        
+  },
   bottomNav: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: 'rgba(22, 109, 181, 0.95)',
     flexDirection: 'row',
     justifyContent: 'space-around',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    paddingBottom: 24,
+    alignItems: 'center',
+    paddingBottom: 20,
+    paddingHorizontal: 20,
   },
   navButton: {
     padding: 8,
-    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  navButtonActive: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-  },
+  // ⭐ 圖標顏色修正：默認藍色，激活時加 40% 透明度的 #40A1DD
   navIcon: {
     width: 34,
     height: 34,
-    tintColor: '#FFFFFF',
+    // 不加 tintColor，保留原始圖片顏色（藍色）
   },
-  // ⭐ 新增：詳情模態框樣式
+  navIconActive: {
+    opacity: 0.4,
+    tintColor: '#40A1DD',
+  },
+  centerNavButton: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: 'transparent',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  centerNavIcon: {
+    width: 60,
+    height: 60,
+    bottom: 16,
+    left: 2.5,
+  },
+  // 模態框樣式
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
