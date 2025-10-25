@@ -27,7 +27,7 @@ import ApiService from './api';
 import PracticeScreen from './PracticeScreen';
 import BreathingPractice from './practice/BreathingPractice';
 import EmotionPractice from './practice/EmotionPractice';
-import FiveSensesPractice from './practice/FiveSensesPractice';
+import MindfulnessPractice from './practice/MindfulnessPractice';
 import SelfAwarenessPractice from './practice/SelfAwarenessPractice';
 
 const { width } = Dimensions.get('window');
@@ -91,14 +91,14 @@ const HomeScreen = ({ navigation }) => {
       // tags: ['自責', '自我懷疑', '內耗'], // 適用時機標籤
     },
     { 
-      name: '五感練習', 
-      description: '「五感覺察」是一個簡單卻重要的情緒調節技巧，也是改變內在的基礎',
-      duration: '3 ~ 5 min', 
-      practiceType: '五感察覺練習',
+      name: '正念安定力練習',
+      description: '立刻幫助平復焦慮、放鬆身體與心情，也在長期中深入觀察自己的內在狀態',
+      duration: '10分鐘',
+      practiceType: '正念安定力練習',
       backgroundColor: '#FFFFFF',
       completedBadgeColor: 'rgba(90, 206, 135, 0.8)',
       uncompletedBadgeColor: 'rgba(0, 232, 227, 0.2)',
-      image: require('./assets/images/五感察覺.png'),
+      image: require('./assets/images/正念安定.png'),
       practiceNumber: 4,
     }
   ];
@@ -642,8 +642,8 @@ const PracticeNavigator = ({ route, navigation }) => {
       return <BreathingPractice navigation={navigation} onComplete={onPracticeComplete} />;
     case '情緒理解力練習':
       return <EmotionPractice navigation={navigation} onComplete={onPracticeComplete} />;
-    case '五感察覺練習':
-      return <FiveSensesPractice navigation={navigation} onComplete={onPracticeComplete} />;
+    case '正念安定力練習':
+      return <MindfulnessPractice navigation={navigation} onComplete={onPracticeComplete} />;
     case '自我覺察力練習':
       return <SelfAwarenessPractice navigation={navigation} onComplete={onPracticeComplete} />;
     default:

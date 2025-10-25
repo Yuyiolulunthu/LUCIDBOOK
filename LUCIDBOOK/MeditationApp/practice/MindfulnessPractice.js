@@ -1,4 +1,4 @@
-//BreathingPractice
+// MindfulnessPractice.js - 正念安定力練習
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
@@ -19,12 +19,16 @@ import {
 import { Audio } from 'expo-av';
 import ApiService from '../api';
 
-export default function BreathingPractice({ onBack, navigation }) {
+export default function MindfulnessPractice({ onBack, navigation }) {
   const [currentStep, setCurrentStep] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [sound, setSound] = useState(null);
+  const [breathingSound, setBreathingSound] = useState(null);
   const [position, setPosition] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [breathingPosition, setBreathingPosition] = useState(0);
+  const [breathingDuration, setBreathingDuration] = useState(0);
+  const [isBreathingPlaying, setIsBreathingPlaying] = useState(false);
   const [practiceId, setPracticeId] = useState(null);
   
   const [startTime, setStartTime] = useState(null);
@@ -33,8 +37,8 @@ export default function BreathingPractice({ onBack, navigation }) {
   const isFocused = useRef(true);
   
   const [formData, setFormData] = useState({
-    feeling: '',
     noticed: '',
+    attention: '',
     reflection: '',
   });
 
@@ -42,50 +46,56 @@ export default function BreathingPractice({ onBack, navigation }) {
 
   const steps = [
     {
-      title: "準備好來開始\n今天的《呼吸穩定力練習》了嗎？",
+      title: "準備好來開始\n今天的《正念安定力練習》了嗎？",
       content: "",
       hasImage: true,
       imageType: "welcome",
     },
     {
-      title: "嗨！歡迎你開始今天的\n《呼吸穩定力》練習",
+      title: "嗨，歡迎你來到\n《正念安定力》練習。",
       content: "",
       showGreeting: true,
     },
     {
-      title: "這個練習能協助你\n平靜、專注，\n也是提升覺察力的重要基礎",
-      content: ""
+      title: "接下來我們會帶你利用\n8分鐘的身體掃描",
+      content: "體驗一套基礎的正念\n從內提升覺察，建立安定的力量。",
     },
     {
       title: "請你找個舒服的位置，",
       content: "坐下，或躺下",
       hasImage: true,
-      imageType: "positions"
+      imageType: "positions",
+      hasBreathingAudio: true,
     },
     {
-      title: "很好，再接下來的5分鐘，\n邀請你跟著聲音指示\n一起呼吸～",
-      content: ""
+      title: "請進行3組，深深的呼吸，",
+      content: "讓身體心靈慢下來",
+      hasBreathingAudio: true,
+      showCompleteButton: true,
     },
     {
-      title: "",
-      content: "讓我們開始進行練習。",
+      title: "很好... 接著跟著音檔的引導，",
+      content: "開始正念...",
+    },
+    {
+      title: "讓我們開始進行身體掃描練習",
+      content: "",
       hasAudio: true
     },
     {
-      title: "你做得很好，",
-      content: "今天你練習了5分鐘的呼吸\n請利用以下空間記錄下今日的練習",
+      title: "身體掃描結束，",
+      content: "你感覺怎麼樣呢？\n讓我們利用書寫，分享自己的身體與心靈感受",
       hasForm: true,
-      isSecondToLast: true
     },
     {
-      title: "恭喜你完成了今天的",
-      content: "《呼吸穩定力練習》，\n讓我們來整理你的回饋吧！",
+      title: "你做得很好，",
+      content: "今天你練習了8分鐘的正念\n請利用以下空間記錄下今日的練習",
       hasSummary: true
     }
   ];
 
   const totalSteps = steps.length;
-  const currentStepData = steps[currentStep];
+  const currentStepData = steps[currentStep] || {};
   const progressPercentage = ((currentStep + 1) / totalSteps) * 100;
 
   useEffect(() => {
@@ -114,19 +124,22 @@ export default function BreathingPractice({ onBack, navigation }) {
       if (sound) {
         sound.unloadAsync();
       }
+      if (breathingSound) {
+        breathingSound.unloadAsync();
+      }
     };
   }, [navigation]);
 
   const initializePractice = async () => {
     try {
-      const response = await ApiService.startPractice('呼吸穩定力練習');
+      const response = await ApiService.startPractice('正念安定力練習');
       
       if (response.practiceId) {
         setPracticeId(response.practiceId);
         
         if (response.currentPage && response.currentPage > 0) {
-          console.log(`✅ 恢復進度到第 ${response.currentPage} 頁`);
-          setCurrentStep(response.currentPage);
+          const validPage = Math.min(response.currentPage, steps.length - 1);
+          setCurrentStep(validPage);
         }
         
         if (response.formData) {
@@ -135,7 +148,6 @@ export default function BreathingPractice({ onBack, navigation }) {
               ? JSON.parse(response.formData) 
               : response.formData;
             setFormData(parsedData);
-            console.log('✅ 恢復表單數據:', parsedData);
           } catch (e) {
             console.log('⚠️ 解析表單數據失敗:', e);
           }
@@ -175,13 +187,61 @@ export default function BreathingPractice({ onBack, navigation }) {
     }
   };
 
+  // 呼吸音檔
+  const loadBreathingAudio = async () => {
+    if (breathingSound) {
+      await breathingSound.unloadAsync();
+    }
+    
+    try {
+      const audioFile = require('../assets/audio/breathing-meditation.mp3');
+      const { sound: newSound } = await Audio.Sound.createAsync(audioFile);
+      setBreathingSound(newSound);
+      
+      const status = await newSound.getStatusAsync();
+      if (status.isLoaded) {
+        setBreathingDuration(status.durationMillis || 0);
+      }
+      
+      newSound.setOnPlaybackStatusUpdate((status) => {
+        if (status.isLoaded) {
+          setBreathingPosition(status.positionMillis || 0);
+          setIsBreathingPlaying(status.isPlaying || false);
+        }
+      });
+    } catch (error) {
+      console.log('呼吸音頻載入錯誤:', error);
+    }
+  };
+
+  const toggleBreathingPlayback = async () => {
+    if (!breathingSound) {
+      await loadBreathingAudio();
+      return;
+    }
+
+    try {
+      const status = await breathingSound.getStatusAsync();
+      if (status.isLoaded) {
+        if (isBreathingPlaying) {
+          await breathingSound.pauseAsync();
+        } else {
+          await breathingSound.playAsync();
+        }
+      }
+    } catch (error) {
+      console.log('呼吸播放錯誤:', error);
+    }
+  };
+
+  // 身體掃描音檔
   const loadAudio = async () => {
     if (sound) {
       await sound.unloadAsync();
     }
     
     try {
-      const audioFile = require('../assets/audio/breathing-meditation.mp3');
+      const audioFile = require('../assets/audio/BodyScanner.mp3');
       const { sound: newSound } = await Audio.Sound.createAsync(audioFile);
       setSound(newSound);
       
@@ -225,6 +285,9 @@ export default function BreathingPractice({ onBack, navigation }) {
     if (currentStepData.hasAudio && !sound) {
       loadAudio();
     }
+    if (currentStepData.hasBreathingAudio && !breathingSound) {
+      loadBreathingAudio();
+    }
   }, [currentStep]);
 
   useEffect(() => {
@@ -232,8 +295,11 @@ export default function BreathingPractice({ onBack, navigation }) {
       if (sound) {
         sound.unloadAsync();
       }
+      if (breathingSound) {
+        breathingSound.unloadAsync();
+      }
     };
-  }, [sound]);
+  }, [sound, breathingSound]);
 
   const formatTime = (milliseconds) => {
     const totalSeconds = Math.floor(milliseconds / 1000);
@@ -276,12 +342,11 @@ export default function BreathingPractice({ onBack, navigation }) {
       await ApiService.completePractice(practiceId, {
         duration: totalMinutes,
         duration_seconds: totalSeconds, 
-        feeling: formData.feeling,
         noticed: formData.noticed,
+        attention: formData.attention,
         reflection: formData.reflection,
       });
 
-      // ⭐ 修正：正確顯示時間
       const mins = Math.floor(totalSeconds / 60);
       const secs = totalSeconds % 60;
       let timeStr = '';
@@ -292,7 +357,7 @@ export default function BreathingPractice({ onBack, navigation }) {
         timeStr += `${secs}秒`;
       }
 
-      Alert.alert('完成', `恭喜完成練習！總時間：${timeStr}分鐘${totalSeconds % 60}秒`, [
+      Alert.alert('完成', `恭喜完成練習！總時間：${timeStr}`, [
         {
           text: '確定',
           onPress: () => {
@@ -314,7 +379,81 @@ export default function BreathingPractice({ onBack, navigation }) {
     Keyboard.dismiss();
   };
 
+  // 小型音頻播放器
+  const renderMiniAudioPlayer = () => {
+    return (
+      <View style={styles.miniPlayerContainer}>
+        <View style={styles.miniPlayerCard}>
+          <Text style={styles.miniLabel}>呼吸穩定</Text>
+          
+          <View style={styles.miniTimeRow}>
+            <Text style={styles.miniTimeText}>{formatTime(breathingPosition)}</Text>
+            <View style={styles.miniProgressSlider}>
+              <View 
+                style={[
+                  styles.miniProgressBar, 
+                  { width: `${breathingDuration > 0 ? (breathingPosition / breathingDuration) * 100 : 0}%` }
+                ]} 
+              />
+              <View 
+                style={[
+                  styles.miniProgressHandle,
+                  { left: `${breathingDuration > 0 ? (breathingPosition / breathingDuration) * 100 : 0}%` }
+                ]}
+              />
+            </View>
+            <Text style={styles.miniTimeText}>{formatTime(breathingDuration)}</Text>
+          </View>
+          
+          <View style={styles.miniControls}>
+            <TouchableOpacity 
+              style={styles.miniControlButton}
+              onPress={async () => {
+                if (breathingSound) {
+                  await breathingSound.setPositionAsync(Math.max(0, breathingPosition - 10000));
+                }
+              }}
+            >
+              <Image 
+                source={require('../assets/images/backward.png')}
+                style={styles.miniControlImage}
+                resizeMode="contain"
+              />
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.miniPlayButton}
+              onPress={toggleBreathingPlayback}
+            >
+              <Image 
+                source={isBreathingPlaying ? require('../assets/images/stop.png') : require('../assets/images/start.png')}
+                style={styles.miniPlayImage}
+                resizeMode="contain"
+              />
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.miniControlButton}
+              onPress={async () => {
+                if (breathingSound) {
+                  await breathingSound.setPositionAsync(Math.min(breathingDuration, breathingPosition + 10000));
+                }
+              }}
+            >
+              <Image 
+                source={require('../assets/images/forward.png')}
+                style={styles.miniControlImage}
+                resizeMode="contain"
+              />
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    );
+  };
+
   const renderStepContent = () => {
+    // 表單頁面
     if (currentStepData.hasForm) {
       return (
         <KeyboardAvoidingView 
@@ -328,95 +467,121 @@ export default function BreathingPractice({ onBack, navigation }) {
             showsVerticalScrollIndicator={false}
             contentContainerStyle={{ paddingBottom: 40 }}
           >
-            <View style={styles.inputField}>
-              <Text style={styles.inputLabel}>練習後，我感覺：</Text>
-              <TextInput 
-                style={styles.inputBox} 
-                multiline 
-                placeholder="寫下你的感受內容"
-                placeholderTextColor="rgba(0, 0, 0, 0.4)"
-                value={formData.feeling}
-                onChangeText={(text) => updateFormData('feeling', text)}
-              />
+            <View style={styles.stepHeader}>
+              {currentStepData.title && (
+                <Text style={styles.stepTitle}>{currentStepData.title}</Text>
+              )}
+              {currentStepData.content && (
+                <Text style={styles.contentText}>{currentStepData.content}</Text>
+              )}
             </View>
-            
-            <View style={styles.separator} />
-            
             <View style={styles.inputField}>
-              <Text style={styles.inputLabel}>練習中的發現，我發現：</Text>
+              <Text style={styles.inputLabel}>今天在身體掃描中，我觀察到什麼過去沒有發現到的？哪些部位讓我感到緊張、放鬆、或有特別的感受？</Text>
               <TextInput 
                 style={styles.inputBox} 
                 multiline 
-                placeholder="記錄練習時的發現"
+                placeholder="在此分享你的經驗..."
                 placeholderTextColor="rgba(0, 0, 0, 0.4)"
                 value={formData.noticed}
                 onChangeText={(text) => updateFormData('noticed', text)}
               />
             </View>
             
+            <View style={styles.inputField}>
+              <Text style={styles.inputLabel}>我的注意力有沒有飄走？我是怎麼把它帶回來的？</Text>
+              <TextInput 
+                style={styles.inputBox} 
+                multiline 
+                placeholder="在此分享你的經驗..."
+                placeholderTextColor="rgba(0, 0, 0, 0.4)"
+                value={formData.attention}
+                onChangeText={(text) => updateFormData('attention', text)}
+              />
+            </View>
+            
             <View style={styles.separator} />
             
             <View style={styles.inputField}>
-              <Text style={styles.inputLabel}>我想對願意給自己一點時間，{'\n'}好好呼吸、與自己共處的自己說：</Text>
+              <Text style={styles.inputLabel}>還有沒有什麼發現？感受？與疑惑</Text>
               <TextInput 
                 style={styles.largeInputBox} 
                 multiline 
-                placeholder="寫下想對自己說的話"
+                placeholder="在此分享你的想法..."
                 placeholderTextColor="rgba(0, 0, 0, 0.4)"
                 value={formData.reflection}
                 onChangeText={(text) => updateFormData('reflection', text)}
               />
             </View>
-
-            {currentStepData.isSecondToLast && (
-              <TouchableOpacity 
-                style={styles.completeButton} 
-                onPress={nextStep}
-              >
-                <Text style={styles.completeButtonText}>我完成練習了！</Text>
-              </TouchableOpacity>
-            )}
+            
+            <TouchableOpacity 
+              style={styles.completeButton}
+              onPress={nextStep}
+            >
+              <Text style={styles.completeButtonText}>我完成練習了！</Text>
+            </TouchableOpacity>
           </ScrollView>
         </KeyboardAvoidingView>
       );
     }
 
+    // 總結頁面
     if (currentStepData.hasSummary) {
       return (
-        <ScrollView style={styles.summarySection} showsVerticalScrollIndicator={false}>
+        <ScrollView 
+          style={styles.summarySection}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: 40 }}
+        >
+          <View style={styles.stepHeader}>
+            {currentStepData.title && (
+              <Text style={styles.stepTitle}>{currentStepData.title}</Text>
+            )}
+            {currentStepData.content && (
+              <Text style={styles.contentText}>{currentStepData.content}</Text>
+            )}
+          </View>
           <View style={styles.summaryCard}>
-            <Text style={styles.summaryTitle}>練習的感覺：</Text>
-            <Text style={styles.summaryContent}>{formData.feeling || "無記錄"}</Text>
+            <Text style={styles.summaryTitle}>你的觀察：</Text>
+            <Text style={styles.summaryContent}>{formData.noticed || '未填寫'}</Text>
           </View>
           
-          <View style={styles.separator} />
-          
           <View style={styles.summaryCard}>
-            <Text style={styles.summaryTitle}>練習中的發現：</Text>
-            <Text style={styles.summaryContent}>{formData.noticed || "無記錄"}</Text>
+            <Text style={styles.summaryTitle}>你的注意力：</Text>
+            <Text style={styles.summaryContent}>{formData.attention || '未填寫'}</Text>
           </View>
           
-          <View style={styles.separator} />
-          
           <View style={styles.summaryCard}>
-            <Text style={styles.summaryTitle}>想和自己說的話：</Text>
-            <Text style={styles.summaryContent}>{formData.reflection || "無記錄"}</Text>
+            <Text style={styles.summaryTitle}>你的反思：</Text>
+            <Text style={styles.summaryContent}>{formData.reflection || '未填寫'}</Text>
           </View>
           
-          <TouchableOpacity style={styles.finishButton} onPress={handleComplete}>
-            <Text style={styles.finishButtonText}>完成今日練習</Text>
+          <TouchableOpacity 
+            style={styles.finishButton}
+            onPress={handleComplete}
+          >
+            <Text style={styles.finishButtonText}>完成練習</Text>
           </TouchableOpacity>
         </ScrollView>
       );
     }
 
+    // 大型音頻播放器頁面
     if (currentStepData.hasAudio) {
       return (
+      <>
+        <View style={styles.stepHeader}>
+          {currentStepData.title && (
+            <Text style={styles.stepTitle}>{currentStepData.title}</Text>
+          )}
+          {currentStepData.content && (
+            <Text style={styles.contentText}>{currentStepData.content}</Text>
+          )}
+        </View>
         <View style={styles.audioPlayer}>
           <View style={styles.audioCard}>
             <View style={styles.albumCover}>
               <Image 
-                source={require('../assets/images/ocean-breathe.png')}
+                source={require('../assets/images/正念安定.png')}
                 style={styles.albumCoverImage}
                 resizeMode="cover"
               />
@@ -425,10 +590,20 @@ export default function BreathingPractice({ onBack, navigation }) {
             <View style={styles.timeContainer}>
               <Text style={styles.timeText}>{formatTime(position)}</Text>
               <View style={styles.progressSlider}>
-                <View style={[styles.progressBar, { width: duration > 0 ? `${(position / duration) * 100}%` : '0%' }]} />
-                <View style={[styles.progressHandle, { left: duration > 0 ? `${(position / duration) * 100}%` : '0%' }]} />
+                <View 
+                  style={[
+                    styles.progressBar, 
+                    { width: `${duration > 0 ? (position / duration) * 100 : 0}%` }
+                  ]} 
+                />
+                <View 
+                  style={[
+                    styles.progressHandle,
+                    { left: `${duration > 0 ? (position / duration) * 100 : 0}%` }
+                  ]}
+                />
               </View>
-              <Text style={styles.timeText}>{formatTime(duration) || '5:00'}</Text>
+              <Text style={styles.timeText}>{formatTime(duration)}</Text>
             </View>
             
             <View style={styles.audioControls}>
@@ -447,13 +622,18 @@ export default function BreathingPractice({ onBack, navigation }) {
                   resizeMode="contain"
                 />
               </TouchableOpacity>
-              <TouchableOpacity onPress={togglePlayback} style={styles.playButtonContainer}>
+              
+              <TouchableOpacity 
+                style={styles.playButtonContainer}
+                onPress={togglePlayback}
+              >
                 <Image 
                   source={isPlaying ? require('../assets/images/stop.png') : require('../assets/images/start.png')}
                   style={styles.playButtonImage}
                   resizeMode="contain"
                 />
               </TouchableOpacity>
+              
               <TouchableOpacity 
                 style={styles.controlButtonContainer}
                 onPress={async () => {
@@ -472,27 +652,48 @@ export default function BreathingPractice({ onBack, navigation }) {
             </View>
             
             <Text style={styles.audioDescription}>
-              呼吸，貼近下意識的節拍，{'\n'}邀請你跟著聲音指示{'\n'}一起呼吸～
+              跟著音檔的引導，開始正念...
             </Text>
           </View>
         </View>
+        </>
       );
     }
 
-    if (currentStepData.hasImage) {
-      return (
-        <View style={styles.imageSection}>
-          {currentStepData.imageType === "welcome" ? (
+    // 一般內容頁面
+    return (
+      <>
+        <View style={styles.stepHeader}>
+          <Text style={styles.stepTitle}>{currentStepData.title}</Text>
+          {currentStepData.content ? (
+            <Text style={styles.contentText}>{currentStepData.content}</Text>
+          ) : null}
+        </View>
+
+        {currentStepData.showGreeting && (
+          <View style={styles.greetingSection}>
+            <View style={styles.greetingCircle}>
+              <Text style={styles.greetingText}>👋</Text>
+            </View>
+          </View>
+        )}
+
+        {currentStepData.hasImage && currentStepData.imageType === "welcome" && (
+          <View style={styles.imageSection}>
             <View style={styles.welcomeImageContainer}>
               <View style={styles.welcomeImageWhiteBox}>
                 <Image 
-                  source={require('../assets/images/呼吸穩定.png')}
+                  source={require('../assets/images/正念安定.png')}
                   style={styles.welcomeImage}
                   resizeMode="contain"
                 />
               </View>
             </View>
-          ) : currentStepData.imageType === "positions" ? (
+          </View>
+        )}
+
+        {currentStepData.hasImage && currentStepData.imageType === "positions" && (
+          <View style={styles.imageSection}>
             <View style={styles.positionImagesContainer}>
               <View style={styles.positionImageTop}>
                 <Image 
@@ -509,103 +710,123 @@ export default function BreathingPractice({ onBack, navigation }) {
                 />
               </View>
             </View>
-          ) : null}
-        </View>
-      );
-    }
-
-    if (currentStepData.showGreeting) {
-      return (
-        <View style={styles.greetingSection}>
-          <View style={styles.greetingCircle}>
-            <Text style={styles.greetingText}>Hi</Text>
           </View>
-        </View>
-      );
-    }
+        )}
 
-    if (currentStepData.content) {
-      return (
-        <Text style={styles.contentText}>{currentStepData.content}</Text>
-      );
-    }
+        {currentStepData.hasBreathingAudio && renderMiniAudioPlayer()}
 
-    return null;
+        {currentStepData.showCompleteButton && (
+          <TouchableOpacity 
+            style={styles.completeBreathingButton}
+            onPress={async () => {
+              // 暫停呼吸音檔（而不是停止）
+              if (breathingSound) {
+                try {
+                  const status = await breathingSound.getStatusAsync();
+                  if (status.isLoaded && status.isPlaying) {
+                    await breathingSound.pauseAsync();
+                  }
+                } catch (error) {
+                  console.log('暫停音頻錯誤:', error);
+                }
+              }
+              // 然後進入下一步
+              nextStep();
+            }}
+          >
+            <Text style={styles.completeBreathingButtonText}>完成呼吸</Text>
+          </TouchableOpacity>
+        )}
+      </>
+    );
   };
-
-  const isLastStep = currentStep === steps.length - 1;
-  const isSecondToLast = currentStepData.isSecondToLast;
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="rgba(46, 134, 171, 0.7)" />
+      <StatusBar barStyle="dark-content" />
       
-      <View style={styles.header}>
-        <TouchableOpacity onPress={onBack || (() => navigation?.goBack())}>
-          <Text style={styles.closeButton}>✕</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>《呼吸穩定力練習》</Text>
-        <TouchableOpacity>
-          <Text style={styles.menuButton}>⋯</Text>
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.progressContainer}>
-        <View style={styles.progressBarContainer}>
-          <View style={[styles.progressBarFill, { width: `${progressPercentage}%` }]} />
-        </View>
-      </View>
-
       <TouchableWithoutFeedback onPress={dismissKeyboard}>
-        <View style={styles.contentContainer}>
-          <View style={styles.stepHeader}>
-            <Text style={styles.stepTitle}>{currentStepData.title}</Text>
-            {currentStepData.content && !currentStepData.hasAudio && !currentStepData.hasImage && (
-              <Text style={styles.contentText}>{currentStepData.content}</Text>
+        <View style={{ flex: 1 }}>
+
+          {/* 標題列 */}
+          <View style={styles.header}>
+            <TouchableOpacity 
+              style={styles.backButton} 
+              onPress={() => {
+                if (onBack) {
+                  onBack();
+                } else if (navigation) {
+                  navigation.goBack();
+                }
+              }}
+            >
+              <Text style={styles.backButtonText}>✕</Text>
+            </TouchableOpacity>
+            
+            <Text style={styles.headerTitle}>《正念安定力練習》</Text>
+            
+            <TouchableOpacity style={styles.menuButton}>
+              <Text style={styles.menuButtonText}>⋯</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* 進度條 */}
+          <View style={styles.progressContainer}>
+            <View style={styles.progressBarContainer}>
+              <View 
+                style={[styles.progressBarFill, { width: `${progressPercentage}%` }]} 
+              />
+            </View>
+          </View>
+
+          {/* 主要內容 */}
+          <View style={styles.contentContainer}>
+            {renderStepContent()}
+          </View>
+
+        {!currentStepData.hasSummary && (
+          <View style={styles.bottomNav}>
+            <TouchableOpacity 
+              style={[
+                styles.navArrowButton,
+                currentStep === 0 && styles.navButtonDisabled
+              ]}
+              onPress={prevStep}
+              disabled={currentStep === 0}
+            >
+              <Text style={styles.navArrowText}>‹</Text>
+            </TouchableOpacity>
+
+            <View style={styles.progressIndicator}>
+              {steps.map((_, index) => (
+                <View 
+                  key={index}
+                  style={[
+                    styles.progressDot,
+                    index === currentStep && styles.progressDotActive
+                  ]}
+                />
+              ))}
+            </View>
+
+            {!currentStepData.hasForm ? (
+              <TouchableOpacity 
+                style={[
+                  styles.navArrowButton,
+                  currentStep === steps.length - 1 && styles.navButtonDisabled
+                ]}
+                onPress={nextStep}
+                disabled={currentStep === steps.length - 1}
+              >
+                <Text style={styles.navArrowText}>›</Text>
+              </TouchableOpacity>
+            ) : (
+              <View style={[styles.navArrowButton, { opacity: 0 }]} />
             )}
           </View>
-
-          {renderStepContent()}
+        )}
         </View>
       </TouchableWithoutFeedback>
-
-      {!isLastStep && (
-        <View style={styles.bottomNav}>
-          <TouchableOpacity 
-            onPress={prevStep}
-            disabled={currentStep === 0}
-            style={[
-              styles.navArrowButton,
-              currentStep === 0 && styles.navButtonDisabled
-            ]}
-          >
-            <Text style={styles.navArrowText}>‹</Text>
-          </TouchableOpacity>
-          
-          <View style={styles.progressIndicator}>
-            {steps.map((_, index) => (
-              <View 
-                key={index}
-                style={[
-                  styles.progressDot,
-                  index === currentStep && styles.progressDotActive
-                ]}
-              />
-            ))}
-          </View>
-          
-          <TouchableOpacity 
-            onPress={nextStep}
-            disabled={isSecondToLast}
-            style={[
-              styles.navArrowButton,
-              isSecondToLast && styles.navButtonDisabled
-            ]}
-          >
-            <Text style={styles.navArrowText}>›</Text>
-          </TouchableOpacity>
-        </View>
-      )}
     </SafeAreaView>
   );
 }
@@ -613,29 +834,39 @@ export default function BreathingPractice({ onBack, navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#92C3D8',
+    backgroundColor: '#ede0dc',
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingVertical: 15,
   },
-  closeButton: {
-    fontSize: 20,
+  backButton: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  backButtonText: {
+    fontSize: 28,
     color: 'rgba(0, 0, 0, 0.6)',
-    fontWeight: 'bold',
   },
   headerTitle: {
-    fontSize: 16,
+    fontSize: 18,
     color: 'rgba(0, 0, 0, 0.6)',
     fontWeight: 'bold',
   },
   menuButton: {
-    fontSize: 20,
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  menuButtonText: {
+    fontSize: 24,
     color: 'rgba(0, 0, 0, 0.6)',
-    fontWeight: 'bold',
   },
   progressContainer: {
     paddingHorizontal: 20,
@@ -670,7 +901,7 @@ const styles = StyleSheet.create({
     lineHeight: 28,
   },
   contentText: {
-    fontSize: 16,
+    fontSize: 18,
     color: 'rgba(0, 0, 0, 0.6)',
     lineHeight: 24,
     textAlign: 'center',
@@ -713,6 +944,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 8,
   },
   welcomeImage: {
     width: '90%',
@@ -733,6 +969,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     overflow: 'hidden',
     zIndex: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 8,
   },
   positionImageBottom: {
     position: 'absolute',
@@ -744,11 +985,134 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     overflow: 'hidden',
     zIndex: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 8,
   },
   positionImageFile: {
     width: '100%',
     height: '100%',
   },
+  // 小型播放器
+  miniPlayerContainer: {
+    alignItems: 'center',
+    marginTop: 20,
+    marginBottom: 20,
+  },
+  miniPlayerCard: {
+    width: '90%',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  miniTimeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
+    marginBottom: 12,
+  },
+  miniTimeText: {
+    fontSize: 12,
+    color: 'rgba(0, 0, 0, 0.6)',
+    width: 35,
+    fontWeight: '500',
+  },
+  miniProgressSlider: {
+    flex: 1,
+    height: 4,
+    backgroundColor: 'rgba(177, 151, 158, 0.3)',
+    borderRadius: 2,
+    marginHorizontal: 10,
+    position: 'relative',
+  },
+  miniProgressBar: {
+    height: '100%',
+    backgroundColor: '#b1979e',
+    borderRadius: 2,
+  },
+  miniProgressHandle: {
+    position: 'absolute',
+    top: -4,
+    width: 12,
+    height: 12,
+    backgroundColor: '#b1979e',
+    borderRadius: 6,
+    marginLeft: -6,
+  },
+  miniControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  miniControlButton: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  miniControlIcon: {
+    fontSize: 20,
+    color: '#b1979e',
+  },
+  miniPlayButton: {
+    width: 45,
+    height: 45,
+    borderRadius: 25,
+    backgroundColor: '#b1979e',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginHorizontal: 15,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  miniPlayIcon: {
+    fontSize: 22,
+    color: '#FFFFFF',
+  },
+  miniLabel: {
+    fontSize: 14,
+    color: '#b1979e',
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  miniControlImage: {
+    width: 25,
+    height: 25,
+    tintColor: '#b1979e',
+  },
+  miniPlayImage: {
+    width: 27,
+    height: 27,
+    tintColor: '#FFFFFF',
+  },
+  completeBreathingButton: {
+    backgroundColor: '#b1979e',
+    paddingVertical: 14,
+    paddingHorizontal: 25,
+    borderRadius: 25,
+    alignSelf: 'center',
+    marginTop: 30,
+    borderWidth: 2,
+    borderColor: '#b1979e',
+  },
+  completeBreathingButtonText: {
+    color: '#f5f5f5',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  // 大型播放器
   audioPlayer: {
     marginBottom: 30,
   },
@@ -767,7 +1131,7 @@ const styles = StyleSheet.create({
     width: 240,
     height: 250,
     borderRadius: 5,
-    backgroundColor: '#87CEEB',
+    backgroundColor: '#ede0dc',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 20,
@@ -792,14 +1156,14 @@ const styles = StyleSheet.create({
   progressSlider: {
     flex: 1,
     height: 6,
-    backgroundColor: 'rgba(0, 0, 0, 0.2)',
+    backgroundColor: '#e6cbd2ff',
     borderRadius: 3,
     marginHorizontal: 15,
     position: 'relative',
   },
   progressBar: {
     height: '100%',
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    backgroundColor: '#b1979e',
     borderRadius: 3,
   },
   progressHandle: {
@@ -808,12 +1172,22 @@ const styles = StyleSheet.create({
     width: 18,
     height: 18,
     borderRadius: 9,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    backgroundColor: '#b1979e',
   },
   audioControls: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 20,
+  },
+  controlButtonImage: {
+    width: 25,
+    height: 25,
+    tintColor: '#b1979e',
+  },
+  playButtonImage: {
+    width: 34,
+    height: 34,
+    tintColor: '#b1979e',
   },
   controlButtonContainer: {
     width: 50,
@@ -842,6 +1216,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 18,
   },
+  // 表單
   formSection: {
     flex: 1,
     marginBottom: 20,
@@ -851,7 +1226,7 @@ const styles = StyleSheet.create({
   },
   inputLabel: {
     fontSize: 14,
-    color: 'rgba(0, 0, 0, 0.6)',
+    color: '#776368ff',
     marginBottom: 8,
     lineHeight: 20,
   },
@@ -875,7 +1250,7 @@ const styles = StyleSheet.create({
   },
   separator: {
     height: 1,
-    backgroundColor: 'rgba(219, 219, 219, 0.5)',
+    backgroundColor: 'rgba(177, 151, 158, 0.3)',
     marginVertical: 15,
   },
   completeButton: {
@@ -887,13 +1262,14 @@ const styles = StyleSheet.create({
     marginTop: 30,
     marginBottom: 20,
     borderWidth: 2,
-    borderColor: '#4F7F96',
+    borderColor: '#b1979e',
   },
   completeButtonText: {
-    color: '#4F7F96',
+    color: '#b1979e',
     fontSize: 16,
     fontWeight: 'bold',
   },
+  // 總結
   summarySection: {
     flex: 1,
     marginBottom: 20,
@@ -903,16 +1279,6 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 10,
     marginBottom: 15,
-  },
-  controlButtonImage: {
-    width: 25,
-    height: 25,
-    tintColor: '#63a0bcff',
-  },
-  playButtonImage: {
-    width: 34,
-    height: 34,
-    tintColor: '#63a0bcff',
   },
   summaryTitle: {
     fontSize: 15,
@@ -926,7 +1292,7 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   finishButton: {
-    backgroundColor: 'rgba(46, 134, 171, 0.9)',
+    backgroundColor: '#b1979e',
     paddingVertical: 14,
     paddingHorizontal: 32,
     borderRadius: 25,
@@ -938,6 +1304,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
   },
+  // 底部導航
   bottomNav: {
     position: 'absolute',
     bottom: 0,
@@ -969,7 +1336,7 @@ const styles = StyleSheet.create({
   },
   navArrowText: {
     fontSize: 24,
-    color: '#4F7F96',
+    color: '#b1979e',
     fontWeight: 'bold',
   },
   progressIndicator: {
@@ -984,7 +1351,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 4,
   },
   progressDotActive: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#b1979e',
     width: 12,
     height: 12,
     borderRadius: 6,

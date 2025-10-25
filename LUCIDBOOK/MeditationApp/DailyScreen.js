@@ -277,6 +277,17 @@ const DailyScreen = ({ navigation }) => {
       } else {
         return '暫無記錄';
       }
+    } else if (practice.practice_type === '正念安定力練習') {
+      // 優先順序：2, 1, 3
+      if (practice.noticed && practice.noticed.trim()) {
+        summary = practice.noticed.trim();
+      } else if (practice.attention && practice.attention.trim()) {
+        summary = practice.attention.trim();
+      } else if (practice.reflection && practice.reflection.trim()) {
+        summary = practice.reflection.trim();
+      } else {
+        return '暫無記錄';
+      }
     } else {
       if (practice.reflection && practice.reflection.trim()) {
         summary = practice.reflection.trim();

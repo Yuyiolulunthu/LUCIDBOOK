@@ -1115,7 +1115,7 @@ export default function EmotionPractice({ onBack, navigation }) {
               currentStep === 0 && styles.navButtonDisabled
             ]}
           >
-            <Text style={styles.navArrowText}>〈</Text>
+            <Text style={styles.navArrowText}>‹</Text>
           </TouchableOpacity>
           
           <View style={styles.progressIndicator}>
@@ -1138,7 +1138,7 @@ export default function EmotionPractice({ onBack, navigation }) {
               isSecondToLast && styles.navButtonDisabled
             ]}
           >
-            <Text style={styles.navArrowText}>〉</Text>
+            <Text style={styles.navArrowText}>›</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -1149,7 +1149,7 @@ export default function EmotionPractice({ onBack, navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#D6C9BD',
+    backgroundColor: '#e3d6caff',
   },
   header: {
     flexDirection: 'row',
@@ -1310,7 +1310,7 @@ const styles = StyleSheet.create({
   },
   emotionChipSelected: {
     backgroundColor: 'rgba(143, 122, 18, 0.25)',
-    borderColor: '#8C8275',
+    borderColor: '#ab9e8dff',
   },
   emotionChipText: {
     fontSize: 14,
@@ -1319,7 +1319,7 @@ const styles = StyleSheet.create({
   },
   emotionChipTextSelected: {
     fontWeight: 'bold',
-    color: '#8C8275',
+    color: '#ab9e8dff',
   },
   selectedEmotionsContainer: {
     backgroundColor: 'rgba(255, 255, 255, 0.95)',
@@ -1358,8 +1358,8 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   choiceButtonSelected: {
-    backgroundColor: 'rgba(143, 122, 18, 0.25)',
-    borderColor: '#8C8275',
+    backgroundColor: 'rgba(210, 170, 109, 0.27)',
+    borderColor: '#ab9e8dff',
   },
   choiceButtonText: {
     fontSize: 15,
@@ -1370,7 +1370,7 @@ const styles = StyleSheet.create({
   },
   choiceButtonTextSelected: {
     fontWeight: 'bold',
-    color: '#8C8275',
+    color: '#ab9e8dff',
   },
   copingFeedback: {
     backgroundColor: 'rgba(255, 255, 255, 0.95)',
@@ -1383,7 +1383,7 @@ const styles = StyleSheet.create({
   copingFeedbackTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#8C8275',
+    color: '#ab9e8dff',
     marginBottom: 12,
     textAlign: 'center',
   },
@@ -1411,7 +1411,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     marginBottom: 16,
     borderLeftWidth: 3,
-    borderLeftColor: 'rgba(145, 119, 33, 0.6)',
+    borderLeftColor: 'rgba(213, 157, 83, 0.6)',
   },
   exampleTitle: {
     fontSize: 14,
@@ -1446,7 +1446,7 @@ const styles = StyleSheet.create({
   },
   regulateChoiceButtonSelected: {
     backgroundColor: 'rgba(46, 134, 171, 0.15)',
-    borderColor: 'rgba(171, 140, 46, 0.8)',
+    borderColor: 'rgba(171, 113, 46, 0.8)',
   },
   regulateChoiceEmoji: {
     fontSize: 24,
@@ -1480,7 +1480,7 @@ const styles = StyleSheet.create({
   breathingTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#8C8275',
+    color: '#ab9e8dff',
     marginBottom: 12,
   },
   breathingDesc: {
@@ -1533,7 +1533,7 @@ const styles = StyleSheet.create({
   moodMessageTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#8C8275',
+    color: '#ab9e8dff',
     marginBottom: 20,
   },
   moodMessageText: {
@@ -1552,10 +1552,10 @@ const styles = StyleSheet.create({
     marginTop: 30,
     marginBottom: 20,
     borderWidth: 2,
-    borderColor: '#8C8275',
+    borderColor: '#ab9e8dff',
   },
   completeButtonText: {
-    color: '#8C8275',
+    color: '#ab9e8dff',
     fontSize: 16,
     fontWeight: 'bold',
   },
@@ -1575,7 +1575,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     alignItems: 'center',
     borderLeftWidth: 4,
-    borderLeftColor: '#8C8275',
+    borderLeftColor: '#ab9e8dff',
   },
   diaryDate: {
     fontSize: 18,
@@ -1631,7 +1631,7 @@ const styles = StyleSheet.create({
   },
   diaryEmotionText: {
     fontSize: 14,
-    color: '#8C8275',
+    color: '#ab9e8dff',
     fontWeight: '500',
   },
   diaryQuoteBox: {
@@ -1665,7 +1665,7 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
   },
   finishButton: {
-    backgroundColor: '#8C8275',
+    backgroundColor: '#ab9e8dff',
     paddingVertical: 14,
     paddingHorizontal: 32,
     borderRadius: 25,
@@ -1713,7 +1713,7 @@ const styles = StyleSheet.create({
   },
   navArrowText: {
     fontSize: 24,
-    color: '#8C8275',
+    color: '#ab9e8dff',
     fontWeight: 'bold',
   },
   progressIndicator: {
