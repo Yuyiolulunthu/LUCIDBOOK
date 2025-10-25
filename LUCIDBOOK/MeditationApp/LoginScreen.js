@@ -14,6 +14,10 @@ import {
   Image,
   Alert,
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  Keyboard,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import ApiService from './api';
 
@@ -118,99 +122,117 @@ const LoginScreen = ({ navigation, onLoginSuccess }) => {
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        <View style={styles.loginContainer}>
-          <View style={styles.logoContainer}>
-            <Image 
-              source={require('./assets/images/lucidbook.png')}
-              style={styles.logoImage}
-              resizeMode="contain"
-            />
-            <Text style={styles.logoText}>LucidBook</Text>
-            <Text style={styles.logoSubtext}>找到內心的平靜</Text>
-          </View>
-
-          <View style={styles.formContainer}>
-            <Text style={styles.formTitle}>登入您的帳戶</Text>
-            
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>電子郵件</Text>
-              <TextInput
-                style={styles.textInput}
-                value={email}
-                onChangeText={setEmail}
-                placeholder="請輸入您的電子郵件"
-                placeholderTextColor="#9CA3AF"
-                keyboardType="email-address"
-                autoCapitalize="none"
-                editable={!isLoading}
-              />
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>密碼</Text>
-              <View style={styles.passwordContainer}>
-                <TextInput
-                  style={styles.passwordInput}
-                  value={password}
-                  onChangeText={setPassword}
-                  placeholder="請輸入您的密碼"
-                  placeholderTextColor="#9CA3AF"
-                  secureTextEntry={!showPassword}
-                  editable={!isLoading}
+      <KeyboardAvoidingView 
+        style={styles.keyboardAvoidingView}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+      >
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <ScrollView 
+            style={styles.scrollView} 
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.scrollViewContent}
+          >
+            <View style={styles.loginContainer}>
+              <View style={styles.logoContainer}>
+                <Image 
+                  source={require('./assets/images/lucidbook.png')}
+                  style={styles.logoImage}
+                  resizeMode="contain"
                 />
+                <Text style={styles.logoText}>LucidBook</Text>
+                <Text style={styles.logoSubtext}>找到內心的平靜</Text>
+              </View>
+
+              <View style={styles.formContainer}>
+                <Text style={styles.formTitle}>登入您的帳戶</Text>
+                
+                <View style={styles.inputContainer}>
+                  <Text style={styles.inputLabel}>電子郵件</Text>
+                  <TextInput
+                    style={styles.textInput}
+                    value={email}
+                    onChangeText={setEmail}
+                    placeholder="請輸入您的電子郵件"
+                    placeholderTextColor="#9CA3AF"
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    editable={!isLoading}
+                    returnKeyType="next"
+                  />
+                </View>
+
+                <View style={styles.inputContainer}>
+                  <Text style={styles.inputLabel}>密碼</Text>
+                  <View style={styles.passwordContainer}>
+                    <TextInput
+                      style={styles.passwordInput}
+                      value={password}
+                      onChangeText={setPassword}
+                      placeholder="請輸入您的密碼"
+                      placeholderTextColor="#9CA3AF"
+                      secureTextEntry={!showPassword}
+                      editable={!isLoading}
+                      returnKeyType="done"
+                      onSubmitEditing={handleLogin}
+                    />
+                    <TouchableOpacity 
+                      style={styles.eyeButton}
+                      onPress={() => setShowPassword(!showPassword)}
+                    >
+                      <Text style={styles.eyeIcon}>{showPassword ? '👁️' : '🙈'}</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
                 <TouchableOpacity 
-                  style={styles.eyeButton}
-                  onPress={() => setShowPassword(!showPassword)}
+                  style={styles.forgotPassword}
+                  onPress={handleForgotPassword}
+                  disabled={isLoading}
+                  activeOpacity={0.7}
                 >
-                  <Text style={styles.eyeIcon}>{showPassword ? '👁️' : '🙈'}</Text>
+                  <Text style={styles.forgotPasswordText}>忘記密碼？</Text>
                 </TouchableOpacity>
+
+                <TouchableOpacity 
+                  style={[styles.loginButton, isLoading && styles.loginButtonDisabled]}
+                  onPress={handleLogin}
+                  disabled={isLoading}
+                  activeOpacity={0.8}
+                >
+                  {isLoading ? (
+                    <ActivityIndicator color="white" />
+                  ) : (
+                    <Text style={styles.loginButtonText}>登入</Text>
+                  )}
+                </TouchableOpacity>
+
+                <View style={styles.divider}>
+                  <View style={styles.dividerLine} />
+                  <Text style={styles.dividerText}>或</Text>
+                  <View style={styles.dividerLine} />
+                </View>
+
+                <TouchableOpacity 
+                  style={styles.guestButton}
+                  onPress={handleGuestLogin}
+                  disabled={isLoading}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.guestButtonText}>以訪客身份繼續</Text>
+                </TouchableOpacity>
+
+                <View style={styles.signupContainer}>
+                  <Text style={styles.signupText}>還沒有帳戶？</Text>
+                  <TouchableOpacity onPress={goToRegister} activeOpacity={0.7}>
+                    <Text style={styles.signupLink}>立即註冊</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             </View>
-
-            <TouchableOpacity 
-              style={styles.forgotPassword}
-              onPress={handleForgotPassword}
-              disabled={isLoading}
-            >
-              <Text style={styles.forgotPasswordText}>忘記密碼？</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={[styles.loginButton, isLoading && styles.loginButtonDisabled]}
-              onPress={handleLogin}
-              disabled={isLoading}
-            >
-              {isLoading ? (
-                <ActivityIndicator color="white" />
-              ) : (
-                <Text style={styles.loginButtonText}>登入</Text>
-              )}
-            </TouchableOpacity>
-
-            <View style={styles.divider}>
-              <View style={styles.dividerLine} />
-              <Text style={styles.dividerText}>或</Text>
-              <View style={styles.dividerLine} />
-            </View>
-
-            <TouchableOpacity 
-              style={styles.guestButton}
-              onPress={handleGuestLogin}
-              disabled={isLoading}
-            >
-              <Text style={styles.guestButtonText}>以訪客身份繼續</Text>
-            </TouchableOpacity>
-
-            <View style={styles.signupContainer}>
-              <Text style={styles.signupText}>還沒有帳戶？</Text>
-              <TouchableOpacity onPress={goToRegister}>
-                <Text style={styles.signupLink}>立即註冊</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </ScrollView>
+          </ScrollView>
+        </TouchableWithoutFeedback>
+      </KeyboardAvoidingView>
     </View>
   );
 };
@@ -235,8 +257,14 @@ const styles = StyleSheet.create({
     color: 'white',
     fontWeight: '500',
   },
+  keyboardAvoidingView: {
+    flex: 1,
+  },
   scrollView: {
     flex: 1,
+  },
+  scrollViewContent: {
+    flexGrow: 1,
   },
   loginContainer: {
     flex: 1,
