@@ -23,6 +23,7 @@ import DailyScreen from './DailyScreen';
 import ForgotPasswordScreen from './ForgotPasswordScreen';
 
 import ApiService from './api';
+import PracticeScreen from './PracticeScreen';
 import BreathingPractice from './practice/BreathingPractice';
 import EmotionPractice from './practice/EmotionPractice';
 import FiveSensesPractice from './practice/FiveSensesPractice';
@@ -557,7 +558,10 @@ const HomeScreen = ({ navigation }) => {
 
           <TouchableOpacity 
             style={styles.navButton}
-            onPress={() => setActiveTab('explore')}
+            onPress={() => {
+              setActiveTab('explore');
+              navigation.navigate('PracticeSelection');  // ✅ 添加跳轉
+            }}
           >
             <Image 
               source={require('./assets/images/new_explore.png')}
@@ -661,6 +665,16 @@ export default function App() {
         <Stack.Screen name="Register" component={RegisterScreen} />
         <Stack.Screen name="Practice" component={PracticeScreen} />
         <Stack.Screen name="Daily" component={DailyScreen} />
+        <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+        <Stack.Screen 
+            name="PracticeSelection" 
+            component={PracticeScreen}
+            options={{ 
+              headerShown: false,
+              gestureEnabled: true 
+            }} 
+          />
+
       </Stack.Navigator>
     </NavigationContainer>
   );
