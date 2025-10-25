@@ -82,22 +82,10 @@ const LoginScreen = ({ navigation, onLoginSuccess }) => {
   };
 
   const handleForgotPassword = () => {
-    Alert.prompt(
-      '忘記密碼',
-      '請輸入您的電子郵件，我們將發送重設密碼連結',
-      async (inputEmail) => {
-        if (!inputEmail) return;
-        
-        try {
-          await ApiService.forgotPassword(inputEmail);
-          Alert.alert('成功', '重設密碼郵件已發送，請查收信箱');
-        } catch (error) {
-          Alert.alert('錯誤', error.message || '發送失敗，請稍後再試');
-        }
-      },
-      'plain-text',
-      email
-    );
+    // 🔥 導航到忘記密碼頁面（跨平台解決方案）
+    if (navigation) {
+      navigation.navigate('ForgotPassword', { email });
+    }
   };
 
   const goToRegister = () => {

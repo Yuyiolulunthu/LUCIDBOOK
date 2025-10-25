@@ -20,6 +20,8 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import LoginScreen from './LoginScreen';
 import RegisterScreen from './RegisterScreen';
 import DailyScreen from './DailyScreen';
+import ForgotPasswordScreen from './ForgotPasswordScreen';
+
 import ApiService from './api';
 import BreathingPractice from './practice/BreathingPractice';
 import EmotionPractice from './practice/EmotionPractice';
@@ -607,6 +609,7 @@ export default function App() {
         <Stack.Screen name="Login" component={LoginScreen} />
         <Stack.Screen name="Register" component={RegisterScreen} />
         <Stack.Screen name="Practice" component={PracticeScreenWrapper} />
+        <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} /> 
         <Stack.Screen name="Daily" component={DailyScreen} />
       </Stack.Navigator>
     </NavigationContainer>
