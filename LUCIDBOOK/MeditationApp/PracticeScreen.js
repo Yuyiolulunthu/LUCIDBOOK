@@ -9,13 +9,13 @@ import {
   Image,
   Dimensions,
 } from 'react-native';
+import BottomNavigation from './BottomNavigation';
 import { Ionicons } from '@expo/vector-icons';
 
 const { width } = Dimensions.get('window');
 
 const PracticeScreen = ({ navigation }) => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeTab, setActiveTab] = useState('explore'); // PracticeScreen 是 explore 頁面
 
   const practices = [
     {
@@ -128,102 +128,8 @@ const PracticeScreen = ({ navigation }) => {
         <View style={styles.bottomSpacing} />
       </ScrollView>
 
-      {/* 底部導航欄 - 使用 menu.png 背景圖片 */}
-      <View style={styles.bottomNavContainer}>
-        <Image 
-          source={require('./assets/images/menu.png')}
-          style={styles.menuImage}
-          resizeMode="stretch"
-        />
-        <View style={styles.bottomNav}>
-          {/* Home 按鈕 */}
-          <TouchableOpacity 
-            style={styles.navButton}
-            onPress={() => {
-              setActiveTab('home');
-              navigation.navigate('Home');
-            }}
-          >
-            <Image 
-              source={require('./assets/images/new_home.png')}
-              style={[
-                styles.navIcon,
-                activeTab === 'home' && styles.navIconActive
-              ]}
-              resizeMode="contain"
-            />
-          </TouchableOpacity>
-
-          {/* Explore 按鈕 (當前頁面) */}
-          <TouchableOpacity 
-            style={styles.navButton}
-            onPress={() => {
-              setActiveTab('explore');
-              navigation.navigate('PracticeSelection');
-            }}
-          >
-            <Image 
-              source={require('./assets/images/new_explore.png')}
-              style={[
-                styles.navIcon,
-                activeTab === 'explore' && styles.navIconActive
-              ]}
-              resizeMode="contain"
-            />
-          </TouchableOpacity>
-
-          {/* 中間的每日打卡按鈕 */}
-          <TouchableOpacity 
-            style={styles.centerNavButton}
-            onPress={() => {
-              // 每日打卡功能
-              navigation.navigate('DailyCheckIn');
-            }}
-          >
-            <Image 
-              source={require('./assets/images/daily_clock.png')}
-              style={styles.centerNavIcon}
-              resizeMode="contain"
-            />
-          </TouchableOpacity>
-
-          {/* Record/Journal 按鈕 */}
-          <TouchableOpacity 
-            style={styles.navButton}
-            onPress={() => {
-              setActiveTab('record');
-              navigation.navigate('Daily');
-            }}
-          >
-            <Image 
-              source={require('./assets/images/record.png')}
-              style={[
-                styles.navIcon,
-                activeTab === 'record' && styles.navIconActive
-              ]}
-              resizeMode="contain"
-            />
-          </TouchableOpacity>
-
-          {/* Profile 按鈕 */}
-          <TouchableOpacity 
-            style={styles.navButton}
-            onPress={() => {
-              setActiveTab('profile');
-              navigation.navigate('Profile');
-            }}
-          >
-            <Image 
-              source={require('./assets/images/new_profile.png')}
-              style={[
-                styles.navIcon,
-                activeTab === 'profile' && styles.navIconActive
-              ]}
-              resizeMode="contain"
-            />
-          </TouchableOpacity>
-        </View>
-      </View>
+      {/* 底部導航欄 */}
+      <BottomNavigation navigation={navigation} activeTab="explore" />
     </View>
   );
 };
@@ -347,67 +253,6 @@ const styles = StyleSheet.create({
     height: 100, // 增加底部間距，避免被導航欄遮擋
   },
   
-  // ⭐ 底部導航欄 - 使用 menu.png 占滿寬度
-  bottomNavContainer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 94,
-  },
-  menuImage: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    width: '100%',
-    height: 115,
-    opacity: 0.90,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -3 },
-    shadowOpacity: 0.15,
-    shadowRadius: 5,
-    elevation: 8,
-  },
-  bottomNav: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
-    paddingBottom: 20,
-    paddingHorizontal: 20,
-  },
-  navButton: {
-    padding: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  navIcon: {
-    width: 34,
-    height: 34,
-  },
-  navIconActive: {
-    opacity: 0.4,
-    tintColor: '#40A1DD',
-  },
-  centerNavButton: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: 'transparent',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  centerNavIcon: {
-    width: 60,
-    height: 60,
-    bottom: 16,
-    left: 2.5,
-  },
 });
 
 export default PracticeScreen;

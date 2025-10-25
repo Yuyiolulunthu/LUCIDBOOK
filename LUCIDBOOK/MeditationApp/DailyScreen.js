@@ -19,6 +19,7 @@ import {
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import ApiService from './api';
+import BottomNavigation from './BottomNavigation';
 
 const { width } = Dimensions.get('window');
 
@@ -26,7 +27,6 @@ const DailyScreen = ({ navigation }) => {
   const [timeRange, setTimeRange] = useState('weeks');
   const [practiceData, setPracticeData] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('tasks');
   const [todayMood, setTodayMood] = useState(null);
   const [todayCompletedPractices, setTodayCompletedPractices] = useState(0);
   const [todayStatus, setTodayStatus] = useState({});
@@ -721,87 +721,8 @@ const DailyScreen = ({ navigation }) => {
 
       {renderPracticeDetailModal()}
 
-      {/* ⭐ 底部導航欄 - 使用 menu.png 占滿寬度 */}
-      <View style={styles.bottomNavContainer}>
-        <Image 
-          source={require('./assets/images/menu.png')}
-          style={styles.menuImage}
-          resizeMode="stretch"
-        />
-        <View style={styles.bottomNav}>
-          <TouchableOpacity 
-            style={styles.navButton}
-            onPress={() => {
-              setActiveTab('home');
-              navigation.navigate('Home');
-            }}
-          >
-            <Image 
-              source={require('./assets/images/new_home.png')}
-              style={[
-                styles.navIcon,
-                activeTab === 'home' && styles.navIconActive
-              ]}
-              resizeMode="contain"
-            />
-          </TouchableOpacity>
-
-          <TouchableOpacity 
-            style={styles.navButton}
-            onPress={() => setActiveTab('explore')}
-          >
-            <Image 
-              source={require('./assets/images/new_explore.png')}
-              style={[
-                styles.navIcon,
-                activeTab === 'explore' && styles.navIconActive
-              ]}
-              resizeMode="contain"
-            />
-          </TouchableOpacity>
-
-          <TouchableOpacity 
-            style={styles.centerNavButton}
-            onPress={() => {
-              // 每日打卡功能
-            }}
-          >
-            <Image 
-              source={require('./assets/images/daily_clock.png')}
-              style={styles.centerNavIcon}
-              resizeMode="contain"
-            />
-          </TouchableOpacity>
-
-          <TouchableOpacity 
-            style={styles.navButton}
-            onPress={() => setActiveTab('record')}
-          >
-            <Image 
-              source={require('./assets/images/record.png')}
-              style={[
-                styles.navIcon,
-                activeTab === 'record' && styles.navIconActive
-              ]}
-              resizeMode="contain"
-            />
-          </TouchableOpacity>
-
-          <TouchableOpacity 
-            style={styles.navButton}
-            onPress={() => setActiveTab('profile')}
-          >
-            <Image 
-              source={require('./assets/images/new_profile.png')}
-              style={[
-                styles.navIcon,
-                activeTab === 'profile' && styles.navIconActive
-              ]}
-              resizeMode="contain"
-            />
-          </TouchableOpacity>
-        </View>
-      </View>
+      {/* 底部導航欄 */}
+      <BottomNavigation navigation={navigation} activeTab="record" />
     </View>
   );
 };
@@ -1060,69 +981,6 @@ const styles = StyleSheet.create({
   },
   bottomPadding: {
     height: 100,
-  },
-  // ⭐ 底部導航欄 - 使用 menu.png 占滿寬度
-  bottomNavContainer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 94,
-  },
-  menuImage: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    width: '100%',
-    height: 115,
-    opacity: 0.90,        
-    shadowColor: '#000',   
-    shadowOffset: { width: 0, height: -3 }, 
-    shadowOpacity: 0.15,   
-    shadowRadius: 5,       
-    elevation: 8,        
-  },
-  bottomNav: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
-    paddingBottom: 20,
-    paddingHorizontal: 20,
-  },
-  navButton: {
-    padding: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  // ⭐ 圖標顏色修正：默認藍色，激活時加 40% 透明度的 #40A1DD
-  navIcon: {
-    width: 34,
-    height: 34,
-    // 不加 tintColor，保留原始圖片顏色（藍色）
-  },
-  navIconActive: {
-    opacity: 0.4,
-    tintColor: '#40A1DD',
-  },
-  centerNavButton: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: 'transparent',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  centerNavIcon: {
-    width: 60,
-    height: 60,
-    bottom: 16,
-    left: 2.5,
   },
   // 模態框樣式
   modalOverlay: {
