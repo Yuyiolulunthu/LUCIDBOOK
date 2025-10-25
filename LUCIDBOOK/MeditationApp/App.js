@@ -21,6 +21,7 @@ import LoginScreen from './LoginScreen';
 import RegisterScreen from './RegisterScreen';
 import DailyScreen from './DailyScreen';
 import ForgotPasswordScreen from './ForgotPasswordScreen';
+import ResetPasswordScreen from './ResetPasswordScreen';
 
 import ApiService from './api';
 import PracticeScreen from './PracticeScreen';
@@ -666,6 +667,7 @@ export default function App() {
         <Stack.Screen name="Practice" component={PracticeScreen} />
         <Stack.Screen name="Daily" component={DailyScreen} />
         <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+        <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
         <Stack.Screen 
             name="PracticeSelection" 
             component={PracticeScreen}

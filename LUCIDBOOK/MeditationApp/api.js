@@ -135,6 +135,14 @@ class ApiService {
     });
   }
 
+  /** 驗證重設密碼令牌 */
+  async validateResetToken(token) {
+    return this.request('/validate-reset-token.php', {
+      method: 'POST',
+      body: JSON.stringify({ token }),
+    });
+  }
+
   /** 重設密碼 */
   async resetPassword(token, newPassword) {
     return this.request('/reset-password.php', {
@@ -399,6 +407,26 @@ await ApiService.completePractice(practiceId, {
     // ...其他情緒日記欄位
   }
 });
+
+// ========== 密碼重設流程 ==========
+
+// 1. 驗證重設令牌
+try {
+  const result = await ApiService.validateResetToken('your-token-here');
+  if (result.valid) {
+    console.log('令牌有效，可以重設密碼');
+  }
+} catch (error) {
+  console.error('令牌無效或已過期');
+}
+
+// 2. 重設密碼
+try {
+  await ApiService.resetPassword('your-token-here', 'new-password-123');
+  console.log('密碼重設成功');
+} catch (error) {
+  console.error('密碼重設失敗:', error.message);
+}
 
 // ========== 其他功能 ==========
 
