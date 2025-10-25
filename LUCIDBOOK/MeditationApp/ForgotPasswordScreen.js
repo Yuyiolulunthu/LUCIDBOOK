@@ -1,6 +1,6 @@
 // ==========================================
-// 檔案名稱: ForgotPasswordScreen.js (改進版)
-// 功能: 開發模式 + 詳細錯誤診斷
+// 檔案名稱: ForgotPasswordScreen.js (改進版 v2)
+// 功能: 支持後端開發模式令牌直接回傳
 // ==========================================
 
 import React, { useState } from 'react';
@@ -19,6 +19,7 @@ import {
   Keyboard,
   TouchableWithoutFeedback,
   Clipboard,
+  Linking,
 } from 'react-native';
 import ApiService from './api';
 
@@ -26,14 +27,10 @@ const ForgotPasswordScreen = ({ navigation, route }) => {
   const [email, setEmail] = useState(route?.params?.email || '');
   const [isLoading, setIsLoading] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
-  const [devModeToken, setDevModeToken] = useState('');
+  const [resetToken, setResetToken] = useState('');
+  const [resetUrl, setResetUrl] = useState('');
   const [errorDetails, setErrorDetails] = useState('');
-
-  // 🔧 開發模式：生成假的重設令牌
-  const generateMockToken = () => {
-    return Math.random().toString(36).substring(2, 15) + 
-           Math.random().toString(36).substring(2, 15);
-  };
+  const [isDevelopmentMode, setIsDevelopmentMode] = useState(false);
 
   const handleSendResetEmail = async () => {
     if (!email) {
@@ -49,100 +46,119 @@ const ForgotPasswordScreen = ({ navigation, route }) => {
 
     setIsLoading(true);
     setErrorDetails('');
+    setResetToken('');
+    setResetUrl('');
     
     try {
       console.log('🔍 嘗試發送忘記密碼請求...');
       console.log('📧 電子郵件:', email);
       console.log('🌐 API 端點: https://curiouscreate.com/api/forgot-password.php');
       
-      // 嘗試呼叫真實 API
       const response = await ApiService.forgotPassword(email);
       
       console.log('✅ API 回應成功:', response);
       
       setEmailSent(true);
       
-      Alert.alert(
-        '✅ 成功', 
-        '重設密碼郵件已發送！\n\n請檢查您的信箱（包含垃圾郵件資料夾）',
-        [
-          {
-            text: '確定',
-            onPress: () => {
-              if (navigation) {
-                navigation.goBack();
+      // 檢查是否為開發模式
+      if (response.dev_mode && response.token) {
+        // 🔧 開發模式：後端直接回傳令牌
+        setIsDevelopmentMode(true);
+        setResetToken(response.token);
+        setResetUrl(response.reset_url || '');
+        
+        console.log('🔧 開發模式偵測到');
+        console.log('🔑 重設令牌:', response.token);
+        console.log('🔗 重設網址:', response.reset_url);
+        
+        Alert.alert(
+          '🔧 開發模式', 
+          response.note || '重設令牌已生成！\n\n由於是開發模式，令牌會直接顯示在畫面上。',
+          [{ text: '確定' }]
+        );
+      } else {
+        // 📧 正式模式：郵件已發送
+        Alert.alert(
+          '✅ 成功', 
+          '重設密碼郵件已發送！\n\n請檢查您的信箱（包含垃圾郵件資料夾）',
+          [
+            {
+              text: '確定',
+              onPress: () => {
+                if (navigation) {
+                  navigation.goBack();
+                }
               }
             }
-          }
-        ]
-      );
+          ]
+        );
+      }
       
     } catch (error) {
       console.error('❌ 忘記密碼 API 錯誤:', error);
       
-      // 詳細的錯誤分析
       let errorMessage = error.message || '未知錯誤';
-      let errorType = '未知問題';
-      let suggestion = '';
+      let detailedError = '';
       
       // 分析錯誤類型
       if (errorMessage.includes('404') || errorMessage.includes('Not Found')) {
-        errorType = '後端 API 未實作';
-        suggestion = '後端需要創建 /forgot-password.php 檔案';
-        setErrorDetails(`❌ 錯誤類型: ${errorType}\n\n💡 解決方案:\n${suggestion}\n\n建議使用開發模式版本進行測試。`);
-      } else if (errorMessage.includes('500') || errorMessage.includes('Internal Server Error')) {
-        errorType = '伺服器內部錯誤';
-        suggestion = '可能是郵件服務未配置或資料庫錯誤';
-        setErrorDetails(`❌ 錯誤類型: ${errorType}\n\n💡 可能原因:\n• 郵件服務（SendGrid/Mailgun）未配置\n• 資料庫連線問題\n• PHP 錯誤\n\n建議檢查後端日誌。`);
+        detailedError = '❌ 錯誤: API 端點不存在\n\n';
+        detailedError += '💡 解決方案:\n';
+        detailedError += '1. 確認 forgot-password.php 已上傳\n';
+        detailedError += '2. 檢查檔案是否在 /api/ 目錄\n';
+        detailedError += '3. 確認檔案權限正確（644 或 755）\n\n';
+        detailedError += '🔍 測試: 在瀏覽器訪問\n';
+        detailedError += 'https://curiouscreate.com/api/forgot-password.php';
+      } else if (errorMessage.includes('500')) {
+        detailedError = '❌ 錯誤: 伺服器內部錯誤\n\n';
+        detailedError += '💡 可能原因:\n';
+        detailedError += '• 資料庫連線問題\n';
+        detailedError += '• PHP 語法錯誤\n';
+        detailedError += '• 郵件服務設定問題\n';
+        detailedError += '• config.php 設定錯誤';
       } else if (errorMessage.includes('Network request failed') || errorMessage.includes('Failed to fetch')) {
-        errorType = '網路連線問題';
-        suggestion = '請檢查網路連線或 API 網址';
-        setErrorDetails(`❌ 錯誤類型: ${errorType}\n\n💡 解決方案:\n${suggestion}`);
+        detailedError = '❌ 錯誤: 無法連接到伺服器\n\n';
+        detailedError += '💡 可能原因:\n';
+        detailedError += '1. API 檔案不存在（最常見）\n';
+        detailedError += '2. 網路連線問題\n';
+        detailedError += '3. API 網址設定錯誤\n';
+        detailedError += '4. CORS 設定問題\n\n';
+        detailedError += '🔍 快速檢查:\n';
+        detailedError += '在瀏覽器訪問:\n';
+        detailedError += 'https://curiouscreate.com/api/test-connection.php';
       } else {
-        setErrorDetails(`❌ 錯誤訊息: ${errorMessage}\n\n💡 這可能表示後端未完全實作忘記密碼功能。`);
+        detailedError = `❌ 錯誤訊息: ${errorMessage}\n\n`;
+        detailedError += '💡 建議:\n';
+        detailedError += '• 檢查後端日誌\n';
+        detailedError += '• 確認 API 檔案已上傳\n';
+        detailedError += '• 測試 API 連線';
       }
       
-      // 🔧 開發模式：提供替代方案
-      if (__DEV__) {
-        Alert.alert(
-          '⚠️ API 呼叫失敗',
-          `${errorMessage}\n\n在開發階段，您可以：\n\n1️⃣ 使用開發模式版本（不需要真實郵件）\n2️⃣ 配置後端郵件服務\n3️⃣ 暫時跳過此功能`,
-          [
-            {
-              text: '使用開發模式',
-              onPress: () => {
-                // 模擬成功
-                const mockToken = generateMockToken();
-                setDevModeToken(mockToken);
-                setEmailSent(true);
-                Alert.alert(
-                  '🔧 開發模式',
-                  `模擬重設令牌：\n${mockToken}\n\n複製此令牌用於測試`,
-                  [
-                    { 
-                      text: '複製', 
-                      onPress: () => {
-                        Clipboard.setString(mockToken);
-                        Alert.alert('✅', '已複製到剪貼簿');
-                      }
-                    },
-                    { text: '確定' }
-                  ]
-                );
-              }
-            },
-            { text: '取消', style: 'cancel' }
-          ]
-        );
-      } else {
-        Alert.alert(
-          '❌ 發送失敗',
-          `${errorMessage}\n\n請稍後再試或聯絡客服。`
-        );
-      }
+      setErrorDetails(detailedError);
+      
+      Alert.alert(
+        '❌ 發送失敗',
+        errorMessage + '\n\n請查看畫面上的詳細錯誤資訊。'
+      );
       
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const copyToken = () => {
+    if (resetToken) {
+      Clipboard.setString(resetToken);
+      Alert.alert('✅ 成功', '令牌已複製到剪貼簿');
+    }
+  };
+
+  const openResetUrl = () => {
+    if (resetUrl) {
+      Linking.openURL(resetUrl).catch(err => {
+        console.error('無法開啟連結:', err);
+        Alert.alert('錯誤', '無法開啟重設密碼頁面');
+      });
     }
   };
 
@@ -156,10 +172,10 @@ const ForgotPasswordScreen = ({ navigation, route }) => {
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="rgba(22, 109, 181, 0.95)" />
       
-      {/* 🔧 開發模式指示器 */}
-      {__DEV__ && (
+      {/* 開發模式指示器 */}
+      {isDevelopmentMode && (
         <View style={styles.devModeBanner}>
-          <Text style={styles.devModeText}>🔧 開發模式</Text>
+          <Text style={styles.devModeText}>🔧 後端開發模式</Text>
         </View>
       )}
       
@@ -172,7 +188,6 @@ const ForgotPasswordScreen = ({ navigation, route }) => {
       <KeyboardAvoidingView 
         style={styles.keyboardAvoidingView}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
       >
         <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
           <ScrollView 
@@ -189,18 +204,6 @@ const ForgotPasswordScreen = ({ navigation, route }) => {
               <Text style={styles.subtitle}>
                 請輸入您的電子郵件地址，我們將發送重設密碼的連結給您
               </Text>
-
-              {/* 🔧 開發模式說明 */}
-              {__DEV__ && (
-                <View style={styles.devModeInfo}>
-                  <Text style={styles.devModeInfoTitle}>💡 開發模式提示</Text>
-                  <Text style={styles.devModeInfoText}>
-                    • 會先嘗試呼叫真實 API{'\n'}
-                    • 如果 API 失敗，可以使用模擬模式{'\n'}
-                    • 正式環境會自動使用真實 API
-                  </Text>
-                </View>
-              )}
 
               <View style={styles.formContainer}>
                 <View style={styles.inputContainer}>
@@ -220,7 +223,7 @@ const ForgotPasswordScreen = ({ navigation, route }) => {
                 </View>
 
                 {/* 顯示錯誤詳情 */}
-                {errorDetails && __DEV__ && (
+                {errorDetails && (
                   <View style={styles.errorDetailsContainer}>
                     <Text style={styles.errorDetailsTitle}>🔍 錯誤詳情</Text>
                     <ScrollView style={styles.errorDetailsScroll}>
@@ -231,24 +234,42 @@ const ForgotPasswordScreen = ({ navigation, route }) => {
                   </View>
                 )}
 
-                {/* 顯示生成的令牌（開發模式） */}
-                {__DEV__ && devModeToken && (
-                  <View style={styles.tokenContainer}>
-                    <Text style={styles.tokenLabel}>🔧 模擬重設令牌：</Text>
+                {/* 開發模式：顯示令牌 */}
+                {isDevelopmentMode && resetToken && (
+                  <View style={styles.devTokenContainer}>
+                    <Text style={styles.devTokenTitle}>🔑 重設令牌（開發模式）</Text>
+                    
                     <View style={styles.tokenBox}>
+                      <Text style={styles.tokenLabel}>令牌：</Text>
                       <Text style={styles.tokenText} selectable>
-                        {devModeToken}
+                        {resetToken}
                       </Text>
                     </View>
-                    <TouchableOpacity 
-                      style={styles.copyButton}
-                      onPress={() => {
-                        Clipboard.setString(devModeToken);
-                        Alert.alert('✅', '令牌已複製');
-                      }}
-                    >
-                      <Text style={styles.copyButtonText}>📋 複製令牌</Text>
-                    </TouchableOpacity>
+
+                    <View style={styles.buttonRow}>
+                      <TouchableOpacity 
+                        style={[styles.actionButton, styles.copyButton]}
+                        onPress={copyToken}
+                      >
+                        <Text style={styles.actionButtonText}>📋 複製令牌</Text>
+                      </TouchableOpacity>
+
+                      {resetUrl && (
+                        <TouchableOpacity 
+                          style={[styles.actionButton, styles.openButton]}
+                          onPress={openResetUrl}
+                        >
+                          <Text style={styles.actionButtonText}>🔗 開啟重設頁面</Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+
+                    <View style={styles.devNote}>
+                      <Text style={styles.devNoteText}>
+                        ⚠️ 這是開發模式，令牌直接顯示。{'\n'}
+                        正式環境會透過郵件發送。
+                      </Text>
+                    </View>
                   </View>
                 )}
 
@@ -300,92 +321,13 @@ const styles = StyleSheet.create({
   },
   devModeBanner: {
     backgroundColor: '#FCD34D',
-    paddingVertical: 4,
+    paddingVertical: 6,
     alignItems: 'center',
   },
   devModeText: {
     fontSize: 12,
     fontWeight: '600',
     color: '#92400E',
-  },
-  devModeInfo: {
-    backgroundColor: '#EFF6FF',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#BFDBFE',
-  },
-  devModeInfoTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1E40AF',
-    marginBottom: 6,
-  },
-  devModeInfoText: {
-    fontSize: 12,
-    color: '#1E40AF',
-    lineHeight: 18,
-  },
-  errorDetailsContainer: {
-    backgroundColor: '#FEE2E2',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#FCA5A5',
-    maxHeight: 200,
-  },
-  errorDetailsTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#991B1B',
-    marginBottom: 8,
-  },
-  errorDetailsScroll: {
-    maxHeight: 150,
-  },
-  errorDetailsText: {
-    fontSize: 12,
-    color: '#991B1B',
-    lineHeight: 18,
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-  },
-  tokenContainer: {
-    marginBottom: 20,
-    padding: 12,
-    backgroundColor: '#F3F4F6',
-    borderRadius: 8,
-  },
-  tokenLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#374151',
-    marginBottom: 8,
-  },
-  tokenBox: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 6,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
-    marginBottom: 8,
-  },
-  tokenText: {
-    fontSize: 12,
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-    color: '#1F2937',
-  },
-  copyButton: {
-    backgroundColor: 'rgba(22, 109, 181, 0.95)',
-    borderRadius: 6,
-    paddingVertical: 8,
-    alignItems: 'center',
-  },
-  copyButtonText: {
-    color: 'white',
-    fontSize: 13,
-    fontWeight: '500',
   },
   headerContainer: {
     backgroundColor: 'rgba(22, 109, 181, 0.95)',
@@ -467,6 +409,94 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#111827',
     backgroundColor: '#F9FAFB',
+  },
+  errorDetailsContainer: {
+    backgroundColor: '#FEE2E2',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#FCA5A5',
+    maxHeight: 250,
+  },
+  errorDetailsTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#991B1B',
+    marginBottom: 8,
+  },
+  errorDetailsScroll: {
+    maxHeight: 200,
+  },
+  errorDetailsText: {
+    fontSize: 12,
+    color: '#991B1B',
+    lineHeight: 18,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+  },
+  devTokenContainer: {
+    backgroundColor: '#FEF3C7',
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 20,
+    borderWidth: 2,
+    borderColor: '#FCD34D',
+  },
+  devTokenTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#92400E',
+    marginBottom: 12,
+  },
+  tokenBox: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 6,
+    padding: 12,
+    marginBottom: 12,
+  },
+  tokenLabel: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginBottom: 4,
+  },
+  tokenText: {
+    fontSize: 11,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    color: '#1F2937',
+    lineHeight: 16,
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 12,
+  },
+  actionButton: {
+    flex: 1,
+    borderRadius: 6,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  copyButton: {
+    backgroundColor: 'rgba(22, 109, 181, 0.95)',
+  },
+  openButton: {
+    backgroundColor: '#10B981',
+  },
+  actionButtonText: {
+    color: 'white',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  devNote: {
+    backgroundColor: '#FFFBEB',
+    borderRadius: 6,
+    padding: 10,
+  },
+  devNoteText: {
+    fontSize: 11,
+    color: '#92400E',
+    lineHeight: 16,
+    textAlign: 'center',
   },
   sendButton: {
     backgroundColor: 'rgba(22, 109, 181, 0.95)',
