@@ -1,12 +1,12 @@
 // ==========================================
 // 檔案名稱: App.js 
+// 最終整合版本
 // ==========================================
 
 import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
-  TextInput,
   TouchableOpacity,
   ScrollView,
   StyleSheet,
@@ -25,18 +25,27 @@ import ResetPasswordScreen from './ResetPasswordScreen';
 import ProfileScreen from './ProfileScreen';
 
 import ApiService from './api';
-import PracticeScreen from './PracticeScreen';
+
+// 練習相關頁面
+import PracticeSelectionScreen from './PracticeSelectionScreen'; // Explore 頁面
 import BreathingPractice from './practice/BreathingPractice';
 import EmotionPractice from './practice/EmotionPractice';
 import MindfulnessPractice from './practice/MindfulnessPractice';
 import SelfAwarenessPractice from './practice/SelfAwarenessPractice';
+
+// 訓練計畫相關頁面
+import TrainingPlanDetailScreen from './TrainingPlanDetailScreen';
+import TrainingPlanProgressScreen from './TrainingPlanProgressScreen';
+import PracticeNavigator from './PracticeNavigator';
+
+// 共用組件
 import BottomNavigation from './BottomNavigation';
 
 const { width } = Dimensions.get('window');
 const Stack = createNativeStackNavigator();
 
 // ==========================================
-// 主畫面組件
+// 主畫面組件 (Home - 單個練習)
 // ==========================================
 const HomeScreen = ({ navigation }) => {
   const [selectedMood, setSelectedMood] = useState(null);
@@ -44,7 +53,7 @@ const HomeScreen = ({ navigation }) => {
   const [user, setUser] = useState(null);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [todayPracticeStatus, setTodayPracticeStatus] = useState({});
-  const [practiceProgress, setPracticeProgress] = useState({ completed: 0, total: 4 }); // 改為 4 個練習
+  const [practiceProgress, setPracticeProgress] = useState({ completed: 0, total: 4 });
 
   // 心情定義
   const moods = [
@@ -55,7 +64,7 @@ const HomeScreen = ({ navigation }) => {
     { name: '很糟!', image: require('./assets/images/terrible.png'), color: 'rgba(199, 239, 238, 0.15)', level: 1 }
   ];
 
-  // 每日練習定義（加入第四個練習）
+  // 每日練習定義（只有單個練習）
   const dailyPractices = [
     { 
       name: '呼吸穩定力練習', 
@@ -89,7 +98,6 @@ const HomeScreen = ({ navigation }) => {
       uncompletedBadgeColor: 'rgba(0, 232, 227, 0.2)',
       image: require('./assets/images/自我覺察.png'),
       practiceNumber: 3,
-      // tags: ['自責', '自我懷疑', '內耗'], // 適用時機標籤
     },
     { 
       name: '正念安定力練習',
@@ -115,12 +123,10 @@ const HomeScreen = ({ navigation }) => {
     { name: '情緒平衡', color: 'rgba(103, 169, 224, 0.95)' }
   ];
 
-  // 在 App 啟動時檢查登入狀態
   useEffect(() => {
     checkLoginStatus();
   }, []);
 
-  // 監聽 navigation focus 事件
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
       checkLoginStatus();
@@ -131,7 +137,6 @@ const HomeScreen = ({ navigation }) => {
     return unsubscribe;
   }, [navigation, isLoggedIn]);
 
-  // 登入後載入今日數據
   useEffect(() => {
     if (isLoggedIn && user && !user.isGuest) {
       loadTodayData();
@@ -160,10 +165,8 @@ const HomeScreen = ({ navigation }) => {
     }
   };
 
-  // 載入今日數據（心情 + 練習狀態）
   const loadTodayData = async () => {
     try {
-      // 載入今日心情
       const moodResponse = await ApiService.getTodayMood();
       if (moodResponse.success && moodResponse.mood) {
         setTodayMoodRecord(moodResponse.mood);
@@ -176,16 +179,14 @@ const HomeScreen = ({ navigation }) => {
         setSelectedMood(null);
       }
 
-      // 載入今日練習狀態
       const practiceResponse = await ApiService.getTodayPracticeStatus();
       if (practiceResponse.success) {
         setTodayPracticeStatus(practiceResponse.practices || {});
         
-        // 計算完成進度（只計算 completed = true 的練習）
         const completedPractices = Object.values(practiceResponse.practices || {}).filter(
           p => p.completed === true
         );
-        setPracticeProgress({ completed: completedPractices.length, total: 4 }); // 總共 4 個練習
+        setPracticeProgress({ completed: completedPractices.length, total: 4 });
       }
     } catch (error) {
       console.error('載入今日數據失敗:', error);
@@ -232,7 +233,6 @@ const HomeScreen = ({ navigation }) => {
     ]);
   };
 
-  // 處理心情選擇
   const handleMoodSelect = async (mood, index) => {
     if (showLoginPrompt()) return;
 
@@ -264,23 +264,20 @@ const HomeScreen = ({ navigation }) => {
   const navigateToPractice = (practice) => {
     if (showLoginPrompt()) return;
     
-    navigation.navigate('Practice', { 
+    navigation.navigate('PracticeNavigator', { 
       practiceType: practice.practiceType,
       onPracticeComplete: async (practiceType) => {
-        // 練習完成後重新載入今日數據
         console.log('✅ 練習完成，重新載入數據');
         await loadTodayData();
       }
     });
   };
 
-  // 判斷練習是否已完成（只有 completed = true 才算完成）
   const isPracticeCompleted = (practiceType) => {
     const practice = todayPracticeStatus[practiceType];
     return practice && practice.completed === true;
   };
 
-  // 獲取練習進度百分比
   const getPracticeProgress = (practiceType) => {
     const practice = todayPracticeStatus[practiceType];
     if (!practice) return 0;
@@ -308,78 +305,59 @@ const HomeScreen = ({ navigation }) => {
     </View>
   );
 
-  const PracticeCard = ({ practice }) => {
+  const PracticeCard = ({ practice, onPress }) => {
     const isCompleted = isPracticeCompleted(practice.practiceType);
     const progress = getPracticeProgress(practice.practiceType);
+
     return (
       <View style={styles.practiceCardContainer}>
         <View style={styles.practiceRow}>
-          <View
+          <View 
             style={[
               styles.practiceNumberBadge,
               { backgroundColor: isCompleted ? practice.completedBadgeColor : practice.uncompletedBadgeColor }
             ]}
           >
-            <Text style={styles.practiceNumberText}>練習{practice.practiceNumber}</Text>
+            <Text style={styles.practiceNumberText}>{practice.practiceNumber}</Text>
           </View>
-
           <View style={styles.practiceRightContent}>
             <View style={styles.practiceDescription}>
               <Text style={styles.practiceDescriptionText}>{practice.description}</Text>
-              {practice.tags && (
-                <View style={styles.tagsContainer}>
-                  {practice.tags.map((tag, index) => (
-                    <View key={index} style={styles.tagBadge}>
-                      <Text style={styles.tagText}>{tag}</Text>
-                    </View>
-                  ))}
-                </View>
-              )}
             </View>
-
             <TouchableOpacity
+              onPress={onPress}
               style={[styles.practiceCard, { backgroundColor: practice.backgroundColor }]}
-              onPress={() => navigateToPractice(practice)}
             >
               <View style={styles.practiceImageContainer}>
-                <Image source={practice.image} style={styles.practiceImage} resizeMode="contain" />
+                <Image 
+                  source={practice.image}
+                  style={styles.practiceImage}
+                  resizeMode="contain"
+                />
               </View>
-
               <View style={styles.practiceContent}>
                 <View style={styles.practiceHeader}>
-                  <Text style={styles.practiceName}>《{practice.name}》</Text>
-                  {practice.difficulty && (
-                    <View style={styles.difficultyContainer}>
-                      {[...Array(practice.difficulty)].map((_, i) => (
-                        <Text key={i} style={styles.difficultyStar}>⭐</Text>
-                      ))}
-                    </View>
-                  )}
+                  <Text style={styles.practiceName}>{practice.name}</Text>
                 </View>
-
                 {isCompleted ? (
                   <View style={styles.completedContainer}>
                     <Text style={styles.completedIcon}>✓</Text>
-                    <Text style={styles.completedText}>完成！</Text>
+                    <Text style={styles.completedText}>已完成</Text>
+                  </View>
+                ) : progress > 0 ? (
+                  <View style={styles.progressContainer}>
+                    <View style={styles.progressBarBackground}>
+                      <View style={[styles.progressBarForeground, { width: `${progress}%` }]} />
+                    </View>
+                    <Text style={styles.progressPercentText}>{progress}%</Text>
                   </View>
                 ) : (
-                  <>
-                    <View style={styles.progressContainer}>
-                      <View style={styles.progressBarBackground}>
-                        <View style={[styles.progressBarForeground, { width: `${progress}%` }]} />
-                      </View>
-                      {progress > 0 ? (
-                        <Text style={styles.progressPercentText}>{progress}%</Text>
-                      ) : null}
-                    </View>
-                    <View style={styles.durationContainer}>
-                      <Text style={styles.durationIcon}>🕐</Text>
-                      <Text style={styles.durationText}>{practice.duration}</Text>
-                    </View>
-                  </>
+                  <View style={styles.durationContainer}>
+                    <Text style={styles.durationIcon}>⏱</Text>
+                    <Text style={styles.durationText}>{practice.duration}</Text>
+                  </View>
                 )}
               </View>
-
               <View style={styles.playButtonContainer}>
                 <View style={styles.playButton}>
                   <Text style={styles.playButtonText}>▶</Text>
@@ -392,62 +370,46 @@ const HomeScreen = ({ navigation }) => {
     );
   };
 
-  const TopicButton = ({ topic }) => (
-    <TouchableOpacity style={[styles.topicButton, { backgroundColor: topic.color }]}>
-      <Text style={styles.topicText}>{topic.name}</Text>
-    </TouchableOpacity>
-  );
-
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="rgba(22, 109, 181, 0.95)" />
-
-      {/* ⭐ 上選單 - 藍色背景 */}
-      <View style={styles.blueHeader}>
-        <View style={styles.headerLeft}>
-          <View style={styles.avatarContainer}>
-            <Image 
-              source={require('./assets/images/person.png')}
-              style={styles.profileAvatar}
-              resizeMode="cover"
-            />
+      <StatusBar barStyle="dark-content" />
+      <ScrollView style={styles.scrollView}>
+        <View style={styles.header}>
+          <View style={styles.headerTop}>
+            <Text style={styles.greeting}>早安</Text>
+            <TouchableOpacity 
+              style={styles.profileButton}
+              onPress={() => {
+                if (isLoggedIn) {
+                  navigation.navigate('Profile', {
+                    user: user,
+                    onLogout: handleLogout
+                  });
+                } else {
+                  navigation.navigate('Login', {
+                    onLoginSuccess: (userData) => {
+                      setUser(userData);
+                      setIsLoggedIn(true);
+                    }
+                  });
+                }
+              }}
+            >
+              <Text style={styles.profileIcon}>👤</Text>
+            </TouchableOpacity>
           </View>
-          <View style={styles.headerTextContainer}>
-            <Text style={styles.greetingText}>早安！祝您有美好的一天</Text>
-            <Text style={styles.userName}>{user?.name || '張三'} player</Text>
-          </View>
+          <Text style={styles.username}>
+            {isLoggedIn && user ? user.name : '訪客'}
+          </Text>
         </View>
-        <View style={styles.headerRight}>
-          {/* ⭐ 通知圖標 - 保留原始圖片（含紅點），放大到 32x32 */}
-          <TouchableOpacity style={styles.headerIconButton}>
-            <Image 
-              source={require('./assets/images/new_notify.png')}
-              style={styles.headerIconLarge}
-              resizeMode="contain"
-            />
-          </TouchableOpacity>
-          {/* ⭐ 設定圖標 - 放大到 32x32 */}
-          <TouchableOpacity 
-            style={styles.headerIconButton}
-            onPress={() => {
-              Alert.alert('設定', '設定功能開發中');
-            }}
-          >
-            <Image 
-              source={require('./assets/images/setting.png')}
-              style={styles.headerIconLarge}
-              resizeMode="contain"
-            />
-          </TouchableOpacity>
-        </View>
-      </View>
 
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {/* ⭐ 心情選擇區 - 保持原樣 */}
         <View style={styles.section}>
-          <Text style={styles.subGreeting}>來記錄一下目前的心情吧？</Text>
-
-          <View style={styles.moodGrid}>
+          <Text style={styles.sectionTitle}>今天感覺如何？</Text>
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false} 
+            style={styles.moodScroll}
+          >
             {moods.map((mood, index) => (
               <MoodButton
                 key={index}
@@ -457,143 +419,88 @@ const HomeScreen = ({ navigation }) => {
                 onPress={() => handleMoodSelect(mood, index)}
               />
             ))}
-          </View>
+          </ScrollView>
         </View>
 
-        {/* ⭐ 每日練習 - 保持舊版樣式 */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>每日練習</Text>
           <Text style={styles.sectionSubtitle}>
-            今日練習進度 ({practiceProgress.completed}/{practiceProgress.total})
+            完成 {practiceProgress.completed} / {practiceProgress.total} 個練習
           </Text>
-
           <View style={styles.practiceList}>
             {dailyPractices.map((practice, index) => (
-              <PracticeCard key={index} practice={practice} />
+              <PracticeCard
+                key={index}
+                practice={practice}
+                onPress={() => navigateToPractice(practice)}
+              />
             ))}
           </View>
         </View>
 
-        {/* ⭐ 推薦練習課程 - 保持舊版樣式 */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>推薦練習課程</Text>
-          <Text style={styles.sectionSubtitle}>熱門主題</Text>
-
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.topicsScrollContainer}>
+          <Text style={styles.sectionTitle}>探索主題</Text>
+          <View style={styles.topicsScrollContainer}>
             <View style={styles.topicsGrid}>
-              <View style={styles.topicsRow}>
-                {topics.slice(0, 2).map((topic, index) => (
-                  <TopicButton key={index} topic={topic} />
-                ))}
-              </View>
-              <View style={styles.topicsRow}>
-                {topics.slice(2, 4).map((topic, index) => (
-                  <TopicButton key={index + 2} topic={topic} />
-                ))}
-              </View>
-            </View>
-
-            <View style={styles.topicsGrid}>
-              <View style={styles.topicsRow}>
-                {topics.slice(4, 6).map((topic, index) => (
-                  <TopicButton key={index + 4} topic={topic} />
-                ))}
-              </View>
-              <View style={styles.topicsRow}>
-                {topics.slice(6, 8).map((topic, index) => (
-                  <TopicButton key={index + 6} topic={topic} />
-                ))}
-              </View>
-            </View>
-          </ScrollView>
-
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.journeyScrollContainer}>
-            <View style={styles.journeyCardWrapper}>
-              <View style={styles.journeyImageSection}>
-                <Image
-                  source={require('./assets/images/植物.png')}
-                  style={styles.journeyMainImage}
-                  resizeMode="cover"
-                />
-              </View>
-              <View style={styles.journeyTextSection}>
-                <Text style={styles.journeyTitle}>繼續你的探索旅途</Text>
-                <View style={styles.progressBarContainer}>
-                  <View style={styles.progressBar}>
-                    <View style={styles.progressFill} />
-                  </View>
-                  <Text style={styles.progressText}>50%</Text>
+              {[0, 1].map(rowIndex => (
+                <View key={rowIndex} style={styles.topicsRow}>
+                  {topics.slice(rowIndex * 4, (rowIndex + 1) * 4).map((topic, index) => (
+                    <TouchableOpacity
+                      key={index}
+                      style={[styles.topicButton, { backgroundColor: topic.color }]}
+                    >
+                      <Text style={styles.topicText}>{topic.name}</Text>
+                    </TouchableOpacity>
+                  ))}
                 </View>
-              </View>
+              ))}
             </View>
-
-            <TouchableOpacity style={styles.independentAddButton}>
-              <Text style={styles.independentAddIcon}>+</Text>
-            </TouchableOpacity>
-          </ScrollView>
+          </View>
         </View>
 
         <View style={styles.bottomPadding} />
       </ScrollView>
-
-      {/* 底部導航欄 */}
       <BottomNavigation navigation={navigation} activeTab="home" />
     </View>
   );
 };
 
 // ==========================================
-// 練習路由容器
+// 主導航配置
 // ==========================================
-const PracticeNavigator = ({ route, navigation }) => {
-  const { practiceType, onPracticeComplete } = route.params;
-
-  switch (practiceType) {
-    case '呼吸穩定力練習':
-      return <BreathingPractice navigation={navigation} onComplete={onPracticeComplete} />;
-    case '情緒理解力練習':
-      return <EmotionPractice navigation={navigation} onComplete={onPracticeComplete} />;
-    case '正念安定力練習':
-      return <MindfulnessPractice navigation={navigation} onComplete={onPracticeComplete} />;
-    case '自我覺察力練習':
-      return <SelfAwarenessPractice navigation={navigation} onComplete={onPracticeComplete} />;
-    default:
-      return <View><Text>未知的練習類型</Text></View>;
-  }
-};
-
-// ==========================================
-// 主應用程式入口
-// ==========================================
-export default function App() {
+const App = () => {
   return (
     <NavigationContainer>
       <Stack.Navigator
-        initialRouteName="Home"
-        screenOptions={{ headerShown: false }}
+        screenOptions={{
+          headerShown: false,
+        }}
       >
         <Stack.Screen name="Home" component={HomeScreen} />
         <Stack.Screen name="Login" component={LoginScreen} />
         <Stack.Screen name="Register" component={RegisterScreen} />
-        <Stack.Screen name="Practice" component={PracticeNavigator} />
-        <Stack.Screen name="Daily" component={DailyScreen} />
         <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
         <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
-        <Stack.Screen 
-            name="PracticeSelection" 
-            component={PracticeScreen}
-            options={{ 
-              headerShown: false,
-              gestureEnabled: true 
-            }} 
-          />
-
-        <Stack.Screen name="Profile" component={ProfileScreen} options={{ headerShown: false }}/>
-
+        <Stack.Screen name="Daily" component={DailyScreen} />
+        <Stack.Screen name="Profile" component={ProfileScreen} />
+        
+        {/* Explore 頁面 - 包含單個練習和訓練計畫 */}
+        <Stack.Screen name="PracticeSelection" component={PracticeSelectionScreen} />
+        
+        {/* 單個練習頁面 */}
+        <Stack.Screen name="BreathingPractice" component={BreathingPractice} />
+        <Stack.Screen name="EmotionPractice" component={EmotionPractice} />
+        <Stack.Screen name="MindfulnessPractice" component={MindfulnessPractice} />
+        <Stack.Screen name="SelfAwarenessPractice" component={SelfAwarenessPractice} />
+        
+        {/* 訓練計畫相關頁面 */}
+        <Stack.Screen name="TrainingPlanDetail" component={TrainingPlanDetailScreen} />
+        <Stack.Screen name="TrainingPlanProgress" component={TrainingPlanProgressScreen} />
+        <Stack.Screen name="PracticeNavigator" component={PracticeNavigator} />
       </Stack.Navigator>
     </NavigationContainer>
   );
-}
+};
 
 // ==========================================
 // 樣式定義
@@ -603,83 +510,51 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F9FAFB',
   },
-  // ⭐ 藍色上選單
-  blueHeader: {
-    backgroundColor: 'rgba(22, 109, 181, 0.95)',
-    paddingHorizontal: 16,
-    paddingTop: 45,
-    paddingBottom: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  avatarContainer: {
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
-    borderRadius: 8,
-    overflow: 'hidden',
-  },
-  profileAvatar: {
-    width: 48,
-    height: 48,
-  },
-  headerTextContainer: {
-    marginLeft: 12,
-    flex: 1,
-  },
-  greetingText: {
-    fontSize: 13,
-    color: '#FFFFFF',
-    marginBottom: 2,
-  },
-  userName: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-  headerRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  headerIconButton: {
-    width: 44,
-    height: 44,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginLeft: 4,
-  },
-  // ⭐ 放大的圖標 - 32x32，不加 tintColor（保留原始顏色）
-  headerIconLarge: {
-    width: 32,
-    height: 32,
-  },
   scrollView: {
     flex: 1,
   },
-  section: {
+  header: {
+    paddingTop: 60,
     paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 10,
+    paddingBottom: 24,
     backgroundColor: '#FFFFFF',
+  },
+  headerTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 8,
   },
-  subGreeting: {
+  greeting: {
     fontSize: 16,
-    color: '#374151',
-    marginBottom: 16,
+    color: '#6B7280',
   },
-  moodGrid: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginBottom: 16,
+  username: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#111827',
+  },
+  profileButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F3F4F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  profileIcon: {
+    fontSize: 20,
+  },
+  section: {
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+  },
+  moodScroll: {
+    marginTop: 8,
   },
   moodContainer: {
     alignItems: 'center',
+    marginRight: 16,
   },
   moodButton: {
     width: 56,
@@ -748,24 +623,6 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     lineHeight: 20,
   },
-  tagsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginTop: 8,
-  },
-  tagBadge: {
-    backgroundColor: 'rgba(103, 169, 224, 0.1)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    marginRight: 6,
-    marginBottom: 4,
-  },
-  tagText: {
-    fontSize: 11,
-    color: 'rgba(103, 169, 224, 0.95)',
-    fontWeight: '500',
-  },
   practiceCard: {
     borderRadius: 12,
     padding: 16,
@@ -805,14 +662,6 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#111827',
     flex: 1,
-  },
-  difficultyContainer: {
-    flexDirection: 'row',
-    marginLeft: 8,
-  },
-  difficultyStar: {
-    fontSize: 10,
-    marginLeft: 2,
   },
   completedContainer: {
     flexDirection: 'row',
@@ -912,79 +761,9 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontWeight: '500',
   },
-  journeyScrollContainer: {
-    marginBottom: 16,
-  },
-  journeyCardWrapper: {
-    backgroundColor: '#F3F4F6',
-    borderRadius: 12,
-    overflow: 'hidden',
-    height: 100,
-    width: 280,
-    flexDirection: 'row',
-    marginRight: 20,
-  },
-  journeyImageSection: {
-    width: 140,
-    height: '100%',
-  },
-  journeyMainImage: {
-    width: '100%',
-    height: '100%',
-  },
-  journeyTextSection: {
-    position: 'absolute',
-    left: 150,
-    top: 25,
-    alignItems: 'flex-start',
-  },
-  journeyTitle: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#111827',
-    marginBottom: 4,
-    textAlign: 'right',
-  },
-  progressBarContainer: {
-    alignItems: 'flex-end',
-    marginTop: 4,
-  },
-  progressBar: {
-    width: 80,
-    height: 4,
-    backgroundColor: 'rgba(255, 255, 255, 0.5)',
-    borderRadius: 2,
-    marginBottom: 2,
-  },
-  progressFill: {
-    width: '50%',
-    height: '100%',
-    backgroundColor: '#3B82F6',
-    borderRadius: 2,
-  },
-  progressText: {
-    fontSize: 10,
-    color: '#374151',
-  },
-  independentAddButton: {
-    width: 80,
-    height: 100,
-    backgroundColor: '#E5E7EB',
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  independentAddIcon: {
-    fontSize: 32,
-    color: '#9CA3AF',
-    fontWeight: '300',
-  },
   bottomPadding: {
-    height: 80,
+    height: 100,
   },
 });
+
+export default App;
