@@ -130,6 +130,21 @@ export default function MindfulnessPractice({ onBack, navigation }) {
     };
   }, [navigation]);
 
+  const setupAudio = async () => {
+    try {
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: false,
+        playsInSilentModeIOS: true,
+        staysActiveInBackground: false,
+        shouldDuckAndroid: true,
+        playThroughEarpieceAndroid: false,
+      });
+      console.log('✅ 音頻模式設置成功');
+    } catch (error) {
+      console.error('❌ 音頻模式設置失敗:', error);
+    }
+  };
+
   const initializePractice = async () => {
     try {
       const response = await ApiService.startPractice('正念安定力練習');
@@ -189,117 +204,243 @@ export default function MindfulnessPractice({ onBack, navigation }) {
 
   // 呼吸音檔
   const loadBreathingAudio = async () => {
-    if (breathingSound) {
-      await breathingSound.unloadAsync();
-    }
-    
     try {
+      // 先卸載舊的音頻
+      if (breathingSound) {
+        console.log('🗑️ 卸載舊的呼吸音頻');
+        await breathingSound.unloadAsync();
+        setBreathingSound(null);
+      }
+      
+      console.log('📥 開始加載呼吸音頻...');
       const audioFile = require('../assets/audio/breathing-meditation.mp3');
-      const { sound: newSound } = await Audio.Sound.createAsync(audioFile);
+      const { sound: newSound } = await Audio.Sound.createAsync(
+        audioFile,
+        { shouldPlay: false }, 
+        (status) => {
+          if (status.isLoaded) {
+            setBreathingPosition(status.positionMillis || 0);
+            setIsBreathingPlaying(status.isPlaying || false);
+            if (!status.isPlaying && status.positionMillis === 0) {
+              setBreathingDuration(status.durationMillis || 0);
+            }
+          }
+        }
+      );
+      
       setBreathingSound(newSound);
+      console.log('✅ 呼吸音頻加載成功');
       
       const status = await newSound.getStatusAsync();
       if (status.isLoaded) {
         setBreathingDuration(status.durationMillis || 0);
+        console.log(`⏱️ 呼吸音頻時長: ${status.durationMillis}ms`);
       }
-      
-      newSound.setOnPlaybackStatusUpdate((status) => {
-        if (status.isLoaded) {
-          setBreathingPosition(status.positionMillis || 0);
-          setIsBreathingPlaying(status.isPlaying || false);
-        }
-      });
     } catch (error) {
-      console.log('呼吸音頻載入錯誤:', error);
+      console.error('❌ 呼吸音頻載入錯誤:', error);
+      Alert.alert('錯誤', '無法加載呼吸音頻');
     }
   };
 
   const toggleBreathingPlayback = async () => {
     if (!breathingSound) {
+      console.log('⚠️ 呼吸音頻未加載，開始加載...');
       await loadBreathingAudio();
       return;
     }
 
     try {
       const status = await breathingSound.getStatusAsync();
+      console.log('🎵 呼吸音頻狀態:', status.isLoaded, status.isPlaying);
+      
       if (status.isLoaded) {
         if (isBreathingPlaying) {
           await breathingSound.pauseAsync();
+          console.log('⏸️ 暫停呼吸音頻');
         } else {
           await breathingSound.playAsync();
+          console.log('▶️ 播放呼吸音頻');
         }
+      } else {
+        console.log('⚠️ 呼吸音頻未準備好，重新加載...');
+        await loadBreathingAudio();
       }
     } catch (error) {
-      console.log('呼吸播放錯誤:', error);
+      console.error('❌ 呼吸播放錯誤:', error);
+      Alert.alert('播放錯誤', '無法播放呼吸音頻，請重試');
     }
   };
 
   // 身體掃描音檔
   const loadAudio = async () => {
-    if (sound) {
-      await sound.unloadAsync();
-    }
-    
     try {
+      // 先卸載舊的音頻
+      if (sound) {
+        console.log('🗑️ 卸載舊的身體掃描音頻');
+        await sound.unloadAsync();
+        setSound(null);
+      }
+      
+      console.log('📥 開始加載身體掃描音頻...');
       const audioFile = require('../assets/audio/BodyScanner.mp3');
-      const { sound: newSound } = await Audio.Sound.createAsync(audioFile);
+      const { sound: newSound } = await Audio.Sound.createAsync(
+        audioFile,
+        { shouldPlay: false }, // ⭐ 明確設置不自動播放
+        (status) => {
+          // ⭐ 使用回調函數
+          if (status.isLoaded) {
+            setPosition(status.positionMillis || 0);
+            setIsPlaying(status.isPlaying || false);
+            if (!status.isPlaying && status.positionMillis === 0) {
+              setDuration(status.durationMillis || 0);
+            }
+          }
+        }
+      );
+      
       setSound(newSound);
+      console.log('✅ 身體掃描音頻加載成功');
       
       const status = await newSound.getStatusAsync();
       if (status.isLoaded) {
         setDuration(status.durationMillis || 0);
+        console.log(`⏱️ 身體掃描音頻時長: ${status.durationMillis}ms`);
       }
-      
-      newSound.setOnPlaybackStatusUpdate((status) => {
-        if (status.isLoaded) {
-          setPosition(status.positionMillis || 0);
-          setIsPlaying(status.isPlaying || false);
-        }
-      });
     } catch (error) {
-      console.log('音頻載入錯誤:', error);
+      console.error('❌ 身體掃描音頻載入錯誤:', error);
+      Alert.alert('錯誤', '無法加載身體掃描音頻');
     }
   };
 
   const togglePlayback = async () => {
     if (!sound) {
+      console.log('⚠️ 身體掃描音頻未加載，開始加載...');
       await loadAudio();
       return;
     }
 
     try {
       const status = await sound.getStatusAsync();
+      console.log('🎵 身體掃描音頻狀態:', status.isLoaded, status.isPlaying);
+      
       if (status.isLoaded) {
         if (isPlaying) {
           await sound.pauseAsync();
+          console.log('⏸️ 暫停身體掃描音頻');
         } else {
           await sound.playAsync();
+          console.log('▶️ 播放身體掃描音頻');
         }
+      } else {
+        console.log('⚠️ 身體掃描音頻未準備好，重新加載...');
+        await loadAudio();
       }
     } catch (error) {
-      console.log('播放錯誤:', error);
+      console.error('❌ 身體掃描播放錯誤:', error);
+      Alert.alert('播放錯誤', '無法播放身體掃描音頻，請重試');
     }
   };
 
   useEffect(() => {
-    if (currentStepData.hasAudio && !sound) {
-      loadAudio();
-    }
-    if (currentStepData.hasBreathingAudio && !breathingSound) {
-      loadBreathingAudio();
-    }
+    const manageAudio = async () => {
+      // 如果當前步驟有大型音頻播放器
+      if (currentStepData.hasAudio) {
+        // 暫停呼吸音頻（如果正在播放）
+        if (breathingSound) {
+          try {
+            const status = await breathingSound.getStatusAsync();
+            if (status.isLoaded && status.isPlaying) {
+              await breathingSound.pauseAsync();
+              console.log('⏸️ 已暫停呼吸音頻');
+            }
+          } catch (error) {
+            console.log('暫停呼吸音頻錯誤:', error);
+          }
+        }
+        
+        // 加載大型音頻
+        if (!sound) {
+          await loadAudio();
+        }
+      }
+      
+      // 如果當前步驟有呼吸音頻
+      if (currentStepData.hasBreathingAudio) {
+        // 暫停大型音頻（如果正在播放）
+        if (sound) {
+          try {
+            const status = await sound.getStatusAsync();
+            if (status.isLoaded && status.isPlaying) {
+              await sound.pauseAsync();
+              console.log('⏸️ 已暫停身體掃描音頻');
+            }
+          } catch (error) {
+            console.log('暫停身體掃描音頻錯誤:', error);
+          }
+        }
+        
+        // 加載呼吸音頻
+        if (!breathingSound) {
+          await loadBreathingAudio();
+        }
+      }
+      
+      // 如果當前步驟沒有音頻，暫停所有音頻
+      if (!currentStepData.hasAudio && !currentStepData.hasBreathingAudio) {
+        if (breathingSound) {
+          try {
+            const status = await breathingSound.getStatusAsync();
+            if (status.isLoaded && status.isPlaying) {
+              await breathingSound.pauseAsync();
+            }
+          } catch (error) {
+            console.log('暫停呼吸音頻錯誤:', error);
+          }
+        }
+        
+        if (sound) {
+          try {
+            const status = await sound.getStatusAsync();
+            if (status.isLoaded && status.isPlaying) {
+              await sound.pauseAsync();
+            }
+          } catch (error) {
+            console.log('暫停音頻錯誤:', error);
+          }
+        }
+      }
+    };
+    
+    manageAudio();
   }, [currentStep]);
 
   useEffect(() => {
     return () => {
-      if (sound) {
-        sound.unloadAsync();
-      }
-      if (breathingSound) {
-        breathingSound.unloadAsync();
-      }
+      const cleanup = async () => {
+        if (breathingSound) {
+          try {
+            await breathingSound.stopAsync();
+            await breathingSound.unloadAsync();
+            console.log('🧹 已清理呼吸音頻');
+          } catch (error) {
+            console.log('清理呼吸音頻錯誤:', error);
+          }
+        }
+        
+        if (sound) {
+          try {
+            await sound.stopAsync();
+            await sound.unloadAsync();
+            console.log('🧹 已清理身體掃描音頻');
+          } catch (error) {
+            console.log('清理身體掃描音頻錯誤:', error);
+          }
+        }
+      };
+      
+      cleanup();
     };
-  }, [sound, breathingSound]);
+  }, []); // ⭐ 空依賴數組，只在組件卸載時執行
 
   const formatTime = (milliseconds) => {
     const totalSeconds = Math.floor(milliseconds / 1000);
@@ -719,15 +860,18 @@ export default function MindfulnessPractice({ onBack, navigation }) {
           <TouchableOpacity 
             style={styles.completeBreathingButton}
             onPress={async () => {
-              // 暫停呼吸音檔（而不是停止）
+              // 暫停呼吸音頻
               if (breathingSound) {
                 try {
                   const status = await breathingSound.getStatusAsync();
-                  if (status.isLoaded && status.isPlaying) {
-                    await breathingSound.pauseAsync();
+                  if (status.isLoaded) {
+                    if (status.isPlaying) {
+                      await breathingSound.pauseAsync();
+                      console.log('⏸️ 已暫停呼吸音頻');
+                    }
                   }
                 } catch (error) {
-                  console.log('暫停音頻錯誤:', error);
+                  console.error('暫停音頻錯誤:', error);
                 }
               }
               // 然後進入下一步
