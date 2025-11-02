@@ -143,7 +143,11 @@ export default function SelfAwarenessPractice({ onBack, navigation }) {
             console.log('⚠️ 解析表單數據失敗:', e);
           }
         }
-        
+        if (response.accumulatedSeconds && response.accumulatedSeconds > 0) {
+          setElapsedTime(response.accumulatedSeconds);
+          console.log(`✅ 恢復累積時間: ${response.accumulatedSeconds} 秒`);
+        }
+
         setStartTime(Date.now());
       }
     } catch (error) {
@@ -176,7 +180,8 @@ export default function SelfAwarenessPractice({ onBack, navigation }) {
         practiceId,
         currentStep,
         totalSteps,
-        formData
+        formData,
+        elapsedTime  
       );
     } catch (error) {
       console.log('儲存進度失敗:', error);
@@ -242,10 +247,15 @@ export default function SelfAwarenessPractice({ onBack, navigation }) {
         {
           text: '確定',
           onPress: () => {
-            if (onBack) {
-              onBack();
-            } else if (navigation) {
+            if (navigation && navigation.canGoBack && navigation.canGoBack()) {
               navigation.goBack();
+            } else if (onBack) {
+              onBack();
+            } else {
+              // ⭐ 如果都沒有，嘗試 navigate 到首頁
+              if (navigation && navigation.navigate) {
+                navigation.navigate('Home');
+              }
             }
           }
         }
@@ -353,14 +363,11 @@ export default function SelfAwarenessPractice({ onBack, navigation }) {
                   這個想法是從何而來的？從什麼時候開始？{'\n'}
                   是誰跟我說過類似的話嗎？
                 </Text>
-                <TextInput 
-                  style={styles.largeInputBox} 
-                  multiline 
-                  placeholder="例：我想到曾經被爸爸說過我很沒用，而且很多次…"
-                  placeholderTextColor="rgba(0, 0, 0, 0.4)"
-                  value={formData.thoughtOrigin}
-                  onChangeText={(text) => updateFormData('thoughtOrigin', text)}
-                />
+                <View style={styles.answerDisplayBox}>
+                  <Text style={styles.answerDisplayText}>
+                    {formData.thoughtOrigin || '請寫下你的想法...'}
+                  </Text>
+                </View>
               </View>
 
               <View style={styles.separator} />
@@ -370,14 +377,11 @@ export default function SelfAwarenessPractice({ onBack, navigation }) {
                   這個想法有多大程度是真實的？{'\n'}
                   是否有客觀證據反對這個想法？
                 </Text>
-                <TextInput 
-                  style={styles.largeInputBox} 
-                  multiline 
-                  placeholder="例：客觀來看，這份文件是在很短的時間內臨時被交辦，加班趕出來的..."
-                  placeholderTextColor="rgba(0, 0, 0, 0.4)"
-                  value={formData.thoughtValidity}
-                  onChangeText={(text) => updateFormData('thoughtValidity', text)}
-                />
+                <View style={styles.answerDisplayBox}>
+                  <Text style={styles.answerDisplayText}>
+                    {formData.thoughtValidity || '請寫下你的想法...'}
+                  </Text>
+                </View>
               </View>
 
               <View style={styles.separator} />
@@ -386,14 +390,11 @@ export default function SelfAwarenessPractice({ onBack, navigation }) {
                 <Text style={styles.inputLabel}>
                   這個想法對我的正向與負向的影響是什麼？
                 </Text>
-                <TextInput 
-                  style={styles.largeInputBox} 
-                  multiline 
-                  placeholder="請寫下你的想法..."
-                  placeholderTextColor="rgba(0, 0, 0, 0.4)"
-                  value={formData.thoughtImpact}
-                  onChangeText={(text) => updateFormData('thoughtImpact', text)}
-                />
+                <View style={styles.answerDisplayBox}>
+                  <Text style={styles.answerDisplayText}>
+                    {formData.thoughtImpact || '請寫下你的想法...'}
+                  </Text>
+                </View>
               </View>
             </View>
           </ScrollView>
@@ -538,13 +539,13 @@ export default function SelfAwarenessPractice({ onBack, navigation }) {
       >
         {/* 第一部分：那個時刻 */}
         <View style={styles.summaryCard}>
-          <Text style={styles.summarySectionTitle}>那個時刻</Text>
+          <Text style={styles.summarySectionTitle}>📍 發生了甚麼</Text>
           
           <View style={styles.summaryItemContainer}>
             <Text style={styles.summaryItemLabel}>事件</Text>
             <View style={styles.summaryAnswerBox}>
               <Text style={styles.summaryAnswerText}>
-                {formData.event || '尚未填寫'}
+                {formData.event || '無紀錄'}
               </Text>
             </View>
           </View>
@@ -553,7 +554,7 @@ export default function SelfAwarenessPractice({ onBack, navigation }) {
             <Text style={styles.summaryItemLabel}>想法</Text>
             <View style={styles.summaryAnswerBox}>
               <Text style={styles.summaryAnswerText}>
-                {formData.thought || '尚未填寫'}
+                {formData.thought || '無紀錄'}
               </Text>
             </View>
           </View>
@@ -562,72 +563,65 @@ export default function SelfAwarenessPractice({ onBack, navigation }) {
             <Text style={styles.summaryItemLabel}>心情</Text>
             <View style={styles.summaryAnswerBox}>
               <Text style={styles.summaryAnswerText}>
-                {formData.mood || '尚未填寫'}
+                {formData.mood || '無紀錄'}
               </Text>
             </View>
           </View>
         </View>
 
-        {/* 第二部分：探索想法 */}
+        {/* 第二部分：探索想法 - 移除條件判斷，全部顯示 */}
         <View style={styles.summaryCard}>
-          <Text style={styles.summarySectionTitle}>探索想法</Text>
+          <Text style={styles.summarySectionTitle}>🔍 探索想法</Text>
           
-          {formData.thoughtOrigin && (
-            <View style={styles.summaryItemContainer}>
-              <Text style={styles.summaryItemLabel}>想法來源</Text>
-              <View style={styles.summaryAnswerBox}>
-                <Text style={styles.summaryAnswerText}>
-                  {formData.thoughtOrigin}
-                </Text>
-              </View>
+          <View style={styles.summaryItemContainer}>
+            <Text style={styles.summaryItemLabel}>想法來源</Text>
+            <View style={styles.summaryAnswerBox}>
+              <Text style={styles.summaryAnswerText}>
+                {formData.thoughtOrigin || '無紀錄'}
+              </Text>
             </View>
-          )}
+          </View>
 
-          {formData.thoughtValidity && (
-            <View style={styles.summaryItemContainer}>
-              <Text style={styles.summaryItemLabel}>真實性檢驗</Text>
-              <View style={styles.summaryAnswerBox}>
-                <Text style={styles.summaryAnswerText}>
-                  {formData.thoughtValidity}
-                </Text>
-              </View>
+          <View style={styles.summaryItemContainer}>
+            <Text style={styles.summaryItemLabel}>真實性檢驗</Text>
+            <View style={styles.summaryAnswerBox}>
+              <Text style={styles.summaryAnswerText}>
+                {formData.thoughtValidity || '無紀錄'}
+              </Text>
             </View>
-          )}
+          </View>
 
-          {formData.thoughtImpact && (
-            <View style={styles.summaryItemContainer}>
-              <Text style={styles.summaryItemLabel}>影響</Text>
-              <View style={styles.summaryAnswerBox}>
-                <Text style={styles.summaryAnswerText}>
-                  {formData.thoughtImpact}
-                </Text>
-              </View>
+          <View style={styles.summaryItemContainer}>
+            <Text style={styles.summaryItemLabel}>影響</Text>
+            <View style={styles.summaryAnswerBox}>
+              <Text style={styles.summaryAnswerText}>
+                {formData.thoughtImpact || '無紀錄'}
+              </Text>
             </View>
-          )}
+          </View>
         </View>
 
-        {/* 第三部分：我的回應 */}
+        {/* 第三部分：我的回應 - 移除條件判斷 */}
         <View style={styles.summaryCard}>
-          <Text style={styles.summarySectionTitle}>我的回應</Text>
+          <Text style={styles.summarySectionTitle}>💭 我的回應</Text>
           
-          {formData.responseMethod && (
-            <View style={styles.summaryMethodTagContainer}>
-              <Text style={styles.summaryMethodLabel}>回應方式：</Text>
-              <View style={styles.summaryMethodTag}>
-                <Text style={styles.summaryMethodText}>
-                  {formData.responseMethod === 'friend' && '以朋友的角度'}
-                  {formData.responseMethod === 'inner' && '內在支持的聲音'}
-                  {formData.responseMethod === 'future' && '未來的回應方式'}
-                </Text>
-              </View>
+          <View style={styles.summaryItemContainer}>
+            <Text style={styles.summaryMethodLabel}>回應方式：</Text>
+            <View style={styles.summaryMethodTag}>
+              <Text style={styles.summaryMethodText}>
+                {formData.responseMethod === 'friend' && '以朋友的角度'}
+                {formData.responseMethod === 'inner' && '內在支持的聲音'}
+                {formData.responseMethod === 'future' && '未來的回應方式'}
+                {!formData.responseMethod && '無紀錄'}
+              </Text>
             </View>
-          )}
+          </View>
 
           <View style={styles.summaryItemContainer}>
             <Text style={styles.summaryItemLabel}>新的回應</Text>
             <View style={styles.summaryHighlightBox}>
               <Text style={styles.summaryHighlightText}>
-                {formData.newResponse || '尚未填寫'}
+                {formData.newResponse || '無紀錄'}
               </Text>
             </View>
           </View>
@@ -635,12 +629,12 @@ export default function SelfAwarenessPractice({ onBack, navigation }) {
 
         {/* 第四部分：練習後的感受 */}
         <View style={styles.summaryCard}>
-          <Text style={styles.summarySectionTitle}>練習後的感受</Text>
+          <Text style={styles.summarySectionTitle}>✨ 練習後的感受</Text>
           
           <View style={styles.summaryItemContainer}>
             <View style={styles.summaryAnswerBox}>
               <Text style={styles.summaryAnswerText}>
-                {formData.finalFeeling || '尚未填寫'}
+                {formData.finalFeeling || '無紀錄'}
               </Text>
             </View>
           </View>
@@ -1119,7 +1113,7 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   completeButton: {
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#ffffffff',
     paddingVertical: 14,
     paddingHorizontal: 32,
     borderRadius: 25,
@@ -1147,14 +1141,14 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 18,
     marginBottom: 16,
-    shadowColor: '#000',
+    shadowColor: '#000000ff',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
     shadowRadius: 4,
     elevation: 3,
   },
   summarySectionTitle: {
-    fontSize: 18,  // 增大
+    fontSize: 19,  // 增大
     fontWeight: 'bold',  // 加粗
     color: '#D49650',
     marginBottom: 16,
@@ -1166,7 +1160,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   summaryItemLabel: {
-    fontSize: 14,
+    fontSize: 16.5,
     fontWeight: '600',
     color: '#D49650',  // 使用主題色
     marginBottom: 6,
@@ -1174,16 +1168,19 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   summaryAnswerBox: {
-    backgroundColor: 'rgba(241, 234, 228, 0.4)',  // 淡背景
+    backgroundColor: 'rgba(244, 238, 233, 0.4)',  // 淡背景
     borderLeftWidth: 3,
-    borderLeftColor: '#D49650',
+    borderLeftColor: '#ebd6a9ff',
+    /*backgroundColor: 'rgba(241, 234, 228, 0.4)',
+    borderWidth: 1,
+    borderColor: 'rgba(212, 150, 80, 0.3)',*/
     borderRadius: 8,
     padding: 12,
     minHeight: 40,
   },
   summaryAnswerText: {
     fontSize: 15,
-    color: 'rgba(0, 0, 0, 0.75)',
+    color: 'rgba(86, 86, 86, 0.75)',
     lineHeight: 22,
   },
   summaryHighlightBox: {
@@ -1196,29 +1193,26 @@ const styles = StyleSheet.create({
   },
   summaryHighlightText: {
     fontSize: 15,
-    color: 'rgba(0, 0, 0, 0.8)',
+    color: 'rgba(86, 86, 86, 0.75)',
     lineHeight: 24,
     fontStyle: 'italic',
-  },
-  summaryMethodTagContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-    flexWrap: 'wrap',
   },
   summaryMethodLabel: {
     fontSize: 14,
     fontWeight: '600',
     color: 'rgba(0, 0, 0, 0.65)',
-    marginRight: 8,
+    marginBottom: 8,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   summaryMethodTag: {
     backgroundColor: 'rgba(212, 150, 80, 0.15)',
     paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingVertical: 8,
     borderRadius: 16,
-    borderWidth: 1,
+    borderWidth: 2,
     borderColor: 'rgba(212, 150, 80, 0.3)',
+    alignSelf: 'flex-start', 
   },
   summaryMethodText: {
     fontSize: 13,
@@ -1238,6 +1232,20 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: 'rgba(0, 0, 0, 0.6)',
     textAlign: 'center',
+    lineHeight: 22,
+  },
+  answerDisplayBox: {
+    backgroundColor: 'rgba(241, 234, 228, 0.5)',
+    borderWidth: 1,
+    borderColor: 'rgba(212, 150, 80, 0.3)',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    minHeight: 60,
+  },
+  answerDisplayText: {
+    fontSize: 15,
+    color: 'rgba(0, 0, 0, 0.75)',
     lineHeight: 22,
   },
   finishButton: {

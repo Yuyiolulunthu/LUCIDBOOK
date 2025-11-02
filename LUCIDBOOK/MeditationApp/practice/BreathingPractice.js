@@ -28,9 +28,7 @@ export default function BreathingPractice({ onBack, navigation }) {
   const [practiceId, setPracticeId] = useState(null);
   
   const [startTime, setStartTime] = useState(null);
-  const [pauseTime, setPauseTime] = useState(null);
-  const [accumulatedTime, setAccumulatedTime] = useState(0);
-  const isFocused = useRef(true);
+  const [elapsedTime, setElapsedTime] = useState(0);
   
   const [formData, setFormData] = useState({
     feeling: '',
@@ -90,32 +88,26 @@ export default function BreathingPractice({ onBack, navigation }) {
 
   useEffect(() => {
     initializePractice();
-    
-    const unsubscribeFocus = navigation?.addListener('focus', () => {
-      isFocused.current = true;
-      if (pauseTime) {
-        setStartTime(Date.now());
-        setPauseTime(null);
-      }
-    });
-
-    const unsubscribeBlur = navigation?.addListener('blur', () => {
-      isFocused.current = false;
-      if (startTime && !pauseTime) {
-        const elapsed = Math.floor((Date.now() - startTime) / 1000);
-        setAccumulatedTime(prev => prev + elapsed);
-        setPauseTime(Date.now());
-      }
-    });
 
     return () => {
-      if (unsubscribeFocus) unsubscribeFocus();
-      if (unsubscribeBlur) unsubscribeBlur();
       if (sound) {
         sound.unloadAsync();
       }
     };
-  }, [navigation]);
+  }, []);
+
+  useEffect(() => {
+    let timer;
+    if (startTime) {
+      timer = setInterval(() => {
+        setElapsedTime(prev => prev + 1);
+      }, 1000);
+    }
+    
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+  }, [startTime]);
 
   const initializePractice = async () => {
     try {
@@ -140,20 +132,16 @@ export default function BreathingPractice({ onBack, navigation }) {
             console.log('⚠️ 解析表單數據失敗:', e);
           }
         }
+        if (response.accumulatedSeconds && response.accumulatedSeconds > 0) {
+          setElapsedTime(response.accumulatedSeconds);
+          console.log(`✅ 恢復累積時間: ${response.accumulatedSeconds} 秒`);
+        }
         
         setStartTime(Date.now());
       }
     } catch (error) {
       console.error('初始化練習失敗:', error);
     }
-  };
-
-  const calculateTotalTime = () => {
-    let total = accumulatedTime;
-    if (startTime && !pauseTime && isFocused.current) {
-      total += Math.floor((Date.now() - startTime) / 1000);
-    }
-    return total;
   };
 
   useEffect(() => {
@@ -168,7 +156,8 @@ export default function BreathingPractice({ onBack, navigation }) {
         practiceId,
         currentStep,
         totalSteps,
-        formData
+        formData,
+        elapsedTime  
       );
     } catch (error) {
       console.log('儲存進度失敗:', error);
@@ -270,7 +259,8 @@ export default function BreathingPractice({ onBack, navigation }) {
     }
 
     try {
-      const totalSeconds = calculateTotalTime();
+      // ✅ 直接使用 elapsedTime
+      const totalSeconds = elapsedTime;
       const totalMinutes = Math.max(1, Math.ceil(totalSeconds / 60));
 
       await ApiService.completePractice(practiceId, {
@@ -281,7 +271,7 @@ export default function BreathingPractice({ onBack, navigation }) {
         reflection: formData.reflection,
       });
 
-      // ⭐ 修正：正確顯示時間
+      // ✅ 修正時間顯示
       const mins = Math.floor(totalSeconds / 60);
       const secs = totalSeconds % 60;
       let timeStr = '';
@@ -292,14 +282,18 @@ export default function BreathingPractice({ onBack, navigation }) {
         timeStr += `${secs}秒`;
       }
 
-      Alert.alert('完成', `恭喜完成練習！總時間：${timeStr}分鐘${totalSeconds % 60}秒`, [
+      Alert.alert('完成', `恭喜完成練習！總時間：${timeStr}`, [
         {
           text: '確定',
           onPress: () => {
-            if (onBack) {
-              onBack();
-            } else if (navigation) {
+            if (navigation && navigation.canGoBack && navigation.canGoBack()) {
               navigation.goBack();
+            } else if (onBack) {
+              onBack();
+            } else {
+              if (navigation && navigation.navigate) {
+                navigation.navigate('Home');
+              }
             }
           }
         }
@@ -385,21 +379,21 @@ export default function BreathingPractice({ onBack, navigation }) {
       return (
         <ScrollView style={styles.summarySection} showsVerticalScrollIndicator={false}>
           <View style={styles.summaryCard}>
-            <Text style={styles.summaryTitle}>練習的感覺：</Text>
+            <Text style={styles.summaryTitle}>💭 練習的感覺：</Text>
             <Text style={styles.summaryContent}>{formData.feeling || "無記錄"}</Text>
           </View>
           
           <View style={styles.separator} />
           
           <View style={styles.summaryCard}>
-            <Text style={styles.summaryTitle}>練習中的發現：</Text>
+            <Text style={styles.summaryTitle}>🎨 練習中的發現：</Text>
             <Text style={styles.summaryContent}>{formData.noticed || "無記錄"}</Text>
           </View>
           
           <View style={styles.separator} />
           
           <View style={styles.summaryCard}>
-            <Text style={styles.summaryTitle}>想和自己說的話：</Text>
+            <Text style={styles.summaryTitle}>🎧 想和自己說的話：</Text>
             <Text style={styles.summaryContent}>{formData.reflection || "無記錄"}</Text>
           </View>
           

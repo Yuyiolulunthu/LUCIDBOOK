@@ -32,9 +32,7 @@ export default function MindfulnessPractice({ onBack, navigation }) {
   const [practiceId, setPracticeId] = useState(null);
   
   const [startTime, setStartTime] = useState(null);
-  const [pauseTime, setPauseTime] = useState(null);
-  const [accumulatedTime, setAccumulatedTime] = useState(0);
-  const isFocused = useRef(true);
+  const [elapsedTime, setElapsedTime] = useState(0);
   
   const [formData, setFormData] = useState({
     noticed: '',
@@ -86,6 +84,7 @@ export default function MindfulnessPractice({ onBack, navigation }) {
       title: "身體掃描結束，",
       content: "你感覺怎麼樣呢？\n讓我們利用書寫，分享自己的身體與心靈感受",
       hasForm: true,
+      isSecondToLast: true
     },
     {
       title: "你做得很好，",
@@ -100,27 +99,8 @@ export default function MindfulnessPractice({ onBack, navigation }) {
 
   useEffect(() => {
     initializePractice();
-    
-    const unsubscribeFocus = navigation?.addListener('focus', () => {
-      isFocused.current = true;
-      if (pauseTime) {
-        setStartTime(Date.now());
-        setPauseTime(null);
-      }
-    });
-
-    const unsubscribeBlur = navigation?.addListener('blur', () => {
-      isFocused.current = false;
-      if (startTime && !pauseTime) {
-        const elapsed = Math.floor((Date.now() - startTime) / 1000);
-        setAccumulatedTime(prev => prev + elapsed);
-        setPauseTime(Date.now());
-      }
-    });
 
     return () => {
-      if (unsubscribeFocus) unsubscribeFocus();
-      if (unsubscribeBlur) unsubscribeBlur();
       if (sound) {
         sound.unloadAsync();
       }
@@ -128,7 +108,20 @@ export default function MindfulnessPractice({ onBack, navigation }) {
         breathingSound.unloadAsync();
       }
     };
-  }, [navigation]);
+  }, []);
+
+  useEffect(() => {
+    let timer;
+    if (startTime) {
+      timer = setInterval(() => {
+        setElapsedTime(prev => prev + 1);
+      }, 1000);
+    }
+    
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+  }, [startTime]);
 
   const setupAudio = async () => {
     try {
@@ -167,20 +160,16 @@ export default function MindfulnessPractice({ onBack, navigation }) {
             console.log('⚠️ 解析表單數據失敗:', e);
           }
         }
-        
+        if (response.accumulatedSeconds && response.accumulatedSeconds > 0) {
+          setElapsedTime(response.accumulatedSeconds);
+          console.log(`✅ 恢復累積時間: ${response.accumulatedSeconds} 秒`);
+        }
+
         setStartTime(Date.now());
       }
     } catch (error) {
       console.error('初始化練習失敗:', error);
     }
-  };
-
-  const calculateTotalTime = () => {
-    let total = accumulatedTime;
-    if (startTime && !pauseTime && isFocused.current) {
-      total += Math.floor((Date.now() - startTime) / 1000);
-    }
-    return total;
   };
 
   useEffect(() => {
@@ -195,7 +184,8 @@ export default function MindfulnessPractice({ onBack, navigation }) {
         practiceId,
         currentStep,
         totalSteps,
-        formData
+        formData,
+        elapsedTime  
       );
     } catch (error) {
       console.log('儲存進度失敗:', error);
@@ -477,7 +467,7 @@ export default function MindfulnessPractice({ onBack, navigation }) {
     }
 
     try {
-      const totalSeconds = calculateTotalTime();
+      const totalSeconds = elapsedTime;
       const totalMinutes = Math.max(1, Math.ceil(totalSeconds / 60));
 
       await ApiService.completePractice(practiceId, {
@@ -502,10 +492,15 @@ export default function MindfulnessPractice({ onBack, navigation }) {
         {
           text: '確定',
           onPress: () => {
-            if (onBack) {
-              onBack();
-            } else if (navigation) {
+            if (navigation && navigation.canGoBack && navigation.canGoBack()) {
               navigation.goBack();
+            } else if (onBack) {
+              onBack();
+            } else {
+              // ⭐ 如果都沒有，嘗試 navigate 到首頁
+              if (navigation && navigation.navigate) {
+                navigation.navigate('Home');
+              }
             }
           }
         }
@@ -682,17 +677,17 @@ export default function MindfulnessPractice({ onBack, navigation }) {
             )}
           </View>
           <View style={styles.summaryCard}>
-            <Text style={styles.summaryTitle}>你的觀察：</Text>
+            <Text style={styles.summaryTitle}>🌱 你的觀察：</Text>
             <Text style={styles.summaryContent}>{formData.noticed || '未填寫'}</Text>
           </View>
           
           <View style={styles.summaryCard}>
-            <Text style={styles.summaryTitle}>你的注意力：</Text>
+            <Text style={styles.summaryTitle}>🌿 你的注意力：</Text>
             <Text style={styles.summaryContent}>{formData.attention || '未填寫'}</Text>
           </View>
           
           <View style={styles.summaryCard}>
-            <Text style={styles.summaryTitle}>你的反思：</Text>
+            <Text style={styles.summaryTitle}>🌳 你的反思：</Text>
             <Text style={styles.summaryContent}>{formData.reflection || '未填寫'}</Text>
           </View>
           
@@ -953,20 +948,16 @@ export default function MindfulnessPractice({ onBack, navigation }) {
               ))}
             </View>
 
-            {!currentStepData.hasForm ? (
-              <TouchableOpacity 
-                style={[
-                  styles.navArrowButton,
-                  currentStep === steps.length - 1 && styles.navButtonDisabled
-                ]}
-                onPress={nextStep}
-                disabled={currentStep === steps.length - 1}
-              >
-                <Text style={styles.navArrowText}>›</Text>
-              </TouchableOpacity>
-            ) : (
-              <View style={[styles.navArrowButton, { opacity: 0 }]} />
-            )}
+            <TouchableOpacity 
+              onPress={nextStep}
+              disabled={currentStepData.isSecondToLast}
+              style={[
+                styles.navArrowButton,
+                currentStepData.isSecondToLast && styles.navButtonDisabled
+              ]}
+            >
+              <Text style={styles.navArrowText}>›</Text>
+            </TouchableOpacity>
           </View>
         )}
         </View>

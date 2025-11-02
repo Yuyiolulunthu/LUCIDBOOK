@@ -212,16 +212,24 @@ class ApiService {
    * @param {number} currentPage - 當前頁面
    * @param {number} totalPages - 總頁數
    * @param {object} formData - 表單資料
+   * @param {number} accumulatedSeconds - 累積時間（秒）
    */
-  async updatePracticeProgress(practiceId, currentPage, totalPages, formData) {
+  async updatePracticeProgress(practiceId, currentPage, totalPages, formData, accumulatedSeconds = null) {
+    const requestBody = {
+      practice_id: practiceId,
+      current_page: currentPage,
+      total_pages: totalPages,
+      form_data: formData,
+    };
+    
+    // ⭐ 如果有累積時間，加入請求
+    if (accumulatedSeconds !== null && accumulatedSeconds !== undefined) {
+      requestBody.accumulated_seconds = accumulatedSeconds;
+    }
+    
     return this.request('/practice/update-progress.php', {
       method: 'POST',
-      body: JSON.stringify({
-        practice_id: practiceId,
-        current_page: currentPage,  // ⭐ 修正：改為 current_page
-        total_pages: totalPages,    // ⭐ 修正：改為 total_pages
-        form_data: formData,        // ⭐ 修正：改為 form_data
-      }),
+      body: JSON.stringify(requestBody),
     });
   }
   /** 

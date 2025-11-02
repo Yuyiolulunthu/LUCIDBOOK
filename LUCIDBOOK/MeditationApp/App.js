@@ -565,8 +565,8 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   moodButtonSelected: {
-    transform: [{ scale: 1.1 }],
-    borderWidth: 2,
+    transform: [{ scale: 0.95 }],
+    borderWidth: 3,
     borderColor: '#3B82F6',
   },
   moodImage: {

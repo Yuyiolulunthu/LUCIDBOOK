@@ -150,8 +150,13 @@ export default function EmotionPractice({ onBack, navigation }) {
             console.log('⚠️ 解析表單數據失敗:', e);
           }
         }
+
+        if (response.accumulatedSeconds && response.accumulatedSeconds > 0) {
+          setElapsedTime(response.accumulatedSeconds);
+          console.log(`✅ 恢復累積時間: ${response.accumulatedSeconds} 秒`);
+        }
         
-        setStartTime(Date.now());
+        setStartTime(Date.now());``
       }
     } catch (error) {
       console.error('初始化練習失敗:', error);
@@ -183,7 +188,8 @@ export default function EmotionPractice({ onBack, navigation }) {
         practiceId,
         currentStep,
         totalSteps,
-        formData
+        formData,
+        elapsedTime  
       );
     } catch (error) {
       console.log('儲存進度失敗:', error);
@@ -350,10 +356,15 @@ export default function EmotionPractice({ onBack, navigation }) {
         {
           text: '確定',
           onPress: () => {
-            if (onBack) {
-              onBack();
-            } else if (navigation) {
+            if (navigation && navigation.canGoBack && navigation.canGoBack()) {
               navigation.goBack();
+            } else if (onBack) {
+              onBack();
+            } else {
+              // ⭐ 如果都沒有，嘗試 navigate 到首頁
+              if (navigation && navigation.navigate) {
+                navigation.navigate('Home');
+              }
             }
           }
         }
