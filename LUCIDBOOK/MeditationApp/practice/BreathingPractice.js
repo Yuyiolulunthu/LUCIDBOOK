@@ -109,6 +109,16 @@ export default function BreathingPractice({ onBack, navigation }) {
     };
   }, [startTime]);
 
+  useEffect(() => {
+    if (!practiceId) return;
+    
+    const autoSaveInterval = setInterval(() => {
+      saveProgress();
+    }, 1000); // 每 1 秒自動保存一次
+    
+    return () => clearInterval(autoSaveInterval);
+  }, [practiceId, currentStep, formData, elapsedTime]);
+
   const initializePractice = async () => {
     try {
       const response = await ApiService.startPractice('呼吸穩定力練習');

@@ -176,6 +176,16 @@ export default function MindfulnessPractice({ onBack, navigation }) {
     saveProgress();
   }, [currentStep, formData]);
 
+  useEffect(() => {
+    if (!practiceId) return;
+    
+    const autoSaveInterval = setInterval(() => {
+      saveProgress();
+    }, 1000); // 每 1 秒自動保存一次
+    
+    return () => clearInterval(autoSaveInterval);
+  }, [practiceId, currentStep, formData, elapsedTime]);
+
   const saveProgress = async () => {
     if (!practiceId) return;
     
