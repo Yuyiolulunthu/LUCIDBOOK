@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native'; 
 import {
   View,
   Text,
@@ -127,31 +128,83 @@ export default function SelfAwarenessPractice({ onBack, navigation }) {
       if (response.practiceId) {
         setPracticeId(response.practiceId);
         
-        if (response.currentPage && response.currentPage > 0) {
-          console.log(`✅ 恢復進度到第 ${response.currentPage} 頁`);
-          setCurrentStep(response.currentPage);
-        }
-        
-        if (response.formData) {
-          try {
-            const parsedData = typeof response.formData === 'string' 
-              ? JSON.parse(response.formData) 
-              : response.formData;
-            setFormData(parsedData);
-            console.log('✅ 恢復表單數據:', parsedData);
-          } catch (e) {
-            console.log('⚠️ 解析表單數據失敗:', e);
+        if (response.isNewPractice) {
+          // 🔥 這是新練習，確保從頭開始
+          console.log('✅ 開始新練習，重置所有狀態');
+          setCurrentStep(0);  // 明確設為第0頁
+          setFormData({        // 重置表單數據
+            event: '',
+            thought: '',
+            mood: '',
+            thoughtOrigin: '',
+            thoughtValidity: '',
+            thoughtImpact: '',
+            responseMethod: '',
+            newResponse: '',
+            finalFeeling: '',
+          });
+          setElapsedTime(0);   // 重置時間
+          setStartTime(Date.now());
+          
+        } else if (response.currentPage !== undefined && response.currentPage !== null) {
+          console.log(`✅ 恢復練習進度到第 ${response.currentPage} 頁`);
+          
+          const validPage = Math.max(0, Math.min(response.currentPage, steps.length - 1));
+          
+          if (validPage !== response.currentPage) {
+            console.warn(`⚠️ 頁碼 ${response.currentPage} 超出範圍，調整為 ${validPage}`);
           }
+          
+          setCurrentStep(validPage);
+          
+          // 恢復表單數據
+          if (response.formData) {
+            try {
+              const parsedData = typeof response.formData === 'string' 
+                ? JSON.parse(response.formData) 
+                : response.formData;
+              
+              console.log('✅ 恢復表單數據:', parsedData);
+              setFormData(parsedData);
+            } catch (e) {
+              console.log('⚠️ 解析表單數據失敗:', e);
+              // 解析失敗時使用空數據
+              setFormData({
+                event: '',
+                thought: '',
+                mood: '',
+                thoughtOrigin: '',
+                thoughtValidity: '',
+                thoughtImpact: '',
+                responseMethod: '',
+                newResponse: '',
+                finalFeeling: '',
+              });
+            }
+          }
+          
+          // 恢復累積時間
+          if (response.accumulatedSeconds && response.accumulatedSeconds > 0) {
+            setElapsedTime(response.accumulatedSeconds);
+            console.log(`✅ 恢復累積時間: ${response.accumulatedSeconds} 秒`);
+          }
+          
+          setStartTime(Date.now());
+          
+        } else {
+          // 🔥 沒有明確的 currentPage，視為新練習
+          console.log('✅ 無進度記錄，從第0頁開始');
+          setCurrentStep(0);
+          setElapsedTime(0);
+          setStartTime(Date.now());
         }
-        if (response.accumulatedSeconds && response.accumulatedSeconds > 0) {
-          setElapsedTime(response.accumulatedSeconds);
-          console.log(`✅ 恢復累積時間: ${response.accumulatedSeconds} 秒`);
-        }
-
-        setStartTime(Date.now());
+      } else {
+        console.error('❌ 未收到 practiceId');
+        Alert.alert('錯誤', '無法開始練習，請重試');
       }
     } catch (error) {
-      console.error('初始化練習失敗:', error);
+      console.error('❌ 初始化練習失敗:', error);
+      Alert.alert('錯誤', '無法連接伺服器，請檢查網路連線');
     }
   };
 
@@ -172,31 +225,48 @@ export default function SelfAwarenessPractice({ onBack, navigation }) {
     saveProgress();
   }, [currentStep, formData]);
 
-  useEffect(() => {
-    if (!practiceId) return;
-    
-    const autoSaveInterval = setInterval(() => {
-      saveProgress();
-    }, 1000); // 每 1 秒自動保存一次
-    
-    return () => clearInterval(autoSaveInterval);
-  }, [practiceId, currentStep, formData, elapsedTime]);
-
   const saveProgress = async () => {
-    if (!practiceId) return;
+    if (!practiceId) {
+      console.log('⚠️ 無法保存：practiceId 不存在');
+      return;
+    }
     
     try {
+      console.log('💾 保存進度:', {
+        practiceId,
+        currentStep,
+        totalSteps,
+        elapsedTime
+      });
+      
       await ApiService.updatePracticeProgress(
         practiceId,
         currentStep,
         totalSteps,
         formData,
-        elapsedTime  
+        elapsedTime
       );
+      
+      console.log('✅ 進度保存成功');
     } catch (error) {
-      console.log('儲存進度失敗:', error);
+      console.error('❌ 儲存進度失敗:', error);
     }
   };
+  useEffect(() => {
+    if (!practiceId) return;
+    
+    console.log('🔄 啟動定期自動保存');
+    
+    const autoSaveInterval = setInterval(() => {
+      console.log('⏰ 定期自動保存觸發');
+      saveProgress();
+    }, 10000); // 每10秒保存一次
+    
+    return () => {
+      console.log('🛑 停止定期自動保存');
+      clearInterval(autoSaveInterval);
+    };
+  }, [practiceId, currentStep, formData, elapsedTime]);
 
   const nextStep = () => {
     if (currentStep < steps.length - 1) {
