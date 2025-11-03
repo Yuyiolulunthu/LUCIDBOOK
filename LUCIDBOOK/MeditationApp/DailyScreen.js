@@ -1235,7 +1235,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   responseMethodTag: {
-    backgroundColor: 'rgba(212, 150, 80, 0.15)',
+    backgroundColor: 'rgba(225, 161, 87, 0.42)',
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 16,
