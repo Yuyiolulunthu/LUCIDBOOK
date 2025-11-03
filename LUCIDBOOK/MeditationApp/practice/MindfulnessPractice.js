@@ -189,10 +189,9 @@ export default function MindfulnessPractice({ onBack, navigation }) {
           }
           
           // 恢復累積時間
-          if (response.accumulatedSeconds && response.accumulatedSeconds > 0) {
-            setElapsedTime(response.accumulatedSeconds);
-            console.log(`✅ 恢復累積時間: ${response.accumulatedSeconds} 秒`);
-          }
+          const restoredTime = response.accumulatedSeconds || 0;
+          setElapsedTime(restoredTime);
+          console.log(`✅ 恢復累積時間: ${restoredTime} 秒`);
           
           setStartTime(Date.now());
           

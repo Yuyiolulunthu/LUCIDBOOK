@@ -182,26 +182,39 @@ class ApiService {
   }
 
   /**
-   * ⭐ 完成練習 - 記錄實際投入時間
-   * @param {number} practiceId - 練習記錄 ID
-   * @param {object} data - 練習數據
-   * @param {number} data.duration - 實際投入時間（分鐘）
-   * @param {string} data.feeling - 感受
-   * @param {string} data.noticed - 發現
-   * @param {string} data.reflection - 反思
-   * @param {object} data.emotionData - 情緒日記資料（情緒理解力練習用）
+  * ⭐ 完成練習 - 記錄實際投入時間
+  * @param {number} practiceId - 練習記錄 ID
+  * @param {object} data - 練習數據
+  * @param {number} data.duration - 實際投入時間（分鐘）
+  * @param {number} data.duration_seconds - 實際投入時間（秒）
+  * @param {string} data.feeling - 感受
+  * @param {string} data.noticed - 發現
+  * @param {string} data.reflection - 反思
+  * @param {object} data.emotion_data - 情緒日記資料（情緒理解力練習用）
+  * @param {string} data.thought - 想法（自我覺察力練習用）
+  * @param {string} data.thoughtOrigin - 想法來源（自我覺察力練習用）
+  * @param {string} data.thoughtValidity - 真實性檢驗（自我覺察力練習用）
+  * @param {string} data.thoughtImpact - 想法影響（自我覺察力練習用）
+  * @param {string} data.responseMethod - 回應方式（自我覺察力練習用）
+  * @param {string} data.newResponse - 新的回應（自我覺察力練習用）
    */
   async completePractice(practiceId, data) {
     return this.request('/practice/complete.php', {
       method: 'POST',
       body: JSON.stringify({
         practice_id: practiceId,
-        duration_seconds: data.duration_seconds || 0,  // ⭐ 新增：精確秒數
+        duration_seconds: data.duration_seconds || 0,
         duration: data.duration,
         feeling: data.feeling || null,
         noticed: data.noticed || null,
         reflection: data.reflection || null,
-        emotion_data: data.emotion_data || null,  // ⭐ 修正：改為 emotion_data
+        emotion_data: data.emotion_data || null,
+        thought: data.thought || null,
+        thoughtOrigin: data.thoughtOrigin || null,
+        thoughtValidity: data.thoughtValidity || null,
+        thoughtImpact: data.thoughtImpact || null,
+        responseMethod: data.responseMethod || null,
+        newResponse: data.newResponse || null,
       }),
     });
   }

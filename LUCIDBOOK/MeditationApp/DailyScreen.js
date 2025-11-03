@@ -274,12 +274,37 @@ const DailyScreen = ({ navigation }) => {
         return '暫無記錄';
       }
     } else if (practice.practice_type === '自我覺察力練習') {
-      let formData = null;
-      if (practice.form_data) {
+      // ⭐ 優先從資料庫欄位讀取，如果沒有才從 form_data 讀取
+      let formData = {
+        event: practice.noticed || null,  // ✅ 改成 practice
+        thought: practice.thought || null,
+        mood: practice.feeling || null,
+        thoughtOrigin: practice.thought_origin || null,
+        thoughtValidity: practice.thought_validity || null,
+        thoughtImpact: practice.thought_impact || null,
+        responseMethod: practice.response_method || null,
+        newResponse: practice.new_response || null,
+        finalFeeling: practice.reflection || null,
+      };
+
+      // 如果資料庫欄位都是空的，才嘗試從 form_data 讀取
+      if (!formData.thought && !formData.event && practice.form_data) {
         try {
-          formData = typeof practice.form_data === 'string' 
-            ? JSON.parse(practice.form_data) 
+          const parsedFormData = typeof practice.form_data === 'string'
+            ? JSON.parse(practice.form_data)
             : practice.form_data;
+          
+          formData = {
+            event: parsedFormData.event || formData.event,
+            thought: parsedFormData.thought || formData.thought,
+            mood: parsedFormData.mood || formData.mood,
+            thoughtOrigin: parsedFormData.thoughtOrigin || formData.thoughtOrigin,
+            thoughtValidity: parsedFormData.thoughtValidity || formData.thoughtValidity,
+            thoughtImpact: parsedFormData.thoughtImpact || formData.thoughtImpact,
+            responseMethod: parsedFormData.responseMethod || formData.responseMethod,
+            newResponse: parsedFormData.newResponse || formData.newResponse,
+            finalFeeling: parsedFormData.finalFeeling || formData.finalFeeling,
+          };
         } catch (e) {
           console.log('解析 form_data 失敗:', e);
         }
@@ -343,12 +368,37 @@ const DailyScreen = ({ navigation }) => {
       }
     }
 
-    let formData = null;
-    if (selectedPractice.form_data) {
+    // ⭐ 優先從資料庫欄位讀取，如果沒有才從 form_data 讀取
+    let formData = {
+      event: selectedPractice.noticed || null,
+      thought: selectedPractice.thought || null,
+      mood: selectedPractice.feeling || null,
+      thoughtOrigin: selectedPractice.thought_origin || null,
+      thoughtValidity: selectedPractice.thought_validity || null,
+      thoughtImpact: selectedPractice.thought_impact || null,
+      responseMethod: selectedPractice.response_method || null,
+      newResponse: selectedPractice.new_response || null,
+      finalFeeling: selectedPractice.reflection || null,
+    };
+
+    // 如果資料庫欄位都是空的，才嘗試從 form_data 讀取
+    if (!formData.thought && !formData.event && selectedPractice.form_data) {
       try {
-        formData = typeof selectedPractice.form_data === 'string'
+        const parsedFormData = typeof selectedPractice.form_data === 'string'
           ? JSON.parse(selectedPractice.form_data)
           : selectedPractice.form_data;
+        
+        formData = {
+          event: parsedFormData.event || formData.event,
+          thought: parsedFormData.thought || formData.thought,
+          mood: parsedFormData.mood || formData.mood,
+          thoughtOrigin: parsedFormData.thoughtOrigin || formData.thoughtOrigin,
+          thoughtValidity: parsedFormData.thoughtValidity || formData.thoughtValidity,
+          thoughtImpact: parsedFormData.thoughtImpact || formData.thoughtImpact,
+          responseMethod: parsedFormData.responseMethod || formData.responseMethod,
+          newResponse: parsedFormData.newResponse || formData.newResponse,
+          finalFeeling: parsedFormData.finalFeeling || formData.finalFeeling,
+        };
       } catch (e) {
         console.log('解析 form_data 失敗:', e);
       }
@@ -422,7 +472,7 @@ const DailyScreen = ({ navigation }) => {
                       <Text style={styles.simpleInfoIcon}>😊</Text>
                       <View style={styles.simpleInfoTextBlock}>
                         <Text style={styles.simpleInfoLabel}>當天心情</Text>
-                        <Text style={styles.simpleInfoValue}>{todayMood.mood_name}</Text>
+                        <Text style={styles.simpleInfoValue}>{todayMood?.mood_name || '無記錄'}</Text>
                       </View>
                     </View>
                   </>
@@ -514,98 +564,79 @@ const DailyScreen = ({ navigation }) => {
                   <View style={styles.simpleContentCard}>
                     <Text style={styles.simpleContentTitle}>📍 那個時刻</Text>
                     
-                    {formData?.event && (
-                      <View style={styles.modalSubSection}>
-                        <Text style={styles.modalSubLabel}>發生的事件</Text>
-                        <Text style={styles.simpleContentText}>
-                          {formData.event}
-                        </Text>
-                      </View>
-                    )}
+                    <View style={styles.modalSubSection}>
+                      <Text style={styles.modalSubLabel}>發生的事件</Text>
+                      <Text style={styles.simpleContentText}>
+                        {formData?.event || '無記錄'}
+                      </Text>
+                    </View>
 
-                    {formData?.thought && (
-                      <View style={styles.modalSubSection}>
-                        <Text style={styles.modalSubLabel}>當下的想法</Text>
-                        <Text style={styles.simpleContentText}>
-                          {formData.thought}
-                        </Text>
-                      </View>
-                    )}
+                    <View style={styles.modalSubSection}>
+                      <Text style={styles.modalSubLabel}>當下的想法</Text>
+                      <Text style={styles.simpleContentText}>
+                        {formData?.thought || '無記錄'}
+                      </Text>
+                    </View>
 
-                    {formData?.mood && (
-                      <View style={styles.modalSubSection}>
-                        <Text style={styles.modalSubLabel}>心情</Text>
-                        <Text style={styles.simpleContentText}>
-                          {formData.mood}
-                        </Text>
-                      </View>
-                    )}
+                    <View style={styles.modalSubSection}>
+                      <Text style={styles.modalSubLabel}>心情</Text>
+                      <Text style={styles.simpleContentText}>
+                        {formData?.mood || '無記錄'}
+                      </Text>
+                    </View>
                   </View>
 
                   {/* 第二部分：探索想法 */}
-                  {(formData?.thoughtOrigin || formData?.thoughtValidity || formData?.thoughtImpact) && (
-                    <View style={styles.simpleContentCard}>
-                      <Text style={styles.simpleContentTitle}>🔍 探索想法</Text>
-                      
-                      {formData?.thoughtOrigin && (
-                        <View style={styles.modalSubSection}>
-                          <Text style={styles.modalSubLabel}>想法來源</Text>
-                          <Text style={styles.simpleContentText}>
-                            {formData.thoughtOrigin}
-                          </Text>
-                        </View>
-                      )}
-
-                      {formData?.thoughtValidity && (
-                        <View style={styles.modalSubSection}>
-                          <Text style={styles.modalSubLabel}>真實性檢驗</Text>
-                          <Text style={styles.simpleContentText}>
-                            {formData.thoughtValidity}
-                          </Text>
-                        </View>
-                      )}
-
-                      {formData?.thoughtImpact && (
-                        <View style={styles.modalSubSection}>
-                          <Text style={styles.modalSubLabel}>想法的影響</Text>
-                          <Text style={styles.simpleContentText}>
-                            {formData.thoughtImpact}
-                          </Text>
-                        </View>
-                      )}
+                  <View style={styles.simpleContentCard}>
+                    <Text style={styles.simpleContentTitle}>🔍 探索想法</Text>
+                    
+                    <View style={styles.modalSubSection}>
+                      <Text style={styles.modalSubLabel}>想法來源</Text>
+                      <Text style={styles.simpleContentText}>
+                        {formData?.thoughtOrigin || '無記錄'}
+                      </Text>
                     </View>
-                  )}
+
+                    <View style={styles.modalSubSection}>
+                      <Text style={styles.modalSubLabel}>真實性檢驗</Text>
+                      <Text style={styles.simpleContentText}>
+                        {formData?.thoughtValidity || '無記錄'}
+                      </Text>
+                    </View>
+
+                    <View style={styles.modalSubSection}>
+                      <Text style={styles.modalSubLabel}>想法的影響</Text>
+                      <Text style={styles.simpleContentText}>
+                        {formData?.thoughtImpact || '無記錄'}
+                      </Text>
+                    </View>
+                  </View>
 
                   {/* 第三部分：我的回應 */}
-                  {(formData?.responseMethod || formData?.newResponse) && (
-                    <View style={styles.simpleContentCard}>
-                      <Text style={styles.simpleContentTitle}>💭 我的回應</Text>
-                      
-                      {formData?.responseMethod && (
-                        <View style={styles.modalSubSection}>
-                          <Text style={styles.modalSubLabel}>回應方式</Text>
-                          <View style={styles.responseMethodTag}>
-                            <Text style={styles.responseMethodText}>
-                              {formData.responseMethod === 'friend' && '以朋友的角度'}
-                              {formData.responseMethod === 'inner' && '內在支持的聲音'}
-                              {formData.responseMethod === 'future' && '未來的回應方式'}
-                            </Text>
-                          </View>
-                        </View>
-                      )}
-
-                      {formData?.newResponse && (
-                        <View style={styles.modalSubSection}>
-                          <Text style={styles.modalSubLabel}>新的回應</Text>
-                          <View style={styles.highlightResponseBox}>
-                            <Text style={styles.highlightResponseText}>
-                              {formData.newResponse}
-                            </Text>
-                          </View>
-                        </View>
-                      )}
+                  <View style={styles.simpleContentCard}>
+                    <Text style={styles.simpleContentTitle}>💭 我的回應</Text>
+                    
+                    <View style={styles.modalSubSection}>
+                      <Text style={styles.modalSubLabel}>回應方式</Text>
+                      <View style={styles.responseMethodTag}>
+                        <Text style={styles.responseMethodText}>
+                          {formData?.responseMethod === 'friend' && '以朋友的角度'}
+                          {formData?.responseMethod === 'inner' && '內在支持的聲音'}
+                          {formData?.responseMethod === 'future' && '未來的回應方式'}
+                          {!formData?.responseMethod && '無記錄'}
+                        </Text>
+                      </View>
                     </View>
-                  )}
+
+                    <View style={styles.modalSubSection}>
+                      <Text style={styles.modalSubLabel}>新的回應</Text>
+                      <View style={styles.highlightResponseBox}>
+                        <Text style={styles.highlightResponseText}>
+                          {formData?.newResponse || '無記錄'}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
 
                   {/* 第四部分：練習後的感受 */}
                   <View style={styles.simpleContentCard}>

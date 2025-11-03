@@ -184,10 +184,9 @@ export default function SelfAwarenessPractice({ onBack, navigation }) {
           }
           
           // 恢復累積時間
-          if (response.accumulatedSeconds && response.accumulatedSeconds > 0) {
-            setElapsedTime(response.accumulatedSeconds);
-            console.log(`✅ 恢復累積時間: ${response.accumulatedSeconds} 秒`);
-          }
+          const restoredTime = response.accumulatedSeconds || 0;
+          setElapsedTime(restoredTime);
+          console.log(`✅ 恢復累積時間: ${restoredTime} 秒`);
           
           setStartTime(Date.now());
           
@@ -221,52 +220,36 @@ export default function SelfAwarenessPractice({ onBack, navigation }) {
     };
   }, [startTime]);
 
+  // ✅ 修改后的版本
   useEffect(() => {
-    saveProgress();
-  }, [currentStep, formData]);
-
-  const saveProgress = async () => {
-    if (!practiceId) {
-      console.log('⚠️ 無法保存：practiceId 不存在');
-      return;
-    }
-    
-    try {
-      console.log('💾 保存進度:', {
-        practiceId,
-        currentStep,
-        totalSteps,
-        elapsedTime
-      });
-      
-      await ApiService.updatePracticeProgress(
-        practiceId,
-        currentStep,
-        totalSteps,
-        formData,
-        elapsedTime
-      );
-      
-      console.log('✅ 進度保存成功');
-    } catch (error) {
-      console.error('❌ 儲存進度失敗:', error);
-    }
-  };
-  useEffect(() => {
-    if (!practiceId) return;
-    
-    console.log('🔄 啟動定期自動保存');
-    
-    const autoSaveInterval = setInterval(() => {
-      console.log('⏰ 定期自動保存觸發');
       saveProgress();
-    }, 10000); // 每10秒保存一次
-    
-    return () => {
-      console.log('🛑 停止定期自動保存');
-      clearInterval(autoSaveInterval);
+    }, [currentStep, formData]);
+
+    useEffect(() => {
+      if (!practiceId) return;
+      
+      const autoSaveInterval = setInterval(() => {
+        saveProgress();
+      }, 1000); // 每 1 秒自動保存一次
+      
+      return () => clearInterval(autoSaveInterval);
+    }, [practiceId, currentStep, formData, elapsedTime]); // ⭐ 只依赖 practiceId，不要包含 currentStep, formData, elapsedTime
+
+    const saveProgress = async () => {
+      if (!practiceId) return;
+      
+      try {
+        await ApiService.updatePracticeProgress(
+          practiceId,
+          currentStep,
+          totalSteps,
+          formData,
+          elapsedTime
+        );
+      } catch (error) {
+        console.log('儲存進度失敗:', error);
+      }
     };
-  }, [practiceId, currentStep, formData, elapsedTime]);
 
   const nextStep = () => {
     if (currentStep < steps.length - 1) {
@@ -308,9 +291,15 @@ export default function SelfAwarenessPractice({ onBack, navigation }) {
       await ApiService.completePractice(practiceId, {
         duration: totalMinutes,
         duration_seconds: totalSeconds,
-        feeling: todayMoodName || formData.mood,
+        feeling: formData.mood,
         noticed: formData.event,
-        reflection: formData.newResponse || formData.finalFeeling,
+        reflection: formData.finalFeeling || formData.newResponse,
+        thought: formData.thought,
+        thoughtOrigin: formData.thoughtOrigin,
+        thoughtValidity: formData.thoughtValidity,
+        thoughtImpact: formData.thoughtImpact,
+        responseMethod: formData.responseMethod,
+        newResponse: formData.newResponse,
       });
 
       const mins = Math.floor(totalSeconds / 60);
@@ -443,11 +432,14 @@ export default function SelfAwarenessPractice({ onBack, navigation }) {
                   這個想法是從何而來的？從什麼時候開始？{'\n'}
                   是誰跟我說過類似的話嗎？
                 </Text>
-                <View style={styles.answerDisplayBox}>
-                  <Text style={styles.answerDisplayText}>
-                    {formData.thoughtOrigin || '請寫下你的想法...'}
-                  </Text>
-                </View>
+                <TextInput 
+                  style={styles.largeInputBox} 
+                  multiline 
+                  placeholder="請寫下你的想法..."
+                  placeholderTextColor="rgba(0, 0, 0, 0.4)"
+                  value={formData.thoughtOrigin}
+                  onChangeText={(text) => updateFormData('thoughtOrigin', text)}
+                />
               </View>
 
               <View style={styles.separator} />
@@ -457,11 +449,14 @@ export default function SelfAwarenessPractice({ onBack, navigation }) {
                   這個想法有多大程度是真實的？{'\n'}
                   是否有客觀證據反對這個想法？
                 </Text>
-                <View style={styles.answerDisplayBox}>
-                  <Text style={styles.answerDisplayText}>
-                    {formData.thoughtValidity || '請寫下你的想法...'}
-                  </Text>
-                </View>
+                <TextInput 
+                  style={styles.largeInputBox} 
+                  multiline 
+                  placeholder="請寫下你的想法..."
+                  placeholderTextColor="rgba(0, 0, 0, 0.4)"
+                  value={formData.thoughtValidity}
+                  onChangeText={(text) => updateFormData('thoughtValidity', text)}
+                />
               </View>
 
               <View style={styles.separator} />
@@ -470,11 +465,14 @@ export default function SelfAwarenessPractice({ onBack, navigation }) {
                 <Text style={styles.inputLabel}>
                   這個想法對我的正向與負向的影響是什麼？
                 </Text>
-                <View style={styles.answerDisplayBox}>
-                  <Text style={styles.answerDisplayText}>
-                    {formData.thoughtImpact || '請寫下你的想法...'}
-                  </Text>
-                </View>
+                <TextInput 
+                  style={styles.largeInputBox} 
+                  multiline 
+                  placeholder="請寫下你的想法..."
+                  placeholderTextColor="rgba(0, 0, 0, 0.4)"
+                  value={formData.thoughtImpact}
+                  onChangeText={(text) => updateFormData('thoughtImpact', text)}
+                />
               </View>
             </View>
           </ScrollView>
