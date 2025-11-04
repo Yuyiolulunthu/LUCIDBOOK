@@ -1,6 +1,8 @@
 // ==========================================
 // 檔案名稱: ProfileScreen.js
-// 用戶個人資料頁面
+// 用戶個人資料頁面 - 整合 ApiService
+// ✅ 支持頭像上傳
+// ✅ 使用 ApiService 管理登入狀態
 // ==========================================
 
 import React, { useState, useEffect } from 'react';
@@ -15,19 +17,25 @@ import {
   Image,
   Alert,
   Switch,
+  Platform,
+  ActivityIndicator,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import BottomNavigation from './BottomNavigation';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
+import ApiService from './api';
 
 const ProfileScreen = ({ navigation, route }) => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
   
   // 用戶可編輯的資料
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [avatar, setAvatar] = useState(null); // 頭像 URI
   const [dailyGoal, setDailyGoal] = useState('15'); // 每日目標分鐘數
   const [notifications, setNotifications] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
@@ -37,61 +45,70 @@ const ProfileScreen = ({ navigation, route }) => {
     loadUserData();
   }, []);
 
-  // 監聽路由參數變化
-  useEffect(() => {
-    if (route.params?.user) {
-      const userData = route.params.user;
-      handleLoginSuccess(userData);
-    }
-  }, [route.params?.user]);
-
   // 監聽導航焦點事件
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
       loadUserData();
     });
-
     return unsubscribe;
   }, [navigation]);
 
   const loadUserData = async () => {
     try {
-      const userDataString = await AsyncStorage.getItem('userData');
-      if (userDataString) {
-        const userData = JSON.parse(userDataString);
-        setUser(userData);
-        setIsLoggedIn(!userData.isGuest);
-        setName(userData.name || '');
-        setEmail(userData.email || '');
-        
-        // 載入其他設定
-        const savedGoal = await AsyncStorage.getItem('dailyGoal');
-        if (savedGoal) setDailyGoal(savedGoal);
-        
-        const savedNotifications = await AsyncStorage.getItem('notifications');
-        if (savedNotifications !== null) setNotifications(JSON.parse(savedNotifications));
+      setLoading(true);
+      
+      // 使用 ApiService 檢查登入狀態
+      const loggedIn = await ApiService.isLoggedIn();
+      
+      if (loggedIn) {
+        try {
+          // 獲取用戶資料
+          const response = await ApiService.getUserProfile();
+          const userData = {
+            id: response.user.id,
+            name: response.user.name,
+            email: response.user.email,
+          };
+          
+          setUser(userData);
+          setIsLoggedIn(true);
+          setName(userData.name || '');
+          setEmail(userData.email || '');
+          
+          // 載入頭像（從 AsyncStorage）
+          const savedAvatar = await AsyncStorage.getItem('userAvatar');
+          if (savedAvatar) setAvatar(savedAvatar);
+          
+          // 載入其他設定
+          const savedGoal = await AsyncStorage.getItem('dailyGoal');
+          if (savedGoal) setDailyGoal(savedGoal);
+          
+          const savedNotifications = await AsyncStorage.getItem('notifications');
+          if (savedNotifications !== null) {
+            setNotifications(JSON.parse(savedNotifications));
+          }
+        } catch (error) {
+          // Token 無效
+          console.log('Token 無效，清除登入狀態');
+          await ApiService.clearToken();
+          setIsLoggedIn(false);
+          setUser(null);
+        }
+      } else {
+        setIsLoggedIn(false);
+        setUser(null);
       }
     } catch (error) {
       console.error('載入用戶資料失敗:', error);
-    }
-  };
-
-  const handleLoginSuccess = async (userData) => {
-    try {
-      await AsyncStorage.setItem('userData', JSON.stringify(userData));
-      setUser(userData);
-      setIsLoggedIn(!userData.isGuest);
-      setName(userData.name || '');
-      setEmail(userData.email || '');
-    } catch (error) {
-      console.error('保存用戶資料失敗:', error);
+      setIsLoggedIn(false);
+      setUser(null);
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleLogin = () => {
-    navigation.navigate('Login', {
-      onLoginSuccess: handleLoginSuccess
-    });
+    navigation.navigate('Login');
   };
 
   const handleLogout = () => {
@@ -105,11 +122,14 @@ const ProfileScreen = ({ navigation, route }) => {
           style: 'destructive',
           onPress: async () => {
             try {
-              await AsyncStorage.removeItem('userData');
+              await ApiService.logout();
+              await AsyncStorage.removeItem('userAvatar');
               setIsLoggedIn(false);
               setUser(null);
               setName('');
               setEmail('');
+              setAvatar(null);
+              Alert.alert('已登出', '期待下次再見！');
             } catch (error) {
               console.error('登出失敗:', error);
             }
@@ -117,6 +137,69 @@ const ProfileScreen = ({ navigation, route }) => {
         }
       ]
     );
+  };
+
+  // 🎨 頭像上傳功能
+  const handleAvatarPress = () => {
+    if (!isEditing) return;
+
+    Alert.alert(
+      '選擇頭像',
+      '請選擇圖片來源',
+      [
+        {
+          text: '取消',
+          style: 'cancel'
+        },
+        {
+          text: '拍照',
+          onPress: () => openCamera()
+        },
+        {
+          text: '從相簿選擇',
+          onPress: () => openImageLibrary()
+        }
+      ]
+    );
+  };
+
+  const openCamera = () => {
+    const options = {
+      mediaType: 'photo',
+      quality: 0.8,
+      maxWidth: 800,
+      maxHeight: 800,
+      saveToPhotos: false,
+    };
+
+    launchCamera(options, (response) => {
+      handleImageResponse(response);
+    });
+  };
+
+  const openImageLibrary = () => {
+    const options = {
+      mediaType: 'photo',
+      quality: 0.8,
+      maxWidth: 800,
+      maxHeight: 800,
+    };
+
+    launchImageLibrary(options, (response) => {
+      handleImageResponse(response);
+    });
+  };
+
+  const handleImageResponse = (response) => {
+    if (response.didCancel) {
+      console.log('用戶取消選擇圖片');
+    } else if (response.errorCode) {
+      console.log('ImagePicker Error: ', response.errorMessage);
+      Alert.alert('錯誤', '無法選擇圖片，請檢查權限設定');
+    } else if (response.assets && response.assets.length > 0) {
+      const source = response.assets[0];
+      setAvatar(source.uri);
+    }
   };
 
   const handleSave = async () => {
@@ -132,13 +215,15 @@ const ProfileScreen = ({ navigation, route }) => {
     }
 
     try {
-      // 更新用戶資料
-      const updatedUser = { ...user, name };
-      await AsyncStorage.setItem('userData', JSON.stringify(updatedUser));
+      // 保存頭像到 AsyncStorage
+      if (avatar) {
+        await AsyncStorage.setItem('userAvatar', avatar);
+      }
+      
+      // 保存其他設定
       await AsyncStorage.setItem('dailyGoal', dailyGoal);
       await AsyncStorage.setItem('notifications', JSON.stringify(notifications));
       
-      setUser(updatedUser);
       Alert.alert('成功', '資料已保存');
       setIsEditing(false);
     } catch (error) {
@@ -146,6 +231,20 @@ const ProfileScreen = ({ navigation, route }) => {
       Alert.alert('錯誤', '保存資料失敗');
     }
   };
+
+  // 載入中
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <StatusBar barStyle="dark-content" backgroundColor="#F9FAFB" />
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#40A1DD" />
+          <Text style={styles.loadingText}>載入中...</Text>
+        </View>
+        <BottomNavigation navigation={navigation} activeTab="profile" />
+      </View>
+    );
+  }
 
   // 未登入狀態
   if (!isLoggedIn) {
@@ -210,18 +309,30 @@ const ProfileScreen = ({ navigation, route }) => {
       >
         {/* 頭像區域 */}
         <View style={styles.avatarSection}>
-          <View style={styles.avatarContainer}>
-            <View style={styles.avatarCircle}>
-              <Text style={styles.avatarText}>
-                {name.charAt(0).toUpperCase() || 'U'}
-              </Text>
-            </View>
-            {isEditing && (
-              <TouchableOpacity style={styles.editAvatarButton}>
-                <Ionicons name="camera" size={16} color="#FFF" />
-              </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.avatarContainer}
+            onPress={handleAvatarPress}
+            activeOpacity={isEditing ? 0.7 : 1}
+            disabled={!isEditing}
+          >
+            {avatar ? (
+              <Image 
+                source={{ uri: avatar }} 
+                style={styles.avatarImage}
+              />
+            ) : (
+              <View style={styles.avatarCircle}>
+                <Text style={styles.avatarText}>
+                  {name.charAt(0).toUpperCase() || 'U'}
+                </Text>
+              </View>
             )}
-          </View>
+            {isEditing && (
+              <View style={styles.editAvatarButton}>
+                <Ionicons name="camera" size={16} color="#FFF" />
+              </View>
+            )}
+          </TouchableOpacity>
           <Text style={styles.userName}>{name || '用戶'}</Text>
           <Text style={styles.userEmail}>{email}</Text>
         </View>
@@ -305,6 +416,7 @@ const ProfileScreen = ({ navigation, route }) => {
                 onValueChange={setNotifications}
                 trackColor={{ false: '#D1D5DB', true: '#93C5FD' }}
                 thumbColor={notifications ? '#40A1DD' : '#F3F4F6'}
+                disabled={!isEditing}
               />
             </View>
           </View>
@@ -332,6 +444,16 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F9FAFB',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: '#6B7280',
   },
   header: {
     flexDirection: 'row',
@@ -432,6 +554,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#40A1DD',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  avatarImage: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
   },
   avatarText: {
     fontSize: 40,

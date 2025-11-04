@@ -1,9 +1,11 @@
 // ==========================================
 // 檔案名稱: PracticeSelectionScreen.js
 // Explore 頁面 - 包含單個練習和訓練計畫
+// 🔒 已整合登入檢查功能
+// ✅ 修復 Navigation 警告
 // ==========================================
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -13,15 +15,20 @@ import {
   TextInput,
   Image,
   Dimensions,
+  Alert,
 } from 'react-native';
 import BottomNavigation from './BottomNavigation';
 import { Ionicons } from '@expo/vector-icons';
+import ApiService from './api';
 
 const { width } = Dimensions.get('window');
 
 const PracticeSelectionScreen = ({ navigation }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTab, setSelectedTab] = useState('all'); // 'all', 'practice', 'program'
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   // 單個練習
   const practices = [
@@ -82,6 +89,73 @@ const PracticeSelectionScreen = ({ navigation }) => {
     },
   ];
 
+  // 🔒 檢查登入狀態
+  useEffect(() => {
+    checkLoginStatus();
+  }, []);
+
+  // 🔒 監聽頁面焦點，每次進入時檢查登入狀態
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      checkLoginStatus();
+    });
+    return unsubscribe;
+  }, [navigation]);
+
+  // 🔒 檢查登入狀態函數
+  const checkLoginStatus = async () => {
+    try {
+      setLoading(true);
+      const loggedIn = await ApiService.isLoggedIn();
+      
+      if (loggedIn) {
+        try {
+          // 嘗試獲取用戶資料以驗證 token 是否有效
+          const response = await ApiService.getUserProfile();
+          setUser({
+            id: response.user.id,
+            name: response.user.name,
+            email: response.user.email,
+          });
+          setIsLoggedIn(true);
+        } catch (error) {
+          // Token 無效或已過期，清除 token
+          console.log('Token 無效，清除並設為未登入');
+          await ApiService.clearToken();
+          setIsLoggedIn(false);
+          setUser(null);
+        }
+      } else {
+        setIsLoggedIn(false);
+        setUser(null);
+      }
+    } catch (error) {
+      console.log('檢查登入狀態失敗:', error);
+      setIsLoggedIn(false);
+      setUser(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 🔒 顯示登入提示
+  const showLoginPrompt = () => {
+    Alert.alert(
+      '需要登入',
+      '請先登入以開始練習和訓練計畫',
+      [
+        { text: '取消', style: 'cancel' },
+        {
+          text: '立即登入',
+          onPress: () => {
+            // ✅ 不傳遞函數參數，而是依賴頁面焦點事件自動刷新
+            navigation.navigate('Profile');
+          },
+        },
+      ]
+    );
+  };
+
   // 根據標籤篩選
   const getFilteredItems = () => {
     let items = [];
@@ -105,7 +179,15 @@ const PracticeSelectionScreen = ({ navigation }) => {
 
   const filteredItems = getFilteredItems();
 
+  // 🔒 處理項目點擊（含登入檢查）
   const handleItemPress = (item) => {
+    // 檢查是否已登入
+    if (!isLoggedIn) {
+      showLoginPrompt();
+      return;
+    }
+
+    // 已登入，允許導航
     if (item.type === 'plan') {
       // 訓練計畫 - 跳轉到詳細頁面
       navigation.navigate('TrainingPlanDetail', { plan: item });
@@ -122,7 +204,9 @@ const PracticeSelectionScreen = ({ navigation }) => {
         <View style={styles.headerTop}>
           <View>
             <Text style={styles.greeting}>探索練習與訓練</Text>
-            <Text style={styles.username}>發現適合你的成長之路</Text>
+            <Text style={styles.username}>
+              {isLoggedIn && user ? `歡迎，${user.name}` : '發現適合你的成長之路'}
+            </Text>
           </View>
           <View style={styles.iconContainer}>
             <TouchableOpacity style={styles.iconButton}>
@@ -133,6 +217,18 @@ const PracticeSelectionScreen = ({ navigation }) => {
             </TouchableOpacity>
           </View>
         </View>
+
+        {/* 登入狀態提示 */}
+        {!isLoggedIn && !loading && (
+          <TouchableOpacity
+            style={styles.loginPromptBanner}
+            onPress={() => navigation.navigate('Profile')}
+          >
+            <Ionicons name="information-circle-outline" size={20} color="#4A90E2" />
+            <Text style={styles.loginPromptText}>登入以開始您的練習之旅</Text>
+            <Ionicons name="chevron-forward" size={20} color="#4A90E2" />
+          </TouchableOpacity>
+        )}
 
         {/* 搜尋框 */}
         <View style={styles.searchContainer}>
@@ -193,7 +289,17 @@ const PracticeSelectionScreen = ({ navigation }) => {
               key={item.id}
               style={[styles.card, { backgroundColor: item.backgroundColor }]}
               onPress={() => handleItemPress(item)}
+              activeOpacity={0.8}
             >
+              {/* 🔒 未登入遮罩 */}
+              {!isLoggedIn && !loading && (
+                <View style={styles.lockOverlay}>
+                  <View style={styles.lockIconContainer}>
+                    <Ionicons name="lock-closed" size={24} color="#FFF" />
+                  </View>
+                </View>
+              )}
+
               {/* 類型徽章 */}
               {item.type === 'plan' && (
                 <View style={styles.planBadgeContainer}>
@@ -221,11 +327,25 @@ const PracticeSelectionScreen = ({ navigation }) => {
                   {item.description}
                 </Text>
                 {item.type === 'single' ? (
-                  <Text style={styles.cardDuration}>{item.duration}</Text>
+                  <View style={styles.cardFooter}>
+                    <Text style={styles.cardDuration}>{item.duration}</Text>
+                    {!isLoggedIn && !loading && (
+                      <View style={styles.lockBadge}>
+                        <Ionicons name="lock-closed" size={10} color="#999" />
+                        <Text style={styles.lockBadgeText}>需登入</Text>
+                      </View>
+                    )}
+                  </View>
                 ) : (
                   <View style={styles.planInfo}>
                     <Text style={styles.planCategory}>{item.category}</Text>
                     <Text style={styles.planLevel}> • {item.level}</Text>
+                    {!isLoggedIn && !loading && (
+                      <View style={styles.lockBadge}>
+                        <Ionicons name="lock-closed" size={10} color="#999" />
+                        <Text style={styles.lockBadgeText}>需登入</Text>
+                      </View>
+                    )}
                   </View>
                 )}
               </View>
@@ -286,6 +406,23 @@ const styles = StyleSheet.create({
   },
   iconButton: {
     padding: 8,
+  },
+  // 🔒 登入提示橫幅
+  loginPromptBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 8,
+    marginBottom: 12,
+  },
+  loginPromptText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#4A90E2',
+    marginLeft: 8,
+    fontWeight: '500',
   },
   searchContainer: {
     flexDirection: 'row',
@@ -362,6 +499,27 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
+    position: 'relative',
+  },
+  // 🔒 鎖定遮罩
+  lockOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    zIndex: 5,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  lockIconContainer: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: 'rgba(74, 144, 226, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   planBadgeContainer: {
     position: 'absolute',
@@ -419,6 +577,12 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     height: 36,
   },
+  // 🔒 卡片底部區域
+  cardFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
   cardDuration: {
     fontSize: 11,
     color: '#4A90E2',
@@ -427,6 +591,7 @@ const styles = StyleSheet.create({
   planInfo: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexWrap: 'wrap',
   },
   planCategory: {
     fontSize: 11,
@@ -436,6 +601,22 @@ const styles = StyleSheet.create({
   planLevel: {
     fontSize: 11,
     color: '#999',
+  },
+  // 🔒 鎖定徽章
+  lockBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+    marginLeft: 6,
+  },
+  lockBadgeText: {
+    fontSize: 10,
+    color: '#999',
+    marginLeft: 3,
+    fontWeight: '500',
   },
   emptyState: {
     alignItems: 'center',
