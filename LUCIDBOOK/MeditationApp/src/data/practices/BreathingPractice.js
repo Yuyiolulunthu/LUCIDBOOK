@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+//BreathingPractice
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -11,16 +12,23 @@ import {
   Keyboard,
   Image,
   ScrollView,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { Audio } from 'expo-av';
-import ApiService from '../api';
+import ApiService from '../../../api';
 
-export default function FiveSensesPractice({ onBack }) {
+export default function BreathingPractice({ onBack, navigation }) {
   const [currentStep, setCurrentStep] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [sound, setSound] = useState(null);
   const [position, setPosition] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [practiceId, setPracticeId] = useState(null);
+  
+  const [startTime, setStartTime] = useState(null);
+  const [elapsedTime, setElapsedTime] = useState(0);
   
   const [formData, setFormData] = useState({
     feeling: '',
@@ -28,20 +36,22 @@ export default function FiveSensesPractice({ onBack }) {
     reflection: '',
   });
 
+  const scrollViewRef = useRef(null);
+
   const steps = [
     {
-      title: "準備好來開始\n今天的《五感覺察練習》了嗎？",
+      title: "準備好來開始\n今天的《呼吸穩定力練習》了嗎？",
       content: "",
       hasImage: true,
       imageType: "welcome",
     },
     {
-      title: "嗨！歡迎你開始今天的\n《五感覺察》練習",
+      title: "嗨！歡迎你開始今天的\n《呼吸穩定力》練習",
       content: "",
       showGreeting: true,
     },
     {
-      title: "這個練習能協助你\n提升感官覺察力，\n連結當下的體驗",
+      title: "這個練習能協助你\n平靜、專注，\n也是提升覺察力的重要基礎",
       content: ""
     },
     {
@@ -51,7 +61,7 @@ export default function FiveSensesPractice({ onBack }) {
       imageType: "positions"
     },
     {
-      title: "很好，再接下來的8分鐘，\n邀請你跟著聲音指示\n進行五感覺察～",
+      title: "很好，再接下來的5分鐘，\n邀請你跟著聲音指示\n一起呼吸～",
       content: ""
     },
     {
@@ -61,12 +71,13 @@ export default function FiveSensesPractice({ onBack }) {
     },
     {
       title: "你做得很好，",
-      content: "今天你練習了8分鐘的五感覺察\n請利用以下空間記錄下今日的練習",
-      hasForm: true
+      content: "今天你練習了5分鐘的呼吸\n請利用以下空間記錄下今日的練習",
+      hasForm: true,
+      isSecondToLast: true
     },
     {
       title: "恭喜你完成了今天的",
-      content: "《五感覺察練習》，\n讓我們來整理你的回饋吧！",
+      content: "《呼吸穩定力練習》，\n讓我們來整理你的回饋吧！",
       hasSummary: true
     }
   ];
@@ -75,18 +86,127 @@ export default function FiveSensesPractice({ onBack }) {
   const currentStepData = steps[currentStep];
   const progressPercentage = ((currentStep + 1) / totalSteps) * 100;
 
-  // 自動儲存進度
+  useEffect(() => {
+    initializePractice();
+
+    return () => {
+      if (sound) {
+        sound.unloadAsync();
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    let timer;
+    if (startTime) {
+      timer = setInterval(() => {
+        setElapsedTime(prev => prev + 1);
+      }, 1000);
+    }
+    
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+  }, [startTime]);
+
+  useEffect(() => {
+    if (!practiceId) return;
+    
+    const autoSaveInterval = setInterval(() => {
+      saveProgress();
+    }, 1000); // 每 1 秒自動保存一次
+    
+    return () => clearInterval(autoSaveInterval);
+  }, [practiceId, currentStep, formData, elapsedTime]);
+
+  const initializePractice = async () => {
+    try {
+      const response = await ApiService.startPractice('呼吸穩定力練習');
+      
+      if (response.practiceId) {
+        setPracticeId(response.practiceId);
+        
+        if (response.isNewPractice) {
+          // 🔥 這是新練習，確保從頭開始
+          console.log('✅ 開始新練習，重置所有狀態');
+          setCurrentStep(0);  // 明確設為第0頁
+          setFormData({        // 重置表單數據
+            feeling: '',
+            noticed: '',
+            reflection: '',
+          });
+          setElapsedTime(0);   // 重置時間
+          setStartTime(Date.now());
+          
+        } else if (response.currentPage !== undefined && response.currentPage !== null) {
+          console.log(`✅ 恢復練習進度到第 ${response.currentPage} 頁`);
+          
+          const validPage = Math.max(0, Math.min(response.currentPage, steps.length - 1));
+          
+          if (validPage !== response.currentPage) {
+            console.warn(`⚠️ 頁碼 ${response.currentPage} 超出範圍，調整為 ${validPage}`);
+          }
+          
+          setCurrentStep(validPage);
+          
+          // 恢復表單數據
+          if (response.formData) {
+            try {
+              const parsedData = typeof response.formData === 'string' 
+                ? JSON.parse(response.formData) 
+                : response.formData;
+              
+              console.log('✅ 恢復表單數據:', parsedData);
+              setFormData(parsedData);
+            } catch (e) {
+              console.log('⚠️ 解析表單數據失敗:', e);
+              // 解析失敗時使用空數據
+              setFormData({
+                feeling: '',
+                noticed: '',
+                reflection: '',
+              });
+            }
+          }
+          
+          // 恢復累積時間
+          const restoredTime = response.accumulatedSeconds || 0;
+          setElapsedTime(restoredTime);
+          console.log(`✅ 恢復累積時間: ${restoredTime} 秒`);
+          
+          setStartTime(Date.now());
+          
+        } else {
+          // 🔥 沒有明確的 currentPage，視為新練習
+          console.log('✅ 無進度記錄，從第0頁開始');
+          setCurrentStep(0);
+          setElapsedTime(0);
+          setStartTime(Date.now());
+        }
+      } else {
+        console.error('❌ 未收到 practiceId');
+        Alert.alert('錯誤', '無法開始練習，請重試');
+      }
+    } catch (error) {
+      console.error('❌ 初始化練習失敗:', error);
+      Alert.alert('錯誤', '無法連接伺服器，請檢查網路連線');
+    }
+  };
+
   useEffect(() => {
     saveProgress();
   }, [currentStep, formData]);
 
   const saveProgress = async () => {
+    if (!practiceId) return;
+    
     try {
-      await ApiService.savePracticeProgress(
-        '五感察覺練習',
+      await ApiService.updatePracticeProgress(
+        practiceId,
         currentStep,
         totalSteps,
-        formData
+        formData,
+        elapsedTime  
       );
     } catch (error) {
       console.log('儲存進度失敗:', error);
@@ -99,7 +219,7 @@ export default function FiveSensesPractice({ onBack }) {
     }
     
     try {
-      const audioFile = require('../assets/audio/five-senses.wav');
+      const audioFile = require('../../../assets/audio/breathing-meditation.mp3');
       const { sound: newSound } = await Audio.Sound.createAsync(audioFile);
       setSound(newSound);
       
@@ -163,12 +283,14 @@ export default function FiveSensesPractice({ onBack }) {
   const nextStep = () => {
     if (currentStep < steps.length - 1) {
       setCurrentStep(currentStep + 1);
+      scrollViewRef.current?.scrollTo({ y: 0, animated: false });
     }
   };
 
   const prevStep = () => {
     if (currentStep > 0) {
       setCurrentStep(currentStep - 1);
+      scrollViewRef.current?.scrollTo({ y: 0, animated: false });
     }
   };
 
@@ -180,16 +302,54 @@ export default function FiveSensesPractice({ onBack }) {
   };
 
   const handleComplete = async () => {
+    if (!practiceId) {
+      Alert.alert('錯誤', '練習記錄不存在');
+      return;
+    }
+
     try {
-      await ApiService.completePracticeWithData(
-        '五感察覺練習',
-        8,
-        formData
-      );
-      onBack();
+      // ✅ 直接使用 elapsedTime
+      const totalSeconds = elapsedTime;
+      const totalMinutes = Math.max(1, Math.ceil(totalSeconds / 60));
+
+      await ApiService.completePractice(practiceId, {
+        duration: totalMinutes,
+        duration_seconds: totalSeconds, 
+        feeling: formData.feeling,
+        noticed: formData.noticed,
+        reflection: formData.reflection,
+      });
+
+      // ✅ 修正時間顯示
+      const mins = Math.floor(totalSeconds / 60);
+      const secs = totalSeconds % 60;
+      let timeStr = '';
+      if (mins > 0) {
+        timeStr = `${mins}分鐘`;
+      }
+      if (secs > 0 || mins === 0) {
+        timeStr += `${secs}秒`;
+      }
+
+      Alert.alert('完成', `恭喜完成練習！總時間：${timeStr}`, [
+        {
+          text: '確定',
+          onPress: () => {
+            if (navigation && navigation.canGoBack && navigation.canGoBack()) {
+              navigation.goBack();
+            } else if (onBack) {
+              onBack();
+            } else {
+              if (navigation && navigation.navigate) {
+                navigation.navigate('Home');
+              }
+            }
+          }
+        }
+      ]);
     } catch (error) {
       console.error('完成練習失敗:', error);
-      onBack();
+      Alert.alert('錯誤', '無法保存練習記錄');
     }
   };
 
@@ -198,17 +358,19 @@ export default function FiveSensesPractice({ onBack }) {
   };
 
   const renderStepContent = () => {
-    // 與 BreathingPractice 相同的邏輯
-    // 複製 BreathingPractice 的 renderStepContent 函數內容
-    // 為了節省空間，這裡省略，與 BreathingPractice 完全相同
-    
-    // 唯一差異是圖片路徑改成：
-    // require('../assets/images/五感察覺.png')
-    
     if (currentStepData.hasForm) {
       return (
-        <TouchableWithoutFeedback onPress={dismissKeyboard}>
-          <ScrollView style={styles.formSection} showsVerticalScrollIndicator={false}>
+        <KeyboardAvoidingView 
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={{ flex: 1 }}
+          keyboardVerticalOffset={100}
+        >
+          <ScrollView 
+            ref={scrollViewRef}
+            style={styles.formSection} 
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingBottom: 40 }}
+          >
             <View style={styles.inputField}>
               <Text style={styles.inputLabel}>練習後，我感覺：</Text>
               <TextInput 
@@ -248,8 +410,17 @@ export default function FiveSensesPractice({ onBack }) {
                 onChangeText={(text) => updateFormData('reflection', text)}
               />
             </View>
+
+            {currentStepData.isSecondToLast && (
+              <TouchableOpacity 
+                style={styles.completeButton} 
+                onPress={nextStep}
+              >
+                <Text style={styles.completeButtonText}>我完成練習了！</Text>
+              </TouchableOpacity>
+            )}
           </ScrollView>
-        </TouchableWithoutFeedback>
+        </KeyboardAvoidingView>
       );
     }
 
@@ -257,22 +428,22 @@ export default function FiveSensesPractice({ onBack }) {
       return (
         <ScrollView style={styles.summarySection} showsVerticalScrollIndicator={false}>
           <View style={styles.summaryCard}>
-            <Text style={styles.summaryTitle}>練習的感覺：</Text>
-            <Text style={styles.summaryContent}>{formData.feeling || "未填寫內容"}</Text>
+            <Text style={styles.summaryTitle}>💭 練習的感覺：</Text>
+            <Text style={styles.summaryContent}>{formData.feeling || "無記錄"}</Text>
           </View>
           
           <View style={styles.separator} />
           
           <View style={styles.summaryCard}>
-            <Text style={styles.summaryTitle}>練習中的發現：</Text>
-            <Text style={styles.summaryContent}>{formData.noticed || "未填寫內容"}</Text>
+            <Text style={styles.summaryTitle}>🎨 練習中的發現：</Text>
+            <Text style={styles.summaryContent}>{formData.noticed || "無記錄"}</Text>
           </View>
           
           <View style={styles.separator} />
           
           <View style={styles.summaryCard}>
-            <Text style={styles.summaryTitle}>想和自己說的話：</Text>
-            <Text style={styles.summaryContent}>{formData.reflection || "未填寫內容"}</Text>
+            <Text style={styles.summaryTitle}>🎧 想和自己說的話：</Text>
+            <Text style={styles.summaryContent}>{formData.reflection || "無記錄"}</Text>
           </View>
           
           <TouchableOpacity style={styles.finishButton} onPress={handleComplete}>
@@ -288,7 +459,7 @@ export default function FiveSensesPractice({ onBack }) {
           <View style={styles.audioCard}>
             <View style={styles.albumCover}>
               <Image 
-                source={require('../assets/images/ocean-breathe.png')}
+                source={require('../../../assets/images/ocean-breathe.png')}
                 style={styles.albumCoverImage}
                 resizeMode="cover"
               />
@@ -300,23 +471,51 @@ export default function FiveSensesPractice({ onBack }) {
                 <View style={[styles.progressBar, { width: duration > 0 ? `${(position / duration) * 100}%` : '0%' }]} />
                 <View style={[styles.progressHandle, { left: duration > 0 ? `${(position / duration) * 100}%` : '0%' }]} />
               </View>
-              <Text style={styles.timeText}>{formatTime(duration) || '8:00'}</Text>
+              <Text style={styles.timeText}>{formatTime(duration) || '5:00'}</Text>
             </View>
             
             <View style={styles.audioControls}>
-              <TouchableOpacity style={styles.controlButtonContainer}>
-                <Text style={styles.controlButton}>⏮</Text>
+              <TouchableOpacity 
+                style={styles.controlButtonContainer}
+                onPress={async () => {
+                  if (sound) {
+                    const newPosition = Math.max(0, position - 10000);
+                    await sound.setPositionAsync(newPosition);
+                  }
+                }}
+              >
+                <Image 
+                  source={require('../../../assets/images/backward.png')}
+                  style={styles.controlButtonImage}
+                  resizeMode="contain"
+                />
               </TouchableOpacity>
               <TouchableOpacity onPress={togglePlayback} style={styles.playButtonContainer}>
-                <Text style={styles.playButton}>{isPlaying ? '⏸️' : '▶️'}</Text>
+                <Image 
+                  source={isPlaying ? require('../../../assets/images/stop.png') : require('../../../assets/images/start.png')}
+                  style={styles.playButtonImage}
+                  resizeMode="contain"
+                />
               </TouchableOpacity>
-              <TouchableOpacity style={styles.controlButtonContainer}>
-                <Text style={styles.controlButton}>⏭</Text>
+              <TouchableOpacity 
+                style={styles.controlButtonContainer}
+                onPress={async () => {
+                  if (sound) {
+                    const newPosition = Math.min(duration, position + 10000);
+                    await sound.setPositionAsync(newPosition);
+                  }
+                }}
+              >
+                <Image 
+                  source={require('../../../assets/images/forward.png')}
+                  style={styles.controlButtonImage}
+                  resizeMode="contain"
+                />
               </TouchableOpacity>
             </View>
             
             <Text style={styles.audioDescription}>
-              五感覺察，貼近當下的體驗，{'\n'}邀請你跟著聲音指示{'\n'}一起感受～
+              呼吸，貼近下意識的節拍，{'\n'}邀請你跟著聲音指示{'\n'}一起呼吸～
             </Text>
           </View>
         </View>
@@ -330,7 +529,7 @@ export default function FiveSensesPractice({ onBack }) {
             <View style={styles.welcomeImageContainer}>
               <View style={styles.welcomeImageWhiteBox}>
                 <Image 
-                  source={require('../assets/images/五感察覺.png')}
+                  source={require('../../../assets/images/呼吸穩定.png')}
                   style={styles.welcomeImage}
                   resizeMode="contain"
                 />
@@ -340,14 +539,14 @@ export default function FiveSensesPractice({ onBack }) {
             <View style={styles.positionImagesContainer}>
               <View style={styles.positionImageTop}>
                 <Image 
-                  source={require('../assets/images/lying-position.png')}
+                  source={require('../../../assets/images/lying-position.png')}
                   style={styles.positionImageFile}
                   resizeMode="contain"
                 />
               </View>
               <View style={styles.positionImageBottom}>
                 <Image 
-                  source={require('../assets/images/sitting-position.png')}
+                  source={require('../../../assets/images/sitting-position.png')}
                   style={styles.positionImageFile}
                   resizeMode="contain"
                 />
@@ -377,15 +576,18 @@ export default function FiveSensesPractice({ onBack }) {
     return null;
   };
 
+  const isLastStep = currentStep === steps.length - 1;
+  const isSecondToLast = currentStepData.isSecondToLast;
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="rgba(46, 134, 171, 0.7)" />
       
       <View style={styles.header}>
-        <TouchableOpacity onPress={onBack}>
+        <TouchableOpacity onPress={onBack || (() => navigation?.goBack())}>
           <Text style={styles.closeButton}>✕</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>《五感覺察練習》</Text>
+        <Text style={styles.headerTitle}>《呼吸穩定力練習》</Text>
         <TouchableOpacity>
           <Text style={styles.menuButton}>⋯</Text>
         </TouchableOpacity>
@@ -399,21 +601,6 @@ export default function FiveSensesPractice({ onBack }) {
 
       <TouchableWithoutFeedback onPress={dismissKeyboard}>
         <View style={styles.contentContainer}>
-          {currentStep > 0 && !currentStepData.hasForm && (
-            <TouchableOpacity 
-              style={styles.leftTapArea}
-              onPress={prevStep}
-              activeOpacity={1}
-            />
-          )}
-          {currentStep < steps.length - 1 && !currentStepData.hasForm && (
-            <TouchableOpacity 
-              style={styles.rightTapArea}
-              onPress={nextStep}
-              activeOpacity={1}
-            />
-          )}
-
           <View style={styles.stepHeader}>
             <Text style={styles.stepTitle}>{currentStepData.title}</Text>
             {currentStepData.content && !currentStepData.hasAudio && !currentStepData.hasImage && (
@@ -425,35 +612,43 @@ export default function FiveSensesPractice({ onBack }) {
         </View>
       </TouchableWithoutFeedback>
 
-      <View style={styles.bottomNav}>
-        <TouchableOpacity 
-          onPress={prevStep}
-          disabled={currentStep === 0}
-          style={[styles.navButton, currentStep === 0 && styles.navButtonDisabled]}
-        >
-          <Text style={styles.navButtonText}>〈</Text>
-        </TouchableOpacity>
-        
-        <View style={styles.progressIndicator}>
-          {steps.map((_, index) => (
-            <View 
-              key={index}
-              style={[
-                styles.progressDot,
-                index === currentStep && styles.progressDotActive
-              ]}
-            />
-          ))}
+      {!isLastStep && (
+        <View style={styles.bottomNav}>
+          <TouchableOpacity 
+            onPress={prevStep}
+            disabled={currentStep === 0}
+            style={[
+              styles.navArrowButton,
+              currentStep === 0 && styles.navButtonDisabled
+            ]}
+          >
+            <Text style={styles.navArrowText}>‹</Text>
+          </TouchableOpacity>
+          
+          <View style={styles.progressIndicator}>
+            {steps.map((_, index) => (
+              <View 
+                key={index}
+                style={[
+                  styles.progressDot,
+                  index === currentStep && styles.progressDotActive
+                ]}
+              />
+            ))}
+          </View>
+          
+          <TouchableOpacity 
+            onPress={nextStep}
+            disabled={isSecondToLast}
+            style={[
+              styles.navArrowButton,
+              isSecondToLast && styles.navButtonDisabled
+            ]}
+          >
+            <Text style={styles.navArrowText}>›</Text>
+          </TouchableOpacity>
         </View>
-        
-        <TouchableOpacity 
-          onPress={nextStep}
-          disabled={currentStep === steps.length - 1}
-          style={[styles.navButton, currentStep === steps.length - 1 && styles.navButtonDisabled]}
-        >
-          <Text style={styles.navButtonText}>〉</Text>
-        </TouchableOpacity>
-      </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -503,24 +698,7 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 20,
     paddingBottom: 100,
-    position: 'relative',
     justifyContent: 'center',
-  },
-  leftTapArea: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
-    width: '40%',
-    zIndex: 10,
-  },
-  rightTapArea: {
-    position: 'absolute',
-    right: 0,
-    top: 0,
-    bottom: 0,
-    width: '40%',
-    zIndex: 10,
   },
   stepHeader: {
     alignItems: 'center',
@@ -618,10 +796,15 @@ const styles = StyleSheet.create({
     marginBottom: 30,
   },
   audioCard: {
-    backgroundColor: 'rgba(230, 230, 230, 1.0)',
+    backgroundColor: '#FFFFFF',
     borderRadius: 16,
     padding: 40,
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 8,
   },
   albumCover: {
     width: 240,
@@ -738,6 +921,22 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(219, 219, 219, 0.5)',
     marginVertical: 15,
   },
+  completeButton: {
+    backgroundColor: '#f5f5f5',
+    paddingVertical: 14,
+    paddingHorizontal: 32,
+    borderRadius: 25,
+    alignSelf: 'center',
+    marginTop: 30,
+    marginBottom: 20,
+    borderWidth: 2,
+    borderColor: '#4F7F96',
+  },
+  completeButtonText: {
+    color: '#4F7F96',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
   summarySection: {
     flex: 1,
     marginBottom: 20,
@@ -747,6 +946,16 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 10,
     marginBottom: 15,
+  },
+  controlButtonImage: {
+    width: 25,
+    height: 25,
+    tintColor: '#63a0bcff',
+  },
+  playButtonImage: {
+    width: 34,
+    height: 34,
+    tintColor: '#63a0bcff',
   },
   summaryTitle: {
     fontSize: 15,
@@ -783,20 +992,28 @@ const styles = StyleSheet.create({
     paddingHorizontal: 30,
     paddingVertical: 20,
     paddingBottom: 36,
-    backgroundColor: 'rgba(46, 134, 171, 0.95)',
+    backgroundColor: 'transparent',
   },
-  navButton: {
-    width: 40,
-    height: 40,
+  navArrowButton: {
+    width: 50,
+    height: 50,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 25,
     justifyContent: 'center',
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 3,
   },
   navButtonDisabled: {
     opacity: 0.3,
   },
-  navButtonText: {
+  navArrowText: {
     fontSize: 24,
-    color: 'rgba(0, 0, 0, 0.6)',
+    color: '#4F7F96',
+    fontWeight: 'bold',
   },
   progressIndicator: {
     flexDirection: 'row',
@@ -806,11 +1023,11 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: 'rgba(0, 0, 0, 0.2)',
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
     marginHorizontal: 4,
   },
   progressDotActive: {
-    backgroundColor: 'rgba(46, 134, 171, 1)',
+    backgroundColor: '#FFFFFF',
     width: 12,
     height: 12,
     borderRadius: 6,

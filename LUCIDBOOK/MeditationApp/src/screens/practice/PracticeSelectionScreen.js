@@ -17,9 +17,9 @@ import {
   Dimensions,
   Alert,
 } from 'react-native';
-import BottomNavigation from './BottomNavigation';
+import BottomNavigation from '../../navigation/BottomNavigation';
 import { Ionicons } from '@expo/vector-icons';
-import ApiService from './api';
+import ApiService from '../../../api';
 
 const { width } = Dimensions.get('window');
 
@@ -37,7 +37,7 @@ const PracticeSelectionScreen = ({ navigation }) => {
       title: '呼吸穩定力',
       description: '透過專注的呼吸練習，提升情緒穩定與了解自己',
       duration: '2~3 mins',
-      image: require('./assets/breathing.jpg'),
+      image: require('../../../assets/images/breathing.jpg'),
       backgroundColor: '#E8F5E9',
       route: 'BreathingPractice',
       type: 'single',
@@ -47,7 +47,7 @@ const PracticeSelectionScreen = ({ navigation }) => {
       title: '心理韌力練習',
       description: '強化自我覺察、平靜心情、透露壓力並更了解自己',
       duration: '7 mins',
-      image: require('./assets/resilience.jpg'),
+      image: require('../../../assets/images/resilience.jpg'),
       backgroundColor: '#FFF3E0',
       route: 'EmotionPractice',
       type: 'single',
@@ -82,7 +82,7 @@ const PracticeSelectionScreen = ({ navigation }) => {
       category: '職場心理',
       level: '初級',
       backgroundColor: '#E3F2FD',
-      image: require('./assets/breathing.jpg'),
+      image: require('../../../assets/images/breathing.jpg'),
       type: 'plan',
       route: 'TrainingPlanDetail',
       units: ['呼吸穩定力練習', '情緒理解力練習', '正念安定力練習', '自我覺察力練習'],

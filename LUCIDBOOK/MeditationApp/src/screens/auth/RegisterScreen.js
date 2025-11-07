@@ -19,7 +19,7 @@ import {
   Keyboard,
   TouchableWithoutFeedback,
 } from 'react-native';
-import ApiService from './api';
+import ApiService from '../../../api';
 
 const RegisterScreen = ({ navigation }) => {
   const [name, setName] = useState('');

@@ -5,7 +5,7 @@
 
 import { useState, useEffect } from 'react';
 import { Alert } from 'react-native';
-import ApiService from '../api';
+import ApiService from '../../services/api';
 
 /**
  * 🔒 自定義 Hook：檢查用戶登入狀態

@@ -19,7 +19,7 @@ import {
   Keyboard,
   TouchableWithoutFeedback,
 } from 'react-native';
-import ApiService from './api';
+import ApiService from '../../../api';
 
 const ResetPasswordScreen = ({ navigation, route }) => {
   const [token, setToken] = useState(route?.params?.token || '');

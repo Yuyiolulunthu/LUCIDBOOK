@@ -16,7 +16,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import ApiService from '../api';
+import ApiService from '../../../api';
 
 export default function EmotionPractice({ onBack, navigation }) {
   const [practiceId, setPracticeId] = useState(null);
@@ -1115,7 +1115,7 @@ export default function EmotionPractice({ onBack, navigation }) {
           <View style={styles.welcomeImageContainer}>
             <View style={styles.welcomeImageWhiteBox}>
               <Image 
-                source={require('../assets/images/情緒理解.png')}
+                source={require('../../../assets/images/情緒理解.png')}
                 style={styles.welcomeImage}
                 resizeMode="contain"
               />

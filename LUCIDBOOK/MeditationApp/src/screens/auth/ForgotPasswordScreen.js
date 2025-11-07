@@ -21,7 +21,7 @@ import {
   Clipboard,
   Linking,
 } from 'react-native';
-import ApiService from './api';
+import ApiService from '../../../api';
 
 const ForgotPasswordScreen = ({ navigation, route }) => {
   const [email, setEmail] = useState(route?.params?.email || '');

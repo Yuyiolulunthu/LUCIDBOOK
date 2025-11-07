@@ -20,7 +20,7 @@ import {
   TouchableWithoutFeedback,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import ApiService from './api';
+import ApiService from '../../../api';
 
 const LoginScreen = ({ navigation, onLoginSuccess }) => {
   const [email, setEmail] = useState('');
@@ -140,7 +140,7 @@ const LoginScreen = ({ navigation, onLoginSuccess }) => {
             <View style={styles.loginContainer}>
               <View style={styles.logoContainer}>
                 <Image 
-                  source={require('./assets/images/lucidbook.png')}
+                  source={require('../../../assets/images/lucidbook.png')}
                   style={styles.logoImage}
                   resizeMode="contain"
                 />

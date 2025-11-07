@@ -1,9 +1,9 @@
 import React from 'react';
 import { View, Text } from 'react-native';
-import BreathingPractice from './practice/BreathingPractice';
-import EmotionPractice from './practice/EmotionPractice';
-import MindfulnessPractice from './practice/MindfulnessPractice';
-import SelfAwarenessPractice from './practice/SelfAwarenessPractice';
+import BreathingPractice from '../data/practices/BreathingPractice';
+import EmotionPractice from '../data/practices/EmotionPractice';
+import MindfulnessPractice from '../data/practices/MindfulnessPractice';
+import SelfAwarenessPractice from '../data/practices/SelfAwarenessPractice';
 
 const PracticeNavigator = ({ route, navigation }) => {
   const { practiceType, onPracticeComplete } = route.params;

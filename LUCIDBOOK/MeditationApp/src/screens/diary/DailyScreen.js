@@ -17,8 +17,8 @@ import {
   Modal,
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
-import ApiService from './api';
-import BottomNavigation from './BottomNavigation';
+import ApiService from '../../../api';
+import BottomNavigation from '../../navigation/BottomNavigation';
 
 const { width } = Dimensions.get('window');
 
@@ -741,7 +741,7 @@ const DailyScreen = ({ navigation }) => {
         {/* 獎杯圖標 */}
         <View style={styles.semiCircleContent}>
           <Image
-            source={require('./assets/images/champion.png')}
+            source={require('../../../assets/images/champion.png')}
             style={styles.championImage}
             resizeMode="contain"
           />
@@ -766,7 +766,7 @@ const DailyScreen = ({ navigation }) => {
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <Image
-            source={require('./assets/images/person.png')}
+            source={require('../../../assets/images/person.png')}
             style={styles.profileAvatar}
             resizeMode="cover"
           />
@@ -778,14 +778,14 @@ const DailyScreen = ({ navigation }) => {
         <View style={styles.headerRight}>
           <TouchableOpacity style={styles.headerIconButton}>
             <Image
-              source={require('./assets/images/new_notify.png')}
+              source={require('../../../assets/images/new_notify.png')}
               style={styles.headerIconLarge}
               resizeMode="contain"
             />
           </TouchableOpacity>
           <TouchableOpacity style={styles.headerIconButton}>
             <Image
-              source={require('./assets/images/setting.png')}
+              source={require('../../../assets/images/setting.png')}
               style={styles.headerIconLarge}
               resizeMode="contain"
             />

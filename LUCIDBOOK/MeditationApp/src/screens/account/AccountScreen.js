@@ -1,5 +1,5 @@
 // ==========================================
-// 檔案名稱: ProfileScreen.js
+// 檔案名稱: AccountScreen.js
 // 用戶個人資料頁面 - 整合 ApiService
 // ✅ 支持頭像上傳
 // ✅ 使用 ApiService 管理登入狀態
@@ -22,10 +22,10 @@ import {
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
-import BottomNavigation from './BottomNavigation';
+import BottomNavigation from '../../navigation/BottomNavigation';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
-import ApiService from './api';
+import ApiService from '../../../api';
 
 const ProfileScreen = ({ navigation, route }) => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
