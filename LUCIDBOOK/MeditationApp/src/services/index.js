@@ -55,6 +55,20 @@ const ApiService = {
   // 情緒日記服務
   saveEmotionDiary: (diaryData) => emotionDiaryService.saveEmotionDiary(diaryData),
   getTodayEmotionDiary: () => emotionDiaryService.getTodayEmotionDiary(),
+
+  // 練習統計服務
+  getPracticeStats: async () => {
+    return apiClient.request('/practice/stats.php', {
+      method: 'GET',
+    });
+  },
+  
+  // 成就徽章服務
+  getAchievements: async () => {
+    return apiClient.request('/practice/achievements.php', {
+      method: 'GET',
+    });
+  },
 };
 
 export default ApiService;

@@ -28,6 +28,9 @@ import TrainingPlanDetailScreen from './src/screens/practice/training/TrainingPl
 import TrainingPlanProgressScreen from './src/screens/practice/training/TrainingPlanProgressScreen';
 import PracticeNavigator from './src/navigation/PracticeNavigator';
 
+// 統計頁面
+import PracticeStatsScreen from './src/screens/account/statistics/PracticeStatsScreen';
+
 const Stack = createNativeStackNavigator();
 
 // ==========================================
@@ -53,6 +56,9 @@ const App = () => {
         {/* 其他主要頁面 */}
         <Stack.Screen name="Daily" component={DailyScreen} />
         <Stack.Screen name="Profile" component={AccountScreen} />
+        
+        {/* 練習統計頁面 */}
+        <Stack.Screen name="PracticeStats" component={PracticeStatsScreen} />
         
         {/* Explore 頁面 - 包含單個練習和訓練計畫 */}
         <Stack.Screen name="PracticeSelection" component={PracticeSelectionScreen} />
