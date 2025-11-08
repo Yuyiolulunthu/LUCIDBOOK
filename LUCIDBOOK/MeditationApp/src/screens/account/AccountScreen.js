@@ -1,9 +1,13 @@
 // ==========================================
 // 檔案名稱: AccountScreen.js
-// ✅ 練習概況
-// ✅ 成就徽章系統
-// ✅ 練習統計
-// ✅ 整合 ApiService
+// 版本: V3.1 - 完全符合設計稿
+// 
+// ✅ Logo + 文字組合（路晰書 LUCIDBOOK）
+// ✅ 漸層背景大幅縮短
+// ✅ 練習概況白色卡片框架
+// ✅ 成就徽章方形圓角設計（完全符合設計圖）
+// ✅ 已解鎖徽章：彩色漸層 + 右上角金色星星
+// ✅ 未解鎖徽章：灰白色虛線框
 // ==========================================
 
 import React, { useState, useEffect } from 'react';
@@ -18,12 +22,16 @@ import {
   Alert,
   ActivityIndicator,
   Modal,
+  Dimensions,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import { LinearGradient } from 'expo-linear-gradient';
 import BottomNavigation from '../../navigation/BottomNavigation';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import ApiService from '../../../api';
+
+const { width } = Dimensions.get('window');
 
 const AccountScreen = ({ navigation, route }) => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -57,6 +65,13 @@ const AccountScreen = ({ navigation, route }) => {
     return unsubscribe;
   }, [navigation]);
 
+  // 當 practiceStats 更新時，如果 achievements 為空或需要更新，重新設置預設成就
+  useEffect(() => {
+    if (isLoggedIn && achievements.length === 0) {
+      setAchievements(getDefaultAchievements());
+    }
+  }, [practiceStats, isLoggedIn]);
+
   const loadUserData = async () => {
     try {
       setLoading(true);
@@ -71,6 +86,7 @@ const AccountScreen = ({ navigation, route }) => {
             id: response.user.id,
             name: response.user.name,
             email: response.user.email,
+            created_at: response.user.created_at,
           };
           
           setUser(userData);
@@ -90,15 +106,20 @@ const AccountScreen = ({ navigation, route }) => {
           await ApiService.clearToken();
           setIsLoggedIn(false);
           setUser(null);
+          setAchievements([]);
         }
       } else {
         setIsLoggedIn(false);
         setUser(null);
+        // 未登入時也初始化空的成就數據
+        setAchievements([]);
       }
     } catch (error) {
       console.error('載入用戶資料失敗:', error);
       setIsLoggedIn(false);
       setUser(null);
+      // 錯誤時也初始化空的成就數據
+      setAchievements([]);
     } finally {
       setLoading(false);
     }
@@ -121,16 +142,25 @@ const AccountScreen = ({ navigation, route }) => {
     try {
       const response = await ApiService.getAchievements();
       if (response.success) {
-        setAchievements(response.achievements);
+        // 轉換數據，添加 gradientColors
+        const transformedAchievements = response.achievements.map(achievement => ({
+          ...achievement,
+          gradientColors: achievement.gradientColors || [
+            achievement.color,
+            achievement.color
+          ]
+        }));
+        setAchievements(transformedAchievements);
+      } else {
+        setAchievements(getDefaultAchievements());
       }
     } catch (error) {
       console.error('載入成就失敗:', error);
-      // 使用預設成就數據
       setAchievements(getDefaultAchievements());
     }
   };
 
-  // 預設成就數據（如果後端還沒準備好）
+  // 預設成就數據
   const getDefaultAchievements = () => [
     { 
       id: 1, 
@@ -138,7 +168,7 @@ const AccountScreen = ({ navigation, route }) => {
       description: '完成第一次練習', 
       icon: '🌱', 
       unlocked: practiceStats.totalPractices >= 1, 
-      color: '#10B981',
+      gradientColors: ['#10B981', '#059669'],
       unlockedDate: practiceStats.totalPractices >= 1 ? new Date().toISOString() : null,
       requirement: '完成第一次呼吸練習',
       progress: `${Math.min(practiceStats.totalPractices, 1)}/1`,
@@ -149,7 +179,7 @@ const AccountScreen = ({ navigation, route }) => {
       description: '連續3天打卡', 
       icon: '🔥', 
       unlocked: practiceStats.currentStreak >= 3, 
-      color: '#F59E0B',
+      gradientColors: ['#F59E0B', '#EF4444'],
       unlockedDate: practiceStats.currentStreak >= 3 ? new Date().toISOString() : null,
       requirement: '連續3天完成練習打卡',
       progress: `${practiceStats.currentStreak}/3`,
@@ -160,7 +190,7 @@ const AccountScreen = ({ navigation, route }) => {
       description: '累積10次練習', 
       icon: '⭐', 
       unlocked: practiceStats.totalPractices >= 10, 
-      color: '#FBBF24',
+      gradientColors: ['#FBBF24', '#F59E0B'],
       unlockedDate: practiceStats.totalPractices >= 10 ? new Date().toISOString() : null,
       requirement: '累積完成10次練習',
       progress: `${practiceStats.totalPractices}/10`,
@@ -171,7 +201,7 @@ const AccountScreen = ({ navigation, route }) => {
       description: '專注度平均85%以上', 
       icon: '🎯', 
       unlocked: practiceStats.averageSatisfaction >= 85, 
-      color: '#3B82F6',
+      gradientColors: ['#3B82F6', '#2563EB'],
       requirement: '練習時保持專注度平均達到85%以上',
       progress: `${practiceStats.averageSatisfaction}/85%`,
     },
@@ -181,7 +211,7 @@ const AccountScreen = ({ navigation, route }) => {
       description: '完成所有情緒練習', 
       icon: '💎', 
       unlocked: false, 
-      color: '#A855F7',
+      gradientColors: ['#A855F7', '#9333EA'],
       requirement: '完成所有4種情緒理解練習',
       progress: '0/4',
     },
@@ -191,7 +221,7 @@ const AccountScreen = ({ navigation, route }) => {
       description: '連續7天打卡', 
       icon: '🏆', 
       unlocked: practiceStats.currentStreak >= 7, 
-      color: '#06B6D4',
+      gradientColors: ['#06B6D4', '#0891B2'],
       requirement: '連續7天完成練習打卡',
       progress: `${practiceStats.currentStreak}/7`,
     },
@@ -227,22 +257,18 @@ const AccountScreen = ({ navigation, route }) => {
     );
   };
 
-  // 導航到統計頁面
   const handleNavigateStats = () => {
     navigation.navigate('PracticeStats');
   };
 
-  // 導航到收藏頁面
   const handleNavigateFavorites = () => {
     navigation.navigate('Favorites');
   };
 
-  // 導航到設定頁面
   const handleNavigateSettings = () => {
     navigation.navigate('Settings');
   };
 
-  // 導航到意見回饋
   const handleNavigateFeedback = () => {
     navigation.navigate('Feedback');
   };
@@ -253,7 +279,7 @@ const AccountScreen = ({ navigation, route }) => {
       <View style={styles.container}>
         <StatusBar barStyle="dark-content" backgroundColor="#F9FAFB" />
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#40A1DD" />
+          <ActivityIndicator size="large" color="#166CB5" />
           <Text style={styles.loadingText}>載入中...</Text>
         </View>
         <BottomNavigation navigation={navigation} activeTab="profile" />
@@ -265,11 +291,24 @@ const AccountScreen = ({ navigation, route }) => {
   if (!isLoggedIn) {
     return (
       <View style={styles.container}>
-        <StatusBar barStyle="dark-content" backgroundColor="#F9FAFB" />
+        {/* 添加這些 Debug */}
+        {console.log('=== 渲染前檢查 ===')}
+        {console.log('isLoggedIn:', isLoggedIn)}
+        {console.log('user:', user)}
+        {console.log('achievements:', achievements)}
+        {console.log('practiceStats:', practiceStats)}
+        {console.log('=====================')}
+        <StatusBar barStyle="light-content" backgroundColor="#166CB5" />
         
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>我的練心書</Text>
-        </View>
+        {/* Header */}
+        <LinearGradient
+          colors={['#166CB5', '#31C6FE']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.loginHeader}
+        >
+          <Text style={styles.loginHeaderTitle}>我的練心書</Text>
+        </LinearGradient>
 
         <ScrollView 
           style={styles.scrollView}
@@ -290,7 +329,14 @@ const AccountScreen = ({ navigation, route }) => {
               onPress={handleLogin}
               activeOpacity={0.8}
             >
-              <Text style={styles.loginButtonText}>立即登入</Text>
+              <LinearGradient
+                colors={['#166CB5', '#31C6FE']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.loginButtonGradient}
+              >
+                <Text style={styles.loginButtonText}>立即登入</Text>
+              </LinearGradient>
             </TouchableOpacity>
           </View>
         </ScrollView>
@@ -305,50 +351,90 @@ const AccountScreen = ({ navigation, route }) => {
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#166CB5" />
       
-      {/* Header with gradient */}
-      <View style={styles.gradientHeader}>
-        <View style={styles.headerTop}>
+      {/* 藍色漸層背景區域 - 大幅縮短 */}
+      <LinearGradient
+        colors={['#166CB5', '#2B9FD9', '#31C6FE']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0, y: 1 }}
+        style={styles.gradientBackground}
+      >
+        {/* Header */}
+        <View style={styles.header}>
           <TouchableOpacity 
-            style={styles.settingsButton}
+            style={styles.headerButton}
             onPress={handleNavigateSettings}
           >
             <Ionicons name="settings-outline" size={24} color="#FFF" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>我的練心書</Text>
-          <View style={styles.placeholder} />
+
+          {/* Logo + 文字 */}
+          <View style={styles.logoContainer}>
+            <Image 
+              source={require('../../../assets/images/lucidlogo.png')}
+              style={styles.logoImageSmall}
+              resizeMode="contain"
+            />
+            <View style={styles.logoTextContainer}>
+              <Text style={styles.logoTitle}>路晰書</Text>
+              <Text style={styles.logoSubtitle}>LUCIDBOOK</Text>
+            </View>
+          </View>
+
+          <TouchableOpacity style={styles.headerButton}>
+            <Ionicons name="notifications-outline" size={24} color="#FFF" />
+            <View style={styles.notificationBadge}>
+              <Text style={styles.notificationText}>2</Text>
+            </View>
+          </TouchableOpacity>
         </View>
 
-        {/* Profile Card */}
+        {/* 標題 */}
+        <Text style={styles.pageTitle}>我的練心書</Text>
+
+        {/* 個人資料卡片 */}
         <View style={styles.profileCard}>
           <View style={styles.profileHeader}>
-            {/* Avatar */}
+            {/* 頭像 - 方形圓角 */}
             <View style={styles.avatarContainer}>
               {avatar ? (
                 <Image source={{ uri: avatar }} style={styles.avatarImage} />
               ) : (
-                <View style={styles.avatarCircle}>
+                <LinearGradient
+                  colors={['#166CB5', '#31C6FE']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.avatarSquare}
+                >
                   <Text style={styles.avatarText}>
                     {user.name.charAt(0).toUpperCase()}
                   </Text>
-                </View>
+                </LinearGradient>
               )}
               <View style={styles.onlineIndicator} />
             </View>
 
-            {/* User Info */}
+            {/* 用戶信息 */}
             <View style={styles.userInfo}>
               <Text style={styles.userName}>{user.name}</Text>
               <Text style={styles.joinDate}>
                 加入 {Math.floor((new Date().getTime() - new Date(user.created_at || Date.now()).getTime()) / (1000 * 60 * 60 * 24))} 天
               </Text>
-              <Text style={styles.userEmail}>{user.email}</Text>
+              
+              <View style={styles.userDetailsContainer}>
+                <View style={styles.userDetailRow}>
+                  <Ionicons name="mail-outline" size={14} color="#6B7280" />
+                  <Text style={styles.userDetail} numberOfLines={1}>{user.email}</Text>
+                </View>
+              </View>
             </View>
           </View>
 
-          {/* Quick Stats */}
+          {/* 快速統計 - 3 個數字 */}
           <View style={styles.quickStats}>
             <View style={styles.statItem}>
-              <Text style={styles.statValue}>{practiceStats.totalPractices}</Text>
+              <Text style={[styles.statValue, { color: '#166CB5' }]}>
+                {practiceStats.totalPractices}
+              </Text>
               <Text style={styles.statLabel}>總練習</Text>
             </View>
             <View style={styles.statDivider} />
@@ -367,148 +453,164 @@ const AccountScreen = ({ navigation, route }) => {
             </View>
           </View>
         </View>
-      </View>
+      </LinearGradient>
 
       <ScrollView 
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        {/* Practice Overview */}
+        {/* 練習概況 - 白色卡片框架 */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <MaterialCommunityIcons name="chart-line" size={20} color="#166CB5" />
             <Text style={styles.sectionTitle}>練習概況</Text>
           </View>
           
-          <View style={styles.card}>
-            <View style={[styles.overviewItem, { backgroundColor: '#EFF6FF' }]}>
+          <View style={styles.overviewCard}>
+            <View style={[styles.overviewRow, { backgroundColor: '#EFF6FF' }]}>
               <Text style={styles.overviewLabel}>累積練習天數</Text>
-              <Text style={[styles.overviewValue, { color: '#166CB5' }]}>
+              <Text style={[styles.overviewValue, { color: '#31C6FE' }]}>
                 {practiceStats.totalDays} 天
               </Text>
             </View>
-            <View style={[styles.overviewItem, { backgroundColor: '#FAF5FF' }]}>
+            
+            <View style={[styles.overviewRow, { backgroundColor: '#FAF5FF' }]}>
               <Text style={styles.overviewLabel}>最長連續紀錄</Text>
               <Text style={[styles.overviewValue, { color: '#A855F7' }]}>
                 {practiceStats.longestStreak} 天
               </Text>
             </View>
-            <View style={[styles.overviewItem, { backgroundColor: '#ECFDF5' }]}>
+            
+            <View style={[styles.overviewRow, { backgroundColor: '#ECFDF5' }]}>
               <Text style={styles.overviewLabel}>最常練習</Text>
-              <Text style={[styles.overviewValue, { color: '#10B981' }]}>
+              <Text style={[styles.overviewValue, { color: '#10B981', fontSize: 14 }]} numberOfLines={1}>
                 {practiceStats.favoriteExercise}
               </Text>
             </View>
           </View>
         </View>
 
-        {/* Achievements */}
+        {/* 成就徽章 - 完全符合設計圖 */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Ionicons name="trophy-outline" size={20} color="#166CB5" />
+            <MaterialCommunityIcons name="medal-outline" size={20} color="#1c61b1ff" />
             <Text style={styles.sectionTitle}>成就徽章</Text>
             <Text style={styles.achievementCount}>
-              {achievements.filter(a => a.unlocked).length}/{achievements.length}
+              {achievements?.filter(a => a.unlocked).length || 0}/{achievements?.length || 0}
             </Text>
           </View>
+
+          {/* 添加這個 Debug 代碼 */}
+          {console.log('achievements 的值:', achievements)}
+          {console.log('achievements 的類型:', typeof achievements)}
+          {console.log('achievements 是否為陣列:', Array.isArray(achievements))}
           
-          <View style={styles.achievementGrid}>
-            {achievements.map((achievement) => (
-              <TouchableOpacity
-                key={achievement.id}
-                style={[
-                  styles.achievementItem,
-                  achievement.unlocked && styles.achievementUnlocked,
-                  { backgroundColor: achievement.unlocked ? achievement.color : '#F3F4F6' }
-                ]}
-                onPress={() => setSelectedAchievement(achievement)}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.achievementIcon}>
-                  {achievement.icon}
-                </Text>
-                <Text style={[
-                  styles.achievementName,
-                  { color: achievement.unlocked ? '#FFF' : '#9CA3AF' }
-                ]}>
-                  {achievement.name}
-                </Text>
-                {achievement.unlocked && (
-                  <View style={styles.achievementBadge}>
-                    <Ionicons name="star" size={12} color="#FFF" />
-                  </View>
-                )}
-              </TouchableOpacity>
-            ))}
+          <View style={styles.achievementContainer}>
+            <View style={styles.achievementGrid}>
+              {(achievements || []).map((achievement) => (
+                <TouchableOpacity
+                  key={achievement.id}
+                  style={styles.achievementItemContainer}
+                  onPress={() => setSelectedAchievement(achievement)}
+                  activeOpacity={0.8}
+                >
+                  {achievement.unlocked ? (
+                    // 已解鎖：彩色漸層背景
+                    <LinearGradient
+                      colors={achievement.gradientColors}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={styles.achievementCardUnlocked}
+                    >
+                      {/* 右上角金色星星徽章 */}
+                      <View style={styles.achievementStarBadge}>
+                        <Ionicons name="star" size={12} color="#FFF" />
+                      </View>
+                      
+                      <Text style={styles.achievementEmojiUnlocked}>
+                        {achievement.icon}
+                      </Text>
+                      <Text style={styles.achievementNameUnlocked}>
+                        {achievement.name}
+                      </Text>
+                    </LinearGradient>
+                  ) : (
+                    // 未解鎖：灰白色虛線框
+                    <View style={styles.achievementCardLocked}>
+                      <Text style={styles.achievementEmojiLocked}>
+                        {achievement.icon}
+                      </Text>
+                      <Text style={styles.achievementNameLocked}>
+                        {achievement.name}
+                      </Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
         </View>
 
-        {/* Menu Items */}
+        {/* 功能按鈕區域 */}
         <View style={styles.section}>
+          {/* 帳號設定 */}
           <TouchableOpacity 
-            style={styles.menuItem}
+            style={styles.menuCard}
             onPress={handleNavigateSettings}
             activeOpacity={0.7}
           >
             <View style={[styles.menuIconContainer, { backgroundColor: '#EFF6FF' }]}>
-              <Ionicons name="settings-outline" size={24} color="#166CB5" />
+              <Ionicons name="settings-outline" size={20} color="#166CB5" />
             </View>
             <Text style={styles.menuLabel}>帳號設定</Text>
             <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
           </TouchableOpacity>
 
+          {/* 練習收藏 */}
           <TouchableOpacity 
-            style={styles.menuItem}
+            style={styles.menuCard}
             onPress={handleNavigateFavorites}
             activeOpacity={0.7}
           >
             <View style={[styles.menuIconContainer, { backgroundColor: '#FEF3C7' }]}>
-              <Ionicons name="bookmark-outline" size={24} color="#F59E0B" />
+              <Ionicons name="bookmark-outline" size={20} color="#F59E0B" />
             </View>
             <Text style={styles.menuLabel}>練習收藏</Text>
             <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
           </TouchableOpacity>
 
+          {/* 練習統計 */}
           <TouchableOpacity 
-            style={styles.menuItem}
+            style={styles.menuCard}
             onPress={handleNavigateStats}
             activeOpacity={0.7}
           >
             <View style={[styles.menuIconContainer, { backgroundColor: '#D1FAE5' }]}>
-              <MaterialCommunityIcons name="chart-bar" size={24} color="#10B981" />
+              <MaterialCommunityIcons name="chart-line" size={20} color="#10B981" />
             </View>
             <Text style={styles.menuLabel}>練習統計</Text>
             <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
           </TouchableOpacity>
 
+          {/* 意見回饋 */}
           <TouchableOpacity 
-            style={styles.menuItem}
+            style={styles.menuCard}
             onPress={handleNavigateFeedback}
             activeOpacity={0.7}
           >
             <View style={[styles.menuIconContainer, { backgroundColor: '#FEE2E2' }]}>
-              <Ionicons name="heart-outline" size={24} color="#EF4444" />
+              <Ionicons name="heart-outline" size={20} color="#EF4444" />
             </View>
             <Text style={styles.menuLabel}>意見回饋</Text>
             <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
           </TouchableOpacity>
         </View>
 
-        {/* Logout Button */}
-        <TouchableOpacity 
-          style={styles.logoutButton}
-          onPress={handleLogout}
-          activeOpacity={0.8}
-        >
-          <Ionicons name="log-out-outline" size={20} color="#EF4444" />
-          <Text style={styles.logoutButtonText}>登出</Text>
-        </TouchableOpacity>
-
         <View style={styles.bottomPadding} />
       </ScrollView>
 
-      {/* Achievement Detail Modal */}
+      {/* 成就詳情 Modal */}
       <Modal
         visible={selectedAchievement !== null}
         transparent={true}
@@ -521,10 +623,15 @@ const AccountScreen = ({ navigation, route }) => {
           onPress={() => setSelectedAchievement(null)}
         >
           <View style={styles.modalContent}>
-            <View style={[
-              styles.modalHeader,
-              { backgroundColor: selectedAchievement?.color || '#166CB5' }
-            ]}>
+            <LinearGradient
+              colors={selectedAchievement?.unlocked 
+                ? selectedAchievement?.gradientColors || ['#166CB5', '#31C6FE']
+                : ['#9CA3AF', '#6B7280']
+              }
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.modalHeader}
+            >
               <TouchableOpacity 
                 style={styles.modalCloseButton}
                 onPress={() => setSelectedAchievement(null)}
@@ -535,7 +642,7 @@ const AccountScreen = ({ navigation, route }) => {
               <Text style={styles.modalIcon}>{selectedAchievement?.icon}</Text>
               <Text style={styles.modalTitle}>{selectedAchievement?.name}</Text>
               <Text style={styles.modalDescription}>{selectedAchievement?.description}</Text>
-            </View>
+            </LinearGradient>
 
             <View style={styles.modalBody}>
               <View style={[
@@ -568,24 +675,19 @@ const AccountScreen = ({ navigation, route }) => {
                 </View>
               </View>
 
-              {selectedAchievement?.unlocked && selectedAchievement?.unlockedDate && (
-                <View style={styles.modalInfoCard}>
-                  <Ionicons name="calendar" size={24} color="#F59E0B" />
-                  <View style={styles.modalInfoText}>
-                    <Text style={styles.modalInfoLabel}>解鎖時間</Text>
-                    <Text style={styles.modalInfoValue}>
-                      {new Date(selectedAchievement.unlockedDate).toLocaleDateString('zh-TW')}
-                    </Text>
-                  </View>
-                </View>
-              )}
-
               <TouchableOpacity 
                 style={styles.modalButton}
                 onPress={() => setSelectedAchievement(null)}
                 activeOpacity={0.8}
               >
-                <Text style={styles.modalButtonText}>關閉</Text>
+                <LinearGradient
+                  colors={['#166CB5', '#31C6FE']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.modalButtonGradient}
+                >
+                  <Text style={styles.modalButtonText}>知道了</Text>
+                </LinearGradient>
               </TouchableOpacity>
             </View>
           </View>
@@ -612,47 +714,87 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#6B7280',
   },
+
+  // === 藍色漸層背景區域（大幅縮短） ===
+  gradientBackground: {
+    paddingTop: 50,
+    paddingBottom: 15,
+    paddingHorizontal: 20,
+  },
+
+  // === Header ===
   header: {
-    paddingHorizontal: 20,
-    paddingTop: 50,
-    paddingBottom: 16,
-    backgroundColor: '#FFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#FFF',
-  },
-  gradientHeader: {
-    backgroundColor: '#166CB5',
-    paddingTop: 50,
-    paddingBottom: 100,
-    paddingHorizontal: 20,
-  },
-  headerTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 16,
   },
-  settingsButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  headerButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: 'rgba(255,255,255,0.2)',
     justifyContent: 'center',
     alignItems: 'center',
+    position: 'relative',
   },
-  placeholder: {
-    width: 40,
+  notificationBadge: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#EF4444',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
+  notificationText: {
+    color: '#FFF',
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+
+  // === Logo + 文字組合 ===
+  logoContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1,
+    justifyContent: 'center',
+  },
+  logoImageSmall: {
+    width: 32,
+    height: 32,
+  },
+  logoTextContainer: {
+    alignItems: 'flex-start',
+  },
+  logoTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFF',
+    letterSpacing: 0.5,
+  },
+  logoSubtitle: {
+    fontSize: 10,
+    color: 'rgba(255,255,255,0.9)',
+    letterSpacing: 1,
+  },
+
+  // === 頁面標題 ===
+  pageTitle: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#FFF',
+    marginBottom: 20,
+  },
+
+  // === 個人資料卡片 ===
   profileCard: {
-    backgroundColor: 'rgba(255,255,255,0.95)',
-    borderRadius: 24,
+    backgroundColor: '#FFF',
+    borderRadius: 20,
     padding: 20,
-    marginTop: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
@@ -661,25 +803,29 @@ const styles = StyleSheet.create({
   },
   profileHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginBottom: 20,
   },
   avatarContainer: {
     position: 'relative',
     marginRight: 16,
   },
-  avatarCircle: {
+  avatarSquare: {
     width: 80,
     height: 80,
-    borderRadius: 40,
-    backgroundColor: '#166CB5',
+    borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
+    shadowColor: '#166CB5',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
   },
   avatarImage: {
     width: 80,
     height: 80,
-    borderRadius: 40,
+    borderRadius: 16,
   },
   avatarText: {
     fontSize: 32,
@@ -688,39 +834,51 @@ const styles = StyleSheet.create({
   },
   onlineIndicator: {
     position: 'absolute',
-    bottom: 2,
-    right: 2,
-    width: 16,
-    height: 16,
-    borderRadius: 8,
+    bottom: 0,
+    right: 0,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
     backgroundColor: '#10B981',
-    borderWidth: 2,
+    borderWidth: 3,
     borderColor: '#FFF',
   },
   userInfo: {
     flex: 1,
+    justifyContent: 'center',
   },
   userName: {
     fontSize: 20,
     fontWeight: 'bold',
     color: '#111827',
-    marginBottom: 4,
+    marginBottom: 2,
   },
   joinDate: {
     fontSize: 12,
     color: '#6B7280',
-    marginBottom: 4,
+    marginBottom: 10,
   },
-  userEmail: {
+  userDetailsContainer: {
+    gap: 6,
+  },
+  userDetailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  userDetail: {
     fontSize: 14,
     color: '#6B7280',
+    flex: 1,
   },
+
+  // === 快速統計 ===
   quickStats: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    paddingTop: 20,
+    paddingTop: 16,
     borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
+    borderTopColor: '#F3F4F6',
   },
   statItem: {
     alignItems: 'center',
@@ -728,8 +886,7 @@ const styles = StyleSheet.create({
   statValue: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#166CB5',
-    marginBottom: 4,
+    marginBottom: 2,
   },
   statLabel: {
     fontSize: 12,
@@ -739,13 +896,17 @@ const styles = StyleSheet.create({
     width: 1,
     backgroundColor: '#E5E7EB',
   },
+
+  // === ScrollView ===
   scrollView: {
     flex: 1,
-    marginTop: -80,
+    marginTop: -10,
   },
   scrollContent: {
-    paddingBottom: 120,
+    paddingBottom: 100,
   },
+
+  // === Section ===
   section: {
     paddingHorizontal: 20,
     marginTop: 20,
@@ -756,98 +917,150 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '600',
     color: '#111827',
     marginLeft: 8,
     flex: 1,
   },
+  achievementIcon: {
+    fontSize: 20,
+  },
   achievementCount: {
     fontSize: 12,
     color: '#6B7280',
   },
-  card: {
+
+  // === 練習概況 - 白色卡片框架 ===
+  overviewCard: {
     backgroundColor: '#FFF',
-    borderRadius: 16,
-    padding: 4,
+    borderRadius: 20,
+    padding: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
   },
-  overviewItem: {
+  overviewRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 12,
+    paddingVertical: 14,
     paddingHorizontal: 16,
-    borderRadius: 12,
+    borderRadius: 16,
     marginVertical: 4,
   },
   overviewLabel: {
     fontSize: 14,
-    color: '#6B7280',
+    color: '#374151',
+    fontWeight: '500',
   },
   overviewValue: {
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+
+  // === 成就徽章 - 完全符合設計圖 ===
+  achievementContainer: {
+    backgroundColor: '#FFF',
+    borderRadius: 20,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
   },
   achievementGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
+    gap: 12,
   },
-  achievementItem: {
-    width: '31%',
+  achievementItemContainer: {
+    width: (width - 72)*4 / 13,
     aspectRatio: 1,
-    borderRadius: 16,
+  },
+  // 已解鎖：彩色漸層背景
+  achievementCardUnlocked: {
+    flex: 1,
+    borderRadius: 20,
     padding: 12,
-    marginBottom: 12,
     justifyContent: 'center',
     alignItems: 'center',
     position: 'relative',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 4,
   },
-  achievementUnlocked: {
-    borderWidth: 0,
-  },
-  achievementIcon: {
-    fontSize: 32,
-    marginBottom: 8,
-  },
-  achievementName: {
-    fontSize: 12,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  achievementBadge: {
+  achievementStarBadge: {
     position: 'absolute',
-    top: -4,
-    right: -4,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    top: 8,
+    right: 8,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
     backgroundColor: '#F59E0B',
     justifyContent: 'center',
     alignItems: 'center',
+    shadowColor: '#F59E0B',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.4,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  menuItem: {
+  achievementEmojiUnlocked: {
+    fontSize: 36,
+    marginBottom: 6,
+  },
+  achievementNameUnlocked: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#FFF',
+    textAlign: 'center',
+    lineHeight: 16,
+  },
+  // 未解鎖：灰白色虛線框
+  achievementCardLocked: {
+    flex: 1,
+    borderRadius: 20,
+    padding: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F3F4F6',
+    borderWidth: 2,
+    borderStyle: 'dashed',
+    borderColor: '#D1D5DB',
+  },
+  achievementEmojiLocked: {
+    fontSize: 36,
+    marginBottom: 6,
+    opacity: 0.4,
+  },
+  achievementNameLocked: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#9CA3AF',
+    textAlign: 'center',
+    lineHeight: 16,
+  },
+
+  // === 功能按鈕 ===
+  menuCard: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#FFF',
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 16,
-    marginBottom: 8,
+    marginBottom: 12,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   menuIconContainer: {
     width: 40,
@@ -860,31 +1073,25 @@ const styles = StyleSheet.create({
   menuLabel: {
     flex: 1,
     fontSize: 16,
+    fontWeight: '500',
     color: '#111827',
   },
-  logoutButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginHorizontal: 20,
-    marginTop: 20,
-    paddingVertical: 16,
-    backgroundColor: '#FFF',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#FEE2E2',
-  },
-  logoutButtonText: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#EF4444',
-    marginLeft: 8,
-  },
+
   bottomPadding: {
     height: 20,
   },
-  
-  // 未登入狀態
+
+  // === 未登入狀態 ===
+  loginHeader: {
+    paddingTop: 50,
+    paddingBottom: 24,
+    paddingHorizontal: 20,
+  },
+  loginHeaderTitle: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#FFF',
+  },
   loginPromptContainer: {
     flex: 1,
     alignItems: 'center',
@@ -916,23 +1123,26 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
   loginButton: {
-    backgroundColor: '#40A1DD',
-    paddingVertical: 16,
-    paddingHorizontal: 48,
     borderRadius: 12,
-    shadowColor: '#40A1DD',
+    overflow: 'hidden',
+    shadowColor: '#166CB5',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 4,
   },
+  loginButtonGradient: {
+    paddingVertical: 16,
+    paddingHorizontal: 48,
+  },
   loginButtonText: {
     color: '#FFF',
     fontSize: 16,
     fontWeight: '600',
+    textAlign: 'center',
   },
 
-  // Modal styles
+  // === Modal ===
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -1019,10 +1229,12 @@ const styles = StyleSheet.create({
     color: '#6B7280',
   },
   modalButton: {
-    backgroundColor: '#166CB5',
-    paddingVertical: 16,
     borderRadius: 12,
+    overflow: 'hidden',
     marginTop: 8,
+  },
+  modalButtonGradient: {
+    paddingVertical: 16,
   },
   modalButtonText: {
     color: '#FFF',
