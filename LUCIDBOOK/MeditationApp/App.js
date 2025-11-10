@@ -31,6 +31,12 @@ import PracticeNavigator from './src/navigation/PracticeNavigator';
 // 統計頁面
 import PracticeStatsScreen from './src/screens/account/statistics/PracticeStatsScreen';
 
+import Settings from './src/screens/account/Settings';
+import EnterpriseCode from './src/screens/account/EnterpriseCode';
+import Feedback from './src/screens/account/Feedback';
+
+// 添加路由
+
 const Stack = createNativeStackNavigator();
 
 // ==========================================
@@ -73,6 +79,12 @@ const App = () => {
         <Stack.Screen name="TrainingPlanDetail" component={TrainingPlanDetailScreen} />
         <Stack.Screen name="TrainingPlanProgress" component={TrainingPlanProgressScreen} />
         <Stack.Screen name="PracticeNavigator" component={PracticeNavigator} />
+
+
+        <Stack.Screen name="Settings" component={Settings} />
+        <Stack.Screen name="EnterpriseCode" component={EnterpriseCode} />
+        <Stack.Screen name="Feedback" component={Feedback} />
+
       </Stack.Navigator>
     </NavigationContainer>
   );
