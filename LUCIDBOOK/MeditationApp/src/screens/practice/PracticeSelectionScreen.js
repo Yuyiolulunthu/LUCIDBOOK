@@ -2,6 +2,7 @@
 // 檔案名稱: PracticeSelectionScreen.js
 // Explore 頁面 - 包含單個練習和訓練計畫
 // 🔒 已整合登入檢查功能
+// ⭐ 已整合收藏功能
 // ✅ 修復 Navigation 警告
 // ==========================================
 
@@ -19,6 +20,7 @@ import {
 } from 'react-native';
 import BottomNavigation from '../../navigation/BottomNavigation';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import ApiService from '../../../api';
 
 const { width } = Dimensions.get('window');
@@ -29,6 +31,7 @@ const PracticeSelectionScreen = ({ navigation }) => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [favorites, setFavorites] = useState([]); // ⭐ 收藏列表
 
   // 單個練習
   const practices = [
@@ -92,12 +95,14 @@ const PracticeSelectionScreen = ({ navigation }) => {
   // 🔒 檢查登入狀態
   useEffect(() => {
     checkLoginStatus();
+    loadFavorites(); // ⭐ 載入收藏
   }, []);
 
   // 🔒 監聽頁面焦點，每次進入時檢查登入狀態
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
       checkLoginStatus();
+      loadFavorites(); // ⭐ 重新載入收藏
     });
     return unsubscribe;
   }, [navigation]);
@@ -136,6 +141,76 @@ const PracticeSelectionScreen = ({ navigation }) => {
     } finally {
       setLoading(false);
     }
+  };
+
+  // ⭐ 載入收藏列表
+  const loadFavorites = async () => {
+    try {
+      const savedFavorites = await AsyncStorage.getItem('favorites');
+      if (savedFavorites) {
+        setFavorites(JSON.parse(savedFavorites));
+      }
+    } catch (error) {
+      console.error('載入收藏失敗:', error);
+    }
+  };
+
+  // ⭐ 切換收藏狀態
+  const toggleFavorite = async (item) => {
+    // 檢查是否已登入
+    if (!isLoggedIn) {
+      Alert.alert(
+        '需要登入',
+        '請先登入才能收藏練習',
+        [
+          { text: '取消', style: 'cancel' },
+          {
+            text: '立即登入',
+            onPress: () => navigation.navigate('Profile'),
+          },
+        ]
+      );
+      return;
+    }
+
+    try {
+      const itemId = `${item.type}-${item.id}`;
+      const isFavorited = favorites.includes(itemId);
+
+      let newFavorites;
+      if (isFavorited) {
+        // 取消收藏
+        newFavorites = favorites.filter(id => id !== itemId);
+        // 可選：顯示提示
+        // Alert.alert('已取消收藏', `「${item.title}」已從收藏中移除`);
+      } else {
+        // 添加收藏
+        newFavorites = [...favorites, itemId];
+        Alert.alert('已收藏', `「${item.title}」已加入收藏`);
+      }
+
+      // 儲存到本地
+      await AsyncStorage.setItem('favorites', JSON.stringify(newFavorites));
+      setFavorites(newFavorites);
+
+      // ⭐ 可選：同步到後端
+      if (isLoggedIn) {
+        try {
+          await ApiService.updateFavorites(newFavorites);
+        } catch (error) {
+          console.log('同步收藏到後端失敗:', error);
+        }
+      }
+    } catch (error) {
+      console.error('切換收藏狀態失敗:', error);
+      Alert.alert('操作失敗', '請稍後再試');
+    }
+  };
+
+  // ⭐ 檢查是否已收藏
+  const isFavorited = (item) => {
+    const itemId = `${item.type}-${item.id}`;
+    return favorites.includes(itemId);
   };
 
   // 🔒 顯示登入提示
@@ -212,8 +287,30 @@ const PracticeSelectionScreen = ({ navigation }) => {
             <TouchableOpacity style={styles.iconButton}>
               <Ionicons name="notifications-outline" size={24} color="#666" />
             </TouchableOpacity>
-            <TouchableOpacity style={styles.iconButton}>
-              <Ionicons name="settings-outline" size={24} color="#666" />
+            {/* ⭐ 收藏按鈕 */}
+            <TouchableOpacity 
+              style={styles.iconButton}
+              onPress={() => {
+                if (!isLoggedIn) {
+                  Alert.alert(
+                    '需要登入',
+                    '請先登入以查看收藏',
+                    [
+                      { text: '取消', style: 'cancel' },
+                      { text: '立即登入', onPress: () => navigation.navigate('Profile') },
+                    ]
+                  );
+                } else {
+                  navigation.navigate('Favorites');
+                }
+              }}
+            >
+              <Ionicons name="bookmark" size={24} color="#666" />
+              {favorites.length > 0 && (
+                <View style={styles.favoriteBadge}>
+                  <Text style={styles.favoriteBadgeText}>{favorites.length}</Text>
+                </View>
+              )}
             </TouchableOpacity>
           </View>
         </View>
@@ -319,8 +416,19 @@ const PracticeSelectionScreen = ({ navigation }) => {
                   <Text style={styles.cardTitle} numberOfLines={2}>
                     {item.title}
                   </Text>
-                  <TouchableOpacity style={styles.bookmarkButton}>
-                    <Ionicons name="bookmark-outline" size={18} color="#4A90E2" />
+                  {/* ⭐ 收藏按鈕 - 改進版 */}
+                  <TouchableOpacity 
+                    style={styles.bookmarkButton}
+                    onPress={(e) => {
+                      e.stopPropagation(); // 防止觸發卡片點擊
+                      toggleFavorite(item);
+                    }}
+                  >
+                    <Ionicons 
+                      name={isFavorited(item) ? "bookmark" : "bookmark-outline"} 
+                      size={20} 
+                      color={isFavorited(item) ? "#F59E0B" : "#4A90E2"} 
+                    />
                   </TouchableOpacity>
                 </View>
                 <Text style={styles.cardDescription} numberOfLines={2}>
@@ -406,6 +514,25 @@ const styles = StyleSheet.create({
   },
   iconButton: {
     padding: 8,
+    position: 'relative',
+  },
+  // ⭐ 收藏數量徽章
+  favoriteBadge: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    backgroundColor: '#F59E0B',
+    borderRadius: 8,
+    minWidth: 16,
+    height: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+  },
+  favoriteBadgeText: {
+    color: '#FFF',
+    fontSize: 10,
+    fontWeight: 'bold',
   },
   // 🔒 登入提示橫幅
   loginPromptBanner: {

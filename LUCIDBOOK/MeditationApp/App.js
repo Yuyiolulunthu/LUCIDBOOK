@@ -34,6 +34,7 @@ import PracticeStatsScreen from './src/screens/account/statistics/PracticeStatsS
 import Settings from './src/screens/account/Settings';
 import EnterpriseCode from './src/screens/account/EnterpriseCode';
 import Feedback from './src/screens/account/Feedback';
+import Favorites from './src/screens/account/Favorites';
 
 // 添加路由
 
@@ -84,6 +85,7 @@ const App = () => {
         <Stack.Screen name="Settings" component={Settings} />
         <Stack.Screen name="EnterpriseCode" component={EnterpriseCode} />
         <Stack.Screen name="Feedback" component={Feedback} />
+        <Stack.Screen name="Favorites" component={Favorites} />
 
       </Stack.Navigator>
     </NavigationContainer>
