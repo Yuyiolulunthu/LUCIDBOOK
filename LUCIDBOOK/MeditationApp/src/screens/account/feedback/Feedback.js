@@ -27,7 +27,7 @@ import Ionicons from 'react-native-vector-icons/Ionicons';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
-import ApiService from '../../../api';
+import ApiService from '../../../../api';
 
 const ISSUE_TYPES = [
   { 
