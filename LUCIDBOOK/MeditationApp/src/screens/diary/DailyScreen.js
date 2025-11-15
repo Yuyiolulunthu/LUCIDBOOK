@@ -1,6 +1,5 @@
 // ==========================================
-// DailyScreen.js (新版呼吸練習適配版)
-// 修改：添加新版呼吸練習的 Modal 顯示邏輯
+// DailyScreen.js (正式版 - 含好事書寫支援)
 // ==========================================
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -22,7 +21,7 @@ import BottomNavigation from '../../navigation/BottomNavigation';
 
 const { width } = Dimensions.get('window');
 
-// ⭐ 新版呼吸練習的類型判斷
+// ⭐ 類型判斷函數
 const isNewBreathingExercise = (practiceType) => {
   return practiceType === '4-6呼吸練習' || 
          practiceType === '屏息呼吸練習' ||
@@ -30,11 +29,21 @@ const isNewBreathingExercise = (practiceType) => {
          practiceType.includes('節奏式屏息');
 };
 
+const isGoodThingsJournal = (practiceType) => {
+  return practiceType === '好事書寫' ||
+         practiceType === '好事書寫練習' ||
+         practiceType.includes('好事') ||
+         practiceType.includes('心理亮點');
+};
+
 // ⭐ 心情顏色映射
 const moodColors = {
   '焦慮': '#FF9A6C',
+  '焦慮緊張': '#FF9A8B',
   '平靜': '#31C6FE',
+  '平靜放鬆': '#7FC8A9',
   '疲憊': '#9CA3AF',
+  '疲憊困倦': '#A8C5DD',
   '清醒': '#5FA676',
   '開心': '#FFD93D',
   '難過': '#B8B8B8',
@@ -42,6 +51,16 @@ const moodColors = {
   '緊張': '#FF9A6C',
   '愉悅': '#FFD93D',
   '滿足': '#7FC8A9',
+  '滿足愉悅': '#FFD93D',
+  '憤怒不快': '#FF6B6B',
+  '悲傷低落': '#A0A0C0',
+  '平靜安定': '#31C6FE',
+  '情緒緩和了些': '#7FC8A9',
+  '有趣新鮮': '#FFD93D',
+  '沒特別感受': '#9CA3AF',
+  '溫暖': '#FFB5A7',
+  '被理解': '#A8D5BA',
+  '被支持': '#B8A8D5',
 };
 
 const DailyScreen = ({ navigation }) => {
@@ -116,12 +135,6 @@ const DailyScreen = ({ navigation }) => {
     }
   };
 
-  const filterAndUpdateData = () => {
-    const filteredData = filterByTimeRange(allPracticeData, timeRange);
-    setDisplayData(filteredData);
-    calculateStats(filteredData);
-  };
-
   const calculateTodayProgress = (practices) => {
     const requiredPractices = ['呼吸穩定力練習', '情緒理解力練習', '五感覺察練習'];
     
@@ -145,6 +158,12 @@ const DailyScreen = ({ navigation }) => {
     });
     
     setTodayCompletedPractices(completedTypes.size);
+  };
+
+  const filterAndUpdateData = () => {
+    const filteredData = filterByTimeRange(allPracticeData, timeRange);
+    setDisplayData(filteredData);
+    calculateStats(filteredData);
   };
 
   const filterByTimeRange = (practices, range) => {
@@ -179,7 +198,7 @@ const DailyScreen = ({ navigation }) => {
   const calculateStats = (practices) => {
     const completedPractices = practices.length;
     const totalSeconds = practices.reduce((sum, p) => {
-      return sum + (parseInt(p.duration_seconds) || parseInt(p.duration) * 60 || 0);
+      return sum + (parseInt(p.duration_seconds) || 0);
     }, 0);
 
     const uniqueTypes = new Set(practices.map(p => p.practice_type));
@@ -249,8 +268,20 @@ const DailyScreen = ({ navigation }) => {
   const extractReflectionSnippet = (practice) => {
     let summary = '';
     
+    // ⭐ 好事書寫練習
+    if (isGoodThingsJournal(practice.practice_type)) {
+      if (practice.good_thing_description && practice.good_thing_description.trim()) {
+        summary = practice.good_thing_description.trim();
+      } else if (practice.journal_entry && practice.journal_entry.trim()) {
+        summary = practice.journal_entry.trim();
+      } else if (practice.reflection && practice.reflection.trim()) {
+        summary = practice.reflection.trim();
+      } else {
+        return '暫無記錄';
+      }
+    }
     // ⭐ 新版呼吸練習
-    if (isNewBreathingExercise(practice.practice_type)) {
+    else if (isNewBreathingExercise(practice.practice_type)) {
       if (practice.journal_entry && practice.journal_entry.trim()) {
         summary = practice.journal_entry.trim();
       } else if (practice.reflection && practice.reflection.trim()) {
@@ -381,24 +412,35 @@ const DailyScreen = ({ navigation }) => {
     setSelectedPractice(null);
   };
 
-  // ⭐ 獲取心情顏色
   const getMoodColor = (mood) => {
     return moodColors[mood] || '#9CA3AF';
   };
 
-  // ⭐ 新版呼吸練習 Modal
-  const renderNewBreathingModal = () => {
+  // ⭐ 好事書寫 Modal - 全新設計
+  const renderGoodThingsJournalModal = () => {
     if (!selectedPractice) return null;
 
-    const totalSeconds = parseInt(selectedPractice.duration_seconds) || 
-                        parseInt(selectedPractice.duration) * 60 || 0;
+    const totalSeconds = parseInt(selectedPractice.duration_seconds) || 0;
 
-    // 配色方案（藍色系）
+    // 配色方案（溫暖粉橘色系）
     const colors = {
-      primary: '#92C3D8',
-      secondary: '#4F7F96',
-      light: '#E8F4F8',
+      primary: '#FFB5A7',
+      secondary: '#F4A261',
+      light: '#FFF5F3',
+      accent: '#FF9A6C',
     };
+
+    // 解析好事書寫數據
+    let journalData = {};
+    try {
+      if (selectedPractice.journal_data) {
+        journalData = typeof selectedPractice.journal_data === 'string'
+          ? JSON.parse(selectedPractice.journal_data)
+          : selectedPractice.journal_data;
+      }
+    } catch (e) {
+      console.log('解析 journal_data 失敗:', e);
+    }
 
     return (
       <Modal
@@ -411,7 +453,7 @@ const DailyScreen = ({ navigation }) => {
           <View style={[styles.modalContainer, { backgroundColor: colors.light }]}>
             {/* Header */}
             <View style={[styles.modalHeader, { backgroundColor: colors.secondary }]}>
-              <Text style={styles.modalTitle}>{selectedPractice.practice_type}</Text>
+              <Text style={styles.modalTitle}>💝 好事書寫</Text>
               <TouchableOpacity onPress={closeDetailModal} style={styles.modalCloseButton}>
                 <Text style={styles.modalCloseText}>×</Text>
               </TouchableOpacity>
@@ -443,7 +485,256 @@ const DailyScreen = ({ navigation }) => {
                 </View>
               </View>
 
-              {/* 心情變化 */}
+              {/* 正向感受程度 */}
+              {(selectedPractice.positive_level !== null && selectedPractice.positive_level !== undefined) && (
+                <View style={styles.simpleContentCard}>
+                  <Text style={styles.simpleContentTitle}>🌟 對自己或生活的正向感受</Text>
+                  <View style={styles.relaxScoreContainer}>
+                    <View style={styles.relaxScoreHeader}>
+                      <Text style={styles.relaxScoreLabel}>正向感受程度</Text>
+                      <Text style={[styles.relaxScoreValue, { color: colors.secondary }]}>
+                        {Math.round(selectedPractice.positive_level * 10)}%
+                      </Text>
+                    </View>
+                    <View style={styles.progressBarContainer}>
+                      <View 
+                        style={[
+                          styles.progressBar, 
+                          { 
+                            width: `${selectedPractice.positive_level * 10}%`,
+                            backgroundColor: colors.secondary 
+                          }
+                        ]} 
+                      />
+                    </View>
+                  </View>
+                </View>
+              )}
+
+              {/* 書寫內容 - 第一部分：今天發生了什麼好事 */}
+              <View style={styles.simpleContentCard}>
+                <Text style={styles.simpleContentTitle}>📝 今天發生了什麼好事</Text>
+                
+                {/* 問題1：那是什麼時刻、情景、與誰一起？ */}
+                {journalData.question1 && (
+                  <View style={styles.journalQuestionBlock}>
+                    <Text style={styles.journalQuestionLabel}>那是什麼時刻、情景、與誰一起？</Text>
+                    <View style={[styles.journalAnswerBox, { 
+                      backgroundColor: 'rgba(244, 162, 97, 0.08)',
+                      borderLeftColor: colors.secondary 
+                    }]}>
+                      <Text style={styles.journalAnswerText}>
+                        {journalData.question1}
+                      </Text>
+                    </View>
+                  </View>
+                )}
+
+                {/* 問題2：你當時的想法是什麼？ */}
+                {journalData.question2 && (
+                  <View style={styles.journalQuestionBlock}>
+                    <Text style={styles.journalQuestionLabel}>你當時的想法是什麼？</Text>
+                    <View style={[styles.journalAnswerBox, { 
+                      backgroundColor: 'rgba(244, 162, 97, 0.08)',
+                      borderLeftColor: colors.secondary 
+                    }]}>
+                      <Text style={styles.journalAnswerText}>
+                        {journalData.question2}
+                      </Text>
+                    </View>
+                  </View>
+                )}
+
+                {/* 問題3：這件事讓你有什麼感受？ */}
+                {(journalData.selectedFeelings && journalData.selectedFeelings.length > 0) && (
+                  <View style={styles.journalQuestionBlock}>
+                    <Text style={styles.journalQuestionLabel}>這件事讓你有什麼感受？</Text>
+                    <View style={styles.feelingTagsContainer}>
+                      {journalData.selectedFeelings.map((feeling, index) => (
+                        <View key={index} style={[styles.feelingTagPill, { 
+                          backgroundColor: getMoodColor(feeling) 
+                        }]}>
+                          <Text style={styles.feelingTagText}>{feeling}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                )}
+
+                {/* 其他感受 */}
+                {journalData.otherFeeling && (
+                  <View style={styles.journalQuestionBlock}>
+                    <Text style={styles.journalQuestionLabel}>其他感受</Text>
+                    <View style={[styles.journalAnswerBox, { 
+                      backgroundColor: 'rgba(244, 162, 97, 0.08)',
+                      borderLeftColor: colors.secondary 
+                    }]}>
+                      <Text style={styles.journalAnswerText}>
+                        {journalData.otherFeeling}
+                      </Text>
+                    </View>
+                  </View>
+                )}
+              </View>
+
+              {/* 書寫內容 - 第二部分：好事可以再發生 */}
+              <View style={styles.simpleContentCard}>
+                <Text style={styles.simpleContentTitle}>🌱 好事可以再發生</Text>
+                
+                {/* 問題4：你或他人做了什麼，讓這件好事得以發生？ */}
+                {journalData.question4 && (
+                  <View style={styles.journalQuestionBlock}>
+                    <Text style={styles.journalQuestionLabel}>
+                      你或他人做了什麼，讓這件好事得以發生？
+                    </Text>
+                    <View style={[styles.journalAnswerBox, { 
+                      backgroundColor: 'rgba(244, 162, 97, 0.08)',
+                      borderLeftColor: colors.secondary 
+                    }]}>
+                      <Text style={styles.journalAnswerText}>
+                        {journalData.question4}
+                      </Text>
+                    </View>
+                  </View>
+                )}
+
+                {/* 問題5：你可以怎麼做，讓這件事有機會再發生？ */}
+                {journalData.question5 && (
+                  <View style={styles.journalQuestionBlock}>
+                    <Text style={styles.journalQuestionLabel}>
+                      你可以怎麼做，讓這件事有機會再發生？
+                    </Text>
+                    <View style={[styles.journalAnswerBox, { 
+                      backgroundColor: 'rgba(244, 162, 97, 0.08)',
+                      borderLeftColor: colors.secondary 
+                    }]}>
+                      <Text style={styles.journalAnswerText}>
+                        {journalData.question5}
+                      </Text>
+                    </View>
+                  </View>
+                )}
+
+                {/* 問題6：選擇想嘗試的小行動 */}
+                {(journalData.selectedActions && journalData.selectedActions.length > 0) && (
+                  <View style={styles.journalQuestionBlock}>
+                    <Text style={styles.journalQuestionLabel}>選擇想嘗試的小行動</Text>
+                    <View style={styles.feelingTagsContainer}>
+                      {journalData.selectedActions.map((action, index) => (
+                        <View key={index} style={[styles.feelingTagPill, { 
+                          backgroundColor: colors.accent 
+                        }]}>
+                          <Text style={styles.feelingTagText}>{action}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                )}
+
+                {/* 其他行動 */}
+                {journalData.otherAction && (
+                  <View style={styles.journalQuestionBlock}>
+                    <Text style={styles.journalQuestionLabel}>其他想嘗試的行動</Text>
+                    <View style={[styles.journalAnswerBox, { 
+                      backgroundColor: 'rgba(244, 162, 97, 0.08)',
+                      borderLeftColor: colors.secondary 
+                    }]}>
+                      <Text style={styles.journalAnswerText}>
+                        {journalData.otherAction}
+                      </Text>
+                    </View>
+                  </View>
+                )}
+              </View>
+
+              {/* 書寫完後的心情 */}
+              {(journalData.selectedMoods && journalData.selectedMoods.length > 0) && (
+                <View style={styles.simpleContentCard}>
+                  <Text style={styles.simpleContentTitle}>💭 書寫完後的心情</Text>
+                  <View style={styles.feelingTagsContainer}>
+                    {journalData.selectedMoods.map((mood, index) => (
+                      <View key={index} style={[styles.feelingTagPill, { 
+                        backgroundColor: getMoodColor(mood) 
+                      }]}>
+                        <Text style={styles.feelingTagText}>{mood}</Text>
+                      </View>
+                    ))}
+                  </View>
+                  {journalData.moodNote && (
+                    <View style={[styles.journalAnswerBox, { 
+                      backgroundColor: 'rgba(244, 162, 97, 0.08)',
+                      borderLeftColor: colors.secondary,
+                      marginTop: 12
+                    }]}>
+                      <Text style={styles.journalAnswerText}>
+                        {journalData.moodNote}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              )}
+
+              <View style={styles.bottomPadding} />
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+    );
+  };
+
+  // ⭐ 新版呼吸練習 Modal
+  const renderNewBreathingModal = () => {
+    if (!selectedPractice) return null;
+
+    const totalSeconds = parseInt(selectedPractice.duration_seconds) || 0;
+
+    const colors = {
+      primary: '#92C3D8',
+      secondary: '#4F7F96',
+      light: '#E8F4F8',
+    };
+
+    return (
+      <Modal
+        visible={detailModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={closeDetailModal}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContainer, { backgroundColor: colors.light }]}>
+            <View style={[styles.modalHeader, { backgroundColor: colors.secondary }]}>
+              <Text style={styles.modalTitle}>🌬️ {selectedPractice.practice_type}</Text>
+              <TouchableOpacity onPress={closeDetailModal} style={styles.modalCloseButton}>
+                <Text style={styles.modalCloseText}>×</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={false}>
+              <View style={styles.simpleInfoSection}>
+                <View style={styles.simpleInfoRow}>
+                  <Text style={styles.simpleInfoIcon}>📅</Text>
+                  <View style={styles.simpleInfoTextBlock}>
+                    <Text style={styles.simpleInfoLabel}>完成日期</Text>
+                    <Text style={styles.simpleInfoValue}>
+                      {formatDate(selectedPractice.completed_at)}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.simpleDivider} />
+
+                <View style={styles.simpleInfoRow}>
+                  <Text style={styles.simpleInfoIcon}>⏱️</Text>
+                  <View style={styles.simpleInfoTextBlock}>
+                    <Text style={styles.simpleInfoLabel}>投入時間</Text>
+                    <Text style={styles.simpleInfoValue}>
+                      {formatDuration(totalSeconds)}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+
               {selectedPractice.pre_mood && selectedPractice.post_mood && (
                 <View style={styles.simpleContentCard}>
                   <Text style={styles.simpleContentTitle}>💭 心情變化</Text>
@@ -465,7 +756,6 @@ const DailyScreen = ({ navigation }) => {
                 </View>
               )}
 
-              {/* 放鬆程度評分 */}
               {selectedPractice.relax_level !== null && selectedPractice.relax_level !== undefined && (
                 <View style={styles.simpleContentCard}>
                   <Text style={styles.simpleContentTitle}>🫧 放鬆程度</Text>
@@ -486,7 +776,6 @@ const DailyScreen = ({ navigation }) => {
                 </View>
               )}
 
-              {/* 練習筆記 */}
               {selectedPractice.journal_entry && (
                 <View style={styles.simpleContentCard}>
                   <Text style={styles.simpleContentTitle}>📝 練習筆記</Text>
@@ -506,7 +795,7 @@ const DailyScreen = ({ navigation }) => {
     );
   };
 
-  // ⭐ 舊版練習 Modal（保持原樣）
+  // ⭐ 舊版練習 Modal（完整版）
   const renderOldPracticeModal = () => {
     if (!selectedPractice) return null;
 
@@ -825,11 +1114,12 @@ const DailyScreen = ({ navigation }) => {
     );
   };
 
-  // ⭐ 根據練習類型渲染不同 Modal
   const renderDetailModal = () => {
     if (!selectedPractice) return null;
     
-    if (isNewBreathingExercise(selectedPractice.practice_type)) {
+    if (isGoodThingsJournal(selectedPractice.practice_type)) {
+      return renderGoodThingsJournalModal();
+    } else if (isNewBreathingExercise(selectedPractice.practice_type)) {
       return renderNewBreathingModal();
     } else {
       return renderOldPracticeModal();
@@ -1014,8 +1304,7 @@ const DailyScreen = ({ navigation }) => {
             </View>
           ) : (
             displayData.map((practice, index) => {
-              const totalSeconds = parseInt(practice.duration_seconds) || 
-                                  parseInt(practice.duration) * 60 || 0;
+              const totalSeconds = parseInt(practice.duration_seconds) || 0;
 
               return (
                 <TouchableOpacity
@@ -1253,7 +1542,7 @@ const styles = StyleSheet.create({
     height: 100,
   },
   
-  // Modal 樣式
+  // ===== Modal 樣式 =====
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -1297,6 +1586,11 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
   },
   simpleInfoRow: {
     flexDirection: 'row',
@@ -1315,6 +1609,8 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: 'rgba(0, 0, 0, 0.5)',
     marginBottom: 4,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   simpleInfoValue: {
     fontSize: 16,
@@ -1333,12 +1629,17 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
   },
   simpleContentTitle: {
     fontSize: 14,
     fontWeight: '600',
     color: 'rgba(0, 0, 0, 0.6)',
-    marginBottom: 8,
+    marginBottom: 12,
   },
   simpleContentText: {
     fontSize: 15,
@@ -1346,8 +1647,46 @@ const styles = StyleSheet.create({
     lineHeight: 24,
   },
   
-  // ⭐ 新版呼吸練習專用樣式
-  // 心情變化
+  // ===== 好事書寫專用樣式 =====
+  journalQuestionBlock: {
+    marginBottom: 16,
+  },
+  journalQuestionLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: 'rgba(0, 0, 0, 0.5)',
+    marginBottom: 8,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  journalAnswerBox: {
+    borderLeftWidth: 3,
+    borderRadius: 8,
+    padding: 14,
+  },
+  journalAnswerText: {
+    fontSize: 15,
+    color: 'rgba(0, 0, 0, 0.8)',
+    lineHeight: 22,
+  },
+  feelingTagsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 4,
+  },
+  feelingTagPill: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 20,
+  },
+  feelingTagText: {
+    fontSize: 13,
+    color: '#FFFFFF',
+    fontWeight: '500',
+  },
+  
+  // ===== 呼吸練習專用樣式 =====
   moodTransitionContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1379,7 +1718,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 8,
   },
   
-  // 放鬆程度評分
+  // 放鬆/正向程度評分
   relaxScoreContainer: {
     paddingVertical: 8,
   },
@@ -1416,7 +1755,7 @@ const styles = StyleSheet.create({
     borderLeftWidth: 3,
     borderLeftColor: '#31C6FE',
     borderRadius: 8,
-    padding: 12,
+    padding: 14,
   },
   journalText: {
     fontSize: 15,
@@ -1424,19 +1763,18 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   
-  // 情緒標籤
+  // 情緒標籤（舊版）
   emotionTagsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     marginTop: 8,
+    gap: 8,
   },
   emotionTagSimple: {
     backgroundColor: 'rgba(140, 130, 117, 0.15)',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 16,
-    marginRight: 8,
-    marginBottom: 8,
   },
   emotionTagTextSimple: {
     fontSize: 13,

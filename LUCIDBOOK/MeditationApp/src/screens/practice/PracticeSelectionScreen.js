@@ -73,6 +73,16 @@ const PracticeSelectionScreen = ({ navigation }) => {
       route: 'SelfAwarenessPractice',
       type: 'single',
     },
+    {
+      id: 5,
+      title: '好事書寫',
+      description: '記住做不好的事情是大腦的原廠設定，用好事書寫改變負向對話的神經迴路',
+      duration: '10 mins',
+      image: require('../../../assets/images/好事發生.png'),
+      backgroundColor: '#FFF5F3',
+      route: 'GoodThingsJournal',
+      type: 'single',
+    },
   ];
 
   // 訓練計畫

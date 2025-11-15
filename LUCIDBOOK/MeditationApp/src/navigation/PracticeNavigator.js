@@ -4,6 +4,7 @@ import BreathingExerciseCard from '../data/practices/BreathingExerciseCard';
 import EmotionPractice from '../data/practices/EmotionPractice';
 import MindfulnessPractice from '../data/practices/MindfulnessPractice';
 import SelfAwarenessPractice from '../data/practices/SelfAwarenessPractice';
+import GoodThingsJournal from '../data/practices/GoodThingsjournal';
 
 const PracticeNavigator = ({ route, navigation }) => {
   const { practiceType, onPracticeComplete } = route.params;
@@ -17,6 +18,9 @@ const PracticeNavigator = ({ route, navigation }) => {
       return <MindfulnessPractice navigation={navigation} onComplete={onPracticeComplete} />;
     case '自我覺察力練習':
       return <SelfAwarenessPractice navigation={navigation} onComplete={onPracticeComplete} />;
+    case '好事書寫':
+    case '好事書寫練習':
+      return <GoodThingsJournal navigation={navigation} onComplete={onPracticeComplete} />;
     default:
       return (
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>

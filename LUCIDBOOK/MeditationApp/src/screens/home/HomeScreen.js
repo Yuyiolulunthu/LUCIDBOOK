@@ -88,7 +88,18 @@ const HomeScreen = ({ navigation }) => {
       uncompletedBadgeColor: 'rgba(0, 232, 227, 0.2)',
       image: require('../../../assets/images/正念安定.png'),
       practiceNumber: 4,
-    }
+    },
+    { 
+      name: '好事書寫練習', 
+      description: '記住做不好的事情是大腦的原廠設定，用好事書寫改變負向對話的神經迴路',
+      duration: '10分鐘', 
+      practiceType: '好事書寫',
+      backgroundColor: '#FFFFFF',
+      completedBadgeColor: 'rgba(90, 206, 135, 0.8)',
+      uncompletedBadgeColor: 'rgba(0, 232, 227, 0.2)',
+      image: require('../../../assets/images/好事發生.png'),
+      practiceNumber: 5,
+    },
   ];
 
   // 探索主題
