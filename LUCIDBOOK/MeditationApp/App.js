@@ -18,7 +18,7 @@ import AccountScreen from './src/screens/account/AccountScreen';
 
 // 練習相關頁面
 import PracticeSelectionScreen from './src/screens/practice/PracticeSelectionScreen';
-import BreathingPractice from './src/data/practices/BreathingPractice';
+import BreathingExerciseCard from './src/data/practices/BreathingExerciseCard';
 import EmotionPractice from './src/data/practices/EmotionPractice';
 import MindfulnessPractice from './src/data/practices/MindfulnessPractice';
 import SelfAwarenessPractice from './src/data/practices/SelfAwarenessPractice';
@@ -31,10 +31,10 @@ import PracticeNavigator from './src/navigation/PracticeNavigator';
 // 統計頁面
 import PracticeStatsScreen from './src/screens/account/statistics/PracticeStatsScreen';
 
-import Settings from './src/screens/account/Settings';
-import EnterpriseCode from './src/screens/account/EnterpriseCode';
-import Feedback from './src/screens/account/Feedback';
-import Favorites from './src/screens/account/Favorites';
+import Settings from './src/screens/account/settings/Settings';
+import EnterpriseCode from './src/screens/account/settings/EnterpriseCode';
+import Feedback from './src/screens/account/feedback/Feedback';
+import Favorites from './src/screens/account/bookmarks/Favorites';
 
 // 添加路由
 
@@ -71,7 +71,7 @@ const App = () => {
         <Stack.Screen name="PracticeSelection" component={PracticeSelectionScreen} />
         
         {/* 單個練習頁面 */}
-        <Stack.Screen name="BreathingPractice" component={BreathingPractice} />
+        <Stack.Screen name="BreathingPractice" component={BreathingExerciseCard} />
         <Stack.Screen name="EmotionPractice" component={EmotionPractice} />
         <Stack.Screen name="MindfulnessPractice" component={MindfulnessPractice} />
         <Stack.Screen name="SelfAwarenessPractice" component={SelfAwarenessPractice} />

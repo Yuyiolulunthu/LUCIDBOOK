@@ -26,7 +26,7 @@ import Ionicons from 'react-native-vector-icons/Ionicons';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import ApiService from '../../../api';
+import ApiService from '../../../../api';
 
 const Settings = ({ navigation }) => {
   const [user, setUser] = useState(null);

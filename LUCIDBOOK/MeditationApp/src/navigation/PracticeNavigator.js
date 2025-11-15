@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text } from 'react-native';
-import BreathingPractice from '../data/practices/BreathingPractice';
+import BreathingExerciseCard from '../data/practices/BreathingExerciseCard';
 import EmotionPractice from '../data/practices/EmotionPractice';
 import MindfulnessPractice from '../data/practices/MindfulnessPractice';
 import SelfAwarenessPractice from '../data/practices/SelfAwarenessPractice';
@@ -10,7 +10,7 @@ const PracticeNavigator = ({ route, navigation }) => {
 
   switch (practiceType) {
     case '呼吸穩定力練習':
-      return <BreathingPractice navigation={navigation} onComplete={onPracticeComplete} />;
+      return <BreathingExerciseCard navigation={navigation} onBack={() => navigation.goBack()} />;
     case '情緒理解力練習':
       return <EmotionPractice navigation={navigation} onComplete={onPracticeComplete} />;
     case '正念安定力練習':

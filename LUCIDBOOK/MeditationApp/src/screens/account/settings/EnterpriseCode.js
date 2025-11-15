@@ -23,7 +23,7 @@ import {
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import ApiService from '../../../api';
+import ApiService from '../../../../api';
 
 const EnterpriseCode = ({ navigation }) => {
   const [code, setCode] = useState(['', '', '', '']);
