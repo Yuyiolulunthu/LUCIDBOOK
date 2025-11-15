@@ -55,6 +55,7 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
   const [relaxLevel, setRelaxLevel] = useState(5); // 放鬆程度 0-10，預設5（中間值）
   const [selectedMoods, setSelectedMoods] = useState([]); // 選中的心情tags
   const [feelingNote, setFeelingNote] = useState(''); // 記錄文字
+  const [isOtherMoodSelected, setIsOtherMoodSelected] = useState(false); // ⭐ 「其他」按鈕是否選中
   
   // 第七頁狀態
   const [completionData, setCompletionData] = useState(null); // 完成數據（練習天數等）
@@ -151,7 +152,7 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
     { id: 3, label: '滿足愉悅', color: '#31C6FF' },
     { id: 4, label: '有趣新鮮', color: '#31C6FF' },
     { id: 5, label: '沒特別感受', color: '#31C6FF' },
-    { id: 6, label: '其他', color: '#31C6FF', filled: true }, // 填充背景的tag
+    { id: 6, label: '其他', color: '#31C6FF', filled: true, isOther: true }, // ⭐ 標記為「其他」
   ];
 
   // 標籤選擇處理
@@ -697,24 +698,17 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
             
             <Text style={styles.descriptionText}>{exercise.description}</Text>
             
-            {/* 標籤按鈕組 */}
+            {/* 標籤顯示組（固定顯示，不可點擊）*/}
             <View style={styles.tagsContainer}>
               {exercise.tags.map((tag, tagIndex) => (
-                <TouchableOpacity
-                  key={tagIndex}
-                  style={[
-                    styles.tagButton,
-                    selectedTags.includes(tag) && styles.tagButtonSelected
-                  ]}
-                  onPress={() => toggleTag(tag)}
+                <View
+                  key={`${exercise.id}-tag-${tagIndex}`}
+                  style={styles.tagButton}
                 >
-                  <Text style={[
-                    styles.tagText,
-                    selectedTags.includes(tag) && styles.tagTextSelected
-                  ]}>
+                  <Text style={styles.tagText}>
                     {tag}
                   </Text>
-                </TouchableOpacity>
+                </View>
               ))}
             </View>
             
@@ -1056,10 +1050,28 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
 
   // 心情選擇處理函數
   const toggleMood = (moodId) => {
-    if (selectedMoods.includes(moodId)) {
-      setSelectedMoods(selectedMoods.filter(id => id !== moodId));
+    // ⭐ 檢查是否點擊了「其他」
+    const selectedMood = moodOptions.find(m => m.id === moodId);
+    
+    if (selectedMood?.isOther) {
+      // 點擊「其他」按鈕，切換選中狀態
+      setIsOtherMoodSelected(!isOtherMoodSelected);
+      
+      if (!isOtherMoodSelected) {
+        // 選中「其他」，添加到已選列表
+        setSelectedMoods([...selectedMoods, moodId]);
+      } else {
+        // 取消選中「其他」，從列表移除
+        setSelectedMoods(selectedMoods.filter(id => id !== moodId));
+        setFeelingNote(''); // 清空輸入
+      }
     } else {
-      setSelectedMoods([...selectedMoods, moodId]);
+      // 普通心情選項
+      if (selectedMoods.includes(moodId)) {
+        setSelectedMoods(selectedMoods.filter(id => id !== moodId));
+      } else {
+        setSelectedMoods([...selectedMoods, moodId]);
+      }
     }
   };
 
@@ -1071,6 +1083,9 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
           contentContainerStyle={styles.recordScrollContent}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
+          nestedScrollEnabled={true}
+          scrollEnabled={true}
+          bounces={true}
         >
           {/* 標題 */}
           <Text style={styles.recordMainTitle}>感受覺察</Text>
@@ -1106,41 +1121,55 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
           <Text style={styles.moodPrompt}>練習完後，現在的心情是</Text>
           
           <View style={styles.moodTagsContainer}>
-            {moodOptions.map((mood) => (
-              <TouchableOpacity
-                key={mood.id}
-                style={[
-                  styles.moodTag,
-                  mood.filled && styles.moodTagFilled,
-                  selectedMoods.includes(mood.id) && styles.moodTagSelected,
-                  selectedMoods.includes(mood.id) && mood.filled && styles.moodTagFilledSelected,
-                ]}
-                onPress={() => toggleMood(mood.id)}
-              >
-                <Text 
+            {moodOptions.map((mood) => {
+              const isSelected = selectedMoods.includes(mood.id);
+              const isOther = mood.isOther;
+              
+              return (
+                <TouchableOpacity
+                  key={mood.id}
                   style={[
-                    styles.moodTagText,
-                    mood.filled && styles.moodTagTextFilled,
-                    selectedMoods.includes(mood.id) && styles.moodTagTextSelected,
+                    styles.moodTag,
+                    // ⭐ 「其他」未選中時不填充背景
+                    isOther && !isSelected && styles.moodTagOutline,
+                    // ⭐ 「其他」選中時才填充背景
+                    isOther && isSelected && styles.moodTagFilled,
+                    // ⭐ 其他選項選中樣式（保持原樣）
+                    !isOther && isSelected && styles.moodTagSelected,
                   ]}
+                  onPress={() => toggleMood(mood.id)}
                 >
-                  {mood.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
+                  <Text 
+                    style={[
+                      styles.moodTagText,
+                      // ⭐ 「其他」選中後文字為白色
+                      isOther && isSelected && styles.moodTagTextFilled,
+                      // ⭐ 其他選項選中文字樣式
+                      !isOther && isSelected && styles.moodTagTextSelected,
+                    ]}
+                  >
+                    {mood.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
 
-          {/* 記錄區塊 */}
-          <Text style={styles.recordPrompt}>記錄下來</Text>
-          
-          <TextInput
-            style={styles.recordInput}
-            multiline
-            placeholder=""
-            value={feelingNote}
-            onChangeText={setFeelingNote}
-            textAlignVertical="top"
-          />
+          {/* ⭐ 記錄區塊 - 只在選中「其他」時顯示 */}
+          {isOtherMoodSelected && (
+            <>
+              <Text style={styles.recordPrompt}>記錄下來</Text>
+              
+              <TextInput
+                style={styles.recordInput}
+                multiline
+                placeholder="在這裡寫下你的感受..."
+                value={feelingNote}
+                onChangeText={setFeelingNote}
+                textAlignVertical="top"
+              />
+            </>
+          )}
 
           {/* 記錄此刻的感受按鈕 */}
           <View style={styles.recordSubmitButtonContainer}>
@@ -1981,7 +2010,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(49, 198, 255, 0.70)',
   },
   moodTagFilledSelected: {
-    backgroundColor: 'rgba(49, 198, 255, 070)',
+    backgroundColor: 'rgba(49, 198, 255, 0.70)',
   },
   moodTagText: {
     fontSize: 14,
@@ -1994,6 +2023,12 @@ const styles = StyleSheet.create({
   },
   moodTagTextSelected: {
     color: '#FFFFFF',
+  },
+  // ⭐ 「其他」未選中時的輪廓樣式（和其他心情按鈕一致）
+  moodTagOutline: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#31C6FF',
   },
   recordPrompt: {
     fontSize: 14,
