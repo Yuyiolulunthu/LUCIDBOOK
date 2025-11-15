@@ -453,7 +453,7 @@ const DailyScreen = ({ navigation }) => {
           <View style={[styles.modalContainer, { backgroundColor: colors.light }]}>
             {/* Header */}
             <View style={[styles.modalHeader, { backgroundColor: colors.secondary }]}>
-              <Text style={styles.modalTitle}>💝 好事書寫</Text>
+              <Text style={styles.modalTitle}>好事書寫</Text>
               <TouchableOpacity onPress={closeDetailModal} style={styles.modalCloseButton}>
                 <Text style={styles.modalCloseText}>×</Text>
               </TouchableOpacity>

@@ -52,7 +52,7 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
   const [pausedAtCycle, setPausedAtCycle] = useState(0); // 記錄暫停時的循環位置
   
   // 第六頁狀態
-  const [relaxLevel, setRelaxLevel] = useState(5); // 放鬆程度 0-10，預設5（中間值）
+  const [relaxLevel, setRelaxLevel] = useState(5); // 放鬆程度 1-10，預設5（中間值）
   const [selectedMoods, setSelectedMoods] = useState([]); // 選中的心情tags
   const [feelingNote, setFeelingNote] = useState(''); // 記錄文字
   const [isOtherMoodSelected, setIsOtherMoodSelected] = useState(false); // ⭐ 「其他」按鈕是否選中
@@ -1075,6 +1075,13 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
     }
   };
 
+  // 處理滑桿變化 - 吸附到最近的整數刻度
+  const handleRelaxLevelChange = (value) => {
+    // 四捨五入到最近的整數（1-10）
+    const snappedValue = Math.round(value);
+    setRelaxLevel(snappedValue);
+  };
+
   // 第六頁：感受覺察/記錄頁面
   const renderRecordPage = () => (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
@@ -1099,21 +1106,45 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
             <View style={styles.sliderContainer}>
               <Slider
                 style={styles.slider}
-                minimumValue={0}
+                minimumValue={1}
                 maximumValue={10}
-                step={0.1}
+                step={1}
                 value={relaxLevel}
-                onValueChange={setRelaxLevel}
+                onValueChange={handleRelaxLevelChange}
                 minimumTrackTintColor="#31C6FF"
                 maximumTrackTintColor="rgba(255, 255, 255, 0.40)"
                 thumbTintColor="#FFFFFF"
               />
             </View>
 
-            {/* 刻度標籤 */}
+            {/* 刻度標籤容器 */}
+            <View style={styles.sliderScaleContainer}>
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((scale) => (
+                <View key={scale} style={styles.sliderScaleItem}>
+                  {/* 刻度線 */}
+                  <View 
+                    style={[
+                      styles.sliderScaleMark,
+                      relaxLevel === scale && styles.sliderScaleMarkActive
+                    ]} 
+                  />
+                  {/* 刻度數字 */}
+                  <Text 
+                    style={[
+                      styles.sliderScaleText,
+                      relaxLevel === scale && styles.sliderScaleTextActive
+                    ]}
+                  >
+                    {scale}
+                  </Text>
+                </View>
+              ))}
+            </View>
+
+            {/* 底部標籤 */}
             <View style={styles.sliderLabels}>
-              <Text style={styles.sliderLabelText}>0 仍緊繃</Text>
-              <Text style={styles.sliderLabelText}>10 非常放鬆</Text>
+              <Text style={styles.sliderLabelText}>仍緊繃</Text>
+              <Text style={styles.sliderLabelText}>非常放鬆</Text>
             </View>
           </View>
 
@@ -1947,7 +1978,6 @@ const styles = StyleSheet.create({
   },
   relaxSection: {
     width: 361,
-    height: 128,
     backgroundColor: 'rgba(255, 255, 255, 0.60)',
     borderRadius: 24,
     padding: 24,
@@ -1969,9 +1999,43 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 8,
   },
+  // ⭐ 新增刻度容器樣式
+  sliderScaleContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 4,
+    marginBottom: 8,
+    paddingHorizontal: 2,
+  },
+  sliderScaleItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  sliderScaleMark: {
+    width: 2,
+    height: 8,
+    backgroundColor: '#D0D0D0',
+    marginBottom: 4,
+  },
+  sliderScaleMarkActive: {
+    backgroundColor: '#31C6FF',
+    height: 10,
+    width: 3,
+  },
+  sliderScaleText: {
+    fontSize: 10,
+    fontWeight: '400',
+    color: '#4A5565',
+    fontFamily: 'Inter',
+  },
+  sliderScaleTextActive: {
+    color: '#31C6FF',
+    fontWeight: '600',
+  },
   sliderLabels: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    marginTop: 4,
   },
   sliderLabelText: {
     fontSize: 12,

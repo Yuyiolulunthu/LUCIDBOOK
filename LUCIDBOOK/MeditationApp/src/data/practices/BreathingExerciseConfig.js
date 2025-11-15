@@ -32,6 +32,15 @@ export const COLORS = {
   angry: '#FF6B6B',
   depressed: '#A0A0C0',
   satisfied: '#FFD93D',
+  
+  // 滑桿顏色
+  sliderTrackActive: '#31C6FF',
+  sliderTrackInactive: 'rgba(255, 255, 255, 0.40)',
+  sliderThumb: '#FFFFFF',
+  sliderScaleMark: '#D0D0D0',
+  sliderScaleMarkActive: '#31C6FF',
+  sliderScaleText: '#4A5565',
+  sliderScaleTextActive: '#31C6FF',
 };
 
 export const SIZES = {
@@ -45,6 +54,8 @@ export const SIZES = {
   arrow: 24,
   breathIcon: 20,
   emotionIcon: 24,
+  sliderScaleText: 10,
+  sliderLabelText: 12,
   
   // 元件尺寸
   headerHeight: 72,
@@ -54,6 +65,11 @@ export const SIZES = {
   homeButtonSize: 56,
   startButtonHeight: 46,
   stateCardAspectRatio: 1.4,
+  sliderHeight: 8,
+  sliderScaleMarkWidth: 2,
+  sliderScaleMarkHeight: 8,
+  sliderScaleMarkActiveWidth: 3,
+  sliderScaleMarkActiveHeight: 10,
   
   // 圓角
   cardRadius: 16,
@@ -73,6 +89,10 @@ export const SIZES = {
   tagGap: 12,
   stateGap: 16,
   elementGap: 10,
+  sliderMarginBottom: 8,
+  sliderScaleMarginTop: 4,
+  sliderScaleMarginBottom: 8,
+  sliderScaleItemGap: 4,
   
   // 陰影
   shadowRadius: 8,
@@ -106,6 +126,14 @@ export const FONTS = {
     fontFamily: 'System',
     fontWeight: '400',
   },
+  sliderScale: {
+    fontFamily: 'Inter',
+    fontWeight: '400',
+  },
+  sliderScaleActive: {
+    fontFamily: 'Inter',
+    fontWeight: '600',
+  },
 };
 
 export const IMAGES = {
@@ -123,6 +151,21 @@ export const IMAGES = {
   
   // 其他圖示
   sittingPosition: '../../../assets/images/sitting-position.png',
+};
+
+// 滑桿配置
+export const SLIDER_CONFIG = {
+  min: 1,
+  max: 10,
+  step: 1,
+  defaultValue: 5,
+  scales: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+  labels: {
+    min: '仍緊繃',
+    max: '非常放鬆',
+  },
+  // 吸附靈敏度配置（可選）
+  snapSensitivity: 0.5, // 距離刻度點多近會吸附（0-1範圍）
 };
 
 // 預設練習資料結構
