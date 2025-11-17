@@ -6,7 +6,7 @@
 // ✅ 保存目標到本地和後端
 // ✅ 可跳過此步驟
 // ✅ 精美的卡片設計
-// 🔧 修正：API 路徑 + 導航邏輯
+// ✅ 修正：正確的導航邏輯
 // ==========================================
 
 import React, { useState } from 'react';
@@ -30,7 +30,7 @@ const SelectGoals = ({ navigation, route }) => {
   const [loading, setLoading] = useState(false);
   const { fromLogin, fromSettings } = route?.params || {};
 
-  // 🔍 調試：打印參數
+  // 🔍 調試:打印參數
   React.useEffect(() => {
     console.log('SelectGoals params:', { fromLogin, fromSettings });
   }, [fromLogin, fromSettings]);
@@ -88,7 +88,7 @@ const SelectGoals = ({ navigation, route }) => {
     {
       id: 'mindfulness',
       title: '培養正念',
-      description: '活在當下，提升生活品質',
+      description: '活在當下,提升生活品質',
       icon: 'flower-outline',
       color: '#EC4899',
       bgColor: '#FCE7F3',
@@ -126,19 +126,19 @@ const SelectGoals = ({ navigation, route }) => {
       // 保存到本地
       await AsyncStorage.setItem('userGoals', JSON.stringify(selectedGoals));
 
-      // 嘗試同步到後端（如果已登入）
+      // 嘗試同步到後端(如果已登入)
       try {
         const isLoggedIn = await ApiService.isLoggedIn();
         if (isLoggedIn) {
           await ApiService.updateUserGoals(selectedGoals);
         }
       } catch (error) {
-        console.log('同步目標到後端失敗，但本地已保存:', error);
+        console.log('同步目標到後端失敗,但本地已保存:', error);
       }
 
       // 顯示成功訊息
       Alert.alert(
-        '設置成功！',
+        '設置成功!',
         `已選擇 ${selectedGoals.length} 個練習目標`,
         [
           {
@@ -149,7 +149,7 @@ const SelectGoals = ({ navigation, route }) => {
       );
     } catch (error) {
       console.error('保存目標失敗:', error);
-      Alert.alert('錯誤', '保存失敗，請稍後再試');
+      Alert.alert('錯誤', '保存失敗,請稍後再試');
     } finally {
       setLoading(false);
     }
@@ -170,58 +170,25 @@ const SelectGoals = ({ navigation, route }) => {
     );
   };
 
-  // 🔧 改進的導航處理
+  // ✅ 修正後的導航處理
   const handleNavigation = () => {
     console.log('handleNavigation called with:', { fromSettings, fromLogin });
     
     if (fromSettings) {
-      // 方案 1: 嘗試 goBack
+      // 從設定頁面進入,返回設定頁面
       console.log('Navigating back to Settings...');
-      if (navigation.canGoBack()) {
-        navigation.goBack();
-      } else {
-        // 方案 2: 如果 goBack 不可用，嘗試直接導航
-        console.log('Cannot go back, trying navigate to Settings...');
-        try {
-          navigation.navigate('Settings');
-        } catch (error) {
-          console.error('Navigate to Settings failed:', error);
-          // 方案 3: 嘗試導航到 Profile Tab
-          try {
-            navigation.navigate('Profile');
-          } catch (err) {
-            console.error('All navigation attempts failed:', err);
-          }
-        }
-      }
+      navigation.goBack();
     } else if (fromLogin) {
-      // 從登入進入，導航到主頁面
-      console.log('Navigating to main tabs...');
-      // 🔧 請根據你的實際路由結構選擇：
-      
-      // 選項 1: 如果有 MainTabs
+      // 從登入進入,重置導航堆疊到 Home
+      console.log('Navigating to Home...');
       navigation.reset({
         index: 0,
-        routes: [{ name: 'MainTabs' }],
+        routes: [{ name: 'Home' }],
       });
-      
-      // 選項 2: 如果直接是 Home
-      // navigation.reset({
-      //   index: 0,
-      //   routes: [{ name: 'Home' }],
-      // });
-      
-      // 選項 3: 如果是 BottomTabs
-      // navigation.reset({
-      //   index: 0,
-      //   routes: [{ name: 'BottomTabs' }],
-      // });
     } else {
-      // 其他情況，返回
-      console.log('Default navigation: going back...');
-      if (navigation.canGoBack()) {
-        navigation.goBack();
-      }
+      // 其他情況,直接返回
+      console.log('Default: going back...');
+      navigation.goBack();
     }
   };
 
@@ -240,7 +207,7 @@ const SelectGoals = ({ navigation, route }) => {
           <View>
             <Text style={styles.headerTitle}>設定你的練習目標</Text>
             <Text style={styles.headerSubtitle}>
-              選擇你想要改善的方向（可多選）
+              選擇你想要改善的方向(可多選)
             </Text>
           </View>
           {!fromLogin && (
@@ -314,7 +281,7 @@ const SelectGoals = ({ navigation, route }) => {
         <View style={styles.tipContainer}>
           <Ionicons name="information-circle-outline" size={20} color="#6B7280" />
           <Text style={styles.tipText}>
-            根據你選擇的目標，我們會為你推薦適合的練習內容
+            根據你選擇的目標,我們會為你推薦適合的練習內容
           </Text>
         </View>
       </ScrollView>

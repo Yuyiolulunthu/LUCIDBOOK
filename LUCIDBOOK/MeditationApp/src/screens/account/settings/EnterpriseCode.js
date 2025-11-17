@@ -1,5 +1,5 @@
 // ==========================================
-// 檔案名稱: EnterpriseCode.js
+// 檔案名稱: EnterpriseCode.js (導航修復版)
 // 功能: 企業引薦碼輸入頁面
 // 
 // ✅ 6個英數字輸入框
@@ -7,6 +7,7 @@
 // ✅ 效期檢查（1個月）
 // ✅ 完成按鈕驗證
 // ✅ 完全符合設計圖
+// 🔧 修正：導航邏輯改進
 // ==========================================
 
 import React, { useState, useRef, useEffect } from 'react';
@@ -39,8 +40,19 @@ const EnterpriseCode = ({ navigation, route }) => {
     useRef(null)
   ];
 
-  // 是否來自登入流程
+  // 獲取導航參數
   const isFromLogin = route?.params?.fromLogin || false;
+  const isFromSettings = route?.params?.fromSettings || false;
+  const isFromManagement = route?.params?.fromManagement || false;
+
+  // 🔍 調試：打印參數
+  useEffect(() => {
+    console.log('EnterpriseCode params:', { 
+      isFromLogin, 
+      isFromSettings, 
+      isFromManagement 
+    });
+  }, [isFromLogin, isFromSettings, isFromManagement]);
 
   useEffect(() => {
     // 自動聚焦第一個輸入框
@@ -113,15 +125,7 @@ const EnterpriseCode = ({ navigation, route }) => {
           [
             {
               text: '開始使用',
-              onPress: () => {
-                if (isFromLogin) {
-                  // 如果是從登入流程來的，導航到選擇目標頁面
-                  navigation.navigate('SelectGoals');
-                } else {
-                  // 否則返回上一頁
-                  navigation.goBack();
-                }
-              }
+              onPress: () => handleNavigationAfterSuccess()
             }
           ]
         );
@@ -140,13 +144,79 @@ const EnterpriseCode = ({ navigation, route }) => {
     }
   };
 
-  const handleSkip = () => {
+  // 🔧 改進的成功後導航邏輯
+  const handleNavigationAfterSuccess = () => {
+    console.log('🎯 handleNavigationAfterSuccess called');
+    
     if (isFromLogin) {
-      // 從登入流程跳過，繼續到選擇目標
-      navigation.navigate('SelectGoals');
-    } else {
-      // 一般情況，返回上一頁
+      // 從登入流程來：導航到選擇目標
+      console.log('✅ From login → navigating to SelectGoals');
+      navigation.navigate('SelectGoals', { fromLogin: true });
+      
+    } else if (isFromManagement) {
+      // 從企業引薦碼管理頁面來：返回管理頁面
+      console.log('✅ From management → going back');
       navigation.goBack();
+      
+    } else if (isFromSettings) {
+      // 從設定頁面來：返回設定
+      console.log('✅ From settings → going back');
+      navigation.goBack();
+      
+    } else {
+      // 其他情況：嘗試返回或導航到主頁
+      console.log('✅ Default → attempting to navigate home');
+      if (navigation.canGoBack()) {
+        navigation.goBack();
+      } else {
+        // 如果無法返回，導航到主頁面
+        try {
+          navigation.reset({
+            index: 0,
+            routes: [{ name: 'MainTabs' }], // 🔧 改為你的主頁面名稱
+          });
+        } catch (error) {
+          console.error('Navigation failed:', error);
+        }
+      }
+    }
+  };
+
+  // 🔧 改進的跳過邏輯
+  const handleSkip = () => {
+    console.log('🔄 handleSkip called');
+    
+    if (isFromLogin) {
+      // 從登入流程跳過：導航到選擇目標
+      console.log('✅ Skip from login → navigating to SelectGoals');
+      navigation.navigate('SelectGoals', { fromLogin: true });
+      
+    } else if (isFromManagement) {
+      // 從管理頁面跳過：返回管理頁面
+      console.log('✅ Skip from management → going back');
+      navigation.goBack();
+      
+    } else if (isFromSettings) {
+      // 從設定頁面跳過：返回設定
+      console.log('✅ Skip from settings → going back');
+      navigation.goBack();
+      
+    } else {
+      // 其他情況：返回或導航到主頁
+      console.log('✅ Default skip → attempting to navigate home');
+      if (navigation.canGoBack()) {
+        navigation.goBack();
+      } else {
+        // 無法返回時，導航到主頁面
+        try {
+          navigation.reset({
+            index: 0,
+            routes: [{ name: 'MainTabs' }], // 🔧 改為你的主頁面名稱
+          });
+        } catch (error) {
+          console.error('Navigation failed:', error);
+        }
+      }
     }
   };
 
