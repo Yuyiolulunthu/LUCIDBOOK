@@ -36,6 +36,8 @@ import Settings from './src/screens/account/settings/Settings';
 import EnterpriseCode from './src/screens/account/settings/EnterpriseCode';
 import Feedback from './src/screens/account/feedback/Feedback';
 import Favorites from './src/screens/account/bookmarks/Favorites';
+import SelectGoals from './src/screens/account/settings/SelectGoals';
+import EnterpriseCodeManagement from './src/screens/account/settings/EnterpriseCodeManagement';
 
 // 添加路由
 
@@ -85,10 +87,12 @@ const App = () => {
 
 
         <Stack.Screen name="Settings" component={Settings} />
-        <Stack.Screen name="EnterpriseCode" component={EnterpriseCode} />
         <Stack.Screen name="Feedback" component={Feedback} />
         <Stack.Screen name="Favorites" component={Favorites} />
-
+        <Stack.Screen name="EnterpriseCode" component={EnterpriseCode}  options={{ headerShown: false }}/>
+        <Stack.Screen name="EnterpriseCodeManagement" component={EnterpriseCodeManagement}  options={{ headerShown: false }}/>
+        <Stack.Screen      name="SelectGoals"      component={SelectGoals}  options={{ headerShown: false }}
+   />
       </Stack.Navigator>
     </NavigationContainer>
   );

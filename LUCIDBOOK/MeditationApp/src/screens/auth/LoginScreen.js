@@ -1,5 +1,11 @@
 // ==========================================
 // 檔案名稱: LoginScreen.js
+// 功能: 登入頁面
+// 
+// ✅ 電子郵件登入
+// ✅ 訪客登入
+// ✅ 登入成功後詢問企業引薦碼
+// ✅ 忘記密碼
 // ==========================================
 
 import React, { useState } from 'react';
@@ -55,19 +61,47 @@ const LoginScreen = ({ navigation, onLoginSuccess }) => {
       // 儲存到 AsyncStorage
       await AsyncStorage.setItem('userData', JSON.stringify(userData));
       
-      Alert.alert('成功', '登入成功！', [
-        {
-          text: '確定',
-          onPress: () => {
-            if (onLoginSuccess) {
-              onLoginSuccess(userData);
+      // ✨ 登入成功後詢問企業引薦碼 ✨
+      Alert.alert(
+        '登入成功！',
+        '您是否有企業引薦碼？\n輸入引薦碼可解鎖專屬功能',
+        [
+          {
+            text: '輸入引薦碼',
+            onPress: () => {
+              // 導航到企業引薦碼頁面
+              if (navigation) {
+                navigation.navigate('EnterpriseCode', { 
+                  fromLogin: true,
+                  // 如果您有選擇目標頁面，取消下面的註解
+                  // nextScreen: 'SelectGoals'
+                });
+              }
+              
+              if (onLoginSuccess) {
+                onLoginSuccess(userData);
+              }
             }
-            if (navigation) {
-              navigation.goBack();
+          },
+          {
+            text: '稍後再說',
+            style: 'cancel',
+            onPress: () => {
+              // 跳過企業引薦碼，直接完成登入
+              // 如果您有選擇目標或引導頁面，可以導航到那裡
+              // navigation.navigate('SelectGoals');
+              
+              if (onLoginSuccess) {
+                onLoginSuccess(userData);
+              }
+              if (navigation) {
+                navigation.goBack();
+              }
             }
           }
-        }
-      ]);
+        ],
+        { cancelable: false }
+      );
     } catch (error) {
       Alert.alert('登入失敗', error.message || '請檢查您的電子郵件和密碼');
     } finally {

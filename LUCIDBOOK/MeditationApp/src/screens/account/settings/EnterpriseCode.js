@@ -2,8 +2,9 @@
 // 檔案名稱: EnterpriseCode.js
 // 功能: 企業引薦碼輸入頁面
 // 
-// ✅ 4個驗證碼輸入框
+// ✅ 6個英數字輸入框
 // ✅ 自動焦點切換
+// ✅ 效期檢查（1個月）
 // ✅ 完成按鈕驗證
 // ✅ 完全符合設計圖
 // ==========================================
@@ -25,10 +26,21 @@ import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import ApiService from '../../../../api';
 
-const EnterpriseCode = ({ navigation }) => {
-  const [code, setCode] = useState(['', '', '', '']);
+const EnterpriseCode = ({ navigation, route }) => {
+  const [code, setCode] = useState(['', '', '', '', '', '']);
   const [loading, setLoading] = useState(false);
-  const inputRefs = [useRef(null), useRef(null), useRef(null), useRef(null)];
+  const [focusedIndex, setFocusedIndex] = useState(0);
+  const inputRefs = [
+    useRef(null), 
+    useRef(null), 
+    useRef(null), 
+    useRef(null), 
+    useRef(null), 
+    useRef(null)
+  ];
+
+  // 是否來自登入流程
+  const isFromLogin = route?.params?.fromLogin || false;
 
   useEffect(() => {
     // 自動聚焦第一個輸入框
@@ -38,17 +50,18 @@ const EnterpriseCode = ({ navigation }) => {
   }, []);
 
   const handleCodeChange = (text, index) => {
-    // 只允許數字
-    if (text && !/^\d+$/.test(text)) {
+    // 只允許英數字（大小寫）
+    if (text && !/^[0-9a-zA-Z]$/.test(text)) {
       return;
     }
 
     const newCode = [...code];
-    newCode[index] = text;
+    // 轉換為大寫（可選，根據您的需求）
+    newCode[index] = text.toUpperCase();
     setCode(newCode);
 
     // 自動跳到下一個輸入框
-    if (text && index < 3) {
+    if (text && index < 5) {
       inputRefs[index + 1].current?.focus();
     }
   };
@@ -63,8 +76,8 @@ const EnterpriseCode = ({ navigation }) => {
   const handleSubmit = async () => {
     const fullCode = code.join('');
     
-    if (fullCode.length !== 4) {
-      Alert.alert('提示', '請輸入完整的4位數驗證碼');
+    if (fullCode.length !== 6) {
+      Alert.alert('提示', '請輸入完整的6位數驗證碼');
       return;
     }
 
@@ -76,31 +89,64 @@ const EnterpriseCode = ({ navigation }) => {
       const response = await ApiService.verifyEnterpriseCode(fullCode);
       
       if (response.success) {
-        // 儲存企業引薦碼
-        await AsyncStorage.setItem('enterpriseCode', fullCode);
+        // 計算效期（1個月後）
+        const expiryDate = new Date();
+        expiryDate.setMonth(expiryDate.getMonth() + 1);
         
+        // 儲存企業引薦碼和效期
+        await AsyncStorage.multiSet([
+          ['enterpriseCode', fullCode],
+          ['enterpriseCodeExpiry', expiryDate.toISOString()],
+          ['enterpriseName', response.enterprise?.name || ''],
+          ['enterpriseId', response.enterprise?.id || ''],
+        ]);
+        
+        const expiryDateStr = expiryDate.toLocaleDateString('zh-TW', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
+        });
+
         Alert.alert(
           '驗證成功！',
-          `歡迎加入 ${response.enterprise?.name || '企業'} 專屬練習模組`,
+          `歡迎加入 ${response.enterprise?.name || '企業'} 專屬練習模組\n\n有效期限：${expiryDateStr}`,
           [
             {
               text: '開始使用',
-              onPress: () => navigation.goBack()
+              onPress: () => {
+                if (isFromLogin) {
+                  // 如果是從登入流程來的，導航到選擇目標頁面
+                  navigation.navigate('SelectGoals');
+                } else {
+                  // 否則返回上一頁
+                  navigation.goBack();
+                }
+              }
             }
           ]
         );
       } else {
-        Alert.alert('驗證失敗', response.message || '引薦碼無效，請檢查後重試');
-        setCode(['', '', '', '']);
+        Alert.alert('驗證失敗', response.message || '引薦碼無效或已過期，請檢查後重試');
+        setCode(['', '', '', '', '', '']);
         inputRefs[0].current?.focus();
       }
     } catch (error) {
       console.error('驗證失敗:', error);
       Alert.alert('錯誤', '驗證失敗，請稍後再試');
-      setCode(['', '', '', '']);
+      setCode(['', '', '', '', '', '']);
       inputRefs[0].current?.focus();
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSkip = () => {
+    if (isFromLogin) {
+      // 從登入流程跳過，繼續到選擇目標
+      navigation.navigate('SelectGoals');
+    } else {
+      // 一般情況，返回上一頁
+      navigation.goBack();
     }
   };
 
@@ -119,7 +165,7 @@ const EnterpriseCode = ({ navigation }) => {
       >
         <TouchableOpacity 
           style={styles.backButton}
-          onPress={() => navigation.goBack()}
+          onPress={handleSkip}
         >
           <Ionicons name="arrow-back" size={24} color="#FFF" />
           <Text style={styles.backText}>返回</Text>
@@ -129,7 +175,7 @@ const EnterpriseCode = ({ navigation }) => {
         
         <TouchableOpacity 
           style={styles.skipButton}
-          onPress={() => navigation.goBack()}
+          onPress={handleSkip}
         >
           <Text style={styles.skipText}>跳過</Text>
         </TouchableOpacity>
@@ -141,10 +187,10 @@ const EnterpriseCode = ({ navigation }) => {
           <Text style={styles.title}>企業引薦碼</Text>
           
           <Text style={styles.description}>
-            輸入驗證碼4個數字以解鎖企業為您準備的練習模組
+            輸入6位英數字驗證碼以解鎖企業為您準備的練習模組
           </Text>
 
-          {/* 4個驗證碼輸入框 */}
+          {/* 6個驗證碼輸入框 */}
           <View style={styles.codeContainer}>
             {code.map((digit, index) => (
               <View key={index} style={styles.inputWrapper}>
@@ -153,12 +199,15 @@ const EnterpriseCode = ({ navigation }) => {
                   style={[
                     styles.codeInput,
                     digit && styles.codeInputFilled,
-                    !digit && index === 0 && styles.codeInputActive,
+                    focusedIndex === index && !digit && styles.codeInputActive,
                   ]}
                   value={digit}
                   onChangeText={(text) => handleCodeChange(text, index)}
                   onKeyPress={(e) => handleKeyPress(e, index)}
-                  keyboardType="number-pad"
+                  onFocus={() => setFocusedIndex(index)}
+                  onBlur={() => setFocusedIndex(-1)}
+                  keyboardType="default"
+                  autoCapitalize="characters"
                   maxLength={1}
                   selectTextOnFocus
                   editable={!loading}
@@ -171,7 +220,7 @@ const EnterpriseCode = ({ navigation }) => {
           <TouchableOpacity 
             style={[
               styles.submitButton,
-              !isComplete && styles.submitButtonDisabled
+              isComplete && styles.submitButtonActive,
             ]}
             onPress={handleSubmit}
             disabled={!isComplete || loading}
@@ -182,7 +231,7 @@ const EnterpriseCode = ({ navigation }) => {
             ) : (
               <Text style={[
                 styles.submitButtonText,
-                !isComplete && styles.submitButtonTextDisabled
+                isComplete && { color: '#FFF' }
               ]}>
                 完成
               </Text>
@@ -193,6 +242,14 @@ const EnterpriseCode = ({ navigation }) => {
           <Text style={styles.hintText}>
             沒有企業引薦碼？您仍可以使用所有基本練習功能
           </Text>
+
+          {/* 效期說明 */}
+          <View style={styles.expiryInfo}>
+            <Ionicons name="information-circle-outline" size={16} color="#9CA3AF" />
+            <Text style={styles.expiryText}>
+              企業引薦碼有效期為1個月，到期後將無法存取專屬內容
+            </Text>
+          </View>
         </View>
       </View>
     </View>
@@ -280,33 +337,49 @@ const styles = StyleSheet.create({
   codeContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: 16,
+    gap: 12,
     marginBottom: 40,
     width: '100%',
+    paddingHorizontal: 8,
   },
   inputWrapper: {
     flex: 1,
-    maxWidth: 70,
+    maxWidth: 56,
   },
   codeInput: {
     width: '100%',
-    aspectRatio: 1,
+    height: 64,
     borderRadius: 16,
-    borderWidth: 2,
+    borderWidth: 2.5,
     borderColor: '#E5E7EB',
-    backgroundColor: '#FFF',
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#111827',
+    backgroundColor: '#FAFBFC',
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#1F2937',
     textAlign: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   codeInputActive: {
     borderColor: '#166CB5',
     borderWidth: 3,
+    backgroundColor: '#FFF',
+    shadowColor: '#166CB5',
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 4,
   },
   codeInputFilled: {
     borderColor: '#166CB5',
     backgroundColor: '#EFF6FF',
+    borderWidth: 2.5,
+    shadowColor: '#166CB5',
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 3,
   },
 
   // Submit Button
@@ -314,18 +387,27 @@ const styles = StyleSheet.create({
     width: '100%',
     paddingVertical: 18,
     borderRadius: 16,
-    backgroundColor: '#D1D5DB',
+    backgroundColor: '#E5E7EB',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 24,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  submitButtonDisabled: {
-    backgroundColor: '#E5E7EB',
+  submitButtonActive: {
+    backgroundColor: '#166CB5',
+    shadowColor: '#166CB5',
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 6,
   },
   submitButtonText: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#FFF',
+    color: '#9CA3AF',
   },
   submitButtonTextDisabled: {
     color: '#9CA3AF',
@@ -337,6 +419,24 @@ const styles = StyleSheet.create({
     color: '#9CA3AF',
     textAlign: 'center',
     lineHeight: 20,
+    marginBottom: 16,
+  },
+
+  // Expiry Info
+  expiryInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 8,
+  },
+  expiryText: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    lineHeight: 16,
+    flex: 1,
   },
 });
 

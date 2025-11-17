@@ -332,7 +332,7 @@ export default function GoodThingsJournal({ onBack, navigation, route }) {
             <TextInput
               style={styles.questionInput}
               multiline
-              placeholder="例如：跟同事邊吃便當邊聊發，突然覺得被理解"
+              placeholder="例如：跟同事邊吃便當邊聊發牢騷，突然覺得被理解"
               placeholderTextColor="#B0B0B0"
               value={question1Answer}
               onChangeText={setQuestion1Answer}
@@ -510,7 +510,7 @@ export default function GoodThingsJournal({ onBack, navigation, route }) {
             <TextInput
               style={styles.questionInput}
               multiline
-              placeholder="例如：我跟早出門，所以能夠慢慢散步"
+              placeholder="例如：我提早出門，所以能夠慢慢散步"
               placeholderTextColor="#B0B0B0"
               value={question4Answer}
               onChangeText={setQuestion4Answer}

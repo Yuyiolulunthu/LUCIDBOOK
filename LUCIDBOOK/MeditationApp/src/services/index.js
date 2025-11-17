@@ -61,6 +61,8 @@ const ApiService = {
     return apiClient.request('/practice/stats.php', {
       method: 'GET',
     });
+
+    
   },
   
   // 成就徽章服務
@@ -69,6 +71,53 @@ const ApiService = {
       method: 'GET',
     });
   },
+
+  // 企業引薦碼驗證
+  async verifyEnterpriseCode(code) {
+    console.log('驗證代碼:', code);
+    
+    // 模擬網路延遲
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    // 測試代碼
+    const validCodes = {
+      'ABC123': {
+        enterpriseId: 'ent_001',
+        enterpriseName: '測試企業有限公司',
+        features: ['enterprise_practices', 'advanced_reports', 'team_statistics']
+      },
+      'TEST01': {
+        enterpriseId: 'ent_002',
+        enterpriseName: 'NTHU 國立清華大學',
+        features: ['enterprise_practices', 'custom_content']
+      },
+      '00AA99': {
+        enterpriseId: 'ent_003',
+        enterpriseName: '範例科技公司',
+        features: ['enterprise_practices', 'priority_support']
+      }
+    };
+
+    const upperCode = code.toUpperCase();
+
+    if (validCodes[upperCode]) {
+      return {
+        success: true,
+        enterprise: {
+          id: validCodes[upperCode].enterpriseId,
+          name: validCodes[upperCode].enterpriseName,
+          features: validCodes[upperCode].features
+        },
+        message: '驗證成功'
+      };
+    }
+
+    return {
+      success: false,
+      enterprise: null,
+      message: '引薦碼無效或已過期'
+    };
+  }
 };
 
 export default ApiService;

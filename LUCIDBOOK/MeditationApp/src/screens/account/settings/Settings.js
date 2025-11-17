@@ -3,13 +3,15 @@
 // 功能: 帳號設定頁面
 // 
 // ✅ 個人資料編輯
-// ✅ 企業引薦碼管理（登入/登出）
+// ✅ 練習目標管理（新增）
+// ✅ 企業引薦碼管理（包含效期顯示）
 // ✅ 通知設定
 // ✅ 隱私設定
 // ✅ 登出帳號
+// ✅ 自動刷新企業引薦碼資訊
 // ==========================================
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -26,15 +28,31 @@ import Ionicons from 'react-native-vector-icons/Ionicons';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useFocusEffect } from '@react-navigation/native';
 import ApiService from '../../../../api';
+import {
+  getEnterpriseCodeInfo,
+  clearEnterpriseCode,
+  formatExpiryDate,
+} from './utils/enterpriseCodeUtils';
+import {
+  getUserGoalsDetails,
+} from './utils/userGoalsUtils';
 
 const Settings = ({ navigation }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   
-  // 企業引薦碼狀態
-  const [enterpriseCode, setEnterpriseCode] = useState(null);
-  const [enterpriseInfo, setEnterpriseInfo] = useState(null);
+  // 練習目標狀態
+  const [userGoals, setUserGoals] = useState([]);
+  
+  // 企業引薦碼狀態（完整資訊）
+  const [enterpriseCodeInfo, setEnterpriseCodeInfo] = useState({
+    code: null,
+    enterpriseName: null,
+    expiryDate: null,
+    daysRemaining: null,
+  });
   
   // 通知設定
   const [notificationSettings, setNotificationSettings] = useState({
@@ -49,8 +67,15 @@ const Settings = ({ navigation }) => {
 
   useEffect(() => {
     loadUserData();
-    loadEnterpriseInfo();
   }, []);
+
+  // 當頁面獲得焦點時重新載入企業引薦碼資訊和目標
+  useFocusEffect(
+    useCallback(() => {
+      loadEnterpriseInfo();
+      loadUserGoals();
+    }, [])
+  );
 
   const loadUserData = async () => {
     try {
@@ -66,17 +91,19 @@ const Settings = ({ navigation }) => {
 
   const loadEnterpriseInfo = async () => {
     try {
-      const code = await AsyncStorage.getItem('enterpriseCode');
-      if (code) {
-        setEnterpriseCode(code);
-        // 從 API 獲取企業資訊
-        const response = await ApiService.getEnterpriseInfo(code);
-        if (response.success) {
-          setEnterpriseInfo(response.enterprise);
-        }
-      }
+      const info = await getEnterpriseCodeInfo();
+      setEnterpriseCodeInfo(info);
     } catch (error) {
       console.error('載入企業資訊失敗:', error);
+    }
+  };
+
+  const loadUserGoals = async () => {
+    try {
+      const goals = await getUserGoalsDetails();
+      setUserGoals(goals);
+    } catch (error) {
+      console.error('載入用戶目標失敗:', error);
     }
   };
 
@@ -98,27 +125,39 @@ const Settings = ({ navigation }) => {
     }
   };
 
+  const handleGoalsManagement = () => {
+    navigation.navigate('SelectGoals', { fromSettings: true });
+  };
+
+  const handleEnterpriseManagement = () => {
+    navigation.navigate('EnterpriseCodeManagement');
+  };
+
   const handleEnterpriseLogin = () => {
-    navigation.navigate('EnterpriseCode');
+    navigation.navigate('EnterpriseCode', { fromSettings: true });
   };
 
   const handleEnterpriseLogout = () => {
     Alert.alert(
-      '確認登出企業帳號',
-      '登出後將無法使用企業專屬的練習模組',
+      '確認刪除企業引薦碼',
+      '刪除後將無法存取企業專屬功能，確定要刪除嗎？',
       [
         { text: '取消', style: 'cancel' },
         {
-          text: '登出',
+          text: '刪除',
           style: 'destructive',
           onPress: async () => {
-            try {
-              await AsyncStorage.removeItem('enterpriseCode');
-              setEnterpriseCode(null);
-              setEnterpriseInfo(null);
-              Alert.alert('成功', '已登出企業帳號');
-            } catch (error) {
-              Alert.alert('錯誤', '登出失敗');
+            const success = await clearEnterpriseCode();
+            if (success) {
+              setEnterpriseCodeInfo({
+                code: null,
+                enterpriseName: null,
+                expiryDate: null,
+                daysRemaining: null,
+              });
+              Alert.alert('成功', '已刪除企業引薦碼');
+            } else {
+              Alert.alert('錯誤', '刪除失敗，請稍後再試');
             }
           }
         }
@@ -141,7 +180,7 @@ const Settings = ({ navigation }) => {
               await AsyncStorage.clear();
               navigation.reset({
                 index: 0,
-                routes: [{ name: 'Home' }],
+                routes: [{ name: 'Login' }],
               });
             } catch (error) {
               console.error('登出失敗:', error);
@@ -261,6 +300,69 @@ const Settings = ({ navigation }) => {
           </View>
         </View>
 
+        {/* 練習目標區塊 */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Ionicons name="flag-outline" size={20} color="#166CB5" />
+            <Text style={styles.sectionTitle}>練習目標</Text>
+          </View>
+          
+          {userGoals.length > 0 ? (
+            // 已設定目標
+            <View style={styles.goalsCard}>
+              <View style={styles.goalsHeader}>
+                <Text style={styles.goalsCount}>已設定 {userGoals.length} 個目標</Text>
+              </View>
+              
+              <View style={styles.goalsGrid}>
+                {userGoals.slice(0, 4).map((goal) => (
+                  <View 
+                    key={goal.id} 
+                    style={[styles.goalChip, { backgroundColor: goal.bgColor }]}
+                  >
+                    <Ionicons name={goal.icon} size={16} color={goal.color} />
+                    <Text style={[styles.goalChipText, { color: goal.color }]}>
+                      {goal.title}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+
+              {userGoals.length > 4 && (
+                <Text style={styles.moreGoalsText}>
+                  還有 {userGoals.length - 4} 個目標...
+                </Text>
+              )}
+
+              <TouchableOpacity 
+                style={styles.editGoalsButton}
+                onPress={handleGoalsManagement}
+              >
+                <Ionicons name="create-outline" size={18} color="#166CB5" />
+                <Text style={styles.editGoalsText}>編輯目標</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            // 未設定目標
+            <TouchableOpacity 
+              style={styles.goalsPromptCard}
+              onPress={handleGoalsManagement}
+              activeOpacity={0.7}
+            >
+              <View style={styles.goalsPromptIcon}>
+                <Ionicons name="flag" size={32} color="#166CB5" />
+              </View>
+              <View style={styles.goalsPromptContent}>
+                <Text style={styles.goalsPromptTitle}>設定練習目標</Text>
+                <Text style={styles.goalsPromptDesc}>
+                  告訴我們你想改善的方向，獲得個人化推薦
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={24} color="#9CA3AF" />
+            </TouchableOpacity>
+          )}
+        </View>
+
         {/* 企業引薦區塊 */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
@@ -268,51 +370,107 @@ const Settings = ({ navigation }) => {
             <Text style={styles.sectionTitle}>企業引薦</Text>
           </View>
           
-          {enterpriseCode ? (
-            // 已登入企業帳號
+          {enterpriseCodeInfo.code ? (
+            // 已設定企業引薦碼
             <View style={styles.enterpriseCard}>
               <LinearGradient
-                colors={['#10B981', '#059669']}
+                colors={
+                  enterpriseCodeInfo.daysRemaining <= 7
+                    ? ['#F59E0B', '#EF4444'] // 即將過期：橘紅色
+                    : ['#10B981', '#059669'] // 正常：綠色
+                }
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.enterpriseBadge}
               >
-                <Ionicons name="shield-checkmark" size={24} color="#FFF" />
+                <Ionicons 
+                  name={enterpriseCodeInfo.daysRemaining <= 7 ? "warning" : "shield-checkmark"} 
+                  size={24} 
+                  color="#FFF" 
+                />
                 <View style={styles.enterpriseBadgeText}>
                   <Text style={styles.enterpriseBadgeTitle}>企業會員</Text>
-                  <Text style={styles.enterpriseBadgeSubtitle}>已啟用</Text>
+                  <Text style={styles.enterpriseBadgeSubtitle}>
+                    {enterpriseCodeInfo.daysRemaining <= 7 
+                      ? `剩餘 ${enterpriseCodeInfo.daysRemaining} 天`
+                      : '已啟用'
+                    }
+                  </Text>
                 </View>
               </LinearGradient>
 
               <View style={styles.enterpriseInfo}>
-                <View style={styles.enterpriseInfoRow}>
-                  <Text style={styles.enterpriseInfoLabel}>企業名稱</Text>
-                  <Text style={styles.enterpriseInfoValue}>
-                    {enterpriseInfo?.name || '企業用戶'}
-                  </Text>
-                </View>
+                {enterpriseCodeInfo.enterpriseName && (
+                  <View style={styles.enterpriseInfoRow}>
+                    <Text style={styles.enterpriseInfoLabel}>企業名稱</Text>
+                    <Text style={styles.enterpriseInfoValue}>
+                      {enterpriseCodeInfo.enterpriseName}
+                    </Text>
+                  </View>
+                )}
+                
                 <View style={styles.enterpriseInfoRow}>
                   <Text style={styles.enterpriseInfoLabel}>引薦碼</Text>
-                  <Text style={styles.enterpriseInfoValue}>{enterpriseCode}</Text>
-                </View>
-                <View style={styles.enterpriseInfoRow}>
-                  <Text style={styles.enterpriseInfoLabel}>專屬練習</Text>
-                  <Text style={styles.enterpriseInfoValue}>
-                    {enterpriseInfo?.moduleCount || 3} 個模組
+                  <Text style={styles.enterpriseCodeValue}>
+                    {enterpriseCodeInfo.code}
                   </Text>
                 </View>
+
+                {enterpriseCodeInfo.expiryDate && (
+                  <View style={styles.enterpriseInfoRow}>
+                    <Text style={styles.enterpriseInfoLabel}>有效期限</Text>
+                    <Text style={[
+                      styles.enterpriseInfoValue,
+                      enterpriseCodeInfo.daysRemaining <= 7 && styles.expiryWarning
+                    ]}>
+                      {formatExpiryDate(enterpriseCodeInfo.expiryDate)}
+                    </Text>
+                  </View>
+                )}
+
+                {enterpriseCodeInfo.daysRemaining !== null && (
+                  <View style={styles.enterpriseInfoRow}>
+                    <Text style={styles.enterpriseInfoLabel}>剩餘天數</Text>
+                    <Text style={[
+                      styles.enterpriseInfoValue,
+                      enterpriseCodeInfo.daysRemaining <= 7 && styles.expiryWarning
+                    ]}>
+                      {enterpriseCodeInfo.daysRemaining} 天
+                    </Text>
+                  </View>
+                )}
               </View>
 
-              <TouchableOpacity 
-                style={styles.enterpriseLogoutButton}
-                onPress={handleEnterpriseLogout}
-              >
-                <Ionicons name="log-out-outline" size={20} color="#EF4444" />
-                <Text style={styles.enterpriseLogoutText}>登出企業帳號</Text>
-              </TouchableOpacity>
+              {/* 即將過期警告 */}
+              {enterpriseCodeInfo.daysRemaining <= 7 && (
+                <View style={styles.warningBanner}>
+                  <Ionicons name="warning-outline" size={20} color="#EF4444" />
+                  <Text style={styles.warningText}>
+                    企業引薦碼即將過期，請聯繫企業管理員取得新的引薦碼
+                  </Text>
+                </View>
+              )}
+
+              <View style={styles.enterpriseActions}>
+                <TouchableOpacity 
+                  style={styles.enterpriseManageButton}
+                  onPress={handleEnterpriseManagement}
+                >
+                  <Ionicons name="settings-outline" size={18} color="#166CB5" />
+                  <Text style={styles.enterpriseManageText}>管理</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity 
+                  style={styles.enterpriseLogoutButton}
+                  onPress={handleEnterpriseLogout}
+                >
+                  <Ionicons name="trash-outline" size={18} color="#EF4444" />
+                  <Text style={styles.enterpriseLogoutText}>刪除</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           ) : (
-            // 未登入企業帳號
+            // 未設定企業引薦碼
             <TouchableOpacity 
               style={styles.enterpriseLoginCard}
               onPress={handleEnterpriseLogin}
@@ -324,7 +482,7 @@ const Settings = ({ navigation }) => {
               <View style={styles.enterpriseLoginContent}>
                 <Text style={styles.enterpriseLoginTitle}>輸入企業引薦碼</Text>
                 <Text style={styles.enterpriseLoginDesc}>
-                  解鎖企業專屬練習模組
+                  解鎖企業專屬練習模組和進階功能
                 </Text>
               </View>
               <Ionicons name="chevron-forward" size={24} color="#9CA3AF" />
@@ -553,6 +711,101 @@ const styles = StyleSheet.create({
     minWidth: 120,
   },
 
+  // Goals Card
+  goalsCard: {
+    backgroundColor: '#FFF',
+    borderRadius: 20,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 5,
+  },
+  goalsHeader: {
+    marginBottom: 16,
+  },
+  goalsCount: {
+    fontSize: 14,
+    color: '#6B7280',
+    fontWeight: '500',
+  },
+  goalsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 16,
+  },
+  goalChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    gap: 6,
+  },
+  goalChipText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  moreGoalsText: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    marginBottom: 16,
+    fontStyle: 'italic',
+  },
+  editGoalsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: '#EFF6FF',
+    gap: 6,
+  },
+  editGoalsText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#166CB5',
+  },
+
+  // Goals Prompt Card
+  goalsPromptCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF',
+    borderRadius: 20,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 5,
+  },
+  goalsPromptIcon: {
+    width: 60,
+    height: 60,
+    borderRadius: 16,
+    backgroundColor: '#EFF6FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  goalsPromptContent: {
+    flex: 1,
+  },
+  goalsPromptTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#111827',
+    marginBottom: 4,
+  },
+  goalsPromptDesc: {
+    fontSize: 14,
+    color: '#6B7280',
+    lineHeight: 20,
+  },
+
   // Enterprise Card
   enterpriseCard: {
     backgroundColor: '#FFF',
@@ -604,17 +857,65 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#111827',
   },
+  enterpriseCodeValue: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#166CB5',
+    letterSpacing: 2,
+  },
+  expiryWarning: {
+    color: '#EF4444',
+  },
+
+  // Warning Banner
+  warningBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#FEF2F2',
+    padding: 12,
+    borderRadius: 12,
+    marginBottom: 16,
+    gap: 10,
+  },
+  warningText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#EF4444',
+    lineHeight: 18,
+  },
+
+  // Enterprise Actions
+  enterpriseActions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  enterpriseManageButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: '#EFF6FF',
+    gap: 6,
+  },
+  enterpriseManageText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#166CB5',
+  },
   enterpriseLogoutButton: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 12,
     borderRadius: 12,
     backgroundColor: '#FEF2F2',
-    gap: 8,
+    gap: 6,
   },
   enterpriseLogoutText: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
     color: '#EF4444',
   },
@@ -653,6 +954,7 @@ const styles = StyleSheet.create({
   enterpriseLoginDesc: {
     fontSize: 14,
     color: '#6B7280',
+    lineHeight: 20,
   },
 
   // Logout Button
