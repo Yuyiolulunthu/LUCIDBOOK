@@ -1,11 +1,12 @@
 // ==========================================
-// 檔案名稱: SelectGoals.js
+// 檔案名稱: SelectGoals.js (導航修復版)
 // 功能: 練習目標設置頁面
 // 
 // ✅ 多選目標功能
 // ✅ 保存目標到本地和後端
 // ✅ 可跳過此步驟
 // ✅ 精美的卡片設計
+// 🔧 修正：API 路徑 + 導航邏輯
 // ==========================================
 
 import React, { useState } from 'react';
@@ -28,6 +29,11 @@ const SelectGoals = ({ navigation, route }) => {
   const [selectedGoals, setSelectedGoals] = useState([]);
   const [loading, setLoading] = useState(false);
   const { fromLogin, fromSettings } = route?.params || {};
+
+  // 🔍 調試：打印參數
+  React.useEffect(() => {
+    console.log('SelectGoals params:', { fromLogin, fromSettings });
+  }, [fromLogin, fromSettings]);
 
   // 預設目標選項
   const goals = [
@@ -136,7 +142,7 @@ const SelectGoals = ({ navigation, route }) => {
         `已選擇 ${selectedGoals.length} 個練習目標`,
         [
           {
-            text: '開始探索',
+            text: '確定',
             onPress: () => handleNavigation(),
           }
         ]
@@ -164,21 +170,58 @@ const SelectGoals = ({ navigation, route }) => {
     );
   };
 
-  // 處理導航
+  // 🔧 改進的導航處理
   const handleNavigation = () => {
+    console.log('handleNavigation called with:', { fromSettings, fromLogin });
+    
     if (fromSettings) {
-      // 從設定頁進入，返回設定
-      navigation.goBack();
+      // 方案 1: 嘗試 goBack
+      console.log('Navigating back to Settings...');
+      if (navigation.canGoBack()) {
+        navigation.goBack();
+      } else {
+        // 方案 2: 如果 goBack 不可用，嘗試直接導航
+        console.log('Cannot go back, trying navigate to Settings...');
+        try {
+          navigation.navigate('Settings');
+        } catch (error) {
+          console.error('Navigate to Settings failed:', error);
+          // 方案 3: 嘗試導航到 Profile Tab
+          try {
+            navigation.navigate('Profile');
+          } catch (err) {
+            console.error('All navigation attempts failed:', err);
+          }
+        }
+      }
     } else if (fromLogin) {
       // 從登入進入，導航到主頁面
-      // 根據你的 App 結構，可能是 Home、Explore 或 MainTabs
+      console.log('Navigating to main tabs...');
+      // 🔧 請根據你的實際路由結構選擇：
+      
+      // 選項 1: 如果有 MainTabs
       navigation.reset({
         index: 0,
-        routes: [{ name: 'MainTabs' }], // 或 'Home', 'Explore' 等
+        routes: [{ name: 'MainTabs' }],
       });
+      
+      // 選項 2: 如果直接是 Home
+      // navigation.reset({
+      //   index: 0,
+      //   routes: [{ name: 'Home' }],
+      // });
+      
+      // 選項 3: 如果是 BottomTabs
+      // navigation.reset({
+      //   index: 0,
+      //   routes: [{ name: 'BottomTabs' }],
+      // });
     } else {
       // 其他情況，返回
-      navigation.goBack();
+      console.log('Default navigation: going back...');
+      if (navigation.canGoBack()) {
+        navigation.goBack();
+      }
     }
   };
 
