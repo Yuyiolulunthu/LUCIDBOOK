@@ -17,7 +17,13 @@ import Slider from '@react-native-community/slider';
 import { LinearGradient } from 'expo-linear-gradient';
 
 export default function GoodThingsJournal({ onBack, navigation, route }) {
-  // 頁面狀態：'intro' (第一頁) -> 'writing1' (第二頁) -> 'writing2' (第三頁) -> 'reflection' (第四頁) -> 'completion' (第五頁)
+  // 頁面狀態：
+  // 'intro' (第一頁)
+  // 'writing1' (第二頁)
+  // 'writing2' (第三頁)
+  // 'encouragement' (新增：第四頁／你做得很好)
+  // 'reflection' (第五頁)
+  // 'completion' (第六頁)
   const [currentPage, setCurrentPage] = useState('intro');
   
   // 第二頁狀態
@@ -38,7 +44,7 @@ export default function GoodThingsJournal({ onBack, navigation, route }) {
   const [showQuestion6, setShowQuestion6] = useState(false);
   const [activeInspirationPage2, setActiveInspirationPage2] = useState(null); // 'q4' or 'q5'
   
-  // 第四頁狀態
+  // 第四（五）頁狀態
   const [positiveLevel, setPositiveLevel] = useState(5); // 正向感受程度 1-10，預設5
   const [selectedMoods, setSelectedMoods] = useState([]); // 書寫完後的心情
   const [moodNote, setMoodNote] = useState(''); // 心情記錄
@@ -70,7 +76,7 @@ export default function GoodThingsJournal({ onBack, navigation, route }) {
     { id: 6, label: '其他', isOther: true },
   ];
 
-  // 第四頁：心情選項
+  // 第五頁：心情選項
   const moodOptions = [
     { id: 1, label: '平靜安定' },
     { id: 2, label: '原本不舒服的情緒緩和了些' },
@@ -100,7 +106,6 @@ export default function GoodThingsJournal({ onBack, navigation, route }) {
 
   // 第三頁：靈感提示內容
   const inspirationContentQ4 = inspirationContentQ1;
-  
   const inspirationContentQ5 = inspirationContentQ2;
 
   // 監聽第一個問題的輸入，顯示第二個問題
@@ -131,11 +136,13 @@ export default function GoodThingsJournal({ onBack, navigation, route }) {
     }
   }, [question5Answer, currentPage, showQuestion6]);
 
-  // 處理返回按鈕
+  // 處理返回按鈕（加上 encouragement）
   const handleBack = () => {
     if (currentPage === 'completion') {
       setCurrentPage('reflection');
     } else if (currentPage === 'reflection') {
+      setCurrentPage('encouragement');
+    } else if (currentPage === 'encouragement') {
       setCurrentPage('writing2');
     } else if (currentPage === 'writing2') {
       setCurrentPage('writing1');
@@ -244,7 +251,6 @@ export default function GoodThingsJournal({ onBack, navigation, route }) {
 
   // 處理滑桿變化 - 吸附到最近的整數刻度
   const handlePositiveLevelChange = (value) => {
-    // 四捨五入到最近的整數（1-10）
     const snappedValue = Math.round(value);
     setPositiveLevel(snappedValue);
   };
@@ -316,7 +322,6 @@ export default function GoodThingsJournal({ onBack, navigation, route }) {
   // 渲染第二頁（書寫頁面1）
   const renderWriting1Page = () => {
     const isOtherFeelingSelected = selectedFeelings.includes(10);
-    // 靈感按鈕始終顯示，位置根據第二題是否出現而定
     const inspirationPosition = showQuestion2 ? 'q2' : 'q1';
 
     return (
@@ -362,7 +367,7 @@ export default function GoodThingsJournal({ onBack, navigation, route }) {
               </>
             )}
 
-            {/* 靈感提示 - 始終顯示，根據位置切換 */}
+            {/* 靈感提示 */}
             <TouchableOpacity 
               style={styles.inspirationTrigger}
               onPress={() => toggleInspiration(inspirationPosition)}
@@ -371,21 +376,21 @@ export default function GoodThingsJournal({ onBack, navigation, route }) {
                 source={require('../../../assets/images/Fresh_idea.png')}
                 style={[
                   styles.inspirationIcon,
-                  activeInspiration === inspirationPosition && styles.inspirationIconActive
+                  activeInspiration === inspirationPosition && styles.inspirationIconActive,
                 ]}
                 resizeMode="contain"
               />
               <Text 
                 style={[
                   styles.inspirationText,
-                  activeInspiration !== inspirationPosition && styles.inspirationTextInactive
+                  activeInspiration !== inspirationPosition && styles.inspirationTextInactive,
                 ]}
               >
                 需要靈感嗎？
               </Text>
             </TouchableOpacity>
 
-            {/* 靈感內容 - 根據當前問題顯示 */}
+            {/* 靈感內容 */}
             {activeInspiration === 'q1' && (
               <View style={styles.inspirationBox}>
                 <Text style={styles.inspirationBoxTitle}>可以試試這些方向：</Text>
@@ -399,14 +404,12 @@ export default function GoodThingsJournal({ onBack, navigation, route }) {
               <View style={styles.inspirationBox}>
                 <Text style={styles.inspirationBoxTitle}>可以試試這些方向：</Text>
                 {inspirationContentQ2.map((item, index) => (
-                  <Text key={index} style={styles.inspirationBoxItem}>
-                    {item.startsWith('•') ? item : `${item}`}
-                  </Text>
+                  <Text key={index} style={styles.inspirationBoxItem}>{item}</Text>
                 ))}
               </View>
             )}
 
-            {/* 問題3 - 條件顯示 */}
+            {/* 問題3 */}
             {showQuestion3 && (
               <>
                 <Text style={styles.questionLabel}>這件事讓你有什麼感受？</Text>
@@ -458,7 +461,7 @@ export default function GoodThingsJournal({ onBack, navigation, route }) {
               </>
             )}
 
-            {/* 好事花生按鈕 - 放在內容底部 */}
+            {/* 好事花生按鈕 -> 第三頁 */}
             <TouchableOpacity 
               style={styles.nextPageButton}
               onPress={() => setCurrentPage('writing2')}
@@ -467,7 +470,6 @@ export default function GoodThingsJournal({ onBack, navigation, route }) {
               <Text style={styles.nextPageArrow}>›</Text>
             </TouchableOpacity>
 
-            {/* 底部間距 */}
             <View style={{ height: 100 }} />
           </ScrollView>
 
@@ -494,7 +496,6 @@ export default function GoodThingsJournal({ onBack, navigation, route }) {
   // 渲染第三頁（書寫頁面2）
   const renderWriting2Page = () => {
     const isOtherActionSelected = selectedActions.includes(6);
-    // 靈感按鈕始終顯示，位置根據第五題是否出現而定
     const inspirationPosition = showQuestion5 ? 'q5' : 'q4';
 
     return (
@@ -524,7 +525,7 @@ export default function GoodThingsJournal({ onBack, navigation, route }) {
               textAlignVertical="top"
             />
 
-            {/* 問題5 - 條件顯示 */}
+            {/* 問題5 */}
             {showQuestion5 && (
               <>
                 <Text style={styles.questionLabel}>你可以怎麼做，讓這件事有機會再發生？</Text>
@@ -540,7 +541,7 @@ export default function GoodThingsJournal({ onBack, navigation, route }) {
               </>
             )}
 
-            {/* 靈感提示 - 始終顯示，根據位置切換 */}
+            {/* 靈感提示 */}
             <TouchableOpacity 
               style={styles.inspirationTrigger}
               onPress={() => toggleInspirationPage2(inspirationPosition)}
@@ -549,14 +550,14 @@ export default function GoodThingsJournal({ onBack, navigation, route }) {
                 source={require('../../../assets/images/Fresh_idea.png')}
                 style={[
                   styles.inspirationIcon,
-                  activeInspirationPage2 === inspirationPosition && styles.inspirationIconActive
+                  activeInspirationPage2 === inspirationPosition && styles.inspirationIconActive,
                 ]}
                 resizeMode="contain"
               />
               <Text 
                 style={[
                   styles.inspirationText,
-                  activeInspirationPage2 !== inspirationPosition && styles.inspirationTextInactive
+                  activeInspirationPage2 !== inspirationPosition && styles.inspirationTextInactive,
                 ]}
               >
                 需要靈感嗎？
@@ -577,14 +578,12 @@ export default function GoodThingsJournal({ onBack, navigation, route }) {
               <View style={styles.inspirationBox}>
                 <Text style={styles.inspirationBoxTitle}>可以試試這些方向：</Text>
                 {inspirationContentQ5.map((item, index) => (
-                  <Text key={index} style={styles.inspirationBoxItem}>
-                    {item.startsWith('•') ? item : `${item}`}
-                  </Text>
+                  <Text key={index} style={styles.inspirationBoxItem}>{item}</Text>
                 ))}
               </View>
             )}
 
-            {/* 問題6 - 條件顯示 */}
+            {/* 問題6 - 小行動 */}
             {showQuestion6 && (
               <>
                 <Text style={styles.actionPrompt}>選擇想嘗試的小行動</Text>
@@ -636,16 +635,15 @@ export default function GoodThingsJournal({ onBack, navigation, route }) {
               </>
             )}
 
-            {/* 好事再花生按鈕 - 放在內容底部 */}
+            {/* 好事再花生按鈕 -> 新增 encouragement 頁 */}
             <TouchableOpacity 
               style={styles.nextPageButton}
-              onPress={() => setCurrentPage('reflection')}
+              onPress={() => setCurrentPage('encouragement')}
             >
               <Text style={styles.nextPageButtonText}>好事再花生</Text>
               <Text style={styles.nextPageArrow}>›</Text>
             </TouchableOpacity>
 
-            {/* 底部間距 */}
             <View style={{ height: 100 }} />
           </ScrollView>
 
@@ -669,7 +667,66 @@ export default function GoodThingsJournal({ onBack, navigation, route }) {
     );
   };
 
-  // 渲染第四頁（感受覺察）
+  // ⭐ 新增：第四頁（你做得很好／過渡頁）
+  const renderEncouragementPage = () => (
+    <View style={styles.encouragementContainer}>
+      <ScrollView
+        contentContainerStyle={styles.encouragementScrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <Text style={styles.encouragementTitle}>你做得很好 🌿</Text>
+        <Text style={styles.encouragementSubtitle}>
+          為自己的堅持感到驕傲吧{'\n'}
+          對生活又擁有了更多了正向感受！
+        </Text>
+
+        {/* 去感受覺察頁面 */}
+        <TouchableOpacity
+          style={styles.encouragementPrimaryButton}
+          onPress={() => setCurrentPage('reflection')}
+        >
+          <Text style={styles.encouragementPrimaryText}>記錄此刻的感受</Text>
+          <LinearGradient
+            colors={['rgba(0, 0, 0, 0.00)', 'rgba(49, 198, 254, 0.20)', 'rgba(0, 0, 0, 0.00)']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.encouragementPrimaryGradient}
+            pointerEvents="none"
+          />
+        </TouchableOpacity>
+
+        {/* 直接結束練習 */}
+        <TouchableOpacity
+          style={styles.encouragementSecondaryButton}
+          onPress={() => setCurrentPage('completion')}
+        >
+          <Text style={styles.encouragementSecondaryText}>靜靜結束練習</Text>
+        </TouchableOpacity>
+
+        <Text style={styles.encouragementHint}>給自己一點時間，慢慢感受</Text>
+
+        <View style={{ height: 100 }} />
+      </ScrollView>
+
+      {/* 底部 Home 按鈕 */}
+      <View style={styles.bottomNav}>
+        <TouchableOpacity 
+          onPress={handleHome}
+          style={styles.homeButtonContainer}
+        >
+          <View style={styles.homeButtonBackground}>
+            <Image 
+              source={require('../../../assets/images/Home_icon.png')}
+              style={styles.bottomHomeIcon}
+              resizeMode="contain"
+            />
+          </View>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+
+  // 渲染第五頁（感受覺察）
   const renderReflectionPage = () => {
     const isOtherMoodSelected = selectedMoods.includes(7);
 
@@ -689,7 +746,6 @@ export default function GoodThingsJournal({ onBack, navigation, route }) {
             <View style={styles.sliderSection}>
               <Text style={styles.sliderTitle}>對自己或生活的正向感受</Text>
               
-              {/* Slider 容器 */}
               <View style={styles.sliderContainer}>
                 <Slider
                   style={styles.slider}
@@ -704,22 +760,20 @@ export default function GoodThingsJournal({ onBack, navigation, route }) {
                 />
               </View>
 
-              {/* 刻度標籤容器 */}
+              {/* 刻度 */}
               <View style={styles.sliderScaleContainer}>
-                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((scale) => (
+                {[1,2,3,4,5,6,7,8,9,10].map((scale) => (
                   <View key={scale} style={styles.sliderScaleItem}>
-                    {/* 刻度線 */}
                     <View 
                       style={[
                         styles.sliderScaleMark,
-                        positiveLevel === scale && styles.sliderScaleMarkActive
+                        positiveLevel === scale && styles.sliderScaleMarkActive,
                       ]} 
                     />
-                    {/* 刻度數字 */}
                     <Text 
                       style={[
                         styles.sliderScaleText,
-                        positiveLevel === scale && styles.sliderScaleTextActive
+                        positiveLevel === scale && styles.sliderScaleTextActive,
                       ]}
                     >
                       {scale}
@@ -728,7 +782,6 @@ export default function GoodThingsJournal({ onBack, navigation, route }) {
                 ))}
               </View>
 
-              {/* 底部標籤 */}
               <View style={styles.sliderLabels}>
                 <Text style={styles.sliderLabelText}>完全沒有</Text>
                 <Text style={styles.sliderLabelText}>踏實愉悅</Text>
@@ -784,11 +837,10 @@ export default function GoodThingsJournal({ onBack, navigation, route }) {
               </>
             )}
 
-            {/* 記錄此刻的感受按鈕 - 放在內容底部 */}
+            {/* 記錄此刻的感受按鈕 -> 完成頁 */}
             <TouchableOpacity 
               style={styles.submitButton}
               onPress={() => {
-                // TODO: 保存數據到後端
                 console.log('保存好事書寫數據');
                 setCurrentPage('completion');
               }}
@@ -803,7 +855,6 @@ export default function GoodThingsJournal({ onBack, navigation, route }) {
               />
             </TouchableOpacity>
 
-            {/* 底部間距 */}
             <View style={{ height: 100 }} />
           </ScrollView>
 
@@ -827,7 +878,7 @@ export default function GoodThingsJournal({ onBack, navigation, route }) {
     );
   };
 
-  // 渲染第五頁（完成頁面）
+  // 渲染第六頁（完成頁面）
   const renderCompletionPage = () => (
     <View style={styles.completionContainer}>
       <ScrollView 
@@ -844,9 +895,7 @@ export default function GoodThingsJournal({ onBack, navigation, route }) {
 
         {/* 連續天數卡片 */}
         <View style={styles.streakCard}>
-          {/* 慶祝 Emoji */}
           <Text style={styles.celebrationEmoji}>🎉</Text>
-          
           <Text style={styles.streakLabel}>你已經連續練習</Text>
           <Text style={styles.streakDays}>3 天</Text>
         </View>
@@ -873,7 +922,6 @@ export default function GoodThingsJournal({ onBack, navigation, route }) {
           />
         </TouchableOpacity>
 
-        {/* 底部間距 */}
         <View style={{ height: 100 }} />
       </ScrollView>
 
@@ -919,6 +967,8 @@ export default function GoodThingsJournal({ onBack, navigation, route }) {
         ? renderWriting1Page()
         : currentPage === 'writing2'
         ? renderWriting2Page()
+        : currentPage === 'encouragement'
+        ? renderEncouragementPage()
         : currentPage === 'reflection'
         ? renderReflectionPage()
         : renderCompletionPage()}
@@ -1236,7 +1286,6 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter',
     marginBottom: 32,
   },
-  // 第二、三頁按鈕 - 淺藍色邊框、白色背景、淺藍色文字
   nextPageButton: {
     width: '100%',
     maxWidth: 361,
@@ -1264,8 +1313,96 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 24,
   },
+
+  // ⭐ 新增 encouragement 頁樣式
+  encouragementContainer: {
+    flex: 1,
+    backgroundColor: '#E9EFF6',
+  },
+  encouragementScrollContent: {
+    flexGrow: 1,
+    paddingHorizontal: 24,
+    paddingTop: 60,
+    paddingBottom: 150,
+    alignItems: 'center',
+  },
+  encouragementTitle: {
+    fontSize: 30,
+    fontWeight: '400',
+    color: '#2B2B2B',
+    textAlign: 'center',
+    fontFamily: 'Inter',
+    marginBottom: 16,
+  },
+  encouragementSubtitle: {
+    fontSize: 17,
+    fontWeight: '400',
+    color: '#4A5565',
+    textAlign: 'center',
+    lineHeight: 29.25,
+    fontFamily: 'Inter',
+    marginBottom: 40,
+  },
+  encouragementPrimaryButton: {
+    width: '100%',
+    maxWidth: 361,
+    height: 62,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 100,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    overflow: 'hidden',
+    marginBottom: 16,
+  },
+  encouragementPrimaryText: {
+    fontSize: 18,
+    fontWeight: '400',
+    color: '#166CB5',
+    fontFamily: 'Inter',
+    zIndex: 1,
+  },
+  encouragementPrimaryGradient: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 100,
+    opacity: 0.4702,
+  },
+  encouragementSecondaryButton: {
+    width: '100%',
+    maxWidth: 361,
+    height: 56,
+    borderRadius: 100,
+    borderWidth: 1,
+    borderColor: '#CBD5E0',
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  encouragementSecondaryText: {
+    fontSize: 16,
+    fontWeight: '400',
+    color: '#4A5565',
+    fontFamily: 'Inter',
+  },
+  encouragementHint: {
+    fontSize: 13,
+    fontWeight: '400',
+    color: '#718096',
+    fontFamily: 'Inter',
+    marginTop: 8,
+    textAlign: 'center',
+  },
   
-  // 第四頁樣式
+  // 第五頁樣式
   reflectionContainer: {
     flex: 1,
     backgroundColor: '#E9EFF6',
@@ -1317,7 +1454,6 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 9.5,
   },
-  // ⭐ 新增刻度容器樣式
   sliderScaleContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -1407,7 +1543,6 @@ const styles = StyleSheet.create({
   moodTagTextSelected: {
     color: '#FFFFFF',
   },
-  // 第四頁按鈕 - 白色背景、漸層效果
   submitButton: {
     width: '100%',
     maxWidth: 361,
@@ -1442,7 +1577,7 @@ const styles = StyleSheet.create({
     opacity: 0.4702,
   },
   
-  // 第五頁樣式 - 根據設計圖優化
+  // 第六頁樣式
   completionContainer: {
     flex: 1,
     backgroundColor: '#E9EFF6',
@@ -1498,7 +1633,6 @@ const styles = StyleSheet.create({
     color: '#31C6FF',
     fontFamily: 'Inter',
   },
-  // 第五頁按鈕 - 白色背景、漸層效果
   viewDiaryButton: {
     width: '100%',
     maxWidth: 361,
