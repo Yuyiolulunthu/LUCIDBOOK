@@ -39,7 +39,7 @@ export default function GoodThingsJournal({ onBack, navigation, route }) {
   const [activeInspirationPage2, setActiveInspirationPage2] = useState(null); // 'q4' or 'q5'
   
   // 第四頁狀態
-  const [positiveLevel, setPositiveLevel] = useState(5); // 正向感受程度 0-10
+  const [positiveLevel, setPositiveLevel] = useState(5); // 正向感受程度 1-10，預設5
   const [selectedMoods, setSelectedMoods] = useState([]); // 書寫完後的心情
   const [moodNote, setMoodNote] = useState(''); // 心情記錄
   
@@ -240,6 +240,13 @@ export default function GoodThingsJournal({ onBack, navigation, route }) {
     } else {
       setActiveInspirationPage2(questionId);
     }
+  };
+
+  // 處理滑桿變化 - 吸附到最近的整數刻度
+  const handlePositiveLevelChange = (value) => {
+    // 四捨五入到最近的整數（1-10）
+    const snappedValue = Math.round(value);
+    setPositiveLevel(snappedValue);
   };
 
   // 渲染第一頁（介紹頁）
@@ -688,19 +695,43 @@ export default function GoodThingsJournal({ onBack, navigation, route }) {
                   style={styles.slider}
                   minimumValue={0}
                   maximumValue={10}
-                  step={0.1}
+                  step={1}
                   value={positiveLevel}
-                  onValueChange={setPositiveLevel}
+                  onValueChange={handlePositiveLevelChange}
                   minimumTrackTintColor="#31C6FF"
                   maximumTrackTintColor="rgba(255, 255, 255, 0.40)"
                   thumbTintColor="#FFFFFF"
                 />
               </View>
 
-              {/* 刻度標籤 */}
+              {/* 刻度標籤容器 */}
+              <View style={styles.sliderScaleContainer}>
+                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((scale) => (
+                  <View key={scale} style={styles.sliderScaleItem}>
+                    {/* 刻度線 */}
+                    <View 
+                      style={[
+                        styles.sliderScaleMark,
+                        positiveLevel === scale && styles.sliderScaleMarkActive
+                      ]} 
+                    />
+                    {/* 刻度數字 */}
+                    <Text 
+                      style={[
+                        styles.sliderScaleText,
+                        positiveLevel === scale && styles.sliderScaleTextActive
+                      ]}
+                    >
+                      {scale}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+
+              {/* 底部標籤 */}
               <View style={styles.sliderLabels}>
-                <Text style={styles.sliderLabelText}>0 完全沒有</Text>
-                <Text style={styles.sliderLabelText}>10 踏實愉悅</Text>
+                <Text style={styles.sliderLabelText}>完全沒有</Text>
+                <Text style={styles.sliderLabelText}>踏實愉悅</Text>
               </View>
             </View>
 
@@ -1286,9 +1317,43 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 9.5,
   },
+  // ⭐ 新增刻度容器樣式
+  sliderScaleContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 4,
+    marginBottom: 8,
+    paddingHorizontal: 2,
+  },
+  sliderScaleItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  sliderScaleMark: {
+    width: 2,
+    height: 8,
+    backgroundColor: '#D0D0D0',
+    marginBottom: 4,
+  },
+  sliderScaleMarkActive: {
+    backgroundColor: '#31C6FF',
+    height: 10,
+    width: 3,
+  },
+  sliderScaleText: {
+    fontSize: 10,
+    fontWeight: '400',
+    color: '#4A5565',
+    fontFamily: 'Inter',
+  },
+  sliderScaleTextActive: {
+    color: '#31C6FF',
+    fontWeight: '600',
+  },
   sliderLabels: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    marginTop: 4,
   },
   sliderLabelText: {
     fontSize: 12,
