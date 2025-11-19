@@ -153,6 +153,7 @@ export default function BreathingPractice({ onBack, navigation }) {
     };
   }, [startTime]);
 
+  // 🔥 修正：完整的依賴數組
   useEffect(() => {
     if (!practiceId) return;
     
@@ -195,7 +196,7 @@ export default function BreathingPractice({ onBack, navigation }) {
           
           setCurrentStep(validPage);
           
-          // 恢復表單數據
+          // 🔥 修正：統一處理表單數據還原
           if (response.formData) {
             try {
               const parsedData = typeof response.formData === 'string' 
@@ -203,7 +204,32 @@ export default function BreathingPractice({ onBack, navigation }) {
                 : response.formData;
               
               console.log('✅ 恢復表單數據:', parsedData);
+              
+              // 🔹 先還原 noticed 的關鍵字和文字
+              const noticedValue = parsedData.noticed || '';
+              if (noticedValue && typeof noticedValue === 'string') {
+                const lines = noticedValue.split('\n');
+                if (lines[0] && lines[0].startsWith('情緒關鍵字：')) {
+                  // 第一行是關鍵字
+                  const kwStr = lines[0].replace('情緒關鍵字：', '');
+                  const parsedKw = kwStr.split('、').map(s => s.trim()).filter(Boolean);
+                  setNoticedKeywords(parsedKw);
+                  // 剩餘的行是自由文字
+                  const remainingText = lines.slice(1).join('\n').trim();
+                  setNoticedText(remainingText);
+                } else {
+                  // 舊資料：全部當成自由文字
+                  setNoticedText(noticedValue);
+                  setNoticedKeywords([]);
+                }
+              } else {
+                setNoticedText('');
+                setNoticedKeywords([]);
+              }
+              
+              // 然後設定完整的 formData
               setFormData(parsedData);
+              
             } catch (e) {
               console.log('⚠️ 解析表單數據失敗:', e);
               setFormData({
@@ -211,37 +237,9 @@ export default function BreathingPractice({ onBack, navigation }) {
                 noticed: '',
                 reflection: '',
               });
-            }
-          }
-
-          // 🔹 從舊資料裡還原 noticed 文字 + 盡力還原關鍵字
-          try {
-            const noticedValue = (response.formData && 
-              (typeof response.formData === 'string'
-                ? JSON.parse(response.formData).noticed
-                : response.formData.noticed)) || '';
-
-            if (noticedValue && typeof noticedValue === 'string') {
-              const lines = noticedValue.split('\n');
-              if (lines[0].startsWith('情緒關鍵字：')) {
-                // 第一行是關鍵字
-                const kwStr = lines[0].replace('情緒關鍵字：', '');
-                const parsedKw = kwStr.split('、').map(s => s.trim()).filter(Boolean);
-                setNoticedKeywords(parsedKw);
-                setNoticedText(lines.slice(1).join('\n'));
-              } else {
-                // 舊資料：全部當成自由文字
-                setNoticedText(noticedValue);
-                setNoticedKeywords([]);
-              }
-            } else {
               setNoticedText('');
               setNoticedKeywords([]);
             }
-          } catch (e) {
-            console.log('⚠️ 還原 noticed 內容失敗:', e);
-            setNoticedText('');
-            setNoticedKeywords([]);
           }
           
           // 恢復累積時間
@@ -267,10 +265,6 @@ export default function BreathingPractice({ onBack, navigation }) {
       Alert.alert('錯誤', '無法連接伺服器，請檢查網路連線');
     }
   };
-
-  useEffect(() => {
-    saveProgress();
-  }, [currentStep, formData]);
 
   const saveProgress = async () => {
     if (!practiceId) return;
@@ -1160,7 +1154,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 3,
     elevation: 3,
