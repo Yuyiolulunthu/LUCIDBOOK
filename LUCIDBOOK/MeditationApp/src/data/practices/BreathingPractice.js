@@ -36,6 +36,10 @@ export default function BreathingPractice({ onBack, navigation }) {
     reflection: '',
   });
 
+  // 🔹 新增：情緒關鍵字 + 自由文字
+  const [noticedKeywords, setNoticedKeywords] = useState([]);
+  const [noticedText, setNoticedText] = useState('');
+
   const scrollViewRef = useRef(null);
 
   const steps = [
@@ -86,6 +90,46 @@ export default function BreathingPractice({ onBack, navigation }) {
   const currentStepData = steps[currentStep];
   const progressPercentage = ((currentStep + 1) / totalSteps) * 100;
 
+  // 🔹 將 關鍵字 + 自由文字 組成要送出的 noticed 字串
+  const buildNoticedValue = (keywords, text) => {
+    const keywordPart = keywords.length
+      ? `情緒關鍵字：${keywords.join('、')}`
+      : '';
+    if (!keywordPart && !text) return '';
+    if (!keywordPart) return text;
+    if (!text) return keywordPart;
+    return `${keywordPart}\n${text}`;
+  };
+
+  // 🔹 點選 / 取消選取關鍵字
+  const toggleNoticedKeyword = (kw) => {
+    setNoticedKeywords((prev) => {
+      let next;
+      if (prev.includes(kw)) {
+        next = prev.filter(k => k !== kw);
+      } else {
+        next = [...prev, kw];
+      }
+      // 同步更新 formData.noticed
+      const combined = buildNoticedValue(next, noticedText);
+      setFormData(prevForm => ({
+        ...prevForm,
+        noticed: combined,
+      }));
+      return next;
+    });
+  };
+
+  // 🔹 文字輸入變動
+  const handleNoticedTextChange = (text) => {
+    setNoticedText(text);
+    const combined = buildNoticedValue(noticedKeywords, text);
+    setFormData(prevForm => ({
+      ...prevForm,
+      noticed: combined,
+    }));
+  };
+
   useEffect(() => {
     initializePractice();
 
@@ -114,7 +158,7 @@ export default function BreathingPractice({ onBack, navigation }) {
     
     const autoSaveInterval = setInterval(() => {
       saveProgress();
-    }, 1000); // 每 1 秒自動保存一次
+    }, 1000);
     
     return () => clearInterval(autoSaveInterval);
   }, [practiceId, currentStep, formData, elapsedTime]);
@@ -129,13 +173,15 @@ export default function BreathingPractice({ onBack, navigation }) {
         if (response.isNewPractice) {
           // 🔥 這是新練習，確保從頭開始
           console.log('✅ 開始新練習，重置所有狀態');
-          setCurrentStep(0);  // 明確設為第0頁
-          setFormData({        // 重置表單數據
+          setCurrentStep(0);
+          setFormData({
             feeling: '',
             noticed: '',
             reflection: '',
           });
-          setElapsedTime(0);   // 重置時間
+          setNoticedText('');
+          setNoticedKeywords([]);
+          setElapsedTime(0);
           setStartTime(Date.now());
           
         } else if (response.currentPage !== undefined && response.currentPage !== null) {
@@ -160,13 +206,42 @@ export default function BreathingPractice({ onBack, navigation }) {
               setFormData(parsedData);
             } catch (e) {
               console.log('⚠️ 解析表單數據失敗:', e);
-              // 解析失敗時使用空數據
               setFormData({
                 feeling: '',
                 noticed: '',
                 reflection: '',
               });
             }
+          }
+
+          // 🔹 從舊資料裡還原 noticed 文字 + 盡力還原關鍵字
+          try {
+            const noticedValue = (response.formData && 
+              (typeof response.formData === 'string'
+                ? JSON.parse(response.formData).noticed
+                : response.formData.noticed)) || '';
+
+            if (noticedValue && typeof noticedValue === 'string') {
+              const lines = noticedValue.split('\n');
+              if (lines[0].startsWith('情緒關鍵字：')) {
+                // 第一行是關鍵字
+                const kwStr = lines[0].replace('情緒關鍵字：', '');
+                const parsedKw = kwStr.split('、').map(s => s.trim()).filter(Boolean);
+                setNoticedKeywords(parsedKw);
+                setNoticedText(lines.slice(1).join('\n'));
+              } else {
+                // 舊資料：全部當成自由文字
+                setNoticedText(noticedValue);
+                setNoticedKeywords([]);
+              }
+            } else {
+              setNoticedText('');
+              setNoticedKeywords([]);
+            }
+          } catch (e) {
+            console.log('⚠️ 還原 noticed 內容失敗:', e);
+            setNoticedText('');
+            setNoticedKeywords([]);
           }
           
           // 恢復累積時間
@@ -308,7 +383,6 @@ export default function BreathingPractice({ onBack, navigation }) {
     }
 
     try {
-      // ✅ 直接使用 elapsedTime
       const totalSeconds = elapsedTime;
       const totalMinutes = Math.max(1, Math.ceil(totalSeconds / 60));
 
@@ -320,7 +394,6 @@ export default function BreathingPractice({ onBack, navigation }) {
         reflection: formData.reflection,
       });
 
-      // ✅ 修正時間顯示
       const mins = Math.floor(totalSeconds / 60);
       const secs = totalSeconds % 60;
       let timeStr = '';
@@ -387,13 +460,63 @@ export default function BreathingPractice({ onBack, navigation }) {
             
             <View style={styles.inputField}>
               <Text style={styles.inputLabel}>練習中的發現，我發現：</Text>
+
+              {/* 🔹 情緒關鍵字區塊 */}
+              <View style={styles.keywordSection}>
+                <Text style={styles.keywordGroupLabel}>🌧️ 負面情緒</Text>
+                <View style={styles.keywordContainer}>
+                  {['焦慮', '煩躁', '疲憊', '緊繃', '分心', '不安', '壓力', '心悶', '心煩'].map((kw) => (
+                    <TouchableOpacity
+                      key={kw}
+                      style={[
+                        styles.keywordButton,
+                        noticedKeywords.includes(kw) && styles.keywordButtonSelected
+                      ]}
+                      onPress={() => toggleNoticedKeyword(kw)}
+                    >
+                      <Text
+                        style={[
+                          styles.keywordButtonText,
+                          noticedKeywords.includes(kw) && styles.keywordButtonTextSelected
+                        ]}
+                      >
+                        {kw}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                <Text style={[styles.keywordGroupLabel, { marginTop: 8 }]}>🌤️ 正向感受</Text>
+                <View style={styles.keywordContainer}>
+                  {['放鬆', '平靜', '安心', '被理解', '被支持', '更清醒', '更專注', '比較好受', '心情有變好'].map((kw) => (
+                    <TouchableOpacity
+                      key={kw}
+                      style={[
+                        styles.keywordButton,
+                        noticedKeywords.includes(kw) && styles.keywordButtonSelected
+                      ]}
+                      onPress={() => toggleNoticedKeyword(kw)}
+                    >
+                      <Text
+                        style={[
+                          styles.keywordButtonText,
+                          noticedKeywords.includes(kw) && styles.keywordButtonTextSelected
+                        ]}
+                      >
+                        {kw}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
               <TextInput 
                 style={styles.inputBox} 
                 multiline 
-                placeholder="記錄練習時的發現"
+                placeholder="記錄練習時的發現（可以搭配上面的關鍵字）"
                 placeholderTextColor="rgba(0, 0, 0, 0.4)"
-                value={formData.noticed}
-                onChangeText={(text) => updateFormData('noticed', text)}
+                value={noticedText}
+                onChangeText={handleNoticedTextChange}
               />
             </View>
             
@@ -915,6 +1038,41 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     color: 'rgba(0, 0, 0, 0.6)',
     textAlignVertical: 'top',
+  },
+  // 🔹 新增樣式
+  keywordSection: {
+    marginBottom: 10,
+  },
+  keywordGroupLabel: {
+    fontSize: 13,
+    color: 'rgba(0,0,0,0.6)',
+    marginBottom: 4,
+  },
+  keywordContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginBottom: 6,
+  },
+  keywordButton: {
+    backgroundColor: 'rgba(255,255,255,0.6)',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+    marginRight: 8,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.2)',
+  },
+  keywordButtonSelected: {
+    backgroundColor: 'rgba(79, 127, 150, 0.95)',
+    borderColor: 'rgba(79, 127, 150, 1)',
+  },
+  keywordButtonText: {
+    fontSize: 13,
+    color: 'rgba(0,0,0,0.7)',
+  },
+  keywordButtonTextSelected: {
+    color: '#FFFFFF',
   },
   separator: {
     height: 1,

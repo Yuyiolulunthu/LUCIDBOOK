@@ -22,7 +22,7 @@ import BreathingExerciseCard from './src/data/practices/BreathingExerciseCard';
 import EmotionPractice from './src/data/practices/EmotionPractice';
 import MindfulnessPractice from './src/data/practices/MindfulnessPractice';
 import SelfAwarenessPractice from './src/data/practices/SelfAwarenessPractice';
-import GoodThingsJournal from './src/data/practices/Goodthingsjournal';
+import GoodThingsJournal from './src/data/practices/GoodThingsjournal';
 
 // 訓練計畫相關頁面
 import TrainingPlanDetailScreen from './src/screens/practice/training/TrainingPlanDetailScreen';
