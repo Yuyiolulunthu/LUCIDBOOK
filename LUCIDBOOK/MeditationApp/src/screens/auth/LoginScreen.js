@@ -6,6 +6,7 @@
 // ✅ 訪客登入
 // ✅ 登入成功後詢問企業引薦碼
 // ✅ 忘記密碼
+// ✅ 修正 navigation.goBack() 錯誤
 // ==========================================
 
 import React, { useState } from 'react';
@@ -28,7 +29,10 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import ApiService from '../../../api';
 
-const LoginScreen = ({ navigation, onLoginSuccess }) => {
+const LoginScreen = ({ navigation, route }) => {
+  // 從 route.params 獲取參數
+  const { onLoginSuccess: parentOnLoginSuccess, canGoBack = false } = route.params || {};
+  
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -69,17 +73,16 @@ const LoginScreen = ({ navigation, onLoginSuccess }) => {
           {
             text: '輸入引薦碼',
             onPress: () => {
+              // 先執行父組件的回調
+              if (parentOnLoginSuccess) {
+                parentOnLoginSuccess(userData);
+              }
+              
               // 導航到企業引薦碼頁面
               if (navigation) {
                 navigation.navigate('EnterpriseCode', { 
                   fromLogin: true,
-                  // 如果您有選擇目標頁面，取消下面的註解
-                  // nextScreen: 'SelectGoals'
                 });
-              }
-              
-              if (onLoginSuccess) {
-                onLoginSuccess(userData);
               }
             }
           },
@@ -87,16 +90,13 @@ const LoginScreen = ({ navigation, onLoginSuccess }) => {
             text: '稍後再說',
             style: 'cancel',
             onPress: () => {
-              // 跳過企業引薦碼，直接完成登入
-              // 如果您有選擇目標或引導頁面，可以導航到那裡
-              // navigation.navigate('SelectGoals');
+              // 先執行父組件的回調
+              if (parentOnLoginSuccess) {
+                parentOnLoginSuccess(userData);
+              }
               
-              if (onLoginSuccess) {
-                onLoginSuccess(userData);
-              }
-              if (navigation) {
-                navigation.goBack();
-              }
+              // 返回上一頁
+              handleGoBack();
             }
           }
         ],
@@ -120,12 +120,13 @@ const LoginScreen = ({ navigation, onLoginSuccess }) => {
       // 儲存訪客資料到 AsyncStorage
       await AsyncStorage.setItem('userData', JSON.stringify(guestData));
       
-      if (onLoginSuccess) {
-        onLoginSuccess(guestData);
+      // 先執行父組件的回調
+      if (parentOnLoginSuccess) {
+        parentOnLoginSuccess(guestData);
       }
-      if (navigation) {
-        navigation.goBack();
-      }
+      
+      // 返回上一頁
+      handleGoBack();
     } catch (error) {
       console.error('訪客登入失敗:', error);
     }
@@ -144,10 +145,23 @@ const LoginScreen = ({ navigation, onLoginSuccess }) => {
     }
   };
 
-  const goBack = () => {
+  const handleGoBack = () => {
     if (navigation) {
-      navigation.goBack();
+      // 檢查是否可以返回
+      if (canGoBack || navigation.canGoBack()) {
+        navigation.goBack();
+      } else {
+        // 如果無法返回，導航到主畫面
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'Home' }],
+        });
+      }
     }
+  };
+
+  const goBack = () => {
+    handleGoBack();
   };
 
   return (
