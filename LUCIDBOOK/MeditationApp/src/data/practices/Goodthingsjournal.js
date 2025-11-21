@@ -1,4 +1,4 @@
-// GoodThingsjournal.js
+// GoodThingsJournalNew.js - 完整修改版
 import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
@@ -12,1693 +12,2414 @@ import {
   TextInput,
   Keyboard,
   TouchableWithoutFeedback,
+  Animated,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
-import Slider from '@react-native-community/slider';
 import { LinearGradient } from 'expo-linear-gradient';
+import Slider from '@react-native-community/slider';
+import Svg, { Path } from 'react-native-svg';
+import { Home, ChevronLeft, ChevronRight, Clock, Sparkles, Volume2, VolumeX, Play, Pause } from 'lucide-react-native';
+import MaskedView from '@react-native-masked-view/masked-view';
 
-export default function GoodThingsJournal({ onBack, navigation, route }) {
-  // 頁面狀態：
-  // 'intro' (第一頁)
-  // 'writing1' (第二頁)
-  // 'writing2' (第三頁)
-  // 'encouragement' (新增：第四頁／你做得很好)
-  // 'reflection' (第五頁)
-  // 'completion' (第六頁)
-  const [currentPage, setCurrentPage] = useState('intro');
+// 進度條組件
+const ProgressBar = ({ currentStep, totalSteps, style }) => {
+  const progress = (currentStep / totalSteps) * 100;
   
-  // 第二頁狀態
-  const [question1Answer, setQuestion1Answer] = useState(''); // 那是什麼時刻、情景、與誰一起？
-  const [question2Answer, setQuestion2Answer] = useState(''); // 你當時的想法是什麼？
-  const [selectedFeelings, setSelectedFeelings] = useState([]); // 這件事讓你有什麼感受？
-  const [otherFeeling, setOtherFeeling] = useState(''); // 其他感受
-  const [showQuestion2, setShowQuestion2] = useState(false);
-  const [showQuestion3, setShowQuestion3] = useState(false);
-  const [activeInspiration, setActiveInspiration] = useState(null); // 'q1' or 'q2'
+  return (
+    <View style={[styles.progressBarContainer, style]}>
+      {/* Progress Track */}
+      <View style={styles.progressTrack}>
+        {/* Progress Fill */}
+        <View style={[styles.progressFillContainer, { width: `${progress}%` }]}>
+          <LinearGradient
+            colors={['#166CB5', '#31C6FE']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.progressGradient}
+          />
+        </View>
+      </View>
+      
+      {/* Step Counter */}
+      <View style={styles.stepCounter}>
+        <Text style={styles.stepText}>{currentStep} / {totalSteps}</Text>
+      </View>
+    </View>
+  );
+};
+
+// 漸層文字組件
+const GradientText = ({ text, style }) => (
+  <MaskedView
+    maskElement={
+      <Text style={[styles.gradientTextMask, style]}>{text}</Text>
+    }
+  >
+    <LinearGradient
+      colors={['#166CB5', '#31C6FE']}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 0 }}
+    >
+      <Text style={[styles.gradientTextMask, style, { opacity: 0 }]}>{text}</Text>
+    </LinearGradient>
+  </MaskedView>
+);
+
+// 自定義箭頭圖標組件
+const ArrowIcon = ({ direction = 'right', color = '#31C6FE', size = 24 }) => {
+  const rotation = direction === 'left' ? '180' : '0';
   
-  // 第三頁狀態
-  const [question4Answer, setQuestion4Answer] = useState(''); // 你或他人做了什麼
-  const [question5Answer, setQuestion5Answer] = useState(''); // 你可以怎麼做
-  const [selectedActions, setSelectedActions] = useState([]); // 選擇想嘗試的小行動
-  const [otherAction, setOtherAction] = useState(''); // 其他行動
-  const [showQuestion5, setShowQuestion5] = useState(false);
-  const [showQuestion6, setShowQuestion6] = useState(false);
-  const [activeInspirationPage2, setActiveInspirationPage2] = useState(null); // 'q4' or 'q5'
+  return (
+    <Svg 
+      width={size} 
+      height={size} 
+      viewBox="0 0 24 24" 
+      style={{ transform: [{ rotate: `${rotation}deg` }] }}
+    >
+      <Path
+        d="M9 18l6-6-6-6"
+        stroke={color}
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+      />
+    </Svg>
+  );
+};
+
+export default function GoodThingsJournalNew({ onBack, navigation, route }) {
+  const [currentPage, setCurrentPage] = useState('welcome');
   
-  // 第四（五）頁狀態
-  const [positiveLevel, setPositiveLevel] = useState(5); // 正向感受程度 1-10，預設5
-  const [selectedMoods, setSelectedMoods] = useState([]); // 書寫完後的心情
-  const [moodNote, setMoodNote] = useState(''); // 心情記錄
-  
+  // 表單數據
+  const [formData, setFormData] = useState({
+    goodThing: '',
+    whoWith: '',
+    feelings: '',
+    emotions: [],
+    otherEmotion: '',
+    reason: '',
+    howToRepeat: '',
+    futureAction: '',
+    positiveScore: 5,
+    moodEmotions: [],
+    moodNotes: '',
+    timestamp: 0,
+  });
+
+  // 其他狀態
+  const [showQ1Suggestions, setShowQ1Suggestions] = useState(false);
+  const [showQ1bSuggestions, setShowQ1bSuggestions] = useState(false);
+  const [showQ2Suggestions, setShowQ2Suggestions] = useState(false);
+  const [showQ4Suggestions, setShowQ4Suggestions] = useState(false);
+  const [showQ4bSuggestions, setShowQ4bSuggestions] = useState(false);
+  const [showOtherEmotionInput, setShowOtherEmotionInput] = useState(false);
+  const [showOtherActionInput, setShowOtherActionInput] = useState(false);
+  const [showOtherMoodInput, setShowOtherMoodInput] = useState(false);
+
   const scrollViewRef = useRef(null);
   const previousScreen = route?.params?.from;
 
-  // 第二頁：感受選項
-  const feelingOptions = [
-    { id: 1, label: '放鬆' },
-    { id: 2, label: '平靜' },
-    { id: 3, label: '被理解' },
-    { id: 4, label: '被支持' },
-    { id: 5, label: '感到貼心' },
-    { id: 6, label: '幸福' },
-    { id: 7, label: '開心' },
-    { id: 8, label: '被照顧' },
-    { id: 9, label: '覺得被看見' },
-    { id: 10, label: '其他', isOther: true },
+  // 動畫值
+  const sparkle1Opacity = useRef(new Animated.Value(0)).current;
+  const sparkle2Opacity = useRef(new Animated.Value(0)).current;
+  const sparkle3Opacity = useRef(new Animated.Value(0)).current;
+  const celebrationScale = useRef(new Animated.Value(0)).current;
+  const celebrationRotate = useRef(new Animated.Value(0)).current;
+
+  // 當前步驟計算
+  const getCurrentStep = () => {
+    const stepMap = {
+      welcome: 0,
+      intro: 1,
+      question1: 2,
+      question1b: 3,
+      question2: 4,
+      emotions: 5,
+      transition: 6,
+      question4: 7,
+      question4b: 8,
+      question5: 9,
+      completion: 10,
+      positiveFeeling: 10,
+      mood: 11,
+      streak: 11,
+    };
+    return stepMap[currentPage] || 1;
+  };
+
+  const totalSteps = 11;
+
+  // 建議內容
+  const question1Suggestions = [
+    '收到朋友的一則暖心訊息',
+    '吃到一份好吃的早餐',
+    '完成了一項拖延已久的工作',
+    '在路上看見可愛的貓咪',
+    '睡了一個飽飽的覺',
+    '抬頭看見美麗的雲朵',
   ];
 
-  // 第三頁：小行動選項
-  const actionOptions = [
-    { id: 1, label: '明天提早 10 分鐘出門' },
-    { id: 2, label: '下次主動跟同事聊天' },
-    { id: 3, label: '明天起床先不要滑手機' },
-    { id: 4, label: '做 5 次深呼吸' },
-    { id: 5, label: '走慢一點、感受身體狀態' },
-    { id: 6, label: '其他', isOther: true },
+  const question1bSuggestions = [
+    '自己一個人,享受獨處時光',
+    '家人(父母、兄弟姊妹、伴侶)',
+    '好朋友、閨蜜、死黨',
+    '同事、合作夥伴',
+    '寵物(貓咪、狗狗)',
+    '陌生人(店員、路人)',
   ];
 
-  // 第五頁：心情選項
+  const question2Suggestions = [
+    '覺得自己很幸運,事情進行得很順利',
+    '覺得被愛著、被關心著,心裡暖暖的',
+    '覺得努力有了回報,很有成就感',
+    '覺得這世界其實很美好',
+    '覺得充滿希望,對未來更有信心',
+    '覺得很放鬆,壓力都釋放了',
+  ];
+
+  const emotionTags = [
+    '平靜',
+    '驕傲',
+    '被支持',
+    '開心',
+    '感謝',
+    '滿足',
+    '其他',
+  ];
+
+  const question4Suggestions = [
+    '我有主動開啟對話',
+    '平常有維持聯絡、互相關心',
+    '手邊工作處理順利,心情輕鬆',
+    '昨晚早睡、今天精神好',
+  ];
+
+  const question4bSuggestions = [
+    '主動創造機會,例如:邀請朋友聚餐',
+    '保持開放的心態,嘗試新事物',
+    '多留意身邊的小事,練習感恩',
+    '建立固定的儀式感,例如:每週一次',
+    '調整自己的作息,例如:早睡早起',
+    '給自己多一點鼓勵和肯定',
+  ];
+
+  const quickActions = [
+    '下次主動約朋友吃飯',
+    '明天提早 10 分鐘出門',
+    '每天多閱讀 5 分鐘',
+    '做一次呼吸練習',
+    '睡前不滑手機 30 分鐘',
+    '主動跟家人聊聊天',
+  ];
+
   const moodOptions = [
-    { id: 1, label: '平靜安定' },
-    { id: 2, label: '原本不舒服的情緒緩和了些' },
-    { id: 3, label: '滿足' },
-    { id: 4, label: '有趣' },
-    { id: 5, label: '溫暖' },
-    { id: 6, label: '沒特別感受' },
-    { id: 7, label: '其他', isOther: true },
+    '平靜安定',
+    '原本不舒服的情緒緩和了些',
+    '滿足',
+    '有趣',
+    '溫暖',
+    '沒特別感受',
+    '其他',
   ];
 
-  // 第二頁：靈感提示內容
-  const inspirationContentQ1 = [
-    '與他人的互動（家人、朋友、同事）',
-    '個人的成就或進步',
-    '生活中的小確幸',
-    '美好的感官體驗（美食、音樂、風景）',
-  ];
+  // 連續天數計算
+  const getStreakDays = () => {
+    return 3;
+  };
 
-  const inspirationContentQ2 = [
-    '原因：',
-    '昨晚早睡、早上沒滑手機，所以有心情陪貓。',
-    '可複製條件：',
-    '早點休息就會有更多早晨的餘裕。',
-    '明日可做行動：',
-    '明早醒來先放下手機 5 分鐘，感受身體狀態。',
-  ];
-
-  // 第三頁：靈感提示內容
-  const inspirationContentQ4 = inspirationContentQ1;
-  const inspirationContentQ5 = inspirationContentQ2;
-
-  // 監聽第一個問題的輸入，顯示第二個問題
+  // 完成頁動畫效果
   useEffect(() => {
-    if (currentPage === 'writing1' && question1Answer.length > 0 && !showQuestion2) {
-      setShowQuestion2(true);
-    }
-  }, [question1Answer, currentPage, showQuestion2]);
-
-  // 監聽第二個問題的輸入，顯示第三個問題
-  useEffect(() => {
-    if (currentPage === 'writing1' && question2Answer.length > 0 && !showQuestion3) {
-      setShowQuestion3(true);
-    }
-  }, [question2Answer, currentPage, showQuestion3]);
-
-  // 監聽第四個問題的輸入（第三頁），顯示第五個問題
-  useEffect(() => {
-    if (currentPage === 'writing2' && question4Answer.length > 0 && !showQuestion5) {
-      setShowQuestion5(true);
-    }
-  }, [question4Answer, currentPage, showQuestion5]);
-
-  // 監聽第五個問題的輸入，顯示第六個問題
-  useEffect(() => {
-    if (currentPage === 'writing2' && question5Answer.length > 0 && !showQuestion6) {
-      setShowQuestion6(true);
-    }
-  }, [question5Answer, currentPage, showQuestion6]);
-
-  // 處理返回按鈕（加上 encouragement）
-  const handleBack = () => {
     if (currentPage === 'completion') {
-      setCurrentPage('reflection');
-    } else if (currentPage === 'reflection') {
-      setCurrentPage('encouragement');
-    } else if (currentPage === 'encouragement') {
-      setCurrentPage('writing2');
-    } else if (currentPage === 'writing2') {
-      setCurrentPage('writing1');
-    } else if (currentPage === 'writing1') {
-      setCurrentPage('intro');
+      Animated.sequence([
+        Animated.delay(1000),
+        Animated.parallel([
+          Animated.timing(sparkle1Opacity, {
+            toValue: 0.1,
+            duration: 1000,
+            useNativeDriver: true,
+          }),
+          Animated.timing(sparkle2Opacity, {
+            toValue: 0.1,
+            duration: 1000,
+            delay: 200,
+            useNativeDriver: true,
+          }),
+          Animated.timing(sparkle3Opacity, {
+            toValue: 0.1,
+            duration: 1000,
+            delay: 400,
+            useNativeDriver: true,
+          }),
+        ]),
+      ]).start();
     } else {
-      // 在第一頁，返回上一個畫面
-      if (onBack) {
-        onBack();
-      } else if (navigation) {
-        if (previousScreen) {
-          navigation.navigate(previousScreen);
-        } else {
-          navigation.goBack();
-        }
-      }
+      sparkle1Opacity.setValue(0);
+      sparkle2Opacity.setValue(0);
+      sparkle3Opacity.setValue(0);
     }
+  }, [currentPage]);
+
+  // 連續天數頁動畫效果
+  useEffect(() => {
+    if (currentPage === 'streak') {
+      Animated.parallel([
+        Animated.spring(celebrationScale, {
+          toValue: 1,
+          tension: 100,
+          friction: 10,
+          useNativeDriver: true,
+        }),
+        Animated.timing(celebrationRotate, {
+          toValue: 1,
+          duration: 600,
+          useNativeDriver: true,
+        }),
+      ]).start(() => {
+        Animated.loop(
+          Animated.sequence([
+            Animated.timing(celebrationRotate, {
+              toValue: 1.1,
+              duration: 500,
+              useNativeDriver: true,
+            }),
+            Animated.timing(celebrationRotate, {
+              toValue: 0.9,
+              duration: 500,
+              useNativeDriver: true,
+            }),
+            Animated.timing(celebrationRotate, {
+              toValue: 1,
+              duration: 500,
+              useNativeDriver: true,
+            }),
+            Animated.delay(3000),
+          ])
+        ).start();
+      });
+    } else {
+      celebrationScale.setValue(0);
+      celebrationRotate.setValue(0);
+    }
+  }, [currentPage]);
+
+  // 處理返回
+  const handleBack = () => {
+    const backMap = {
+      welcome: () => onBack?.() || navigation?.goBack(),
+      intro: () => setCurrentPage('welcome'),
+      question1: () => setCurrentPage('intro'),
+      question1b: () => setCurrentPage('question1'),
+      question2: () => setCurrentPage('question1b'),
+      emotions: () => setCurrentPage('question2'),
+      transition: () => setCurrentPage('emotions'),
+      question4: () => setCurrentPage('transition'),
+      question4b: () => setCurrentPage('question4'),
+      question5: () => setCurrentPage('question4b'),
+      completion: () => setCurrentPage('question5'),
+      positiveFeeling: () => setCurrentPage('completion'),
+      mood: () => setCurrentPage('positiveFeeling'),
+      streak: () => setCurrentPage('mood'),
+    };
+    
+    const action = backMap[currentPage];
+    if (action) action();
   };
 
   // 處理 Home 按鈕
   const handleHome = () => {
-    // 重置所有狀態
-    setCurrentPage('intro');
+    setCurrentPage('welcome');
     if (navigation) {
       navigation.navigate('Home');
     }
   };
 
-  // 切換感受選項
-  const toggleFeeling = (feelingId) => {
-    const selectedFeeling = feelingOptions.find(f => f.id === feelingId);
-    
-    if (selectedFeeling?.isOther) {
-      if (selectedFeelings.includes(feelingId)) {
-        setSelectedFeelings(selectedFeelings.filter(id => id !== feelingId));
-        setOtherFeeling('');
+  // 切換情緒標籤
+  const toggleEmotion = (emotion) => {
+    if (emotion === '其他') {
+      if (formData.emotions.includes('其他')) {
+        setFormData(prev => ({
+          ...prev,
+          emotions: prev.emotions.filter(e => e !== '其他'),
+          otherEmotion: '',
+        }));
+        setShowOtherEmotionInput(false);
       } else {
-        setSelectedFeelings([...selectedFeelings, feelingId]);
+        setFormData(prev => ({
+          ...prev,
+          emotions: [...prev.emotions, '其他'],
+        }));
+        setShowOtherEmotionInput(true);
       }
     } else {
-      if (selectedFeelings.includes(feelingId)) {
-        setSelectedFeelings(selectedFeelings.filter(id => id !== feelingId));
-      } else {
-        setSelectedFeelings([...selectedFeelings, feelingId]);
-      }
+      setFormData(prev => ({
+        ...prev,
+        emotions: prev.emotions.includes(emotion)
+          ? prev.emotions.filter(e => e !== emotion)
+          : [...prev.emotions, emotion],
+      }));
     }
   };
 
-  // 切換行動選項
-  const toggleAction = (actionId) => {
-    const selectedAction = actionOptions.find(a => a.id === actionId);
-    
-    if (selectedAction?.isOther) {
-      if (selectedActions.includes(actionId)) {
-        setSelectedActions(selectedActions.filter(id => id !== actionId));
-        setOtherAction('');
-      } else {
-        setSelectedActions([...selectedActions, actionId]);
+  // 選擇快速行動
+  const handleActionSelect = (action) => {
+    if (action === '其他') {
+      setShowOtherActionInput(!showOtherActionInput);
+      if (!showOtherActionInput) {
+        setFormData(prev => ({ ...prev, futureAction: '' }));
       }
     } else {
-      if (selectedActions.includes(actionId)) {
-        setSelectedActions(selectedActions.filter(id => id !== actionId));
-      } else {
-        setSelectedActions([...selectedActions, actionId]);
-      }
+      setFormData(prev => ({ ...prev, futureAction: action }));
+      setShowOtherActionInput(false);
     }
   };
 
-  // 切換心情選項
-  const toggleMood = (moodId) => {
-    const selectedMood = moodOptions.find(m => m.id === moodId);
-    
-    if (selectedMood?.isOther) {
-      if (selectedMoods.includes(moodId)) {
-        setSelectedMoods(selectedMoods.filter(id => id !== moodId));
-        setMoodNote('');
+  // 切換心情標籤
+  const toggleMood = (mood) => {
+    if (mood === '其他') {
+      if (formData.moodEmotions.includes('其他')) {
+        setFormData(prev => ({
+          ...prev,
+          moodEmotions: prev.moodEmotions.filter(m => m !== '其他'),
+          moodNotes: '',
+        }));
+        setShowOtherMoodInput(false);
       } else {
-        setSelectedMoods([...selectedMoods, moodId]);
+        setFormData(prev => ({
+          ...prev,
+          moodEmotions: [...prev.moodEmotions, '其他'],
+        }));
+        setShowOtherMoodInput(true);
       }
     } else {
-      if (selectedMoods.includes(moodId)) {
-        setSelectedMoods(selectedMoods.filter(id => id !== moodId));
-      } else {
-        setSelectedMoods([...selectedMoods, moodId]);
-      }
+      setFormData(prev => ({
+        ...prev,
+        moodEmotions: prev.moodEmotions.includes(mood)
+          ? prev.moodEmotions.filter(m => m !== mood)
+          : [...prev.moodEmotions, mood],
+      }));
     }
   };
 
-  // 切換靈感提示（第二頁）
-  const toggleInspiration = (questionId) => {
-    if (activeInspiration === questionId) {
-      setActiveInspiration(null);
-    } else {
-      setActiveInspiration(questionId);
-    }
-  };
-
-  // 切換靈感提示（第三頁）
-  const toggleInspirationPage2 = (questionId) => {
-    if (activeInspirationPage2 === questionId) {
-      setActiveInspirationPage2(null);
-    } else {
-      setActiveInspirationPage2(questionId);
-    }
-  };
-
-  // 處理滑桿變化 - 吸附到最近的整數刻度
-  const handlePositiveLevelChange = (value) => {
+  // 滑桿處理
+  const handlePositiveScoreChange = (value) => {
     const snappedValue = Math.round(value);
-    setPositiveLevel(snappedValue);
+    setFormData(prev => ({ ...prev, positiveScore: snappedValue }));
   };
 
-  // 渲染第一頁（介紹頁）
-  const renderIntroPage = () => (
-    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-      <View style={styles.introContainer}>
-        <ScrollView 
-          contentContainerStyle={styles.introScrollContent}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* 圖標 */}
-          <View style={styles.introIconContainer}>
-            <Image 
-              source={require('../../../assets/images/Heart_shine.png')}
-              style={styles.introIcon}
-              resizeMode="contain"
-            />
-          </View>
+  // ========== 頁面渲染函數 ==========
 
-          {/* 標題 */}
-          <Text style={styles.introTitle}>心理亮點雷達</Text>
-          
-          {/* 時間 */}
-          <View style={styles.introTimeContainer}>
-            <Image 
-              source={require('../../../assets/images/sample_clock.png')}
-              style={styles.clockIcon}
-              resizeMode="contain"
-            />
-            <Text style={styles.introTimeText}>10 分鐘</Text>
-          </View>
-
-          {/* 說明文字 */}
-          <Text style={styles.introDescription}>
-            記住做不好的事情是大腦的原廠設定{'\n'}用好事書寫改變負向對話的神經迴路
-          </Text>
-
-          {/* 開始按鈕 */}
-          <TouchableOpacity 
-            style={styles.startJournalButton}
-            onPress={() => setCurrentPage('writing1')}
-          >
-            <Text style={styles.startJournalButtonText}>記錄那些小小的好事</Text>
-            <Text style={styles.startJournalArrow}>›</Text>
-          </TouchableOpacity>
-        </ScrollView>
-
-        {/* 底部 Home 按鈕 */}
-        <View style={styles.bottomNav}>
-          <TouchableOpacity 
-            onPress={handleHome}
-            style={styles.homeButtonContainer}
-          >
-            <View style={styles.homeButtonBackground}>
-              <Image 
-                source={require('../../../assets/images/Home_icon.png')}
-                style={styles.bottomHomeIcon}
-                resizeMode="contain"
-              />
-            </View>
-          </TouchableOpacity>
-        </View>
-      </View>
-    </TouchableWithoutFeedback>
-  );
-
-  // 渲染第二頁（書寫頁面1）
-  const renderWriting1Page = () => {
-    const isOtherFeelingSelected = selectedFeelings.includes(10);
-    const inspirationPosition = showQuestion2 ? 'q2' : 'q1';
-
-    return (
-      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-        <View style={styles.writingContainer}>
-          <ScrollView 
-            ref={scrollViewRef}
-            contentContainerStyle={styles.writingScrollContent}
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
-          >
-            {/* 標題 */}
-            <Text style={styles.writingMainTitle}>今天發生了什麼好事</Text>
-            <Text style={styles.writingSubtitle}>
-              任何讓你覺得舒服、安心、{'\n'}快樂的小事
-            </Text>
-
-            {/* 問題1 */}
-            <Text style={styles.questionLabel}>那是什麼時刻、情景、與誰一起？</Text>
-            <TextInput
-              style={styles.questionInput}
-              multiline
-              placeholder="例如：跟同事邊吃便當邊聊發牢騷，突然覺得被理解"
-              placeholderTextColor="#B0B0B0"
-              value={question1Answer}
-              onChangeText={setQuestion1Answer}
-              textAlignVertical="top"
-            />
-
-            {/* 問題2 - 條件顯示 */}
-            {showQuestion2 && (
-              <>
-                <Text style={styles.questionLabel}>你當時的想法是什麼？</Text>
-                <TextInput
-                  style={styles.questionInput}
-                  multiline
-                  placeholder="例如：原來小事也可以讓我心情變好"
-                  placeholderTextColor="#B0B0B0"
-                  value={question2Answer}
-                  onChangeText={setQuestion2Answer}
-                  textAlignVertical="top"
-                />
-              </>
-            )}
-
-            {/* 靈感提示 */}
-            <TouchableOpacity 
-              style={styles.inspirationTrigger}
-              onPress={() => toggleInspiration(inspirationPosition)}
-            >
-              <Image 
-                source={require('../../../assets/images/Fresh_idea.png')}
-                style={[
-                  styles.inspirationIcon,
-                  activeInspiration === inspirationPosition && styles.inspirationIconActive,
-                ]}
-                resizeMode="contain"
-              />
-              <Text 
-                style={[
-                  styles.inspirationText,
-                  activeInspiration !== inspirationPosition && styles.inspirationTextInactive,
-                ]}
-              >
-                需要靈感嗎？
-              </Text>
-            </TouchableOpacity>
-
-            {/* 靈感內容 */}
-            {activeInspiration === 'q1' && (
-              <View style={styles.inspirationBox}>
-                <Text style={styles.inspirationBoxTitle}>可以試試這些方向：</Text>
-                {inspirationContentQ1.map((item, index) => (
-                  <Text key={index} style={styles.inspirationBoxItem}>• {item}</Text>
-                ))}
-              </View>
-            )}
-
-            {activeInspiration === 'q2' && (
-              <View style={styles.inspirationBox}>
-                <Text style={styles.inspirationBoxTitle}>可以試試這些方向：</Text>
-                {inspirationContentQ2.map((item, index) => (
-                  <Text key={index} style={styles.inspirationBoxItem}>{item}</Text>
-                ))}
-              </View>
-            )}
-
-            {/* 問題3 */}
-            {showQuestion3 && (
-              <>
-                <Text style={styles.questionLabel}>這件事讓你有什麼感受？</Text>
-                <View style={styles.tagsContainer}>
-                  {feelingOptions.map((feeling) => {
-                    const isSelected = selectedFeelings.includes(feeling.id);
-                    const isOther = feeling.isOther;
-                    
-                    return (
-                      <TouchableOpacity
-                        key={feeling.id}
-                        style={[
-                          styles.feelingTag,
-                          isOther && !isSelected && styles.feelingTagOutline,
-                          isOther && isSelected && styles.feelingTagFilled,
-                          !isOther && isSelected && styles.feelingTagSelected,
-                        ]}
-                        onPress={() => toggleFeeling(feeling.id)}
-                      >
-                        <Text 
-                          style={[
-                            styles.feelingTagText,
-                            isOther && isSelected && styles.feelingTagTextFilled,
-                            !isOther && isSelected && styles.feelingTagTextSelected,
-                          ]}
-                        >
-                          {feeling.label}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-
-                {/* 其他感受輸入框 */}
-                {isOtherFeelingSelected && (
-                  <>
-                    <Text style={styles.recordPrompt}>記錄下來</Text>
-                    <TextInput
-                      style={styles.recordInput}
-                      multiline
-                      placeholder="在這裡寫下你的感受..."
-                      placeholderTextColor="#B0B0B0"
-                      value={otherFeeling}
-                      onChangeText={setOtherFeeling}
-                      textAlignVertical="top"
-                    />
-                  </>
-                )}
-              </>
-            )}
-
-            {/* 好事花生按鈕 -> 第三頁 */}
-            <TouchableOpacity 
-              style={styles.nextPageButton}
-              onPress={() => setCurrentPage('writing2')}
-            >
-              <Text style={styles.nextPageButtonText}>好事花生</Text>
-              <Text style={styles.nextPageArrow}>›</Text>
-            </TouchableOpacity>
-
-            <View style={{ height: 100 }} />
-          </ScrollView>
-
-          {/* 底部 Home 按鈕 */}
-          <View style={styles.bottomNav}>
-            <TouchableOpacity 
-              onPress={handleHome}
-              style={styles.homeButtonContainer}
-            >
-              <View style={styles.homeButtonBackground}>
-                <Image 
-                  source={require('../../../assets/images/Home_icon.png')}
-                  style={styles.bottomHomeIcon}
-                  resizeMode="contain"
-                />
-              </View>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </TouchableWithoutFeedback>
-    );
-  };
-
-  // 渲染第三頁（書寫頁面2）
-  const renderWriting2Page = () => {
-    const isOtherActionSelected = selectedActions.includes(6);
-    const inspirationPosition = showQuestion5 ? 'q5' : 'q4';
-
-    return (
-      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-        <View style={styles.writingContainer}>
-          <ScrollView 
-            ref={scrollViewRef}
-            contentContainerStyle={styles.writingScrollContent}
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
-          >
-            {/* 標題 */}
-            <Text style={styles.writingMainTitle}>好事可以再發生</Text>
-            <Text style={styles.writingSubtitle}>
-              找出讓好事發生的原因{'\n'}讓複製好心情更容易
-            </Text>
-
-            {/* 問題4 */}
-            <Text style={styles.questionLabel}>你或他人做了什麼，讓這件好事得以發生？</Text>
-            <TextInput
-              style={styles.questionInput}
-              multiline
-              placeholder="例如：我提早出門，所以能夠慢慢散步"
-              placeholderTextColor="#B0B0B0"
-              value={question4Answer}
-              onChangeText={setQuestion4Answer}
-              textAlignVertical="top"
-            />
-
-            {/* 問題5 */}
-            {showQuestion5 && (
-              <>
-                <Text style={styles.questionLabel}>你可以怎麼做，讓這件事有機會再發生？</Text>
-                <TextInput
-                  style={styles.questionInput}
-                  multiline
-                  placeholder="例如：明天也提早 10 分鐘出門"
-                  placeholderTextColor="#B0B0B0"
-                  value={question5Answer}
-                  onChangeText={setQuestion5Answer}
-                  textAlignVertical="top"
-                />
-              </>
-            )}
-
-            {/* 靈感提示 */}
-            <TouchableOpacity 
-              style={styles.inspirationTrigger}
-              onPress={() => toggleInspirationPage2(inspirationPosition)}
-            >
-              <Image 
-                source={require('../../../assets/images/Fresh_idea.png')}
-                style={[
-                  styles.inspirationIcon,
-                  activeInspirationPage2 === inspirationPosition && styles.inspirationIconActive,
-                ]}
-                resizeMode="contain"
-              />
-              <Text 
-                style={[
-                  styles.inspirationText,
-                  activeInspirationPage2 !== inspirationPosition && styles.inspirationTextInactive,
-                ]}
-              >
-                需要靈感嗎？
-              </Text>
-            </TouchableOpacity>
-
-            {/* 靈感內容 */}
-            {activeInspirationPage2 === 'q4' && (
-              <View style={styles.inspirationBox}>
-                <Text style={styles.inspirationBoxTitle}>可以試試這些方向：</Text>
-                {inspirationContentQ4.map((item, index) => (
-                  <Text key={index} style={styles.inspirationBoxItem}>• {item}</Text>
-                ))}
-              </View>
-            )}
-
-            {activeInspirationPage2 === 'q5' && (
-              <View style={styles.inspirationBox}>
-                <Text style={styles.inspirationBoxTitle}>可以試試這些方向：</Text>
-                {inspirationContentQ5.map((item, index) => (
-                  <Text key={index} style={styles.inspirationBoxItem}>{item}</Text>
-                ))}
-              </View>
-            )}
-
-            {/* 問題6 - 小行動 */}
-            {showQuestion6 && (
-              <>
-                <Text style={styles.actionPrompt}>選擇想嘗試的小行動</Text>
-                <View style={styles.tagsContainer}>
-                  {actionOptions.map((action) => {
-                    const isSelected = selectedActions.includes(action.id);
-                    const isOther = action.isOther;
-                    
-                    return (
-                      <TouchableOpacity
-                        key={action.id}
-                        style={[
-                          styles.actionTag,
-                          isOther && !isSelected && styles.actionTagOutline,
-                          isOther && isSelected && styles.actionTagFilled,
-                          !isOther && isSelected && styles.actionTagSelected,
-                        ]}
-                        onPress={() => toggleAction(action.id)}
-                      >
-                        <Text 
-                          style={[
-                            styles.actionTagText,
-                            isOther && isSelected && styles.actionTagTextFilled,
-                            !isOther && isSelected && styles.actionTagTextSelected,
-                          ]}
-                        >
-                          {action.label}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-
-                {/* 其他行動輸入框 */}
-                {isOtherActionSelected && (
-                  <>
-                    <Text style={styles.recordPrompt}>記錄下來</Text>
-                    <TextInput
-                      style={styles.recordInput}
-                      multiline
-                      placeholder="在這裡寫下你想嘗試的行動..."
-                      placeholderTextColor="#B0B0B0"
-                      value={otherAction}
-                      onChangeText={setOtherAction}
-                      textAlignVertical="top"
-                    />
-                  </>
-                )}
-              </>
-            )}
-
-            {/* 好事再花生按鈕 -> 新增 encouragement 頁 */}
-            <TouchableOpacity 
-              style={styles.nextPageButton}
-              onPress={() => setCurrentPage('encouragement')}
-            >
-              <Text style={styles.nextPageButtonText}>好事再花生</Text>
-              <Text style={styles.nextPageArrow}>›</Text>
-            </TouchableOpacity>
-
-            <View style={{ height: 100 }} />
-          </ScrollView>
-
-          {/* 底部 Home 按鈕 */}
-          <View style={styles.bottomNav}>
-            <TouchableOpacity 
-              onPress={handleHome}
-              style={styles.homeButtonContainer}
-            >
-              <View style={styles.homeButtonBackground}>
-                <Image 
-                  source={require('../../../assets/images/Home_icon.png')}
-                  style={styles.bottomHomeIcon}
-                  resizeMode="contain"
-                />
-              </View>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </TouchableWithoutFeedback>
-    );
-  };
-
-  // ⭐ 新增：第四頁（你做得很好／過渡頁）
-  const renderEncouragementPage = () => (
-    <View style={styles.encouragementContainer}>
-      <ScrollView
-        contentContainerStyle={styles.encouragementScrollContent}
+  // 1. 歡迎頁
+  const renderWelcomePage = () => (
+    <View style={styles.welcomeContainer}>
+      <ScrollView 
+        contentContainerStyle={styles.welcomeScrollContent}
         showsVerticalScrollIndicator={false}
+        bounces={true}
+        scrollEventThrottle={16}
       >
-        <Text style={styles.encouragementTitle}>你做得很好 🌿</Text>
-        <Text style={styles.encouragementSubtitle}>
-          為自己的堅持感到驕傲吧{'\n'}
-          對生活又擁有了更多了正向感受！
-        </Text>
-
-        {/* 去感受覺察頁面 */}
-        <TouchableOpacity
-          style={styles.encouragementPrimaryButton}
-          onPress={() => setCurrentPage('reflection')}
-        >
-          <Text style={styles.encouragementPrimaryText}>記錄此刻的感受</Text>
-          <LinearGradient
-            colors={['rgba(0, 0, 0, 0.00)', 'rgba(49, 198, 254, 0.20)', 'rgba(0, 0, 0, 0.00)']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.encouragementPrimaryGradient}
-            pointerEvents="none"
-          />
-        </TouchableOpacity>
-
-        {/* 直接結束練習 */}
-        <TouchableOpacity
-          style={styles.encouragementSecondaryButton}
-          onPress={() => setCurrentPage('completion')}
-        >
-          <Text style={styles.encouragementSecondaryText}>靜靜結束練習</Text>
-        </TouchableOpacity>
-
-        <Text style={styles.encouragementHint}>給自己一點時間，慢慢感受</Text>
-
-        <View style={{ height: 100 }} />
-      </ScrollView>
-
-      {/* 底部 Home 按鈕 */}
-      <View style={styles.bottomNav}>
         <TouchableOpacity 
           onPress={handleHome}
-          style={styles.homeButtonContainer}
+          style={styles.welcomeHomeButton}
         >
-          <View style={styles.homeButtonBackground}>
-            <Image 
-              source={require('../../../assets/images/Home_icon.png')}
-              style={styles.bottomHomeIcon}
-              resizeMode="contain"
-            />
+          <View style={styles.homeButtonCircle}>
+            <Home size={20} color="#31C6FE" />
           </View>
+        </TouchableOpacity>
+
+        <View style={styles.welcomeContent}>
+          <View style={styles.welcomeIconContainer}>
+            <View style={styles.glowCircle1} />
+            <View style={styles.glowCircle2} />
+            <View style={styles.welcomeIconCore}>
+              <Text style={styles.welcomeEmoji}>✨</Text>
+            </View>
+          </View>
+
+          <Text style={styles.welcomeTitle}>歡迎來到好事書寫</Text>
+          <Text style={styles.welcomeSubtitle}>透過書寫,讓美好被看見、被記得</Text>
+
+          <View style={styles.welcomeInfoCards}>
+            <View style={styles.infoCard}>
+              <Text style={styles.infoCardEmoji}>🌟</Text>
+              <Text style={styles.infoCardText}>捕捉生活中的美好時刻</Text>
+            </View>
+            <View style={styles.infoCard}>
+              <Text style={styles.infoCardEmoji}>💛</Text>
+              <Text style={styles.infoCardText}>培養感恩與正向心態</Text>
+            </View>
+            <View style={styles.infoCard}>
+              <Text style={styles.infoCardEmoji}>📖</Text>
+              <Text style={styles.infoCardText}>建立專屬於你的幸福日記</Text>
+            </View>
+          </View>
+
+          <TouchableOpacity 
+            style={styles.welcomeStartButton}
+            onPress={() => setCurrentPage('intro')}
+          >
+            <LinearGradient
+              colors={['#166CB5', '#31C6FE']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.welcomeStartGradient}
+            >
+              <Text style={styles.welcomeStartText}>開始書寫</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    </View>
+  );
+
+  // 2. 介紹頁
+  const renderIntroPage = () => (
+    <View style={styles.pageContainer}>
+      <View style={styles.headerContainer}>
+        <TouchableOpacity onPress={handleHome} style={styles.headerHomeButton}>
+          <View style={styles.homeButtonCircle}>
+            <Home size={20} color="#31C6FE" />
+          </View>
+        </TouchableOpacity>
+
+        <Text style={styles.headerTitle}>好事書寫</Text>
+
+        <ProgressBar currentStep={getCurrentStep()} totalSteps={totalSteps} />
+      </View>
+
+      <ScrollView 
+        contentContainerStyle={styles.introScrollContent}
+        showsVerticalScrollIndicator={false}
+        bounces={true}
+        scrollEventThrottle={16}
+        removeClippedSubviews={true}
+      >
+        <View style={styles.introIconContainer}>
+          <LinearGradient
+            colors={['#10b981', '#31C6FE']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.introIconGradient}
+          >
+            <Text style={styles.introIconHeart}>♥</Text>
+          </LinearGradient>
+        </View>
+
+        <Text style={styles.introMainTitle}>培養正向注意力</Text>
+
+        <View style={styles.introDuration}>
+          <Clock size={20} color="#6B7280" />
+          <Text style={styles.introDurationText}> 10 分鐘</Text>
+        </View>
+
+        <View style={styles.introDescription}>
+          <Text style={styles.introDescText}>大腦天生容易記住不開心的事,</Text>
+          <Text style={styles.introDescText}>一起訓練大腦捕捉正向事務的能力,</Text>
+          <Text style={styles.introDescText}>並且讓好事再花生!</Text>
+        </View>
+
+        <TouchableOpacity 
+          style={styles.introStartButton}
+          onPress={() => setCurrentPage('question1')}
+        >
+          <Text style={styles.introStartButtonText}>記錄那些小小的好事</Text>
+          <View style={styles.introStartArrow}>
+            <ArrowIcon direction="right" color="#31C6FE" size={20} />
+          </View>
+        </TouchableOpacity>
+      </ScrollView>
+
+      <View style={styles.bottomNavigation}>
+        <TouchableOpacity 
+          onPress={handleBack}
+          style={styles.navButton}
+        >
+          <ArrowIcon direction="left" color="#31C6FE" size={24} />
+        </TouchableOpacity>
+
+        <TouchableOpacity 
+          onPress={() => setCurrentPage('question1')}
+          style={styles.navButton}
+        >
+          <ArrowIcon direction="right" color="#31C6FE" size={24} />
         </TouchableOpacity>
       </View>
     </View>
   );
 
-  // 渲染第五頁（感受覺察）
-  const renderReflectionPage = () => {
-    const isOtherMoodSelected = selectedMoods.includes(7);
-
-    return (
+  // 3. 問題1-1頁
+  const renderQuestion1Page = () => (
+    <KeyboardAvoidingView 
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      style={{ flex: 1 }}
+    >
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-        <View style={styles.reflectionContainer}>
+        <View style={styles.pageContainer}>
+          <View style={styles.headerContainer}>
+            <TouchableOpacity onPress={handleHome} style={styles.headerHomeButton}>
+              <View style={styles.homeButtonCircle}>
+                <Home size={20} color="#31C6FE" />
+              </View>
+            </TouchableOpacity>
+
+            <Text style={styles.headerTitle}>好事書寫</Text>
+
+            <ProgressBar currentStep={getCurrentStep()} totalSteps={totalSteps} />
+
+            <View style={styles.questionTitleSection}>
+              <Text style={styles.questionMainTitle}>
+                今天有發生什麼{'\n'}讓你心裡暖一下的事嗎?
+              </Text>
+              <Text style={styles.questionSubtitle}>
+                任何讓你覺得舒服、安心、放鬆的小事都可以
+              </Text>
+            </View>
+          </View>
+
           <ScrollView 
-            contentContainerStyle={styles.reflectionScrollContent}
+            ref={scrollViewRef}
+            contentContainerStyle={styles.questionScrollContent}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
+            bounces={true}
+            scrollEventThrottle={16}
+            removeClippedSubviews={true}
           >
-            {/* 標題 */}
-            <Text style={styles.reflectionMainTitle}>感受覺察</Text>
-            <Text style={styles.reflectionSubtitle}>花1分鐘看今天的心情</Text>
+            <Text style={styles.questionLabel}>那是在什麼時候、什麼情境下?</Text>
+            <TextInput
+              style={styles.questionTextarea}
+              multiline
+              placeholder="例如:今天下班時看到美麗的夕陽..."
+              placeholderTextColor="#B0B0B0"
+              value={formData.goodThing}
+              onChangeText={(text) => setFormData(prev => ({ ...prev, goodThing: text }))}
+              textAlignVertical="top"
+            />
 
-            {/* 正向感受程度區塊 */}
-            <View style={styles.sliderSection}>
-              <Text style={styles.sliderTitle}>對自己或生活的正向感受</Text>
-              
-              <View style={styles.sliderContainer}>
-                <Slider
-                  style={styles.slider}
-                  minimumValue={0}
-                  maximumValue={10}
-                  step={1}
-                  value={positiveLevel}
-                  onValueChange={handlePositiveLevelChange}
-                  minimumTrackTintColor="#31C6FF"
-                  maximumTrackTintColor="rgba(255, 255, 255, 0.40)"
-                  thumbTintColor="#FFFFFF"
-                />
-              </View>
+            <TouchableOpacity 
+              style={styles.suggestionTrigger}
+              onPress={() => setShowQ1Suggestions(!showQ1Suggestions)}
+            >
+              <Image 
+                source={require('../../../assets/images/Fresh_idea.png')}
+                style={[
+                  styles.suggestionIcon,
+                  showQ1Suggestions && styles.suggestionIconActive,
+                ]}
+                resizeMode="contain"
+              />
+              <Text style={[
+                styles.suggestionText,
+                !showQ1Suggestions && styles.suggestionTextInactive,
+              ]}>
+                需要靈感嗎?
+              </Text>
+            </TouchableOpacity>
 
-              {/* 刻度 */}
-              <View style={styles.sliderScaleContainer}>
-                {[1,2,3,4,5,6,7,8,9,10].map((scale) => (
-                  <View key={scale} style={styles.sliderScaleItem}>
-                    <View 
-                      style={[
-                        styles.sliderScaleMark,
-                        positiveLevel === scale && styles.sliderScaleMarkActive,
-                      ]} 
-                    />
-                    <Text 
-                      style={[
-                        styles.sliderScaleText,
-                        positiveLevel === scale && styles.sliderScaleTextActive,
-                      ]}
-                    >
-                      {scale}
-                    </Text>
-                  </View>
+            {showQ1Suggestions && (
+              <View style={styles.suggestionBox}>
+                <Text style={styles.suggestionBoxTitle}>可以試試這些方向:</Text>
+                {question1Suggestions.map((item, index) => (
+                  <Text key={index} style={styles.suggestionBoxItem}>• {item}</Text>
                 ))}
               </View>
+            )}
+          </ScrollView>
 
-              <View style={styles.sliderLabels}>
-                <Text style={styles.sliderLabelText}>完全沒有</Text>
-                <Text style={styles.sliderLabelText}>踏實愉悅</Text>
+          <View style={styles.bottomNavigation}>
+            <TouchableOpacity onPress={handleBack} style={styles.navButton}>
+              <ArrowIcon direction="left" color="#31C6FE" size={24} />
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              onPress={() => setCurrentPage('question1b')}
+              style={styles.navButton}
+            >
+              <ArrowIcon direction="right" color="#31C6FE" size={24} />
+            </TouchableOpacity>
+          </View>
+        </View>
+      </TouchableWithoutFeedback>
+    </KeyboardAvoidingView>
+  );
+
+  // 4. 問題1-2頁
+  const renderQuestion1bPage = () => (
+    <KeyboardAvoidingView 
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      style={{ flex: 1 }}
+    >
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <View style={styles.pageContainer}>
+          <View style={styles.headerContainer}>
+            <TouchableOpacity onPress={handleHome} style={styles.headerHomeButton}>
+              <View style={styles.homeButtonCircle}>
+                <Home size={20} color="#31C6FE" />
               </View>
-            </View>
+            </TouchableOpacity>
 
-            {/* 心情選擇 */}
-            <Text style={styles.moodPrompt}>書寫完後，今天的心情是</Text>
+            <Text style={styles.headerTitle}>好事書寫</Text>
+
+            <ProgressBar currentStep={getCurrentStep()} totalSteps={totalSteps} />
+
+            <View style={styles.questionTitleSection}>
+              <Text style={styles.questionMainTitle}>
+                今天有發生什麼{'\n'}讓你心裡暖一下的事嗎?
+              </Text>
+              <Text style={styles.questionSubtitle}>
+                任何讓你覺得舒服、安心、放鬆的小事都可以
+              </Text>
+            </View>
+          </View>
+
+          <ScrollView 
+            contentContainerStyle={styles.questionScrollContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+            bounces={true}
+            scrollEventThrottle={16}
+            removeClippedSubviews={true}
+          >
+            <Text style={styles.questionLabel}>當時你跟誰在一起呢?</Text>
+            <TextInput
+              style={styles.questionTextarea}
+              multiline
+              placeholder="例如:和我的好朋友小明"
+              placeholderTextColor="#B0B0B0"
+              value={formData.whoWith}
+              onChangeText={(text) => setFormData(prev => ({ ...prev, whoWith: text }))}
+              textAlignVertical="top"
+            />
+
+            <TouchableOpacity 
+              style={styles.suggestionTrigger}
+              onPress={() => setShowQ1bSuggestions(!showQ1bSuggestions)}
+            >
+              <Image 
+                source={require('../../../assets/images/Fresh_idea.png')}
+                style={[
+                  styles.suggestionIcon,
+                  showQ1bSuggestions && styles.suggestionIconActive,
+                ]}
+                resizeMode="contain"
+              />
+              <Text style={[
+                styles.suggestionText,
+                !showQ1bSuggestions && styles.suggestionTextInactive,
+              ]}>
+                需要靈感嗎?
+              </Text>
+            </TouchableOpacity>
+
+            {showQ1bSuggestions && (
+              <View style={styles.suggestionBox}>
+                <Text style={styles.suggestionBoxTitle}>可以試試這些方向:</Text>
+                {question1bSuggestions.map((item, index) => (
+                  <Text key={index} style={styles.suggestionBoxItem}>• {item}</Text>
+                ))}
+              </View>
+            )}
+          </ScrollView>
+
+          <View style={styles.bottomNavigation}>
+            <TouchableOpacity onPress={handleBack} style={styles.navButton}>
+              <ArrowIcon direction="left" color="#31C6FE" size={24} />
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              onPress={() => setCurrentPage('question2')}
+              style={styles.navButton}
+            >
+              <ArrowIcon direction="right" color="#31C6FE" size={24} />
+            </TouchableOpacity>
+          </View>
+        </View>
+      </TouchableWithoutFeedback>
+    </KeyboardAvoidingView>
+  );
+
+  // 5. 問題1-3頁
+  const renderQuestion2Page = () => (
+    <KeyboardAvoidingView 
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      style={{ flex: 1 }}
+    >
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <View style={styles.pageContainer}>
+          <View style={styles.headerContainer}>
+            <TouchableOpacity onPress={handleHome} style={styles.headerHomeButton}>
+              <View style={styles.homeButtonCircle}>
+                <Home size={20} color="#31C6FE" />
+              </View>
+            </TouchableOpacity>
+
+            <Text style={styles.headerTitle}>好事書寫</Text>
+
+            <ProgressBar currentStep={getCurrentStep()} totalSteps={totalSteps} />
+
+            <View style={styles.questionTitleSection}>
+              <Text style={styles.questionMainTitle}>
+                今天有發生什麼{'\n'}讓你心裡暖一下的事嗎?
+              </Text>
+              <Text style={styles.questionSubtitle}>
+                任何讓你覺得舒服、安心、放鬆的小事都可以
+              </Text>
+            </View>
+          </View>
+
+          <ScrollView 
+            contentContainerStyle={styles.questionScrollContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+            bounces={true}
+            scrollEventThrottle={16}
+            removeClippedSubviews={true}
+          >
+            <Text style={styles.questionLabel}>當下你的想法是什麼呢?</Text>
+            <TextInput
+              style={styles.questionTextarea}
+              multiline
+              placeholder="例如:這件讓我感覺很感激與溫暖,覺得很幸福很感恩"
+              placeholderTextColor="#B0B0B0"
+              value={formData.feelings}
+              onChangeText={(text) => setFormData(prev => ({ ...prev, feelings: text }))}
+              textAlignVertical="top"
+            />
+
+            <TouchableOpacity 
+              style={styles.suggestionTrigger}
+              onPress={() => setShowQ2Suggestions(!showQ2Suggestions)}
+            >
+              <Image 
+                source={require('../../../assets/images/Fresh_idea.png')}
+                style={[
+                  styles.suggestionIcon,
+                  showQ2Suggestions && styles.suggestionIconActive,
+                ]}
+                resizeMode="contain"
+              />
+              <Text style={[
+                styles.suggestionText,
+                !showQ2Suggestions && styles.suggestionTextInactive,
+              ]}>
+                需要靈感嗎?
+              </Text>
+            </TouchableOpacity>
+
+            {showQ2Suggestions && (
+              <View style={styles.suggestionBox}>
+                <Text style={styles.suggestionBoxTitle}>可以試試這些方向:</Text>
+                {question2Suggestions.map((item, index) => (
+                  <Text key={index} style={styles.suggestionBoxItem}>• {item}</Text>
+                ))}
+              </View>
+            )}
+          </ScrollView>
+
+          <View style={styles.bottomNavigation}>
+            <TouchableOpacity onPress={handleBack} style={styles.navButton}>
+              <ArrowIcon direction="left" color="#31C6FE" size={24} />
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              onPress={() => setCurrentPage('emotions')}
+              style={styles.navButton}
+            >
+              <ArrowIcon direction="right" color="#31C6FE" size={24} />
+            </TouchableOpacity>
+          </View>
+        </View>
+      </TouchableWithoutFeedback>
+    </KeyboardAvoidingView>
+  );
+
+  // 6. 問題1-end頁(情緒標籤)
+  const renderEmotionsPage = () => (
+    <KeyboardAvoidingView 
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      style={{ flex: 1 }}
+    >
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <View style={styles.pageContainer}>
+          <View style={styles.headerContainer}>
+            <TouchableOpacity onPress={handleHome} style={styles.headerHomeButton}>
+              <View style={styles.homeButtonCircle}>
+                <Home size={20} color="#31C6FE" />
+              </View>
+            </TouchableOpacity>
+
+            <Text style={styles.headerTitle}>好事書寫</Text>
+
+            <ProgressBar currentStep={getCurrentStep()} totalSteps={totalSteps} />
+
+            <View style={styles.questionTitleSection}>
+              <Text style={styles.questionMainTitle}>今天發生了什麼好事</Text>
+              <Text style={styles.questionSubtitle}>
+                任何讓你感覺好奇、安心、快樂的小事
+              </Text>
+            </View>
+          </View>
+
+          <ScrollView 
+            contentContainerStyle={styles.questionScrollContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+            bounces={true}
+            scrollEventThrottle={16}
+            removeClippedSubviews={true}
+          >
+            <Text style={styles.questionLabel}>這件事讓你感覺⋯</Text>
             
-            <View style={styles.moodTagsContainer}>
-              {moodOptions.map((mood) => {
-                const isSelected = selectedMoods.includes(mood.id);
-                const isOther = mood.isOther;
-                
+            <View style={styles.emotionTagsContainer}>
+              {emotionTags.map((emotion, index) => {
+                const isSelected = formData.emotions.includes(emotion);
                 return (
                   <TouchableOpacity
-                    key={mood.id}
+                    key={index}
                     style={[
-                      styles.moodTag,
-                      isOther && !isSelected && styles.moodTagOutline,
-                      isOther && isSelected && styles.moodTagFilled,
-                      !isOther && isSelected && styles.moodTagSelected,
+                      styles.emotionTag,
+                      isSelected && styles.emotionTagSelected,
                     ]}
-                    onPress={() => toggleMood(mood.id)}
+                    onPress={() => toggleEmotion(emotion)}
                   >
-                    <Text 
-                      style={[
-                        styles.moodTagText,
-                        isOther && isSelected && styles.moodTagTextFilled,
-                        !isOther && isSelected && styles.moodTagTextSelected,
-                      ]}
-                    >
-                      {mood.label}
+                    <Text style={[
+                      styles.emotionTagText,
+                      isSelected && styles.emotionTagTextSelected,
+                    ]}>
+                      {emotion}
                     </Text>
                   </TouchableOpacity>
                 );
               })}
             </View>
 
-            {/* 其他心情輸入框 */}
-            {isOtherMoodSelected && (
+            {showOtherEmotionInput && (
               <>
                 <Text style={styles.recordPrompt}>記錄下來</Text>
                 <TextInput
-                  style={styles.recordInput}
+                  style={styles.recordTextarea}
                   multiline
-                  placeholder="在這裡寫下你的感受..."
+                  placeholder="寫下我的感受"
                   placeholderTextColor="#B0B0B0"
-                  value={moodNote}
-                  onChangeText={setMoodNote}
+                  value={formData.otherEmotion}
+                  onChangeText={(text) => setFormData(prev => ({ ...prev, otherEmotion: text }))}
                   textAlignVertical="top"
                 />
               </>
             )}
-
-            {/* 記錄此刻的感受按鈕 -> 完成頁 */}
-            <TouchableOpacity 
-              style={styles.submitButton}
-              onPress={() => {
-                console.log('保存好事書寫數據');
-                setCurrentPage('completion');
-              }}
-            >
-              <Text style={styles.submitButtonText}>記錄此刻的感受</Text>
-              <LinearGradient
-                colors={['rgba(0, 0, 0, 0.00)', 'rgba(49, 198, 254, 0.20)', 'rgba(0, 0, 0, 0.00)']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.submitButtonGradient}
-                pointerEvents="none"
-              />
-            </TouchableOpacity>
-
-            <View style={{ height: 100 }} />
           </ScrollView>
 
-          {/* 底部 Home 按鈕 */}
-          <View style={styles.bottomNav}>
+          <View style={styles.bottomNavigation}>
+            <TouchableOpacity onPress={handleBack} style={styles.navButton}>
+              <ArrowIcon direction="left" color="#31C6FE" size={24} />
+            </TouchableOpacity>
+
             <TouchableOpacity 
-              onPress={handleHome}
-              style={styles.homeButtonContainer}
+              onPress={() => setCurrentPage('transition')}
+              style={styles.navButton}
             >
-              <View style={styles.homeButtonBackground}>
-                <Image 
-                  source={require('../../../assets/images/Home_icon.png')}
-                  style={styles.bottomHomeIcon}
-                  resizeMode="contain"
-                />
-              </View>
+              <ArrowIcon direction="right" color="#31C6FE" size={24} />
             </TouchableOpacity>
           </View>
         </View>
       </TouchableWithoutFeedback>
-    );
-  };
+    </KeyboardAvoidingView>
+  );
 
-  // 渲染第六頁（完成頁面）
-  const renderCompletionPage = () => (
-    <View style={styles.completionContainer}>
-      <ScrollView 
-        contentContainerStyle={styles.completionScrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* 標題 */}
-        <Text style={styles.completionTitle}>太棒了！</Text>
-        
-        {/* 副標題 */}
-        <Text style={styles.completionSubtitle}>
-          你完成了今天的好事書寫，{'\n'}繼續保持這個美好的習慣吧！
-        </Text>
-
-        {/* 連續天數卡片 */}
-        <View style={styles.streakCard}>
-          <Text style={styles.celebrationEmoji}>🎉</Text>
-          <Text style={styles.streakLabel}>你已經連續練習</Text>
-          <Text style={styles.streakDays}>3 天</Text>
-        </View>
-
-        {/* 查看日記按鈕 */}
-        <TouchableOpacity 
-          style={styles.viewDiaryButton}
-          onPress={() => {
-            console.log('導航到日記頁面');
-            if (navigation) {
-              navigation.navigate('Daily');
-            } else {
-              handleHome();
-            }
-          }}
-        >
-          <Text style={styles.viewDiaryButtonText}>查看日記</Text>
-          <LinearGradient
-            colors={['rgba(0, 0, 0, 0.00)', 'rgba(49, 198, 254, 0.20)', 'rgba(0, 0, 0, 0.00)']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.viewDiaryButtonGradient}
-            pointerEvents="none"
-          />
+  // 7. 過渡頁
+  const renderTransitionPage = () => (
+    <View style={styles.pageContainer}>
+      <View style={styles.headerContainer}>
+        <TouchableOpacity onPress={handleHome} style={styles.headerHomeButton}>
+          <View style={styles.homeButtonCircle}>
+            <Home size={20} color="#31C6FE" />
+          </View>
         </TouchableOpacity>
 
-        <View style={{ height: 100 }} />
-      </ScrollView>
+        <Text style={styles.headerTitle}>好事書寫</Text>
 
-      {/* 底部 Home 按鈕 */}
-      <View style={styles.bottomNav}>
+        <ProgressBar currentStep={getCurrentStep()} totalSteps={totalSteps} />
+      </View>
+
+      <View style={styles.transitionContent}>
+        <Text style={styles.transitionEmoji}>✨</Text>
+
+        <Text style={styles.transitionMainTitle}>
+          想起美好的時光{'\n'}不錯吧!
+        </Text>
+
+        <View style={styles.transitionTextBlock}>
+          <Text style={styles.transitionBigText}>好事可以被複製</Text>
+          <Text style={styles.transitionSmallText}>
+            找出讓好事發生的原因{'\n'}你會更容易抓到生活裡的亮點
+          </Text>
+        </View>
+      </View>
+
+      <View style={styles.bottomNavigationRight}>
         <TouchableOpacity 
-          onPress={handleHome}
-          style={styles.homeButtonContainer}
+          onPress={() => setCurrentPage('question4')}
+          style={styles.navButton}
         >
-          <View style={styles.homeButtonBackground}>
-            <Image 
-              source={require('../../../assets/images/Home_icon.png')}
-              style={styles.bottomHomeIcon}
-              resizeMode="contain"
-            />
-          </View>
+          <ArrowIcon direction="right" color="#31C6FE" size={24} />
         </TouchableOpacity>
       </View>
     </View>
   );
 
-  return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#E9EFF6" />
-      
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={handleBack} style={styles.backButton}>
-          <Image 
-            source={require('../../../assets/images/Left_arrow.png')}
-            style={styles.backArrowIcon}
-            resizeMode="contain"
-          />
+  // 8. 問題2-1頁
+  const renderQuestion4Page = () => (
+    <KeyboardAvoidingView 
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      style={{ flex: 1 }}
+    >
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <View style={styles.pageContainer}>
+          <View style={styles.headerContainer}>
+            <TouchableOpacity onPress={handleHome} style={styles.headerHomeButton}>
+              <View style={styles.homeButtonCircle}>
+                <Home size={20} color="#31C6FE" />
+              </View>
+            </TouchableOpacity>
+
+            <Text style={styles.headerTitle}>好事書寫</Text>
+
+            <ProgressBar currentStep={getCurrentStep()} totalSteps={totalSteps} />
+
+            <View style={styles.questionTitleSection}>
+              <Text style={styles.questionMainTitle}>好事可以被複製</Text>
+              <Text style={styles.questionSubtitle}>
+                找出讓好事發生的原因{'\n'}你會更容易抓到生活裡的亮點
+              </Text>
+            </View>
+          </View>
+
+          <ScrollView 
+            contentContainerStyle={styles.questionScrollContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+            bounces={true}
+            scrollEventThrottle={16}
+            removeClippedSubviews={true}
+          >
+            <Text style={styles.questionLabel}>是什麼原因,讓這件好事有機會發生呢?</Text>
+            <TextInput
+              style={styles.questionTextarea}
+              multiline
+              placeholder="例如:我當時想出門,用心觀察周遭環境"
+              placeholderTextColor="#B0B0B0"
+              value={formData.reason}
+              onChangeText={(text) => setFormData(prev => ({ ...prev, reason: text }))}
+              textAlignVertical="top"
+            />
+
+            <TouchableOpacity 
+              style={styles.suggestionTrigger}
+              onPress={() => setShowQ4Suggestions(!showQ4Suggestions)}
+            >
+              <Image 
+                source={require('../../../assets/images/Fresh_idea.png')}
+                style={[
+                  styles.suggestionIcon,
+                  showQ4Suggestions && styles.suggestionIconActive,
+                ]}
+                resizeMode="contain"
+              />
+              <Text style={[
+                styles.suggestionText,
+                !showQ4Suggestions && styles.suggestionTextInactive,
+              ]}>
+                需要靈感嗎?
+              </Text>
+            </TouchableOpacity>
+
+            {showQ4Suggestions && (
+              <View style={styles.suggestionBox}>
+                <Text style={styles.suggestionBoxTitle}>可以試試這些方向:</Text>
+                {question4Suggestions.map((item, index) => (
+                  <Text key={index} style={styles.suggestionBoxItem}>• {item}</Text>
+                ))}
+              </View>
+            )}
+          </ScrollView>
+
+          <View style={styles.bottomNavigation}>
+            <TouchableOpacity onPress={handleBack} style={styles.navButton}>
+              <ArrowIcon direction="left" color="#31C6FE" size={24} />
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              onPress={() => setCurrentPage('question4b')}
+              style={styles.navButton}
+            >
+              <ArrowIcon direction="right" color="#31C6FE" size={24} />
+            </TouchableOpacity>
+          </View>
+        </View>
+      </TouchableWithoutFeedback>
+    </KeyboardAvoidingView>
+  );
+
+  // 9. 問題2-2頁
+  const renderQuestion4bPage = () => (
+    <KeyboardAvoidingView 
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      style={{ flex: 1 }}
+    >
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <View style={styles.pageContainer}>
+          <View style={styles.headerContainer}>
+            <TouchableOpacity onPress={handleHome} style={styles.headerHomeButton}>
+              <View style={styles.homeButtonCircle}>
+                <Home size={20} color="#31C6FE" />
+              </View>
+            </TouchableOpacity>
+
+            <Text style={styles.headerTitle}>好事書寫</Text>
+
+            <ProgressBar currentStep={getCurrentStep()} totalSteps={totalSteps} />
+
+            <View style={styles.questionTitleSection}>
+              <Text style={styles.questionMainTitle}>好事可以被複製</Text>
+              <Text style={styles.questionSubtitle}>
+                找出讓好事發生的原因{'\n'}你會更容易抓到生活裡的亮點
+              </Text>
+            </View>
+          </View>
+
+          <ScrollView 
+            contentContainerStyle={styles.questionScrollContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+            bounces={true}
+            scrollEventThrottle={16}
+            removeClippedSubviews={true}
+          >
+            <Text style={styles.questionLabel}>可以怎麼做,讓這種好事更常出現?</Text>
+            <TextInput
+              style={styles.questionTextarea}
+              multiline
+              placeholder="例如:明天也早10分鐘出門"
+              placeholderTextColor="#B0B0B0"
+              value={formData.howToRepeat}
+              onChangeText={(text) => setFormData(prev => ({ ...prev, howToRepeat: text }))}
+              textAlignVertical="top"
+            />
+
+            <TouchableOpacity 
+              style={styles.suggestionTrigger}
+              onPress={() => setShowQ4bSuggestions(!showQ4bSuggestions)}
+            >
+              <Image 
+                source={require('../../../assets/images/Fresh_idea.png')}
+                style={[
+                  styles.suggestionIcon,
+                  showQ4bSuggestions && styles.suggestionIconActive,
+                ]}
+                resizeMode="contain"
+              />
+              <Text style={[
+                styles.suggestionText,
+                !showQ4bSuggestions && styles.suggestionTextInactive,
+              ]}>
+                需要靈感嗎?
+              </Text>
+            </TouchableOpacity>
+
+            {showQ4bSuggestions && (
+              <View style={styles.suggestionBox}>
+                <Text style={styles.suggestionBoxTitle}>可以試試這些方向:</Text>
+                {question4bSuggestions.map((item, index) => (
+                  <Text key={index} style={styles.suggestionBoxItem}>• {item}</Text>
+                ))}
+              </View>
+            )}
+          </ScrollView>
+
+          <View style={styles.bottomNavigation}>
+            <TouchableOpacity onPress={handleBack} style={styles.navButton}>
+              <ArrowIcon direction="left" color="#31C6FE" size={24} />
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              onPress={() => setCurrentPage('question5')}
+              style={styles.navButton}
+            >
+              <ArrowIcon direction="right" color="#31C6FE" size={24} />
+            </TouchableOpacity>
+          </View>
+        </View>
+      </TouchableWithoutFeedback>
+    </KeyboardAvoidingView>
+  );
+
+  // 10. 問題2-3頁(選擇小行動)
+  const renderQuestion5Page = () => {
+    const isCustomAction = showOtherActionInput;
+    const selectedAction = formData.futureAction;
+
+    return (
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1 }}
+      >
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <View style={styles.pageContainer}>
+            <View style={styles.headerContainer}>
+              <TouchableOpacity onPress={handleHome} style={styles.headerHomeButton}>
+                <View style={styles.homeButtonCircle}>
+                  <Home size={20} color="#31C6FE" />
+                </View>
+              </TouchableOpacity>
+
+              <Text style={styles.headerTitle}>好事書寫</Text>
+
+              <ProgressBar currentStep={getCurrentStep()} totalSteps={totalSteps} />
+
+              <View style={styles.questionTitleSection}>
+                <Text style={styles.questionMainTitle}>好事可以被複製</Text>
+                <Text style={styles.questionSubtitle}>
+                  找出讓好事發生的原因{'\n'}讓它變成你心裡的答案
+                </Text>
+              </View>
+            </View>
+
+            <ScrollView 
+              contentContainerStyle={styles.questionScrollContent}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+              bounces={true}
+              scrollEventThrottle={16}
+              removeClippedSubviews={true}
+            >
+              <Text style={styles.questionLabel}>選一個好事複製小行動</Text>
+              
+              <View style={styles.actionTagsContainer}>
+                {quickActions.map((action, index) => {
+                  const isSelected = selectedAction === action;
+                  return (
+                    <TouchableOpacity
+                      key={index}
+                      style={[
+                        styles.actionTag,
+                        isSelected && styles.actionTagSelected,
+                      ]}
+                      onPress={() => handleActionSelect(action)}
+                    >
+                      <Text style={[
+                        styles.actionTagText,
+                        isSelected && styles.actionTagTextSelected,
+                      ]}>
+                        {action}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              {/* 「其他」按鈕 - 縮小寬度,使用 alignSelf */}
+              <View style={styles.otherActionButtonContainer}>
+                <TouchableOpacity
+                  style={[
+                    styles.actionTag,
+                    styles.otherActionButton,
+                    showOtherActionInput && styles.actionTagSelected,
+                  ]}
+                  onPress={() => handleActionSelect('其他')}
+                >
+                  <Text style={[
+                    styles.actionTagText,
+                    showOtherActionInput && styles.actionTagTextSelected,
+                  ]}>
+                    其他
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {showOtherActionInput && (
+                <>
+                  <Text style={styles.recordPrompt}>記錄下來</Text>
+                  <TextInput
+                    style={styles.recordTextarea}
+                    multiline
+                    placeholder="寫下你的想法..."
+                    placeholderTextColor="#B0B0B0"
+                    value={isCustomAction ? formData.futureAction : ''}
+                    onChangeText={(text) => setFormData(prev => ({ ...prev, futureAction: text }))}
+                    textAlignVertical="top"
+                  />
+                </>
+              )}
+            </ScrollView>
+
+            <View style={styles.bottomNavigation}>
+              <TouchableOpacity onPress={handleBack} style={styles.navButton}>
+                <ArrowIcon direction="left" color="#31C6FE" size={24} />
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                onPress={() => setCurrentPage('completion')}
+                style={styles.navButton}
+              >
+                <ArrowIcon direction="right" color="#31C6FE" size={24} />
+              </TouchableOpacity>
+            </View>
+          </View>
+        </TouchableWithoutFeedback>
+      </KeyboardAvoidingView>
+    );
+  };
+
+  // 11. 你做得很好頁 - 添加裝飾動畫
+  const renderCompletionPage = () => (
+    <View style={styles.completionContainer}>
+      {/* 裝飾元素 */}
+      <Animated.Text 
+        style={[
+          styles.decorativeSparkle1,
+          { opacity: sparkle1Opacity }
+        ]}
+      >
+        ✨
+      </Animated.Text>
+      <Animated.Text 
+        style={[
+          styles.decorativeSparkle2,
+          { opacity: sparkle2Opacity }
+        ]}
+      >
+        💫
+      </Animated.Text>
+      <Animated.Text 
+        style={[
+          styles.decorativeSparkle3,
+          { opacity: sparkle3Opacity }
+        ]}
+      >
+        🌟
+      </Animated.Text>
+
+      <View style={styles.headerContainer}>
+        <TouchableOpacity onPress={handleHome} style={styles.headerHomeButton}>
+          <View style={styles.homeButtonCircle}>
+            <Home size={20} color="#31C6FE" />
+          </View>
         </TouchableOpacity>
+
         <Text style={styles.headerTitle}>好事書寫</Text>
-        <View style={styles.headerRight} />
       </View>
 
-      {/* 根據當前頁面渲染不同內容 */}
-      {currentPage === 'intro' 
-        ? renderIntroPage() 
-        : currentPage === 'writing1' 
-        ? renderWriting1Page()
-        : currentPage === 'writing2'
-        ? renderWriting2Page()
-        : currentPage === 'encouragement'
-        ? renderEncouragementPage()
-        : currentPage === 'reflection'
-        ? renderReflectionPage()
-        : renderCompletionPage()}
-    </SafeAreaView>
+      <ScrollView 
+        contentContainerStyle={styles.completionScrollContent}
+        showsVerticalScrollIndicator={false}
+        bounces={true}
+        scrollEventThrottle={16}
+      >
+        <Text style={styles.completionTitle}>你做得很好 🌿</Text>
+        
+        <View style={styles.completionDescription}>
+          <Text style={styles.completionDescText}>願意停下來看看生活裡的好</Text>
+          <Text style={styles.completionDescText}>是一件很值得被肯定的事</Text>
+        </View>
+
+        <TouchableOpacity 
+          style={styles.completionPrimaryButton}
+          onPress={() => setCurrentPage('positiveFeeling')}
+        >
+          <Text style={styles.completionPrimaryText}>記錄此刻的感受</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity 
+          style={styles.completionSecondaryButton}
+          onPress={() => setCurrentPage('streak')}
+        >
+          <Text style={styles.completionSecondaryText}>靜靜結束練習</Text>
+        </TouchableOpacity>
+
+        <Text style={styles.completionBottomMessage}>
+          你已慢慢發現,{'\n'}
+          幸福往往是從日常中發現的,{'\n'}
+          而不是創造的 ✨
+        </Text>
+      </ScrollView>
+    </View>
+  );
+
+  // 12. 正向感受滑桿頁(完全重新設計)
+  const renderPositiveFeelingPage = () => (
+    <View style={styles.pageContainer}>
+      <View style={styles.headerContainer}>
+        <TouchableOpacity onPress={handleHome} style={styles.headerHomeButton}>
+          <View style={styles.homeButtonCircle}>
+            <Home size={20} color="#31C6FE" />
+          </View>
+        </TouchableOpacity>
+
+        <Text style={styles.headerTitle}>好事書寫</Text>
+
+        <View style={styles.feelingTitleSection}>
+          <Text style={styles.questionMainTitle}>感受覺察</Text>
+          <Text style={styles.questionSubtitle}>花幾秒看看現在的心情</Text>
+        </View>
+      </View>
+
+      <ScrollView 
+        contentContainerStyle={styles.questionScrollContent}
+        showsVerticalScrollIndicator={false}
+        bounces={true}
+        scrollEventThrottle={16}
+      >
+        <View style={styles.sliderCard}>
+          <Text style={styles.sliderCardTitle}>對自己或生活的正向感受</Text>
+
+          {/* 分數顯示 - 使用漸層文字組件 */}
+          <View style={styles.sliderScoreDisplay}>
+            <GradientText 
+              text={String(formData.positiveScore)} 
+              style={styles.sliderScoreNumber}
+            />
+            <Text style={styles.sliderScoreTotal}>/10</Text>
+          </View>
+
+          {/* 刻度在滑桿上方 */}
+          <View style={styles.sliderMarkersTop}>
+            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
+              <View key={num} style={styles.sliderMarkerItem}>
+                <Text style={[
+                  styles.sliderMarkerTextTop,
+                  num === formData.positiveScore && styles.sliderMarkerTextActive,
+                ]}>
+                  {num}
+                </Text>
+                <View style={[
+                  styles.sliderMarkerLine,
+                  num <= formData.positiveScore && styles.sliderMarkerLineActive,
+                ]} />
+              </View>
+            ))}
+          </View>
+
+          {/* 滑桿容器 - 使用漸層和加粗 */}
+          <View style={styles.sliderContainerNew}>
+            <View style={styles.sliderTrackBackground}>
+              <LinearGradient
+                colors={['#166CB5', '#31C6FE']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={[styles.sliderTrackFill, { width: `${(formData.positiveScore / 10) * 100}%` }]}
+              />
+            </View>
+            <Slider
+              style={styles.sliderOverlay}
+              minimumValue={0}
+              maximumValue={10}
+              step={1}
+              value={formData.positiveScore}
+              onValueChange={handlePositiveScoreChange}
+              minimumTrackTintColor="transparent"
+              maximumTrackTintColor="transparent"
+              thumbTintColor="#FFFFFF"
+            />
+          </View>
+
+          {/* 標籤 - 改為黑色 */}
+          <View style={styles.sliderLabels}>
+            <Text style={styles.sliderLabelTextBlack}>0 完全沒有</Text>
+            <Text style={styles.sliderLabelTextBlack}>10 踏實愉悅</Text>
+          </View>
+        </View>
+      </ScrollView>
+
+      <View style={styles.bottomNavigation}>
+        <TouchableOpacity onPress={handleBack} style={styles.navButton}>
+          <ArrowIcon direction="left" color="#31C6FE" size={24} />
+        </TouchableOpacity>
+
+        <TouchableOpacity 
+          onPress={() => setCurrentPage('mood')}
+          style={styles.navButton}
+        >
+          <ArrowIcon direction="right" color="#31C6FE" size={24} />
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+
+  // 13. 書寫後心情頁
+  const renderMoodPage = () => (
+    <KeyboardAvoidingView 
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      style={{ flex: 1 }}
+    >
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <View style={styles.pageContainer}>
+          <View style={styles.headerContainer}>
+            <TouchableOpacity onPress={handleHome} style={styles.headerHomeButton}>
+              <View style={styles.homeButtonCircle}>
+                <Home size={20} color="#31C6FE" />
+              </View>
+            </TouchableOpacity>
+
+            <Text style={styles.headerTitle}>好事書寫</Text>
+
+            <ProgressBar currentStep={getCurrentStep()} totalSteps={totalSteps} />
+
+            <View style={styles.feelingTitleSection}>
+              <Text style={styles.questionMainTitle}>感受覺察</Text>
+              <Text style={styles.questionSubtitle}>花幾秒看看現在的心情</Text>
+            </View>
+          </View>
+
+          <ScrollView 
+            contentContainerStyle={styles.questionScrollContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+            bounces={true}
+            scrollEventThrottle={16}
+          >
+            <Text style={styles.questionLabel}>書寫完後,今天的心情是</Text>
+            
+            <View style={styles.moodTagsContainer}>
+              {moodOptions.map((mood, index) => {
+                const isSelected = formData.moodEmotions.includes(mood);
+                return (
+                  <TouchableOpacity
+                    key={index}
+                    style={[
+                      styles.moodTag,
+                      isSelected && styles.moodTagSelected,
+                    ]}
+                    onPress={() => toggleMood(mood)}
+                  >
+                    <Text style={[
+                      styles.moodTagText,
+                      isSelected && styles.moodTagTextSelected,
+                    ]}>
+                      {mood}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {showOtherMoodInput && (
+              <>
+                <Text style={styles.recordPrompt}>記錄下來</Text>
+                <TextInput
+                  style={styles.recordTextarea}
+                  multiline
+                  placeholder="寫下這裡好了..."
+                  placeholderTextColor="#B0B0B0"
+                  value={formData.moodNotes}
+                  onChangeText={(text) => setFormData(prev => ({ ...prev, moodNotes: text }))}
+                  textAlignVertical="top"
+                />
+              </>
+            )}
+          </ScrollView>
+
+          <View style={styles.bottomNavigation}>
+            <TouchableOpacity onPress={handleBack} style={styles.navButton}>
+              <ArrowIcon direction="left" color="#31C6FE" size={24} />
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              onPress={() => {
+                console.log('保存好事書寫數據:', formData);
+                setCurrentPage('streak');
+              }}
+              style={styles.navButton}
+            >
+              <ArrowIcon direction="right" color="#31C6FE" size={24} />
+            </TouchableOpacity>
+          </View>
+        </View>
+      </TouchableWithoutFeedback>
+    </KeyboardAvoidingView>
+  );
+
+  // 14. 連續天數完成頁 - 添加慶祝動畫
+  const renderStreakPage = () => {
+    const streakDays = getStreakDays();
+    const rotation = celebrationRotate.interpolate({
+      inputRange: [0, 0.25, 0.75, 1, 1.1],
+      outputRange: ['0deg', '-10deg', '10deg', '0deg', '0deg'],
+    });
+
+    return (
+      <View style={styles.streakContainer}>
+        <View style={styles.headerContainer}>
+          <TouchableOpacity onPress={handleHome} style={styles.headerHomeButton}>
+            <View style={styles.homeButtonCircle}>
+              <Home size={20} color="#31C6FE" />
+            </View>
+          </TouchableOpacity>
+
+          <Text style={styles.headerTitle}>好事書寫</Text>
+        </View>
+
+        <ScrollView 
+          contentContainerStyle={styles.streakScrollContent}
+          showsVerticalScrollIndicator={false}
+          bounces={true}
+          scrollEventThrottle={16}
+        >
+          <Text style={styles.streakTitle}>太棒了!</Text>
+          
+          <View style={styles.streakDescription}>
+            <Text style={styles.streakDescText}>你完成了好事書寫練習</Text>
+            <Text style={styles.streakDescText}>今天也替生活多留下一個亮亮的小片段</Text>
+          </View>
+
+          <View style={styles.streakCard}>
+            <Animated.Text 
+              style={[
+                styles.streakEmoji,
+                {
+                  transform: [
+                    { scale: celebrationScale },
+                    { rotate: rotation }
+                  ]
+                }
+              ]}
+            >
+              🎉
+            </Animated.Text>
+            <Text style={styles.streakLabel}>你已經連續書寫</Text>
+            <GradientText 
+              text={`${streakDays} 天`} 
+              style={styles.streakDays}
+            />
+          </View>
+
+          <TouchableOpacity 
+            style={styles.streakButton}
+            onPress={() => {
+              console.log('查看日記');
+              if (navigation) {
+                navigation.navigate('Daily');
+              } else {
+                handleHome();
+              }
+            }}
+          >
+            <Text style={styles.streakButtonText}>查看日記</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </View>
+    );
+  };
+
+  // ========== 主渲染 ==========
+  return (
+    <LinearGradient
+      colors={['#E8F4F9', '#F0F9FF', '#E0F2FE']}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={{ flex: 1 }}
+    >
+      <SafeAreaView style={styles.container}>
+        <StatusBar barStyle="dark-content" />
+        
+        {currentPage === 'welcome' && renderWelcomePage()}
+        {currentPage === 'intro' && renderIntroPage()}
+        {currentPage === 'question1' && renderQuestion1Page()}
+        {currentPage === 'question1b' && renderQuestion1bPage()}
+        {currentPage === 'question2' && renderQuestion2Page()}
+        {currentPage === 'emotions' && renderEmotionsPage()}
+        {currentPage === 'transition' && renderTransitionPage()}
+        {currentPage === 'question4' && renderQuestion4Page()}
+        {currentPage === 'question4b' && renderQuestion4bPage()}
+        {currentPage === 'question5' && renderQuestion5Page()}
+        {currentPage === 'completion' && renderCompletionPage()}
+        {currentPage === 'positiveFeeling' && renderPositiveFeelingPage()}
+        {currentPage === 'mood' && renderMoodPage()}
+        {currentPage === 'streak' && renderStreakPage()}
+      </SafeAreaView>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#E9EFF6',
+    backgroundColor: 'transparent',
   },
-  header: {
+
+  // ========== 進度條樣式 ==========
+  progressBarContainer: {
+    width: '100%',
+    paddingHorizontal: 0,
+    marginBottom: 24,
+  },
+  progressTrack: {
+    position: 'relative',
+    width: '100%',
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: 'rgba(49, 198, 254, 0.2)',
+    overflow: 'hidden',
+  },
+  progressFillContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    height: '100%',
+    borderRadius: 4,
+  },
+  progressGradient: {
+    width: '100%',
+    height: '100%',
+  },
+  stepCounter: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: 12,
-    backgroundColor: '#E9EFF6',
+    justifyContent: 'center',
+    marginTop: 8,
   },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+  stepText: {
+    fontSize: 12,
+    color: '#6B7280',
+    fontWeight: '400',
+  },
+
+  // ========== 漸層文字樣式 ==========
+  gradientTextMask: {
+    fontSize: 48,
+    fontWeight: '400',
+    textAlign: 'center',
+  },
+
+  // ========== 歡迎頁樣式 ==========
+  welcomeContainer: {
+    flex: 1,
+    backgroundColor: 'transparent',
+  },
+  welcomeScrollContent: {
+    flexGrow: 1,
+    paddingBottom: 80,
+  },
+  welcomeHomeButton: {
+    margin: 24,
+    marginBottom: 0,
+  },
+  homeButtonCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: 'rgba(49, 198, 254, 0.3)',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 1,
+    shadowRadius: 32,
+    elevation: 8,
+  },
+  welcomeContent: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+  },
+  welcomeIconContainer: {
+    width: 128,
+    height: 128,
+    marginBottom: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  glowCircle1: {
+    position: 'absolute',
+    width: 128,
+    height: 128,
+    borderRadius: 64,
+    backgroundColor: 'rgba(49, 198, 254, 0.2)',
+  },
+  glowCircle2: {
+    position: 'absolute',
+    width: 128,
+    height: 128,
+    borderRadius: 64,
+    backgroundColor: 'rgba(22, 108, 181, 0.25)',
+  },
+  welcomeIconCore: {
+    width: 128,
+    height: 128,
+    borderRadius: 64,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: 'rgba(49, 198, 254, 0.2)',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 1,
+    shadowRadius: 32,
+    elevation: 8,
+  },
+  welcomeEmoji: {
+    fontSize: 50,
+  },
+  welcomeTitle: {
+    fontSize: 36,
+    color: '#2F2F2F',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  welcomeSubtitle: {
+    fontSize: 16,
+    color: '#5F6368',
+    textAlign: 'center',
+    marginBottom: 48,
+  },
+  welcomeInfoCards: {
+    width: '100%',
+    marginBottom: 48,
+  },
+  infoCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+    borderRadius: 24,
+    padding: 16,
+    marginBottom: 12,
+  },
+  infoCardEmoji: {
+    fontSize: 24,
+    marginRight: 16,
+  },
+  infoCardText: {
+    fontSize: 14,
+    color: '#4A5568',
+    flex: 1,
+  },
+  welcomeStartButton: {
+    width: '100%',
+    maxWidth: 400,
+    height: 56,
+    borderRadius: 28,
+    overflow: 'hidden',
+  },
+  welcomeStartGradient: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  backArrowIcon: {
-    width: 18,
-    height: 24,
-    tintColor: '#31C6FE',
+  welcomeStartText: {
+    fontSize: 16,
+    color: '#FFFFFF',
+    fontWeight: '500',
+  },
+
+  // ========== 通用頁面樣式 ==========
+  pageContainer: {
+    flex: 1,
+    backgroundColor: 'transparent',
+  },
+  headerContainer: {
+    paddingHorizontal: 24,
+    paddingTop: 32,
+    paddingBottom: 16,
+  },
+  headerHomeButton: {
+    marginBottom: 32,
   },
   headerTitle: {
-    fontSize: 24,
-    fontWeight: '600',
-    color: '#606060',
-    flex: 1,
+    fontSize: 20,
     textAlign: 'center',
+    color: '#2F2F2F',
+    marginBottom: 24,
   },
-  headerRight: {
-    width: 40,
-  },
-  
-  // 第一頁樣式
-  introContainer: {
-    flex: 1,
-    backgroundColor: '#E9EFF6',
-  },
+
+  // ========== 介紹頁樣式 ==========
   introScrollContent: {
     flexGrow: 1,
-    paddingHorizontal: 24,
-    paddingTop: 40,
-    paddingBottom: 150,
     alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingBottom: 120,
   },
   introIconContainer: {
-    width: 64,
-    height: 64,
+    width: 96,
+    height: 96,
+    marginBottom: 32,
+    borderRadius: 48,
+    overflow: 'hidden',
+  },
+  introIconGradient: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  introIconHeart: {
+    fontSize: 48,
+    color: '#FFFFFF',
+  },
+  introMainTitle: {
+    fontSize: 24,
+    textAlign: 'center',
+    color: '#2F2F2F',
     marginBottom: 24,
   },
-  introIcon: {
-    width: 64,
-    height: 64,
-  },
-  introTitle: {
-    fontSize: 33,
-    fontWeight: '400',
-    color: '#2B2B2B',
-    textAlign: 'center',
-    fontFamily: 'Inter',
-    marginBottom: 16,
-  },
-  introTimeContainer: {
+  introDuration: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 32,
   },
-  clockIcon: {
-    width: 16,
-    height: 16,
-    marginRight: 6,
-  },
-  introTimeText: {
-    fontSize: 14,
-    fontWeight: '400',
-    color: '#4A5565',
-    fontFamily: 'Inter',
+  introDurationText: {
+    fontSize: 16,
+    color: '#5F6368',
   },
   introDescription: {
-    fontSize: 17,
-    fontWeight: '400',
-    color: '#2B2B2B',
-    textAlign: 'center',
-    lineHeight: 29.25,
-    fontFamily: 'Inter',
-    marginBottom: 60,
+    alignItems: 'center',
+    marginBottom: 48,
   },
-  startJournalButton: {
-    width: 340,
+  introDescText: {
+    fontSize: 16,
+    color: '#4A5568',
+    textAlign: 'center',
+    lineHeight: 28,
+  },
+  introStartButton: {
+    width: '100%',
+    maxWidth: 400,
     height: 56,
-    backgroundColor: 'rgba(255, 255, 255, 0.60)',
-    borderRadius: 100,
-    borderWidth: 1,
+    borderRadius: 28,
+    borderWidth: 2,
     borderColor: '#31C6FE',
+    backgroundColor: 'transparent',
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    position: 'relative',
   },
-  startJournalButtonText: {
-    fontSize: 18,
-    fontWeight: '400',
-    color: '#166CB5',
-    fontFamily: 'Inter',
-  },
-  startJournalArrow: {
-    fontSize: 22,
+  introStartButtonText: {
+    fontSize: 16,
     color: '#31C6FE',
-    fontWeight: '300',
-    position: 'absolute',
-    right: 24,
   },
-  
-  // 第二、三頁共用樣式
-  writingContainer: {
-    flex: 1,
-    backgroundColor: '#E9EFF6',
-  },
-  writingScrollContent: {
-    flexGrow: 1,
-    paddingHorizontal: 24,
-    paddingTop: 20,
-    paddingBottom: 150,
-  },
-  writingMainTitle: {
-    fontSize: 30,
-    fontWeight: '400',
-    color: '#2B2B2B',
-    textAlign: 'center',
-    fontFamily: 'Inter',
-    marginBottom: 8,
-  },
-  writingSubtitle: {
-    fontSize: 17,
-    fontWeight: '400',
-    color: '#2B2B2B',
-    textAlign: 'center',
-    lineHeight: 29.25,
-    fontFamily: 'Inter',
-    marginBottom: 32,
-  },
-  questionLabel: {
-    fontSize: 14,
-    fontWeight: '400',
-    color: '#5c5c5cff',
-    fontFamily: 'Inter',
-    marginBottom: 12,
-  },
-  questionInput: {
-    width: '100%',
-    minHeight: 155,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 10,
-    borderWidth: 0.732,
-    borderColor: 'rgba(0, 0, 0, 0.00)',
-    padding: 16,
-    fontSize: 14,
-    fontFamily: 'Inter',
-    color: '#808080',
-    marginBottom: 24,
-  },
-  inspirationTrigger: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  inspirationIcon: {
-    width: 16,
-    height: 16,
-    marginRight: 6,
-    tintColor: '#B0B0B0',
-  },
-  inspirationIconActive: {
-    tintColor: '#31C6FF',
-  },
-  inspirationText: {
-    fontSize: 14,
-    fontWeight: '400',
-    color: '#31C6FF',
-    fontFamily: 'Inter',
-  },
-  inspirationTextInactive: {
-    color: '#B0B0B0',
-  },
-  inspirationBox: {
-    backgroundColor: 'rgba(49, 198, 254, 0.10)',
-    borderRadius: 10,
-    borderWidth: 0.732,
-    borderColor: 'rgba(49, 198, 254, 0.20)',
-    padding: 22,
-    marginBottom: 24,
-  },
-  inspirationBoxTitle: {
-    fontSize: 19.25,
-    fontWeight: '400',
-    color: '#1A2633',
-    fontFamily: 'Inter',
-    marginBottom: 16,
-  },
-  inspirationBoxItem: {
-    fontSize: 19.25,
-    fontWeight: '400',
-    color: '#5B6B7F',
-    fontFamily: 'Noto Sans TC',
-    lineHeight: 27.5,
-    marginBottom: 4,
-  },
-  tagsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-    marginBottom: 24,
-  },
-  feelingTag: {
-    height: 48,
-    paddingHorizontal: 14,
-    borderRadius: 100,
-    borderWidth: 1,
-    borderColor: '#31C6FF',
-    backgroundColor: 'transparent',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  feelingTagOutline: {
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: '#31C6FF',
-  },
-  feelingTagFilled: {
-    backgroundColor: '#31C6FF',
-  },
-  feelingTagSelected: {
-    backgroundColor: 'rgba(49, 198, 255, 0.70)',
-  },
-  feelingTagText: {
-    fontSize: 14,
-    fontWeight: '400',
-    color: '#31C6FF',
-    fontFamily: 'Inter',
-  },
-  feelingTagTextFilled: {
-    color: '#FFFFFF',
-  },
-  feelingTagTextSelected: {
-    color: '#FFFFFF',
-  },
-  actionTag: {
-    height: 48,
-    paddingHorizontal: 14,
-    borderRadius: 100,
-    borderWidth: 1,
-    borderColor: '#31C6FF',
-    backgroundColor: 'transparent',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  actionTagOutline: {
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: '#31C6FF',
-  },
-  actionTagFilled: {
-    backgroundColor: '#31C6FF',
-  },
-  actionTagSelected: {
-    backgroundColor: 'rgba(49, 198, 255, 0.70)',
-  },
-  actionTagText: {
-    fontSize: 14,
-    fontWeight: '400',
-    color: '#31C6FF',
-    fontFamily: 'Inter',
-  },
-  actionTagTextFilled: {
-    color: '#FFFFFF',
-  },
-  actionTagTextSelected: {
-    color: '#FFFFFF',
-  },
-  actionPrompt: {
-    fontSize: 14,
-    fontWeight: '400',
-    color: '#31C6FF',
-    fontFamily: 'Inter',
-    marginBottom: 16,
-  },
-  recordPrompt: {
-    fontSize: 14,
-    fontWeight: '400',
-    color: '#31C6FF',
-    fontFamily: 'Inter',
-    marginBottom: 12,
-  },
-  recordInput: {
-    width: '100%',
-    height: 161,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 10,
-    borderWidth: 1.464,
-    borderColor: 'rgba(0, 0, 0, 0.00)',
-    padding: 16,
-    fontSize: 14,
-    fontFamily: 'Inter',
-    marginBottom: 32,
-  },
-  nextPageButton: {
-    width: '100%',
-    maxWidth: 361,
-    height: 48,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 100,
-    borderWidth: 1,
-    borderColor: '#31C6FF',
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    alignSelf: 'center',
-    marginTop: 24,
-  },
-  nextPageButtonText: {
-    fontSize: 18,
-    fontWeight: '400',
-    color: '#31C6FE',
-    fontFamily: 'Inter',
-  },
-  nextPageArrow: {
-    fontSize: 22,
-    color: '#31C6FE',
-    fontWeight: '300',
+  introStartArrow: {
     position: 'absolute',
     right: 24,
   },
 
-  // ⭐ 新增 encouragement 頁樣式
-  encouragementContainer: {
-    flex: 1,
-    backgroundColor: '#E9EFF6',
+  // ========== 問題頁樣式 ==========
+  questionTitleSection: {
+    marginBottom: 24,
   },
-  encouragementScrollContent: {
+  questionMainTitle: {
+    fontSize: 24,
+    textAlign: 'center',
+    color: '#2F2F2F',
+    marginBottom: 12,
+    lineHeight: 32,
+  },
+  questionSubtitle: {
+    fontSize: 14,
+    textAlign: 'center',
+    color: '#5F6368',
+    lineHeight: 22,
+  },
+  questionScrollContent: {
     flexGrow: 1,
     paddingHorizontal: 24,
-    paddingTop: 60,
-    paddingBottom: 150,
-    alignItems: 'center',
+    paddingBottom: 120,
   },
-  encouragementTitle: {
-    fontSize: 30,
-    fontWeight: '400',
-    color: '#2B2B2B',
-    textAlign: 'center',
-    fontFamily: 'Inter',
-    marginBottom: 16,
+  questionLabel: {
+    fontSize: 14,
+    color: '#4A5568',
+    marginBottom: 12,
   },
-  encouragementSubtitle: {
-    fontSize: 17,
-    fontWeight: '400',
-    color: '#4A5565',
-    textAlign: 'center',
-    lineHeight: 29.25,
-    fontFamily: 'Inter',
-    marginBottom: 40,
-  },
-  encouragementPrimaryButton: {
+  questionTextarea: {
     width: '100%',
-    maxWidth: 361,
-    height: 62,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 100,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-    overflow: 'hidden',
-    marginBottom: 16,
-  },
-  encouragementPrimaryText: {
-    fontSize: 18,
-    fontWeight: '400',
-    color: '#166CB5',
-    fontFamily: 'Inter',
-    zIndex: 1,
-  },
-  encouragementPrimaryGradient: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    borderRadius: 100,
-    opacity: 0.4702,
-  },
-  encouragementSecondaryButton: {
-    width: '100%',
-    maxWidth: 361,
-    height: 56,
-    borderRadius: 100,
-    borderWidth: 1,
-    borderColor: '#CBD5E0',
+    minHeight: 180,
     backgroundColor: 'rgba(255, 255, 255, 0.8)',
-    justifyContent: 'center',
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.5)',
+    padding: 20,
+    fontSize: 14,
+    color: '#4A5568',
+    marginBottom: 24,
+    shadowColor: 'rgba(0, 0, 0, 0.1)',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 1,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+
+  // 建議提示
+  suggestionTrigger: {
+    flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 12,
   },
-  encouragementSecondaryText: {
-    fontSize: 16,
-    fontWeight: '400',
-    color: '#4A5565',
-    fontFamily: 'Inter',
+  suggestionIcon: {
+    width: 16,
+    height: 16,
+    marginRight: 8,
+    tintColor: '#B0B0B0',
   },
-  encouragementHint: {
-    fontSize: 13,
-    fontWeight: '400',
-    color: '#718096',
-    fontFamily: 'Inter',
-    marginTop: 8,
-    textAlign: 'center',
+  suggestionIconActive: {
+    tintColor: '#31C6FE',
   },
-  
-  // 第五頁樣式
-  reflectionContainer: {
-    flex: 1,
-    backgroundColor: '#E9EFF6',
+  suggestionText: {
+    fontSize: 14,
+    color: '#31C6FE',
   },
-  reflectionScrollContent: {
-    flexGrow: 1,
-    paddingHorizontal: 24,
-    paddingTop: 20,
-    paddingBottom: 150,
+  suggestionTextInactive: {
+    color: '#B0B0B0',
   },
-  reflectionMainTitle: {
-    fontSize: 30,
-    fontWeight: '400',
-    color: '#2B2B2B',
-    textAlign: 'center',
-    fontFamily: 'Inter',
-    marginBottom: 8,
-  },
-  reflectionSubtitle: {
-    fontSize: 17,
-    fontWeight: '400',
-    color: '#2B2B2B',
-    textAlign: 'center',
-    lineHeight: 29.25,
-    fontFamily: 'Inter',
-    marginBottom: 32,
-  },
-  sliderSection: {
-    width: '100%',
-    maxWidth: 361,
-    backgroundColor: 'rgba(255, 255, 255, 0.60)',
+  suggestionBox: {
+    backgroundColor: 'rgba(210, 237, 249, 0.6)',
     borderRadius: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.5)',
     padding: 24,
     marginBottom: 24,
-    alignSelf: 'center',
   },
-  sliderTitle: {
-    fontSize: 18,
-    fontWeight: '400',
-    color: '#0A0A0A',
-    fontFamily: 'Inter',
-    marginBottom: 16,
+  suggestionBoxTitle: {
+    fontSize: 14,
+    color: '#1A2633',
+    marginBottom: 12,
   },
-  sliderContainer: {
-    height: 9.5,
-    marginBottom: 8,
-  },
-  slider: {
-    width: '100%',
-    height: 9.5,
-  },
-  sliderScaleContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 4,
-    marginBottom: 8,
-    paddingHorizontal: 2,
-  },
-  sliderScaleItem: {
-    alignItems: 'center',
-    flex: 1,
-  },
-  sliderScaleMark: {
-    width: 2,
-    height: 8,
-    backgroundColor: '#D0D0D0',
+  suggestionBoxItem: {
+    fontSize: 14,
+    color: '#4A5568',
+    lineHeight: 24,
     marginBottom: 4,
   },
-  sliderScaleMarkActive: {
-    backgroundColor: '#31C6FF',
-    height: 10,
-    width: 3,
-  },
-  sliderScaleText: {
-    fontSize: 10,
-    fontWeight: '400',
-    color: '#4A5565',
-    fontFamily: 'Inter',
-  },
-  sliderScaleTextActive: {
-    color: '#31C6FF',
-    fontWeight: '600',
-  },
-  sliderLabels: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 4,
-  },
-  sliderLabelText: {
-    fontSize: 12,
-    fontWeight: '400',
-    color: '#4A5565',
-    fontFamily: 'Inter',
-  },
-  moodPrompt: {
-    fontSize: 14,
-    fontWeight: '400',
-    color: '#4A5565',
-    fontFamily: 'Inter',
-    marginBottom: 16,
-  },
-  moodTagsContainer: {
+
+  // 標籤容器
+  emotionTagsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
+    gap: 12,
     marginBottom: 24,
   },
-  moodTag: {
-    height: 48,
-    paddingHorizontal: 14,
-    borderRadius: 100,
-    borderWidth: 1,
-    borderColor: '#31C6FF',
-    backgroundColor: 'transparent',
+  emotionTag: {
+    height: 44,
+    paddingHorizontal: 20,
+    borderRadius: 22,
+    borderWidth: 2,
+    borderColor: '#31C6FE',
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  moodTagOutline: {
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: '#31C6FF',
+  emotionTagSelected: {
+    backgroundColor: '#31C6FE',
+    borderColor: '#31C6FE',
   },
-  moodTagFilled: {
-    backgroundColor: '#31C6FF',
+  emotionTagText: {
+    fontSize: 14,
+    color: '#31C6FE',
+  },
+  emotionTagTextSelected: {
+    color: '#FFFFFF',
+  },
+
+  actionTagsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginBottom: 16,
+  },
+  actionTag: {
+    height: 44,
+    paddingHorizontal: 20,
+    borderRadius: 22,
+    borderWidth: 2,
+    borderColor: '#31C6FE',
+    backgroundColor: 'rgba(255, 255, 255, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  actionTagSelected: {
+    backgroundColor: '#31C6FE',
+    borderColor: '#31C6FE',
+  },
+  actionTagText: {
+    fontSize: 14,
+    color: '#31C6FE',
+  },
+  actionTagTextSelected: {
+    color: '#FFFFFF',
+  },
+  // 「其他」按鈕容器 - 新增
+  otherActionButtonContainer: {
+    alignItems: 'flex-start',
+    marginBottom: 16,
+  },
+  // 「其他」按鈕 - 新增
+  otherActionButton: {
+    alignSelf: 'flex-start',
+  },
+
+  moodTagsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginBottom: 24,
+  },
+  moodTag: {
+    height: 44,
+    paddingHorizontal: 20,
+    borderRadius: 22,
+    borderWidth: 2,
+    borderColor: '#31C6FE',
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   moodTagSelected: {
-    backgroundColor: 'rgba(49, 198, 255, 0.70)',
+    backgroundColor: '#31C6FE',
+    borderColor: '#31C6FE',
   },
   moodTagText: {
     fontSize: 14,
-    fontWeight: '400',
-    color: '#31C6FF',
-    fontFamily: 'Inter',
-  },
-  moodTagTextFilled: {
-    color: '#FFFFFF',
+    color: '#31C6FE',
   },
   moodTagTextSelected: {
     color: '#FFFFFF',
   },
-  submitButton: {
+
+  // 記錄輸入框
+  recordPrompt: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    marginBottom: 8,
+    marginTop: 16,
+  },
+  recordTextarea: {
     width: '100%',
-    maxWidth: 361,
-    height: 62,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 100,
-    justifyContent: 'center',
+    minHeight: 120,
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.5)',
+    padding: 20,
+    fontSize: 14,
+    color: '#4A5568',
+    marginBottom: 24,
+  },
+
+  // ========== 過渡頁樣式 ==========
+  transitionContent: {
+    flex: 1,
     alignItems: 'center',
-    alignSelf: 'center',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-    overflow: 'hidden',
-    marginTop: 24,
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+    paddingBottom: 120,
   },
-  submitButtonText: {
-    fontSize: 18,
-    fontWeight: '400',
-    color: '#166CB5',
-    fontFamily: 'Inter',
-    zIndex: 1,
+  transitionEmoji: {
+    fontSize: 70,
+    marginBottom: 32,
   },
-  submitButtonGradient: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    borderRadius: 100,
-    opacity: 0.4702,
+  transitionMainTitle: {
+    fontSize: 24,
+    textAlign: 'center',
+    color: '#2F2F2F',
+    marginBottom: 24,
+    lineHeight: 34,
   },
-  
-  // 第六頁樣式
+  transitionTextBlock: {
+    alignItems: 'center',
+  },
+  transitionBigText: {
+    fontSize: 20,
+    color: '#2F2F2F',
+    marginBottom: 12,
+  },
+  transitionSmallText: {
+    fontSize: 14,
+    color: '#5F6368',
+    textAlign: 'center',
+    lineHeight: 22,
+  },
+
+  // ========== 完成頁樣式 ==========
   completionContainer: {
     flex: 1,
-    backgroundColor: '#E9EFF6',
+    backgroundColor: 'transparent',
   },
   completionScrollContent: {
     flexGrow: 1,
+    alignItems: 'center',
     paddingHorizontal: 24,
     paddingTop: 60,
-    paddingBottom: 150,
-    alignItems: 'center',
+    paddingBottom: 80,
   },
   completionTitle: {
-    fontSize: 32,
-    fontWeight: '400',
-    color: '#2B2B2B',
+    fontSize: 36,
+    color: '#2F2F2F',
     textAlign: 'center',
-    fontFamily: 'Inter',
-    marginBottom: 24,
+    marginBottom: 32,
   },
-  completionSubtitle: {
-    fontSize: 18,
-    fontWeight: '400',
-    color: '#4A5565',
+  completionDescription: {
+    alignItems: 'center',
+    marginBottom: 64,
+  },
+  completionDescText: {
+    fontSize: 16,
+    color: '#4A5568',
     textAlign: 'center',
-    lineHeight: 29.25,
-    fontFamily: 'Inter',
-    marginBottom: 40,
+    lineHeight: 28,
   },
-  streakCard: {
+  completionPrimaryButton: {
     width: '100%',
-    maxWidth: 361,
-    backgroundColor: 'rgba(255, 255, 255, 0.60)',
-    borderRadius: 24,
-    padding: 22,
+    maxWidth: 400,
+    height: 56,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+    shadowColor: 'rgba(0, 0, 0, 0.1)',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  completionPrimaryText: {
+    fontSize: 16,
+    color: '#31C6FE',
+  },
+  completionSecondaryButton: {
+    width: '100%',
+    maxWidth: 400,
+    paddingVertical: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 48,
+  },
+  completionSecondaryText: {
+    fontSize: 14,
+    color: '#9CA3AF',
+  },
+  completionBottomMessage: {
+    fontSize: 14,
+    color: '#9CA3AF',
+    textAlign: 'center',
+    lineHeight: 24,
+  },
+  // 裝飾元素
+  decorativeSparkle1: {
+    position: 'absolute',
+    top: 80,
+    left: 40,
+    fontSize: 48,
+    zIndex: 1,
+  },
+  decorativeSparkle2: {
+    position: 'absolute',
+    top: 128,
+    right: 64,
+    fontSize: 40,
+    zIndex: 1,
+  },
+  decorativeSparkle3: {
+    position: 'absolute',
+    bottom: 260,
+    left: 80,
+    fontSize: 32,
+    zIndex: 1,
+  },
+
+  // ========== 感受覺察頁樣式(完全重新設計)==========
+  feelingTitleSection: {
     alignItems: 'center',
     marginBottom: 32,
   },
-  celebrationEmoji: {
-    fontSize: 50,
+  sliderCard: {
+    width: '100%',
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    borderRadius: 24,
+    padding: 24,
+    marginBottom: 32,
+    shadowColor: 'rgba(0, 0, 0, 0.1)',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  sliderCardTitle: {
+    fontSize: 16,
+    color: '#2F2F2F',
+    marginBottom: 24,
     textAlign: 'center',
+  },
+  sliderScoreDisplay: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'center',
+    marginBottom: 24,
+  },
+  sliderScoreNumber: {
+    fontSize: 48,
+    fontWeight: '600',
+  },
+  sliderScoreTotal: {
+    fontSize: 18,
+    color: '#9CA3AF',
+    marginLeft: 4,
+  },
+  // 刻度在滑桿上方
+  sliderMarkersTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+    paddingHorizontal: 2,
+  },
+  sliderMarkerItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  sliderMarkerTextTop: {
+    fontSize: 10,
+    color: '#9CA3AF',
+    marginBottom: 4,
+  },
+  sliderMarkerLine: {
+    width: 2,
+    height: 8,
+    backgroundColor: '#D1D5DB',
+  },
+  sliderMarkerLineActive: {
+    backgroundColor: '#31C6FE',
+    height: 10,
+    width: 3,
+  },
+  sliderMarkerTextActive: {
+    color: '#31C6FE',
+    fontWeight: '600',
+  },
+  // 滑桿容器 - 使用漸層和加粗
+  sliderContainerNew: {
+    position: 'relative',
+    height: 12,
     marginBottom: 16,
+  },
+  sliderTrackBackground: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: '50%',
+    height: 12,
+    backgroundColor: '#E5E7EB',
+    borderRadius: 6,
+    transform: [{ translateY: -6 }],
+    overflow: 'hidden',
+  },
+  sliderTrackFill: {
+    height: '100%',
+    borderRadius: 6,
+  },
+  sliderOverlay: {
+    width: '100%',
+    height: 12,
+  },
+  sliderLabels: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  // 標籤改為黑色
+  sliderLabelTextBlack: {
+    fontSize: 12,
+    color: '#1F2937',
+  },
+
+  // ========== 連續天數頁樣式 ==========
+  streakContainer: {
+    flex: 1,
+    backgroundColor: 'transparent',
+  },
+  streakScrollContent: {
+    flexGrow: 1,
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingTop: 0,
+    paddingBottom: 80,
+  },
+  streakTitle: {
+    fontSize: 36,
+    color: '#2F2F2F',
+    textAlign: 'center',
+    marginBottom: 14,
+  },
+  streakDescription: {
+    alignItems: 'center',
+    marginBottom: 48,
+  },
+  streakDescText: {
+    fontSize: 16,
+    color: '#4A5568',
+    textAlign: 'center',
+    lineHeight: 28,
+  },
+  streakCard: {
+    width: '100%',
+    maxWidth: 400,
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    borderRadius: 24,
+    padding: 40,
+    alignItems: 'center',
+    marginBottom: 32,
+  },
+  streakEmoji: {
+    fontSize: 60,
+    marginBottom: 24,
   },
   streakLabel: {
     fontSize: 14,
-    fontWeight: '400',
-    color: '#4A5565',
-    fontFamily: 'Inter',
-    marginBottom: 8,
+    color: '#4A5568',
+    marginBottom: 12,
   },
   streakDays: {
-    fontSize: 24,
-    fontWeight: '400',
-    color: '#31C6FF',
-    fontFamily: 'Inter',
+    fontSize: 48,
+    fontWeight: '600',
   },
-  viewDiaryButton: {
+  streakButton: {
     width: '100%',
-    maxWidth: 361,
+    maxWidth: 400,
     height: 62,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 100,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    borderRadius: 31,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000000',
+    shadowColor: 'rgba(0, 0, 0, 0.1)',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowOpacity: 1,
+    shadowRadius: 8,
     elevation: 3,
-    overflow: 'hidden',
-    marginBottom: 40,
   },
-  viewDiaryButtonText: {
+  streakButtonText: {
     fontSize: 18,
-    fontWeight: '400',
-    color: '#166CB5',
-    fontFamily: 'Inter',
-    zIndex: 1,
+    color: '#31C6FE',
   },
-  viewDiaryButtonGradient: {
+
+  // ========== 底部導航樣式 ==========
+  bottomNavigation: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    borderRadius: 100,
-    opacity: 0.4702,
+    bottom: 32,
+    left: 24,
+    right: 24,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
-  
-  // 共用底部樣式
-  bottomNav: {
+  bottomNavigationRight: {
     position: 'absolute',
-    bottom: 50,
-    left: 0,
-    right: 0,
-    height: 80,
-    backgroundColor: 'transparent',
+    bottom: 32,
+    right: 24,
+  },
+  navButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingBottom: 20,
-  },
-  homeButtonContainer: {
-    width: 56,
-    height: 56,
-    alignSelf: 'center',
-  },
-  homeButtonBackground: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: '#FFFFFF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  bottomHomeIcon: {
-    width: 32,
-    height: 32,
-    tintColor: '#31C6FE',
+    shadowColor: 'rgba(49, 198, 254, 0.3)',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 1,
+    shadowRadius: 32,
+    elevation: 8,
   },
 });
