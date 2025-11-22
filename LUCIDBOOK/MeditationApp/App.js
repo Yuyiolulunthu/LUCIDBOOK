@@ -9,6 +9,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 // 導入所有頁面
 import HomeScreen from './src/screens/home/HomeScreen';
+import EmotionalResiliencePlanScreen from './src/screens/home/EmotionalResiliencePlanScreen';
 import LoginScreen from './src/screens/auth/LoginScreen';
 import RegisterScreen from './src/screens/auth/RegisterScreen';
 import ForgotPasswordScreen from './src/screens/auth/ForgotPasswordScreen';
@@ -39,8 +40,6 @@ import Favorites from './src/screens/account/bookmarks/Favorites';
 import SelectGoals from './src/screens/account/settings/SelectGoals';
 import EnterpriseCodeManagement from './src/screens/account/settings/EnterpriseCodeManagement';
 
-// 添加路由
-
 const Stack = createNativeStackNavigator();
 
 // ==========================================
@@ -56,6 +55,11 @@ const App = () => {
       >
         {/* 主頁面 */}
         <Stack.Screen name="Home" component={HomeScreen} />
+        <Stack.Screen 
+          name="EmotionalResiliencePlan" 
+          component={EmotionalResiliencePlanScreen} 
+          options={{ headerShown: false }}
+        />
         
         {/* 認證相關頁面 */}
         <Stack.Screen name="Login" component={LoginScreen} />
@@ -85,14 +89,25 @@ const App = () => {
         <Stack.Screen name="TrainingPlanProgress" component={TrainingPlanProgressScreen} />
         <Stack.Screen name="PracticeNavigator" component={PracticeNavigator} />
 
-
+        {/* 設定相關頁面 */}
         <Stack.Screen name="Settings" component={Settings} />
         <Stack.Screen name="Feedback" component={Feedback} />
         <Stack.Screen name="Favorites" component={Favorites} />
-        <Stack.Screen name="EnterpriseCode" component={EnterpriseCode}  options={{ headerShown: false }}/>
-        <Stack.Screen name="EnterpriseCodeManagement" component={EnterpriseCodeManagement}  options={{ headerShown: false }}/>
-        <Stack.Screen      name="SelectGoals"      component={SelectGoals}  options={{ headerShown: false }}
-   />
+        <Stack.Screen 
+          name="EnterpriseCode" 
+          component={EnterpriseCode}  
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen 
+          name="EnterpriseCodeManagement" 
+          component={EnterpriseCodeManagement}  
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen      
+          name="SelectGoals"      
+          component={SelectGoals}  
+          options={{ headerShown: false }}
+        />
       </Stack.Navigator>
     </NavigationContainer>
   );
