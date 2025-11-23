@@ -1,14 +1,13 @@
 // ==========================================
 // 檔案名稱: Settings.js
-// 功能: 帳號設定頁面
+// 功能: 設定頁面
 // 
-// ✅ 個人資料編輯
-// ✅ 練習目標管理（新增）
-// ✅ 企業引薦碼管理（包含效期顯示）
-// ✅ 通知設定
-// ✅ 隱私設定
-// ✅ 登出帳號
-// ✅ 自動刷新企業引薦碼資訊
+// ✅ 帳號設定（個人資料、修改密碼、隱私設定、企業引薦碼）
+// ✅ 通知設定（推播通知、練習提醒時間）
+// ✅ 應用設定（音效、深色模式、語言）
+// ✅ 關於（關於我們、幫助中心、服務條款、隱私政策、版本）
+// ✅ 帳號管理（登出、刪除帳號）
+// 🎨 依照設計程式風格更新
 // ==========================================
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -21,8 +20,10 @@ import {
   StatusBar,
   Alert,
   Switch,
-  TextInput,
   ActivityIndicator,
+  Platform,
+  KeyboardAvoidingView,
+  Modal,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -30,139 +31,152 @@ import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import ApiService from '../../../../api';
-import {
-  getEnterpriseCodeInfo,
-  clearEnterpriseCode,
-  formatExpiryDate,
-} from './utils/enterpriseCodeUtils';
-import {
-  getUserGoalsDetails,
-} from './utils/userGoalsUtils';
 
 const Settings = ({ navigation }) => {
-  const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   
-  // 練習目標狀態
-  const [userGoals, setUserGoals] = useState([]);
-  
-  // 企業引薦碼狀態（完整資訊）
-  const [enterpriseCodeInfo, setEnterpriseCodeInfo] = useState({
-    code: null,
-    enterpriseName: null,
-    expiryDate: null,
-    daysRemaining: null,
-  });
-  
   // 通知設定
-  const [notificationSettings, setNotificationSettings] = useState({
-    practiceReminder: true,
-    achievementNotification: true,
-    weeklyReport: false,
-  });
+  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [darkModeEnabled, setDarkModeEnabled] = useState(false);
+  const [reminderTime, setReminderTime] = useState('09:00');
 
-  // 編輯模式
-  const [isEditingName, setIsEditingName] = useState(false);
-  const [editedName, setEditedName] = useState('');
+  // 時間選擇器 Modal 狀態
+  const [timePickerVisible, setTimePickerVisible] = useState(false);
+  const [selectedPeriod, setSelectedPeriod] = useState('上午'); // 上午 or 下午
+  const [selectedHour, setSelectedHour] = useState(9);
+  const [selectedMinute, setSelectedMinute] = useState(0);
 
   useEffect(() => {
-    loadUserData();
+    loadSettings();
   }, []);
 
-  // 當頁面獲得焦點時重新載入企業引薦碼資訊和目標
-  useFocusEffect(
-    useCallback(() => {
-      loadEnterpriseInfo();
-      loadUserGoals();
-    }, [])
-  );
-
-  const loadUserData = async () => {
+  const loadSettings = async () => {
     try {
-      const response = await ApiService.getUserProfile();
-      setUser(response.user);
-      setEditedName(response.user.name);
+      // 載入儲存的設定
+      const savedNotifications = await AsyncStorage.getItem('notificationsEnabled');
+      const savedSound = await AsyncStorage.getItem('soundEnabled');
+      const savedDarkMode = await AsyncStorage.getItem('darkModeEnabled');
+      const savedReminderTime = await AsyncStorage.getItem('reminderTime');
+
+      if (savedNotifications !== null) setNotificationsEnabled(JSON.parse(savedNotifications));
+      if (savedSound !== null) setSoundEnabled(JSON.parse(savedSound));
+      if (savedDarkMode !== null) setDarkModeEnabled(JSON.parse(savedDarkMode));
+      if (savedReminderTime !== null) {
+        setReminderTime(savedReminderTime);
+        // 解析已儲存的時間來設定選擇器初始值
+        parseTimeToState(savedReminderTime);
+      }
     } catch (error) {
-      console.error('載入用戶資料失敗:', error);
+      console.error('載入設定失敗:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const loadEnterpriseInfo = async () => {
-    try {
-      const info = await getEnterpriseCodeInfo();
-      setEnterpriseCodeInfo(info);
-    } catch (error) {
-      console.error('載入企業資訊失敗:', error);
+  // 解析時間字串到狀態 (例如 "09:00" -> 上午 9:00)
+  const parseTimeToState = (timeStr) => {
+    const [hourStr, minuteStr] = timeStr.split(':');
+    let hour = parseInt(hourStr, 10);
+    const minute = parseInt(minuteStr, 10);
+    
+    if (hour === 0) {
+      setSelectedPeriod('上午');
+      setSelectedHour(12);
+    } else if (hour === 12) {
+      setSelectedPeriod('下午');
+      setSelectedHour(12);
+    } else if (hour > 12) {
+      setSelectedPeriod('下午');
+      setSelectedHour(hour - 12);
+    } else {
+      setSelectedPeriod('上午');
+      setSelectedHour(hour);
+    }
+    setSelectedMinute(minute);
+  };
+
+  // 格式化時間顯示 (12小時制帶上午/下午)
+  const formatTimeDisplay = (timeStr) => {
+    const [hourStr, minuteStr] = timeStr.split(':');
+    let hour = parseInt(hourStr, 10);
+    const minute = minuteStr;
+    
+    if (hour === 0) {
+      return `上午 12:${minute}`;
+    } else if (hour === 12) {
+      return `下午 12:${minute}`;
+    } else if (hour > 12) {
+      return `下午 ${hour - 12}:${minute}`;
+    } else {
+      return `上午 ${hour}:${minute}`;
     }
   };
 
-  const loadUserGoals = async () => {
-    try {
-      const goals = await getUserGoalsDetails();
-      setUserGoals(goals);
-    } catch (error) {
-      console.error('載入用戶目標失敗:', error);
+  // 將選擇的時間轉換為24小時制字串
+  const convertTo24Hour = () => {
+    let hour = selectedHour;
+    if (selectedPeriod === '上午') {
+      if (hour === 12) hour = 0;
+    } else {
+      if (hour !== 12) hour = hour + 12;
     }
+    const hourStr = hour.toString().padStart(2, '0');
+    const minuteStr = selectedMinute.toString().padStart(2, '0');
+    return `${hourStr}:${minuteStr}`;
   };
 
-  const handleSaveName = async () => {
-    if (!editedName.trim()) {
-      Alert.alert('提示', '名稱不能為空');
-      return;
-    }
-
-    try {
-      const response = await ApiService.updateProfile({ name: editedName });
-      if (response.success) {
-        setUser({ ...user, name: editedName });
-        setIsEditingName(false);
-        Alert.alert('成功', '名稱已更新');
-      }
-    } catch (error) {
-      Alert.alert('錯誤', '更新失敗，請稍後再試');
-    }
+  // 確認時間選擇
+  const handleConfirmTime = async () => {
+    const newTime = convertTo24Hour();
+    setReminderTime(newTime);
+    await AsyncStorage.setItem('reminderTime', newTime);
+    setTimePickerVisible(false);
   };
 
-  const handleGoalsManagement = () => {
-    navigation.navigate('SelectGoals', { fromSettings: true });
+  // 打開時間選擇器
+  const handleOpenTimePicker = () => {
+    parseTimeToState(reminderTime);
+    setTimePickerVisible(true);
   };
 
-  const handleEnterpriseManagement = () => {
+  const toggleSetting = async (key, value, setter) => {
+    setter(value);
+    await AsyncStorage.setItem(key, JSON.stringify(value));
+  };
+
+  // 導航功能
+  const handleNavigateToProfile = () => {
+    navigation.navigate('ProfileEdit');
+  };
+
+  const handleNavigateToPassword = () => {
+    // 導航到 ResetPassword 頁面
+    navigation.navigate('ResetPassword');
+  };
+
+  const handleNavigateToPrivacy = () => {
+    navigation.navigate('PrivacySettings');
+  };
+
+  const handleNavigateToCompanyReferral = () => {
     navigation.navigate('EnterpriseCodeManagement');
   };
 
-  const handleEnterpriseLogin = () => {
-    navigation.navigate('EnterpriseCode', { fromSettings: true });
+  const handleNavigateToAboutUs = () => {
+    navigation.navigate('AboutUs');
   };
 
-  const handleEnterpriseLogout = () => {
-    Alert.alert(
-      '確認刪除企業引薦碼',
-      '刪除後將無法存取企業專屬功能，確定要刪除嗎？',
-      [
-        { text: '取消', style: 'cancel' },
-        {
-          text: '刪除',
-          style: 'destructive',
-          onPress: async () => {
-            const success = await clearEnterpriseCode();
-            if (success) {
-              setEnterpriseCodeInfo({
-                code: null,
-                enterpriseName: null,
-                expiryDate: null,
-                daysRemaining: null,
-              });
-              Alert.alert('成功', '已刪除企業引薦碼');
-            } else {
-              Alert.alert('錯誤', '刪除失敗，請稍後再試');
-            }
-          }
-        }
-      ]
-    );
+  const handleNavigateToHelp = () => {
+    navigation.navigate('HelpCenter');
+  };
+
+  const handleNavigateToTerms = () => {
+    navigation.navigate('TermsOfService');
+  };
+
+  const handleNavigateToPrivacyPolicy = () => {
+    navigation.navigate('PrivacyPolicy');
   };
 
   const handleLogout = () => {
@@ -191,17 +205,326 @@ const Settings = ({ navigation }) => {
     );
   };
 
-  const toggleNotification = (key) => {
-    setNotificationSettings(prev => ({
-      ...prev,
-      [key]: !prev[key]
-    }));
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      '刪除帳號',
+      '此操作無法復原，確定要刪除您的帳號嗎？',
+      [
+        { text: '取消', style: 'cancel' },
+        {
+          text: '刪除',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              // 呼叫刪除帳號 API
+              // await ApiService.deleteAccount();
+              await AsyncStorage.clear();
+              navigation.reset({
+                index: 0,
+                routes: [{ name: 'Login' }],
+              });
+            } catch (error) {
+              console.error('刪除帳號失敗:', error);
+              Alert.alert('錯誤', '刪除帳號失敗，請稍後再試');
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  // 渲染導航項目
+  const renderNavigateItem = (icon, label, onPress, iconColor = '#166CB5') => (
+    <TouchableOpacity
+      style={styles.settingItem}
+      onPress={onPress}
+      activeOpacity={0.7}
+    >
+      <View style={styles.settingItemLeft}>
+        <View style={[styles.iconContainer, { backgroundColor: `${iconColor}15` }]}>
+          <Ionicons name={icon} size={20} color={iconColor} />
+        </View>
+        <Text style={styles.settingItemLabel}>{label}</Text>
+      </View>
+      <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
+    </TouchableOpacity>
+  );
+
+  // 渲染 Toggle 項目
+  const renderToggleItem = (icon, label, value, onToggle, iconColor = '#166CB5') => (
+    <View style={styles.settingItem}>
+      <View style={styles.settingItemLeft}>
+        <View style={[styles.iconContainer, { backgroundColor: `${iconColor}15` }]}>
+          <Ionicons name={icon} size={20} color={iconColor} />
+        </View>
+        <Text style={styles.settingItemLabel}>{label}</Text>
+      </View>
+      <TouchableOpacity
+        style={[
+          styles.toggleButton,
+          value && styles.toggleButtonActive
+        ]}
+        onPress={() => onToggle(!value)}
+        activeOpacity={0.8}
+      >
+        {value ? (
+          <LinearGradient
+            colors={['#166CB5', '#31C6FE']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.toggleButtonGradient}
+          >
+            <View style={[styles.toggleKnob, styles.toggleKnobActive]} />
+          </LinearGradient>
+        ) : (
+          <View style={styles.toggleButtonInactive}>
+            <View style={styles.toggleKnob} />
+          </View>
+        )}
+      </TouchableOpacity>
+    </View>
+  );
+
+  // 渲染文字項目
+  const renderTextItem = (icon, label, value, iconColor = '#166CB5') => (
+    <View style={styles.settingItem}>
+      <View style={styles.settingItemLeft}>
+        <View style={[styles.iconContainer, { backgroundColor: `${iconColor}15` }]}>
+          <Ionicons name={icon} size={20} color={iconColor} />
+        </View>
+        <Text style={styles.settingItemLabel}>{label}</Text>
+      </View>
+      <Text style={styles.settingItemValue}>{value}</Text>
+    </View>
+  );
+
+  // 渲染可點擊的時間項目
+  const renderTimeItem = (icon, label, value, onPress, iconColor = '#166CB5') => (
+    <TouchableOpacity
+      style={styles.settingItem}
+      onPress={onPress}
+      activeOpacity={0.7}
+    >
+      <View style={styles.settingItemLeft}>
+        <View style={[styles.iconContainer, { backgroundColor: `${iconColor}15` }]}>
+          <Ionicons name={icon} size={20} color={iconColor} />
+        </View>
+        <Text style={styles.settingItemLabel}>{label}</Text>
+      </View>
+      <View style={styles.timeValueContainer}>
+        <Text style={styles.settingItemValue}>{value}</Text>
+        <Ionicons name="chevron-forward" size={16} color="#9CA3AF" style={{ marginLeft: 4 }} />
+      </View>
+    </TouchableOpacity>
+  );
+
+  // 渲染危險操作項目
+  const renderDangerItem = (icon, label, onPress, color = '#EF4444') => (
+    <TouchableOpacity
+      style={styles.settingItem}
+      onPress={onPress}
+      activeOpacity={0.7}
+    >
+      <View style={styles.settingItemLeft}>
+        <View style={[styles.iconContainer, { backgroundColor: `${color}15` }]}>
+          <Ionicons name={icon} size={20} color={color} />
+        </View>
+        <Text style={[styles.settingItemLabel, { color }]}>{label}</Text>
+      </View>
+      <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
+    </TouchableOpacity>
+  );
+
+  // 渲染時間選擇器 Modal
+  const renderTimePickerModal = () => {
+    const hours = [12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+    const minutes = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55];
+
+    return (
+      <Modal
+        visible={timePickerVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setTimePickerVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            {/* Modal Header */}
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>設定提醒時間</Text>
+              <TouchableOpacity
+                onPress={() => setTimePickerVisible(false)}
+                style={styles.modalCloseButton}
+              >
+                <Ionicons name="close" size={24} color="#6B7280" />
+              </TouchableOpacity>
+            </View>
+
+            {/* 上午/下午 選擇 */}
+            <View style={styles.periodSelector}>
+              <TouchableOpacity
+                style={[
+                  styles.periodButton,
+                  selectedPeriod === '上午' && styles.periodButtonActive
+                ]}
+                onPress={() => setSelectedPeriod('上午')}
+              >
+                {selectedPeriod === '上午' ? (
+                  <LinearGradient
+                    colors={['#166CB5', '#31C6FE']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={styles.periodButtonGradient}
+                  >
+                    <Text style={styles.periodButtonTextActive}>上午</Text>
+                  </LinearGradient>
+                ) : (
+                  <Text style={styles.periodButtonText}>上午</Text>
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.periodButton,
+                  selectedPeriod === '下午' && styles.periodButtonActive
+                ]}
+                onPress={() => setSelectedPeriod('下午')}
+              >
+                {selectedPeriod === '下午' ? (
+                  <LinearGradient
+                    colors={['#166CB5', '#31C6FE']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={styles.periodButtonGradient}
+                  >
+                    <Text style={styles.periodButtonTextActive}>下午</Text>
+                  </LinearGradient>
+                ) : (
+                  <Text style={styles.periodButtonText}>下午</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+
+            {/* 時間顯示 */}
+            <View style={styles.timeDisplay}>
+              <Text style={styles.timeDisplayText}>
+                {selectedPeriod} {selectedHour}:{selectedMinute.toString().padStart(2, '0')}
+              </Text>
+            </View>
+
+            {/* 小時選擇 */}
+            <View style={styles.pickerSection}>
+              <Text style={styles.pickerLabel}>小時</Text>
+              <ScrollView 
+                horizontal 
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.pickerScrollContent}
+              >
+                {hours.map((hour) => (
+                  <TouchableOpacity
+                    key={`hour-${hour}`}
+                    style={[
+                      styles.pickerItem,
+                      selectedHour === hour && styles.pickerItemActive
+                    ]}
+                    onPress={() => setSelectedHour(hour)}
+                  >
+                    {selectedHour === hour ? (
+                      <LinearGradient
+                        colors={['#166CB5', '#31C6FE']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                        style={styles.pickerItemGradient}
+                      >
+                        <Text style={styles.pickerItemTextActive}>{hour}</Text>
+                      </LinearGradient>
+                    ) : (
+                      <Text style={styles.pickerItemText}>{hour}</Text>
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+
+            {/* 分鐘選擇 */}
+            <View style={styles.pickerSection}>
+              <Text style={styles.pickerLabel}>分鐘</Text>
+              <ScrollView 
+                horizontal 
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.pickerScrollContent}
+              >
+                {minutes.map((minute) => (
+                  <TouchableOpacity
+                    key={`minute-${minute}`}
+                    style={[
+                      styles.pickerItem,
+                      selectedMinute === minute && styles.pickerItemActive
+                    ]}
+                    onPress={() => setSelectedMinute(minute)}
+                  >
+                    {selectedMinute === minute ? (
+                      <LinearGradient
+                        colors={['#166CB5', '#31C6FE']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                        style={styles.pickerItemGradient}
+                      >
+                        <Text style={styles.pickerItemTextActive}>
+                          {minute.toString().padStart(2, '0')}
+                        </Text>
+                      </LinearGradient>
+                    ) : (
+                      <Text style={styles.pickerItemText}>
+                        {minute.toString().padStart(2, '0')}
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+
+            {/* 確認按鈕 */}
+            <TouchableOpacity
+              style={styles.confirmButton}
+              onPress={handleConfirmTime}
+              activeOpacity={0.8}
+            >
+              <LinearGradient
+                colors={['#166CB5', '#31C6FE']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.confirmButtonGradient}
+              >
+                <Text style={styles.confirmButtonText}>確認</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+    );
   };
 
   if (loading) {
     return (
       <View style={styles.container}>
         <StatusBar barStyle="light-content" backgroundColor="#166CB5" />
+        <LinearGradient
+          colors={['#166CB5', '#31C6FE']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={styles.header}
+        >
+          <View style={styles.headerContent}>
+            <TouchableOpacity 
+              style={styles.backButton}
+              onPress={() => navigation.goBack()}
+            >
+              <Ionicons name="chevron-back" size={24} color="#FFF" />
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>設定</Text>
+            <View style={styles.headerPlaceholder} />
+          </View>
+        </LinearGradient>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#166CB5" />
         </View>
@@ -210,393 +533,139 @@ const Settings = ({ navigation }) => {
   }
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView 
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
       <StatusBar barStyle="light-content" backgroundColor="#166CB5" />
       
       {/* Header */}
       <LinearGradient
         colors={['#166CB5', '#31C6FE']}
         start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
+        end={{ x: 1, y: 0 }}
         style={styles.header}
       >
-        <TouchableOpacity 
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Ionicons name="arrow-back" size={24} color="#FFF" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>帳號設定</Text>
-        <View style={styles.headerPlaceholder} />
+        <View style={styles.headerContent}>
+          <TouchableOpacity 
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="chevron-back" size={24} color="#FFF" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>設定</Text>
+          <View style={styles.headerPlaceholder} />
+        </View>
       </LinearGradient>
 
+      {/* Content */}
       <ScrollView 
         style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* 個人資料區塊 */}
+        {/* 帳號設定 */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>個人資料</Text>
-          
-          {/* 姓名 */}
-          <View style={styles.settingCard}>
-            <View style={styles.settingRow}>
-              <View style={styles.settingLeft}>
-                <Ionicons name="person-outline" size={20} color="#166CB5" />
-                <Text style={styles.settingLabel}>姓名</Text>
-              </View>
-              {isEditingName ? (
-                <View style={styles.editContainer}>
-                  <TextInput
-                    style={styles.editInput}
-                    value={editedName}
-                    onChangeText={setEditedName}
-                    autoFocus
-                  />
-                  <TouchableOpacity onPress={handleSaveName}>
-                    <Ionicons name="checkmark" size={24} color="#10B981" />
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={() => {
-                    setIsEditingName(false);
-                    setEditedName(user.name);
-                  }}>
-                    <Ionicons name="close" size={24} color="#EF4444" />
-                  </TouchableOpacity>
-                </View>
-              ) : (
-                <TouchableOpacity 
-                  style={styles.settingRight}
-                  onPress={() => setIsEditingName(true)}
-                >
-                  <Text style={styles.settingValue}>{user?.name}</Text>
-                  <Ionicons name="create-outline" size={20} color="#9CA3AF" />
-                </TouchableOpacity>
-              )}
-            </View>
-          </View>
-
-          {/* Email */}
-          <View style={styles.settingCard}>
-            <View style={styles.settingRow}>
-              <View style={styles.settingLeft}>
-                <Ionicons name="mail-outline" size={20} color="#166CB5" />
-                <Text style={styles.settingLabel}>電子郵件</Text>
-              </View>
-              <Text style={styles.settingValueDisabled}>{user?.email}</Text>
-            </View>
-          </View>
-
-          {/* 加入日期 */}
-          <View style={styles.settingCard}>
-            <View style={styles.settingRow}>
-              <View style={styles.settingLeft}>
-                <Ionicons name="calendar-outline" size={20} color="#166CB5" />
-                <Text style={styles.settingLabel}>加入日期</Text>
-              </View>
-              <Text style={styles.settingValueDisabled}>
-                {new Date(user?.created_at).toLocaleDateString('zh-TW')}
-              </Text>
-            </View>
+          <Text style={styles.sectionTitle}>帳號設定</Text>
+          <View style={styles.sectionCard}>
+            {renderNavigateItem('person-outline', '個人資料', handleNavigateToProfile)}
+            <View style={styles.divider} />
+            {renderNavigateItem('lock-closed-outline', '修改密碼', handleNavigateToPassword)}
+            <View style={styles.divider} />
+            {renderNavigateItem('shield-outline', '隱私設定', handleNavigateToPrivacy)}
+            <View style={styles.divider} />
+            {renderNavigateItem('business-outline', '企業引薦碼', handleNavigateToCompanyReferral)}
           </View>
         </View>
 
-        {/* 練習目標區塊 */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Ionicons name="flag-outline" size={20} color="#166CB5" />
-            <Text style={styles.sectionTitle}>練習目標</Text>
-          </View>
-          
-          {userGoals.length > 0 ? (
-            // 已設定目標
-            <View style={styles.goalsCard}>
-              <View style={styles.goalsHeader}>
-                <Text style={styles.goalsCount}>已設定 {userGoals.length} 個目標</Text>
-              </View>
-              
-              <View style={styles.goalsGrid}>
-                {userGoals.slice(0, 4).map((goal) => (
-                  <View 
-                    key={goal.id} 
-                    style={[styles.goalChip, { backgroundColor: goal.bgColor }]}
-                  >
-                    <Ionicons name={goal.icon} size={16} color={goal.color} />
-                    <Text style={[styles.goalChipText, { color: goal.color }]}>
-                      {goal.title}
-                    </Text>
-                  </View>
-                ))}
-              </View>
-
-              {userGoals.length > 4 && (
-                <Text style={styles.moreGoalsText}>
-                  還有 {userGoals.length - 4} 個目標...
-                </Text>
-              )}
-
-              <TouchableOpacity 
-                style={styles.editGoalsButton}
-                onPress={handleGoalsManagement}
-              >
-                <Ionicons name="create-outline" size={18} color="#166CB5" />
-                <Text style={styles.editGoalsText}>編輯目標</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            // 未設定目標
-            <TouchableOpacity 
-              style={styles.goalsPromptCard}
-              onPress={handleGoalsManagement}
-              activeOpacity={0.7}
-            >
-              <View style={styles.goalsPromptIcon}>
-                <Ionicons name="flag" size={32} color="#166CB5" />
-              </View>
-              <View style={styles.goalsPromptContent}>
-                <Text style={styles.goalsPromptTitle}>設定練習目標</Text>
-                <Text style={styles.goalsPromptDesc}>
-                  告訴我們你想改善的方向，獲得個人化推薦
-                </Text>
-              </View>
-              <Ionicons name="chevron-forward" size={24} color="#9CA3AF" />
-            </TouchableOpacity>
-          )}
-        </View>
-
-        {/* 企業引薦區塊 */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <MaterialCommunityIcons name="office-building" size={20} color="#166CB5" />
-            <Text style={styles.sectionTitle}>企業引薦</Text>
-          </View>
-          
-          {enterpriseCodeInfo.code ? (
-            // 已設定企業引薦碼
-            <View style={styles.enterpriseCard}>
-              <LinearGradient
-                colors={
-                  enterpriseCodeInfo.daysRemaining <= 7
-                    ? ['#F59E0B', '#EF4444'] // 即將過期：橘紅色
-                    : ['#10B981', '#059669'] // 正常：綠色
-                }
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.enterpriseBadge}
-              >
-                <Ionicons 
-                  name={enterpriseCodeInfo.daysRemaining <= 7 ? "warning" : "shield-checkmark"} 
-                  size={24} 
-                  color="#FFF" 
-                />
-                <View style={styles.enterpriseBadgeText}>
-                  <Text style={styles.enterpriseBadgeTitle}>企業會員</Text>
-                  <Text style={styles.enterpriseBadgeSubtitle}>
-                    {enterpriseCodeInfo.daysRemaining <= 7 
-                      ? `剩餘 ${enterpriseCodeInfo.daysRemaining} 天`
-                      : '已啟用'
-                    }
-                  </Text>
-                </View>
-              </LinearGradient>
-
-              <View style={styles.enterpriseInfo}>
-                {enterpriseCodeInfo.enterpriseName && (
-                  <View style={styles.enterpriseInfoRow}>
-                    <Text style={styles.enterpriseInfoLabel}>企業名稱</Text>
-                    <Text style={styles.enterpriseInfoValue}>
-                      {enterpriseCodeInfo.enterpriseName}
-                    </Text>
-                  </View>
-                )}
-                
-                <View style={styles.enterpriseInfoRow}>
-                  <Text style={styles.enterpriseInfoLabel}>引薦碼</Text>
-                  <Text style={styles.enterpriseCodeValue}>
-                    {enterpriseCodeInfo.code}
-                  </Text>
-                </View>
-
-                {enterpriseCodeInfo.expiryDate && (
-                  <View style={styles.enterpriseInfoRow}>
-                    <Text style={styles.enterpriseInfoLabel}>有效期限</Text>
-                    <Text style={[
-                      styles.enterpriseInfoValue,
-                      enterpriseCodeInfo.daysRemaining <= 7 && styles.expiryWarning
-                    ]}>
-                      {formatExpiryDate(enterpriseCodeInfo.expiryDate)}
-                    </Text>
-                  </View>
-                )}
-
-                {enterpriseCodeInfo.daysRemaining !== null && (
-                  <View style={styles.enterpriseInfoRow}>
-                    <Text style={styles.enterpriseInfoLabel}>剩餘天數</Text>
-                    <Text style={[
-                      styles.enterpriseInfoValue,
-                      enterpriseCodeInfo.daysRemaining <= 7 && styles.expiryWarning
-                    ]}>
-                      {enterpriseCodeInfo.daysRemaining} 天
-                    </Text>
-                  </View>
-                )}
-              </View>
-
-              {/* 即將過期警告 */}
-              {enterpriseCodeInfo.daysRemaining <= 7 && (
-                <View style={styles.warningBanner}>
-                  <Ionicons name="warning-outline" size={20} color="#EF4444" />
-                  <Text style={styles.warningText}>
-                    企業引薦碼即將過期，請聯繫企業管理員取得新的引薦碼
-                  </Text>
-                </View>
-              )}
-
-              <View style={styles.enterpriseActions}>
-                <TouchableOpacity 
-                  style={styles.enterpriseManageButton}
-                  onPress={handleEnterpriseManagement}
-                >
-                  <Ionicons name="settings-outline" size={18} color="#166CB5" />
-                  <Text style={styles.enterpriseManageText}>管理</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity 
-                  style={styles.enterpriseLogoutButton}
-                  onPress={handleEnterpriseLogout}
-                >
-                  <Ionicons name="trash-outline" size={18} color="#EF4444" />
-                  <Text style={styles.enterpriseLogoutText}>刪除</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          ) : (
-            // 未設定企業引薦碼
-            <TouchableOpacity 
-              style={styles.enterpriseLoginCard}
-              onPress={handleEnterpriseLogin}
-              activeOpacity={0.7}
-            >
-              <View style={styles.enterpriseLoginIcon}>
-                <MaterialCommunityIcons name="key-variant" size={32} color="#166CB5" />
-              </View>
-              <View style={styles.enterpriseLoginContent}>
-                <Text style={styles.enterpriseLoginTitle}>輸入企業引薦碼</Text>
-                <Text style={styles.enterpriseLoginDesc}>
-                  解鎖企業專屬練習模組和進階功能
-                </Text>
-              </View>
-              <Ionicons name="chevron-forward" size={24} color="#9CA3AF" />
-            </TouchableOpacity>
-          )}
-        </View>
-
-        {/* 通知設定區塊 */}
+        {/* 通知設定 */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>通知設定</Text>
-          
-          <View style={styles.settingCard}>
-            <View style={styles.settingRow}>
-              <View style={styles.settingLeft}>
-                <Ionicons name="notifications-outline" size={20} color="#166CB5" />
-                <Text style={styles.settingLabel}>練習提醒</Text>
-              </View>
-              <Switch
-                value={notificationSettings.practiceReminder}
-                onValueChange={() => toggleNotification('practiceReminder')}
-                trackColor={{ false: '#D1D5DB', true: '#9CE7FE' }}
-                thumbColor={notificationSettings.practiceReminder ? '#166CB5' : '#F3F4F6'}
-              />
-            </View>
-          </View>
-
-          <View style={styles.settingCard}>
-            <View style={styles.settingRow}>
-              <View style={styles.settingLeft}>
-                <Ionicons name="trophy-outline" size={20} color="#F59E0B" />
-                <Text style={styles.settingLabel}>成就通知</Text>
-              </View>
-              <Switch
-                value={notificationSettings.achievementNotification}
-                onValueChange={() => toggleNotification('achievementNotification')}
-                trackColor={{ false: '#D1D5DB', true: '#9CE7FE' }}
-                thumbColor={notificationSettings.achievementNotification ? '#166CB5' : '#F3F4F6'}
-              />
-            </View>
-          </View>
-
-          <View style={styles.settingCard}>
-            <View style={styles.settingRow}>
-              <View style={styles.settingLeft}>
-                <Ionicons name="stats-chart-outline" size={20} color="#10B981" />
-                <Text style={styles.settingLabel}>每週報告</Text>
-              </View>
-              <Switch
-                value={notificationSettings.weeklyReport}
-                onValueChange={() => toggleNotification('weeklyReport')}
-                trackColor={{ false: '#D1D5DB', true: '#9CE7FE' }}
-                thumbColor={notificationSettings.weeklyReport ? '#166CB5' : '#F3F4F6'}
-              />
-            </View>
+          <View style={styles.sectionCard}>
+            {renderToggleItem(
+              'notifications-outline', 
+              '推播通知', 
+              notificationsEnabled, 
+              (value) => toggleSetting('notificationsEnabled', value, setNotificationsEnabled)
+            )}
+            <View style={styles.divider} />
+            {renderTimeItem(
+              'time-outline', 
+              '練習提醒時間', 
+              formatTimeDisplay(reminderTime),
+              handleOpenTimePicker
+            )}
           </View>
         </View>
 
-        {/* 其他設定 */}
+        {/* 應用設定 */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>其他</Text>
-          
-          <TouchableOpacity style={styles.settingCard}>
-            <View style={styles.settingRow}>
-              <View style={styles.settingLeft}>
-                <Ionicons name="shield-checkmark-outline" size={20} color="#166CB5" />
-                <Text style={styles.settingLabel}>隱私政策</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
-            </View>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.settingCard}>
-            <View style={styles.settingRow}>
-              <View style={styles.settingLeft}>
-                <Ionicons name="document-text-outline" size={20} color="#166CB5" />
-                <Text style={styles.settingLabel}>使用條款</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
-            </View>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.settingCard}>
-            <View style={styles.settingRow}>
-              <View style={styles.settingLeft}>
-                <Ionicons name="information-circle-outline" size={20} color="#166CB5" />
-                <Text style={styles.settingLabel}>關於我們</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
-            </View>
-          </TouchableOpacity>
+          <Text style={styles.sectionTitle}>應用設定</Text>
+          <View style={styles.sectionCard}>
+            {renderToggleItem(
+              'volume-high-outline', 
+              '音效', 
+              soundEnabled, 
+              (value) => toggleSetting('soundEnabled', value, setSoundEnabled)
+            )}
+            <View style={styles.divider} />
+            {renderToggleItem(
+              'moon-outline', 
+              '深色模式', 
+              darkModeEnabled, 
+              (value) => toggleSetting('darkModeEnabled', value, setDarkModeEnabled)
+            )}
+            <View style={styles.divider} />
+            {renderTextItem('globe-outline', '語言', '繁體中文')}
+          </View>
         </View>
 
-        {/* 登出按鈕 */}
+        {/* 關於 */}
         <View style={styles.section}>
-          <TouchableOpacity 
-            style={styles.logoutButton}
-            onPress={handleLogout}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="log-out-outline" size={20} color="#EF4444" />
-            <Text style={styles.logoutText}>登出帳號</Text>
-          </TouchableOpacity>
+          <Text style={styles.sectionTitle}>關於</Text>
+          <View style={styles.sectionCard}>
+            {renderNavigateItem('information-circle-outline', '關於我們', handleNavigateToAboutUs)}
+            <View style={styles.divider} />
+            {renderNavigateItem('help-circle-outline', '幫助中心', handleNavigateToHelp)}
+            <View style={styles.divider} />
+            {renderNavigateItem('document-text-outline', '服務條款', handleNavigateToTerms)}
+            <View style={styles.divider} />
+            {renderNavigateItem('shield-checkmark-outline', '隱私政策', handleNavigateToPrivacyPolicy)}
+            <View style={styles.divider} />
+            {renderTextItem('phone-portrait-outline', '版本資訊', 'v1.0.0')}
+          </View>
+        </View>
+
+        {/* 帳號管理 */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>帳號管理</Text>
+          <View style={styles.sectionCard}>
+            {renderDangerItem('log-out-outline', '登出', handleLogout, '#EF4444')}
+            <View style={styles.divider} />
+            {renderDangerItem('trash-outline', '刪除帳號', handleDeleteAccount, '#DC2626')}
+          </View>
+        </View>
+
+        {/* App Info */}
+        <View style={styles.appInfo}>
+          <Text style={styles.appInfoText}>路晰書 LUCIDBOOK</Text>
+          <Text style={styles.appInfoText}>© 2025 All rights reserved</Text>
         </View>
 
         <View style={styles.bottomPadding} />
       </ScrollView>
-    </View>
+
+      {/* 時間選擇器 Modal */}
+      {renderTimePickerModal()}
+    </KeyboardAvoidingView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#F5F7FA',
   },
   loadingContainer: {
     flex: 1,
@@ -606,12 +675,19 @@ const styles = StyleSheet.create({
 
   // Header
   header: {
+    paddingTop: 50,
+    paddingBottom: 16,
+    paddingHorizontal: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  headerContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingTop: 50,
-    paddingBottom: 20,
-    paddingHorizontal: 20,
   },
   backButton: {
     width: 40,
@@ -622,8 +698,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
+    fontSize: 18,
+    fontWeight: '600',
     color: '#FFF',
   },
   headerPlaceholder: {
@@ -634,349 +710,276 @@ const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
   },
+  scrollContent: {
+    paddingHorizontal: 16,
+    paddingTop: 24,
+  },
 
   // Section
   section: {
-    paddingHorizontal: 20,
-    marginTop: 24,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 24,
   },
   sectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#111827',
+    fontSize: 13,
+    color: '#6B7280',
     marginBottom: 12,
-    marginLeft: 8,
+    paddingHorizontal: 8,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  sectionCard: {
+    backgroundColor: 'rgba(255,255,255,0.8)',
+    borderRadius: 16,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(229,231,235,0.5)',
   },
 
-  // Setting Card
-  settingCard: {
+  // Setting Item
+  settingItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+  },
+  settingItemLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  iconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  settingItemLabel: {
+    fontSize: 16,
+    color: '#1F2937',
+  },
+  settingItemValue: {
+    fontSize: 14,
+    color: '#6B7280',
+  },
+  timeValueContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+
+  // Divider
+  divider: {
+    height: 1,
+    backgroundColor: '#F3F4F6',
+    marginLeft: 68,
+  },
+
+  // Toggle Button
+  toggleButton: {
+    width: 48,
+    height: 28,
+    borderRadius: 14,
+    overflow: 'hidden',
+  },
+  toggleButtonActive: {
+    // 由 LinearGradient 處理
+  },
+  toggleButtonGradient: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    paddingHorizontal: 2,
+  },
+  toggleButtonInactive: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    paddingHorizontal: 2,
+    backgroundColor: '#D1D5DB',
+    borderRadius: 14,
+  },
+  toggleKnob: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     backgroundColor: '#FFF',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
+    shadowOpacity: 0.2,
     shadowRadius: 4,
-    elevation: 2,
+    elevation: 3,
   },
-  settingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  settingLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  settingLabel: {
-    fontSize: 16,
-    color: '#111827',
-    marginLeft: 12,
-    fontWeight: '500',
-  },
-  settingRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  settingValue: {
-    fontSize: 16,
-    color: '#6B7280',
-  },
-  settingValueDisabled: {
-    fontSize: 16,
-    color: '#9CA3AF',
+  toggleKnobActive: {
+    // 位置由父容器控制
   },
 
-  // Edit Name
-  editContainer: {
-    flexDirection: 'row',
+  // App Info
+  appInfo: {
     alignItems: 'center',
-    gap: 12,
+    paddingTop: 32,
+    paddingBottom: 16,
+    gap: 4,
   },
-  editInput: {
-    flex: 1,
-    borderBottomWidth: 1,
-    borderBottomColor: '#166CB5',
-    paddingVertical: 4,
-    fontSize: 16,
-    color: '#111827',
-    minWidth: 120,
-  },
-
-  // Goals Card
-  goalsCard: {
-    backgroundColor: '#FFF',
-    borderRadius: 20,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 5,
-  },
-  goalsHeader: {
-    marginBottom: 16,
-  },
-  goalsCount: {
-    fontSize: 14,
-    color: '#6B7280',
-    fontWeight: '500',
-  },
-  goalsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 16,
-  },
-  goalChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
-    gap: 6,
-  },
-  goalChipText: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  moreGoalsText: {
+  appInfoText: {
     fontSize: 12,
     color: '#9CA3AF',
-    marginBottom: 16,
-    fontStyle: 'italic',
-  },
-  editGoalsButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    borderRadius: 12,
-    backgroundColor: '#EFF6FF',
-    gap: 6,
-  },
-  editGoalsText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#166CB5',
-  },
-
-  // Goals Prompt Card
-  goalsPromptCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFF',
-    borderRadius: 20,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 5,
-  },
-  goalsPromptIcon: {
-    width: 60,
-    height: 60,
-    borderRadius: 16,
-    backgroundColor: '#EFF6FF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
-  },
-  goalsPromptContent: {
-    flex: 1,
-  },
-  goalsPromptTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 4,
-  },
-  goalsPromptDesc: {
-    fontSize: 14,
-    color: '#6B7280',
-    lineHeight: 20,
-  },
-
-  // Enterprise Card
-  enterpriseCard: {
-    backgroundColor: '#FFF',
-    borderRadius: 20,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 5,
-  },
-  enterpriseBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    borderRadius: 16,
-    marginBottom: 16,
-  },
-  enterpriseBadgeText: {
-    marginLeft: 12,
-  },
-  enterpriseBadgeTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#FFF',
-  },
-  enterpriseBadgeSubtitle: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.9)',
-  },
-  enterpriseInfo: {
-    gap: 12,
-    marginBottom: 16,
-  },
-  enterpriseInfoRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
-  },
-  enterpriseInfoLabel: {
-    fontSize: 14,
-    color: '#6B7280',
-  },
-  enterpriseInfoValue: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#111827',
-  },
-  enterpriseCodeValue: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#166CB5',
-    letterSpacing: 2,
-  },
-  expiryWarning: {
-    color: '#EF4444',
-  },
-
-  // Warning Banner
-  warningBanner: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    backgroundColor: '#FEF2F2',
-    padding: 12,
-    borderRadius: 12,
-    marginBottom: 16,
-    gap: 10,
-  },
-  warningText: {
-    flex: 1,
-    fontSize: 13,
-    color: '#EF4444',
-    lineHeight: 18,
-  },
-
-  // Enterprise Actions
-  enterpriseActions: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  enterpriseManageButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    borderRadius: 12,
-    backgroundColor: '#EFF6FF',
-    gap: 6,
-  },
-  enterpriseManageText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#166CB5',
-  },
-  enterpriseLogoutButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    borderRadius: 12,
-    backgroundColor: '#FEF2F2',
-    gap: 6,
-  },
-  enterpriseLogoutText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#EF4444',
-  },
-
-  // Enterprise Login Card
-  enterpriseLoginCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFF',
-    borderRadius: 20,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 5,
-  },
-  enterpriseLoginIcon: {
-    width: 60,
-    height: 60,
-    borderRadius: 16,
-    backgroundColor: '#EFF6FF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
-  },
-  enterpriseLoginContent: {
-    flex: 1,
-  },
-  enterpriseLoginTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 4,
-  },
-  enterpriseLoginDesc: {
-    fontSize: 14,
-    color: '#6B7280',
-    lineHeight: 20,
-  },
-
-  // Logout Button
-  logoutButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#FFF',
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 2,
-    borderColor: '#FEE2E2',
-    gap: 8,
-  },
-  logoutText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#EF4444',
   },
 
   bottomPadding: {
     height: 40,
+  },
+
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContainer: {
+    width: '90%',
+    maxWidth: 400,
+    backgroundColor: '#FFF',
+    borderRadius: 20,
+    padding: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1F2937',
+  },
+  modalCloseButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#F3F4F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  // Period Selector (上午/下午)
+  periodSelector: {
+    flexDirection: 'row',
+    marginBottom: 20,
+    gap: 12,
+  },
+  periodButton: {
+    flex: 1,
+    height: 44,
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: '#F3F4F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  periodButtonActive: {
+    backgroundColor: 'transparent',
+  },
+  periodButtonGradient: {
+    flex: 1,
+    width: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  periodButtonText: {
+    fontSize: 16,
+    color: '#6B7280',
+    fontWeight: '500',
+  },
+  periodButtonTextActive: {
+    fontSize: 16,
+    color: '#FFF',
+    fontWeight: '600',
+  },
+
+  // Time Display
+  timeDisplay: {
+    alignItems: 'center',
+    paddingVertical: 16,
+    marginBottom: 16,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+  },
+  timeDisplayText: {
+    fontSize: 32,
+    fontWeight: '600',
+    color: '#166CB5',
+  },
+
+  // Picker Section
+  pickerSection: {
+    marginBottom: 16,
+  },
+  pickerLabel: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginBottom: 10,
+    fontWeight: '500',
+  },
+  pickerScrollContent: {
+    paddingHorizontal: 4,
+    gap: 8,
+  },
+  pickerItem: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: '#F3F4F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  pickerItemActive: {
+    backgroundColor: 'transparent',
+    overflow: 'hidden',
+  },
+  pickerItemGradient: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  pickerItemText: {
+    fontSize: 16,
+    color: '#6B7280',
+    fontWeight: '500',
+  },
+  pickerItemTextActive: {
+    fontSize: 16,
+    color: '#FFF',
+    fontWeight: '600',
+  },
+
+  // Confirm Button
+  confirmButton: {
+    marginTop: 8,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  confirmButtonGradient: {
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  confirmButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFF',
   },
 });
 

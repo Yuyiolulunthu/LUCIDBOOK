@@ -33,12 +33,21 @@ import PracticeNavigator from './src/navigation/PracticeNavigator';
 // 統計頁面
 import PracticeStatsScreen from './src/screens/account/statistics/PracticeStatsScreen';
 
+// 設定相關頁面
 import Settings from './src/screens/account/settings/Settings';
 import EnterpriseCode from './src/screens/account/settings/EnterpriseCode';
 import Feedback from './src/screens/account/feedback/Feedback';
 import Favorites from './src/screens/account/bookmarks/Favorites';
 import SelectGoals from './src/screens/account/settings/SelectGoals';
 import EnterpriseCodeManagement from './src/screens/account/settings/EnterpriseCodeManagement';
+
+// 🆕 新增的設定工具頁面
+import ProfileEditScreen from './src/screens/account/settings/utils/ProfileEditScreen';
+import PrivacySettingsScreen from './src/screens/account/settings/utils/PrivacySettingsScreen';
+import TermsOfServiceScreen from './src/screens/account/settings/utils/TermsOfServiceScreen';
+import HelpCenter from './src/screens/account/settings/utils/HelpCenter';
+import PrivacyPolicy from './src/screens/account/settings/utils/PrivacyPolicy';
+import AboutUs from './src/screens/account/settings/utils/AboutUs';
 
 const Stack = createNativeStackNavigator();
 
@@ -106,6 +115,38 @@ const App = () => {
         <Stack.Screen      
           name="SelectGoals"      
           component={SelectGoals}  
+          options={{ headerShown: false }}
+        />
+
+        {/* 🆕 設定工具頁面 */}
+        <Stack.Screen 
+          name="ProfileEdit" 
+          component={ProfileEditScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen 
+          name="PrivacySettings" 
+          component={PrivacySettingsScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen 
+          name="TermsOfService" 
+          component={TermsOfServiceScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen 
+          name="HelpCenter" 
+          component={HelpCenter}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen 
+          name="PrivacyPolicy" 
+          component={PrivacyPolicy}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen 
+          name="AboutUs" 
+          component={AboutUs}
           options={{ headerShown: false }}
         />
       </Stack.Navigator>

@@ -1,7 +1,7 @@
 // ==========================================
 // 檔案名稱: ResetPasswordScreen.js
 // 功能: 重設密碼頁面
-// 🎨 統一設計風格 + 鎖頭圖標
+// 🎨 統一設計風格 + 密碼強度指示器
 // ==========================================
 
 import React, { useState, useEffect } from 'react';
@@ -19,6 +19,7 @@ import {
   Platform,
   Keyboard,
   TouchableWithoutFeedback,
+  Animated,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -26,16 +27,25 @@ import ApiService from '../../../api';
 
 const ResetPasswordScreen = ({ navigation, route }) => {
   const [token, setToken] = useState(route?.params?.token || '');
+  const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [isValidating, setIsValidating] = useState(true);
-  const [tokenValid, setTokenValid] = useState(false);
+  const [isValidating, setIsValidating] = useState(false);
+  const [tokenValid, setTokenValid] = useState(true);
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [error, setError] = useState('');
+
+  // 判斷是否從設定頁面來的（修改密碼）還是忘記密碼流程
+  const isFromSettings = !route?.params?.token;
 
   useEffect(() => {
-    validateToken();
+    if (!isFromSettings && token) {
+      validateToken();
+    }
   }, []);
 
   const validateToken = async () => {
@@ -55,50 +65,76 @@ const ResetPasswordScreen = ({ navigation, route }) => {
       if (response.success) {
         setTokenValid(true);
       } else {
-        Alert.alert(
-          '令牌無效',
-          '重設密碼連結已過期或無效。請重新申請。',
-          [
-            {
-              text: '重新申請',
-              onPress: () => navigation.navigate('ForgotPassword')
-            },
-            {
-              text: '返回登入',
-              onPress: () => navigation.navigate('Login')
-            }
-          ]
-        );
+        setTokenValid(false);
       }
     } catch (error) {
-      Alert.alert(
-        '驗證失敗',
-        error.message || '無法驗證重設令牌',
-        [
-          {
-            text: '返回登入',
-            onPress: () => navigation.navigate('Login')
-          }
-        ]
-      );
+      setTokenValid(false);
     } finally {
       setIsValidating(false);
     }
   };
 
+  // 密碼強度計算
+  const getPasswordStrength = (password) => {
+    if (password.length === 0) return { strength: 0, label: '', color: '#E5E7EB' };
+    if (password.length < 6) return { strength: 1, label: '弱', color: '#EF4444' };
+    if (password.length < 10) return { strength: 2, label: '中', color: '#F59E0B' };
+    
+    const hasUpperCase = /[A-Z]/.test(password);
+    const hasLowerCase = /[a-z]/.test(password);
+    const hasNumber = /[0-9]/.test(password);
+    const hasSpecial = /[@$!%*?&#^()_+\-=\[\]{};':"\\|,.<>\/]/.test(password);
+    
+    if (hasUpperCase && hasLowerCase && hasNumber && hasSpecial) {
+      return { strength: 3, label: '強', color: '#10B981' };
+    }
+    if ((hasUpperCase || hasLowerCase) && hasNumber) {
+      return { strength: 2, label: '中', color: '#F59E0B' };
+    }
+    return { strength: 1, label: '弱', color: '#EF4444' };
+  };
+
+  const passwordStrength = getPasswordStrength(newPassword);
+
+  // 檢查密碼要求
+  const checkRequirement = (type) => {
+    switch (type) {
+      case 'length':
+        return newPassword.length >= 8;
+      case 'uppercase':
+        return /[A-Z]/.test(newPassword);
+      case 'lowercase':
+        return /[a-z]/.test(newPassword);
+      case 'number':
+        return /[0-9]/.test(newPassword);
+      case 'special':
+        return /[@$!%*?&#^()_+\-=\[\]{};':"\\|,.<>\/]/.test(newPassword);
+      default:
+        return false;
+    }
+  };
+
   const handleResetPassword = async () => {
-    if (!newPassword || !confirmPassword) {
-      Alert.alert('錯誤', '請輸入新密碼和確認密碼');
+    setError('');
+
+    // 驗證輸入
+    if (isFromSettings && !currentPassword) {
+      setError('請輸入目前密碼');
       return;
     }
 
-    if (newPassword.length < 8) {
-      Alert.alert('錯誤', '密碼長度至少需要 8 個字元');
+    if (!newPassword || !confirmPassword) {
+      setError('請填寫所有欄位');
       return;
     }
 
     if (newPassword !== confirmPassword) {
-      Alert.alert('錯誤', '兩次輸入的密碼不一致');
+      setError('新密碼與確認密碼不相符');
+      return;
+    }
+
+    if (newPassword.length < 8) {
+      setError('密碼長度至少需要 8 個字元');
       return;
     }
 
@@ -107,43 +143,42 @@ const ResetPasswordScreen = ({ navigation, route }) => {
     const hasNumber = /[0-9]/.test(newPassword);
 
     if (!hasUpperCase || !hasLowerCase || !hasNumber) {
-      Alert.alert(
-        '密碼強度不足',
-        '密碼必須包含大寫字母、小寫字母和數字',
-        [{ text: '我知道了' }]
-      );
+      setError('密碼必須包含大寫字母、小寫字母和數字');
       return;
     }
 
     setIsLoading(true);
     try {
-      const response = await ApiService.resetPassword(token, newPassword);
+      let response;
+      if (isFromSettings) {
+        // 從設定頁面來的，呼叫修改密碼 API
+        response = await ApiService.changePassword(currentPassword, newPassword);
+      } else {
+        // 忘記密碼流程，呼叫重設密碼 API
+        response = await ApiService.resetPassword(token, newPassword);
+      }
       
       if (response.success) {
-        Alert.alert(
-          '✅ 成功',
-          '密碼已重設成功！請使用新密碼登入。',
-          [
-            {
-              text: '前往登入',
-              onPress: () => navigation.navigate('Login')
-            }
-          ]
-        );
+        setShowSuccess(true);
+        setTimeout(() => {
+          setShowSuccess(false);
+          if (isFromSettings) {
+            navigation.goBack();
+          } else {
+            navigation.navigate('Login');
+          }
+        }, 2000);
       }
     } catch (error) {
-      Alert.alert(
-        '重設失敗',
-        error.message || '密碼重設失敗，請稍後再試'
-      );
+      setError(error.message || '密碼變更失敗，請稍後再試');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const goToLogin = () => {
+  const goBack = () => {
     if (navigation) {
-      navigation.navigate('Login');
+      navigation.goBack();
     }
   };
 
@@ -169,8 +204,8 @@ const ResetPasswordScreen = ({ navigation, route }) => {
     );
   }
 
-  // 令牌無效的畫面
-  if (!tokenValid) {
+  // 令牌無效的畫面（僅限忘記密碼流程）
+  if (!isFromSettings && !tokenValid) {
     return (
       <View style={styles.container}>
         <StatusBar barStyle="light-content" backgroundColor="#166CB5" />
@@ -214,18 +249,29 @@ const ResetPasswordScreen = ({ navigation, route }) => {
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#166CB5" />
       
-      {/* ⭐ Header - 漸層藍色設計 */}
+      {/* Header */}
       <LinearGradient
         colors={['#166CB5', '#31C6FE']}
         start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
+        end={{ x: 1, y: 0 }}
         style={styles.header}
       >
-        <TouchableOpacity onPress={goToLogin} style={styles.backButton}>
-          <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>重設密碼</Text>
-        <View style={styles.headerPlaceholder} />
+        <View style={styles.headerContent}>
+          <TouchableOpacity 
+            onPress={goBack} 
+            style={styles.backButton}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>
+            {isFromSettings ? '修改密碼' : '重設密碼'}
+          </Text>
+          <View style={styles.headerPlaceholder} />
+        </View>
+        <Text style={styles.headerSubtitle}>
+          為了您的帳號安全，請定期更新密碼
+        </Text>
       </LinearGradient>
 
       <KeyboardAvoidingView 
@@ -240,143 +286,269 @@ const ResetPasswordScreen = ({ navigation, route }) => {
             contentContainerStyle={styles.scrollViewContent}
           >
             <View style={styles.contentContainer}>
-              {/* ⭐ Logo 區域 - 使用鎖頭圖標 */}
-              <View style={styles.logoContainer}>
-                <View style={styles.logoCircle}>
-                  <LinearGradient
-                    colors={['#166CB5', '#31C6FE']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.logoGradient}
-                  >
-                    <Ionicons name="key-outline" size={48} color="#FFFFFF" />
-                  </LinearGradient>
+              {/* 錯誤訊息 */}
+              {error ? (
+                <View style={styles.errorMessageContainer}>
+                  <Ionicons name="alert-circle" size={20} color="#DC2626" />
+                  <Text style={styles.errorMessageText}>{error}</Text>
                 </View>
-                <Text style={styles.logoText}>設定新密碼</Text>
-                <Text style={styles.logoSubtext}>請輸入您的新密碼</Text>
-              </View>
+              ) : null}
 
-              {/* 表單卡片 */}
-              <View style={styles.formCard}>
-                {/* 新密碼輸入 */}
-                <View style={styles.inputContainer}>
-                  <Text style={styles.inputLabel}>新密碼</Text>
+              {/* 目前密碼（僅限從設定頁面來的） */}
+              {isFromSettings && (
+                <View style={styles.inputSection}>
+                  <Text style={styles.inputLabel}>目前密碼</Text>
                   <View style={styles.inputWrapper}>
-                    <Ionicons name="lock-closed-outline" size={20} color="#9CA3AF" style={styles.inputIcon} />
+                    <View style={styles.inputIconContainer}>
+                      <Ionicons name="lock-closed-outline" size={20} color="#9CA3AF" />
+                    </View>
                     <TextInput
-                      style={[styles.textInput, { flex: 1 }]}
-                      value={newPassword}
-                      onChangeText={setNewPassword}
-                      placeholder="請輸入新密碼（至少 8 個字元）"
+                      style={styles.textInput}
+                      value={currentPassword}
+                      onChangeText={(text) => {
+                        setCurrentPassword(text);
+                        setError('');
+                      }}
+                      placeholder="請輸入目前密碼"
                       placeholderTextColor="#9CA3AF"
-                      secureTextEntry={!showNewPassword}
+                      secureTextEntry={!showCurrentPassword}
                       editable={!isLoading}
                       returnKeyType="next"
                     />
                     <TouchableOpacity 
                       style={styles.eyeButton}
-                      onPress={() => setShowNewPassword(!showNewPassword)}
+                      onPress={() => setShowCurrentPassword(!showCurrentPassword)}
+                      activeOpacity={0.7}
                     >
                       <Ionicons 
-                        name={showNewPassword ? "eye-outline" : "eye-off-outline"} 
+                        name={showCurrentPassword ? "eye-outline" : "eye-off-outline"} 
                         size={20} 
                         color="#9CA3AF" 
                       />
                     </TouchableOpacity>
                   </View>
                 </View>
+              )}
 
-                {/* 確認密碼輸入 */}
-                <View style={styles.inputContainer}>
-                  <Text style={styles.inputLabel}>確認新密碼</Text>
-                  <View style={styles.inputWrapper}>
-                    <Ionicons name="lock-closed-outline" size={20} color="#9CA3AF" style={styles.inputIcon} />
-                    <TextInput
-                      style={[styles.textInput, { flex: 1 }]}
-                      value={confirmPassword}
-                      onChangeText={setConfirmPassword}
-                      placeholder="請再次輸入新密碼"
-                      placeholderTextColor="#9CA3AF"
-                      secureTextEntry={!showConfirmPassword}
-                      editable={!isLoading}
-                      returnKeyType="done"
-                      onSubmitEditing={handleResetPassword}
-                    />
-                    <TouchableOpacity 
-                      style={styles.eyeButton}
-                      onPress={() => setShowConfirmPassword(!showConfirmPassword)}
-                    >
-                      <Ionicons 
-                        name={showConfirmPassword ? "eye-outline" : "eye-off-outline"} 
-                        size={20} 
-                        color="#9CA3AF" 
-                      />
-                    </TouchableOpacity>
+              {/* 新密碼 */}
+              <View style={styles.inputSection}>
+                <Text style={styles.inputLabel}>新密碼</Text>
+                <View style={styles.inputWrapper}>
+                  <View style={styles.inputIconContainer}>
+                    <Ionicons name="lock-closed-outline" size={20} color="#9CA3AF" />
                   </View>
-                </View>
-
-                {/* 密碼強度提示 */}
-                <View style={styles.requirementsContainer}>
-                  <View style={styles.requirementsHeader}>
-                    <Ionicons name="shield-checkmark" size={18} color="#166CB5" />
-                    <Text style={styles.requirementsTitle}>密碼要求</Text>
-                  </View>
-                  <View style={styles.requirementsList}>
-                    <View style={styles.requirementItem}>
-                      <Ionicons name="checkmark-circle" size={16} color="#10B981" />
-                      <Text style={styles.requirementText}>至少 8 個字元</Text>
-                    </View>
-                    <View style={styles.requirementItem}>
-                      <Ionicons name="checkmark-circle" size={16} color="#10B981" />
-                      <Text style={styles.requirementText}>包含大寫字母 (A-Z)</Text>
-                    </View>
-                    <View style={styles.requirementItem}>
-                      <Ionicons name="checkmark-circle" size={16} color="#10B981" />
-                      <Text style={styles.requirementText}>包含小寫字母 (a-z)</Text>
-                    </View>
-                    <View style={styles.requirementItem}>
-                      <Ionicons name="checkmark-circle" size={16} color="#10B981" />
-                      <Text style={styles.requirementText}>包含數字 (0-9)</Text>
-                    </View>
-                  </View>
-                </View>
-
-                {/* 重設按鈕 */}
-                <TouchableOpacity 
-                  style={styles.resetButtonContainer}
-                  onPress={handleResetPassword}
-                  disabled={isLoading}
-                  activeOpacity={0.9}
-                >
-                  <LinearGradient
-                    colors={isLoading ? ['#9CA3AF', '#9CA3AF'] : ['#166CB5', '#31C6FE']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    style={styles.resetButton}
+                  <TextInput
+                    style={styles.textInput}
+                    value={newPassword}
+                    onChangeText={(text) => {
+                      setNewPassword(text);
+                      setError('');
+                    }}
+                    placeholder="請輸入新密碼"
+                    placeholderTextColor="#9CA3AF"
+                    secureTextEntry={!showNewPassword}
+                    editable={!isLoading}
+                    returnKeyType="next"
+                  />
+                  <TouchableOpacity 
+                    style={styles.eyeButton}
+                    onPress={() => setShowNewPassword(!showNewPassword)}
+                    activeOpacity={0.7}
                   >
-                    {isLoading ? (
-                      <ActivityIndicator color="white" />
-                    ) : (
-                      <>
-                        <Text style={styles.resetButtonText}>重設密碼</Text>
-                        <Ionicons name="arrow-forward" size={20} color="#FFFFFF" />
-                      </>
-                    )}
-                  </LinearGradient>
-                </TouchableOpacity>
+                    <Ionicons 
+                      name={showNewPassword ? "eye-outline" : "eye-off-outline"} 
+                      size={20} 
+                      color="#9CA3AF" 
+                    />
+                  </TouchableOpacity>
+                </View>
 
-                {/* 提示訊息 */}
-                <View style={styles.infoBox}>
-                  <Ionicons name="information-circle" size={20} color="#166CB5" />
-                  <Text style={styles.infoText}>
-                    重設密碼後，請使用新密碼登入您的帳戶。
-                  </Text>
+                {/* 密碼強度指示器 */}
+                {newPassword.length > 0 && (
+                  <View style={styles.strengthContainer}>
+                    <View style={styles.strengthLabelRow}>
+                      <Text style={styles.strengthLabel}>密碼強度：</Text>
+                      <Text style={[styles.strengthValue, { color: passwordStrength.color }]}>
+                        {passwordStrength.label}
+                      </Text>
+                    </View>
+                    <View style={styles.strengthBars}>
+                      {[1, 2, 3].map((level) => (
+                        <View
+                          key={level}
+                          style={[
+                            styles.strengthBar,
+                            {
+                              backgroundColor: level <= passwordStrength.strength 
+                                ? passwordStrength.color 
+                                : '#E5E7EB'
+                            }
+                          ]}
+                        />
+                      ))}
+                    </View>
+                  </View>
+                )}
+              </View>
+
+              {/* 確認新密碼 */}
+              <View style={styles.inputSection}>
+                <Text style={styles.inputLabel}>確認新密碼</Text>
+                <View style={styles.inputWrapper}>
+                  <View style={styles.inputIconContainer}>
+                    <Ionicons name="lock-closed-outline" size={20} color="#9CA3AF" />
+                  </View>
+                  <TextInput
+                    style={styles.textInput}
+                    value={confirmPassword}
+                    onChangeText={(text) => {
+                      setConfirmPassword(text);
+                      setError('');
+                    }}
+                    placeholder="請再次輸入新密碼"
+                    placeholderTextColor="#9CA3AF"
+                    secureTextEntry={!showConfirmPassword}
+                    editable={!isLoading}
+                    returnKeyType="done"
+                    onSubmitEditing={handleResetPassword}
+                  />
+                  <TouchableOpacity 
+                    style={styles.eyeButton}
+                    onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons 
+                      name={showConfirmPassword ? "eye-outline" : "eye-off-outline"} 
+                      size={20} 
+                      color="#9CA3AF" 
+                    />
+                  </TouchableOpacity>
+                </View>
+                {/* 密碼不相符提示 */}
+                {confirmPassword.length > 0 && newPassword !== confirmPassword && (
+                  <Text style={styles.mismatchText}>密碼不相符</Text>
+                )}
+                {/* 密碼相符提示 */}
+                {confirmPassword.length > 0 && newPassword === confirmPassword && (
+                  <View style={styles.matchContainer}>
+                    <Ionicons name="checkmark-circle" size={16} color="#10B981" />
+                    <Text style={styles.matchText}>密碼相符</Text>
+                  </View>
+                )}
+              </View>
+
+              {/* 密碼要求提示卡片 */}
+              <View style={styles.requirementsCard}>
+                <Text style={styles.requirementsTitle}>密碼要求：</Text>
+                <View style={styles.requirementsList}>
+                  <View style={styles.requirementItem}>
+                    <Ionicons 
+                      name={checkRequirement('length') ? "checkmark-circle" : "ellipse-outline"} 
+                      size={16} 
+                      color={checkRequirement('length') ? "#10B981" : "#9CA3AF"} 
+                    />
+                    <Text style={[
+                      styles.requirementText,
+                      checkRequirement('length') && styles.requirementTextActive
+                    ]}>
+                      至少 8 個字元
+                    </Text>
+                  </View>
+                  <View style={styles.requirementItem}>
+                    <Ionicons 
+                      name={checkRequirement('uppercase') ? "checkmark-circle" : "ellipse-outline"} 
+                      size={16} 
+                      color={checkRequirement('uppercase') ? "#10B981" : "#9CA3AF"} 
+                    />
+                    <Text style={[
+                      styles.requirementText,
+                      checkRequirement('uppercase') && styles.requirementTextActive
+                    ]}>
+                      包含大寫字母 (A-Z)
+                    </Text>
+                  </View>
+                  <View style={styles.requirementItem}>
+                    <Ionicons 
+                      name={checkRequirement('lowercase') ? "checkmark-circle" : "ellipse-outline"} 
+                      size={16} 
+                      color={checkRequirement('lowercase') ? "#10B981" : "#9CA3AF"} 
+                    />
+                    <Text style={[
+                      styles.requirementText,
+                      checkRequirement('lowercase') && styles.requirementTextActive
+                    ]}>
+                      包含小寫字母 (a-z)
+                    </Text>
+                  </View>
+                  <View style={styles.requirementItem}>
+                    <Ionicons 
+                      name={checkRequirement('number') ? "checkmark-circle" : "ellipse-outline"} 
+                      size={16} 
+                      color={checkRequirement('number') ? "#10B981" : "#9CA3AF"} 
+                    />
+                    <Text style={[
+                      styles.requirementText,
+                      checkRequirement('number') && styles.requirementTextActive
+                    ]}>
+                      包含數字 (0-9)
+                    </Text>
+                  </View>
+                  <View style={styles.requirementItem}>
+                    <Ionicons 
+                      name={checkRequirement('special') ? "checkmark-circle" : "ellipse-outline"} 
+                      size={16} 
+                      color={checkRequirement('special') ? "#10B981" : "#9CA3AF"} 
+                    />
+                    <Text style={[
+                      styles.requirementText,
+                      checkRequirement('special') && styles.requirementTextActive
+                    ]}>
+                      建議包含特殊符號 (@$!%*?&)
+                    </Text>
+                  </View>
                 </View>
               </View>
             </View>
           </ScrollView>
         </TouchableWithoutFeedback>
       </KeyboardAvoidingView>
+
+      {/* 底部按鈕區域 */}
+      <View style={styles.bottomContainer}>
+        <TouchableOpacity 
+          style={styles.submitButtonContainer}
+          onPress={handleResetPassword}
+          disabled={isLoading || showSuccess}
+          activeOpacity={0.9}
+        >
+          <LinearGradient
+            colors={
+              (isLoading || showSuccess || 
+               (isFromSettings && !currentPassword) || 
+               !newPassword || !confirmPassword)
+                ? ['#D1D5DB', '#D1D5DB'] 
+                : ['#166CB5', '#31C6FE']
+            }
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.submitButton}
+          >
+            {isLoading ? (
+              <View style={styles.loadingButtonContent}>
+                <ActivityIndicator color="#FFFFFF" size="small" />
+                <Text style={styles.submitButtonText}>變更中...</Text>
+              </View>
+            ) : showSuccess ? (
+              <View style={styles.successButtonContent}>
+                <Ionicons name="checkmark-circle" size={20} color="#FFFFFF" />
+                <Text style={styles.submitButtonText}>變更成功！</Text>
+              </View>
+            ) : (
+              <Text style={styles.submitButtonText}>確認變更</Text>
+            )}
+          </LinearGradient>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 };
@@ -450,7 +622,7 @@ const styles = StyleSheet.create({
   },
   errorButtonContainer: {
     width: '100%',
-    borderRadius: 12,
+    borderRadius: 16,
     overflow: 'hidden',
     shadowColor: '#166CB5',
     shadowOffset: { width: 0, height: 4 },
@@ -462,7 +634,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 14,
+    paddingVertical: 16,
     gap: 8,
   },
   errorButtonText: {
@@ -473,12 +645,20 @@ const styles = StyleSheet.create({
 
   // Header
   header: {
+    paddingTop: 50,
+    paddingHorizontal: 16,
+    paddingBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  headerContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingTop: 50,
-    paddingHorizontal: 20,
-    paddingBottom: 20,
+    marginBottom: 8,
   },
   backButton: {
     width: 40,
@@ -489,14 +669,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   headerTitle: {
-    flex: 1,
-    fontSize: 20,
-    fontWeight: '700',
+    fontSize: 18,
+    fontWeight: '600',
     color: '#FFFFFF',
-    textAlign: 'center',
   },
   headerPlaceholder: {
     width: 40,
+  },
+  headerSubtitle: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.8)',
+    paddingHorizontal: 8,
+    textAlign: 'center',
   },
 
   keyboardAvoidingView: {
@@ -507,110 +691,128 @@ const styles = StyleSheet.create({
   },
   scrollViewContent: {
     flexGrow: 1,
+    paddingBottom: 20,
   },
   contentContainer: {
-    flex: 1,
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     paddingTop: 20,
-    paddingBottom: 40,
   },
 
-  // ⭐ Logo 區域 - 鑰匙圖標設計
-  logoContainer: {
-    alignItems: 'center',
-    marginBottom: 32,
-  },
-  logoCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 50,
-    overflow: 'hidden',
+  // 錯誤訊息
+  errorMessageContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    borderRadius: 16,
+    padding: 16,
     marginBottom: 16,
-    shadowColor: '#166CB5',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    elevation: 8,
+    gap: 12,
   },
-  logoGradient: {
-    width: '100%',
-    height: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  logoText: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#1F2937',
-    marginBottom: 4,
-  },
-  logoSubtext: {
+  errorMessageText: {
+    flex: 1,
     fontSize: 14,
-    color: '#6B7280',
-    fontWeight: '500',
+    color: '#991B1B',
+    lineHeight: 20,
   },
 
-  // 表單卡片
-  formCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
-    elevation: 4,
-  },
-
-  // 輸入框
-  inputContainer: {
+  // 輸入區塊
+  inputSection: {
     marginBottom: 16,
   },
   inputLabel: {
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '500',
     color: '#374151',
     marginBottom: 8,
+    paddingHorizontal: 4,
   },
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    borderWidth: 2,
     borderColor: '#E5E7EB',
-    borderRadius: 12,
-    backgroundColor: '#F9FAFB',
-    paddingHorizontal: 16,
+    borderRadius: 16,
+    overflow: 'hidden',
   },
-  inputIcon: {
-    marginRight: 12,
+  inputIconContainer: {
+    paddingLeft: 16,
   },
   textInput: {
     flex: 1,
     paddingVertical: 14,
+    paddingHorizontal: 12,
     fontSize: 15,
     color: '#1F2937',
   },
   eyeButton: {
-    padding: 8,
+    padding: 12,
+    paddingRight: 16,
   },
 
-  // 密碼要求
-  requirementsContainer: {
-    backgroundColor: '#EFF6FF',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 20,
+  // 密碼強度指示器
+  strengthContainer: {
+    marginTop: 10,
+    paddingHorizontal: 4,
   },
-  requirementsHeader: {
+  strengthLabelRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
-    gap: 8,
+    marginBottom: 6,
+  },
+  strengthLabel: {
+    fontSize: 12,
+    color: '#6B7280',
+  },
+  strengthValue: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  strengthBars: {
+    flexDirection: 'row',
+    gap: 4,
+  },
+  strengthBar: {
+    flex: 1,
+    height: 6,
+    borderRadius: 3,
+  },
+
+  // 密碼相符/不相符提示
+  mismatchText: {
+    fontSize: 12,
+    color: '#EF4444',
+    marginTop: 6,
+    paddingHorizontal: 4,
+  },
+  matchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 6,
+    paddingHorizontal: 4,
+    gap: 4,
+  },
+  matchText: {
+    fontSize: 12,
+    color: '#10B981',
+  },
+
+  // 密碼要求卡片
+  requirementsCard: {
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    borderRadius: 16,
+    padding: 16,
+    marginTop: 8,
   },
   requirementsTitle: {
     fontSize: 14,
-    fontWeight: '700',
-    color: '#166CB5',
+    fontWeight: '600',
+    color: '#1E40AF',
+    marginBottom: 12,
   },
   requirementsList: {
     gap: 8,
@@ -622,47 +824,48 @@ const styles = StyleSheet.create({
   },
   requirementText: {
     fontSize: 13,
+    color: '#6B7280',
+  },
+  requirementTextActive: {
     color: '#1E40AF',
   },
 
-  // 重設按鈕
-  resetButtonContainer: {
-    borderRadius: 12,
+  // 底部按鈕區域
+  bottomContainer: {
+    padding: 16,
+    paddingBottom: Platform.OS === 'ios' ? 34 : 16,
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+  },
+  submitButtonContainer: {
+    borderRadius: 16,
     overflow: 'hidden',
-    marginBottom: 20,
     shadowColor: '#166CB5',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 5,
   },
-  resetButton: {
-    flexDirection: 'row',
+  submitButton: {
+    paddingVertical: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 16,
-    gap: 8,
   },
-  resetButtonText: {
+  submitButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: '600',
   },
-
-  // 提示訊息
-  infoBox: {
+  loadingButtonContent: {
     flexDirection: 'row',
-    backgroundColor: '#EFF6FF',
-    borderRadius: 12,
-    padding: 14,
-    gap: 12,
-    alignItems: 'flex-start',
+    alignItems: 'center',
+    gap: 8,
   },
-  infoText: {
-    flex: 1,
-    fontSize: 13,
-    color: '#1E40AF',
-    lineHeight: 20,
+  successButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
 });
 
