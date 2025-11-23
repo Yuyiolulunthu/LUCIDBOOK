@@ -1,9 +1,11 @@
 // ==========================================
 // 檔案名稱: PracticeSelectionScreen.js
-// Explore 頁面 - 包含單個練習和訓練計畫
+// 🎨 採用 LUCIDBOOK 統一設計系統
 // 🔒 已整合登入檢查功能
 // ⭐ 已整合收藏功能
-// ✅ 修復 Navigation 警告
+// ⭐ 雙欄卡片設計（寬度縮減為一半）
+// 🎨 統一使用 lucide-react-native 圖標
+// 🎨 統一配色方案與 HomeScreen 一致
 // ==========================================
 
 import React, { useState, useEffect } from 'react';
@@ -14,110 +16,91 @@ import {
   TouchableOpacity,
   ScrollView,
   TextInput,
-  Image,
   Dimensions,
   Alert,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import BottomNavigation from '../../navigation/BottomNavigation';
+import AppHeader from '../../navigation/AppHeader';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import ApiService from '../../../api';
+import MaskedView from '@react-native-masked-view/masked-view';
+// ⭐ 引入 lucide-react-native 圖標
+import { Wind, PenLine, Briefcase } from 'lucide-react-native';
 
 const { width } = Dimensions.get('window');
 
 const PracticeSelectionScreen = ({ navigation }) => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedTab, setSelectedTab] = useState('all'); // 'all', 'practice', 'program'
+  const [selectedTab, setSelectedTab] = useState('all');
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [favorites, setFavorites] = useState([]); // ⭐ 收藏列表
+  const [favorites, setFavorites] = useState([]);
 
-  // 單個練習
+  // ⭐ 單個練習 - 使用 lucide 圖標組件，與 HomeScreen 完全一致
   const practices = [
     {
       id: 1,
-      title: '呼吸穩定力',
-      description: '透過專注的呼吸練習，提升情緒穩定與了解自己',
-      duration: '2~3 mins',
-      image: require('../../../assets/images/breathing.jpg'),
-      backgroundColor: '#E8F5E9',
+      title: '呼吸練習',
+      subtitle: 'Breathing',
+      description: '透過專注的呼吸練習，提升情緒穩定',
+      duration: '2~3m',
+      icon: Wind, // ⭐ 使用 lucide Wind 組件
+      gradient: ['#166CB5', '#31C6FE'], // ⭐ 與 HomeScreen 一致
+      accentColor: '#166CB5',
+      category: '正念',
       route: 'BreathingPractice',
-      type: 'single',
-    },
-    {
-      id: 2,
-      title: '心理韌力練習',
-      description: '強化自我覺察、平靜心情、透露壓力並更了解自己',
-      duration: '7 mins',
-      image: require('../../../assets/images/resilience.jpg'),
-      backgroundColor: '#FFF3E0',
-      route: 'EmotionPractice',
-      type: 'single',
-    },
-    {
-      id: 3,
-      title: '五感覺察',
-      description: '通過五感體驗，提升當下的覺察力',
-      duration: '5 mins',
-      backgroundColor: '#E3F2FD',
-      route: 'FiveSensesPractice',
-      type: 'single',
-    },
-    {
-      id: 4,
-      title: '自我覺察練習',
-      description: '深入了解自己的想法和感受',
-      duration: '6 mins',
-      backgroundColor: '#F3E5F5',
-      route: 'SelfAwarenessPractice',
       type: 'single',
     },
     {
       id: 5,
       title: '好事書寫',
-      description: '記住做不好的事情是大腦的原廠設定，用好事書寫改變負向對話的神經迴路',
-      duration: '10 mins',
-      image: require('../../../assets/images/好事發生.png'),
-      backgroundColor: '#FFF5F3',
+      subtitle: 'Good Things',
+      description: '用好事書寫改變負向對話的神經迴路',
+      duration: '10m',
+      icon: PenLine, // ⭐ 使用 lucide PenLine 組件
+      gradient: ['#FFBC42', '#FF8C42'], // ⭐ 與 HomeScreen 一致
+      accentColor: '#FF8C42',
+      category: '正向',
       route: 'GoodThingsJournal',
       type: 'single',
     },
   ];
 
-  // 訓練計畫
+  // ⭐ 訓練計畫 - 使用 lucide 圖標
   const trainingPlans = [
     {
       id: 101,
-      title: '員工抗內耗訓練計畫',
-      description: '幫助你在工作高壓下，快速調整心態、降低內耗',
-      unitCount: 4,
-      category: '職場心理',
+      title: '情緒抗壓力計畫',
+      subtitle: 'Training',
+      description: '快速調整心態、降低內耗',
+      unitCount: 2,
+      category: '計畫',
       level: '初級',
-      backgroundColor: '#E3F2FD',
-      image: require('../../../assets/images/breathing.jpg'),
+      icon: Briefcase, // ⭐ 使用 lucide Briefcase 組件
+      gradient: ['#8B5CF6', '#A78BFA'],
+      accentColor: '#8B5CF6',
       type: 'plan',
       route: 'TrainingPlanDetail',
-      units: ['呼吸穩定力練習', '情緒理解力練習', '正念安定力練習', '自我覺察力練習'],
+      units: ['呼吸練習', '好事發生練習'],
     },
   ];
 
-  // 🔒 檢查登入狀態
   useEffect(() => {
     checkLoginStatus();
-    loadFavorites(); // ⭐ 載入收藏
+    loadFavorites();
   }, []);
 
-  // 🔒 監聽頁面焦點，每次進入時檢查登入狀態
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
       checkLoginStatus();
-      loadFavorites(); // ⭐ 重新載入收藏
+      loadFavorites();
     });
     return unsubscribe;
   }, [navigation]);
 
-  // 🔒 檢查登入狀態函數
   const checkLoginStatus = async () => {
     try {
       setLoading(true);
@@ -125,7 +108,6 @@ const PracticeSelectionScreen = ({ navigation }) => {
       
       if (loggedIn) {
         try {
-          // 嘗試獲取用戶資料以驗證 token 是否有效
           const response = await ApiService.getUserProfile();
           setUser({
             id: response.user.id,
@@ -134,7 +116,6 @@ const PracticeSelectionScreen = ({ navigation }) => {
           });
           setIsLoggedIn(true);
         } catch (error) {
-          // Token 無效或已過期，清除 token
           console.log('Token 無效，清除並設為未登入');
           await ApiService.clearToken();
           setIsLoggedIn(false);
@@ -153,7 +134,6 @@ const PracticeSelectionScreen = ({ navigation }) => {
     }
   };
 
-  // ⭐ 載入收藏列表
   const loadFavorites = async () => {
     try {
       const savedFavorites = await AsyncStorage.getItem('favorites');
@@ -165,9 +145,7 @@ const PracticeSelectionScreen = ({ navigation }) => {
     }
   };
 
-  // ⭐ 切換收藏狀態
   const toggleFavorite = async (item) => {
-    // 檢查是否已登入
     if (!isLoggedIn) {
       Alert.alert(
         '需要登入',
@@ -189,21 +167,15 @@ const PracticeSelectionScreen = ({ navigation }) => {
 
       let newFavorites;
       if (isFavorited) {
-        // 取消收藏
         newFavorites = favorites.filter(id => id !== itemId);
-        // 可選：顯示提示
-        // Alert.alert('已取消收藏', `「${item.title}」已從收藏中移除`);
       } else {
-        // 添加收藏
         newFavorites = [...favorites, itemId];
         Alert.alert('已收藏', `「${item.title}」已加入收藏`);
       }
 
-      // 儲存到本地
       await AsyncStorage.setItem('favorites', JSON.stringify(newFavorites));
       setFavorites(newFavorites);
 
-      // ⭐ 可選：同步到後端
       if (isLoggedIn) {
         try {
           await ApiService.updateFavorites(newFavorites);
@@ -217,13 +189,11 @@ const PracticeSelectionScreen = ({ navigation }) => {
     }
   };
 
-  // ⭐ 檢查是否已收藏
   const isFavorited = (item) => {
     const itemId = `${item.type}-${item.id}`;
     return favorites.includes(itemId);
   };
 
-  // 🔒 顯示登入提示
   const showLoginPrompt = () => {
     Alert.alert(
       '需要登入',
@@ -232,16 +202,12 @@ const PracticeSelectionScreen = ({ navigation }) => {
         { text: '取消', style: 'cancel' },
         {
           text: '立即登入',
-          onPress: () => {
-            // ✅ 不傳遞函數參數，而是依賴頁面焦點事件自動刷新
-            navigation.navigate('Profile');
-          },
+          onPress: () => navigation.navigate('Profile'),
         },
       ]
     );
   };
 
-  // 根據標籤篩選
   const getFilteredItems = () => {
     let items = [];
     if (selectedTab === 'all') {
@@ -252,7 +218,6 @@ const PracticeSelectionScreen = ({ navigation }) => {
       items = trainingPlans;
     }
 
-    // 搜尋過濾
     if (searchQuery) {
       items = items.filter((item) =>
         item.title.toLowerCase().includes(searchQuery.toLowerCase())
@@ -264,42 +229,62 @@ const PracticeSelectionScreen = ({ navigation }) => {
 
   const filteredItems = getFilteredItems();
 
-  // 🔒 處理項目點擊（含登入檢查）
   const handleItemPress = (item) => {
-    // 檢查是否已登入
     if (!isLoggedIn) {
       showLoginPrompt();
       return;
     }
 
-    // 已登入，允許導航
     if (item.type === 'plan') {
-      // 訓練計畫 - 跳轉到詳細頁面
       navigation.navigate('TrainingPlanDetail', { plan: item });
     } else {
-      // 單個練習 - 直接進入練習
       navigation.navigate(item.route);
     }
   };
 
+  // ⭐ 漸層收藏圖標組件
+  const GradientBookmarkIcon = ({ isFavorited }) => {
+    const iconName = isFavorited ? "bookmark" : "bookmark-outline";
+    
+    return (
+      <MaskedView
+        maskElement={
+          <View style={styles.iconMask}>
+            <Ionicons name={iconName} size={24} color="white" />
+          </View>
+        }
+      >
+        <LinearGradient
+          colors={['#166CB5', '#31C6FE']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.gradientIconContainer}
+        >
+          <Ionicons name={iconName} size={24} color="transparent" />
+        </LinearGradient>
+      </MaskedView>
+    );
+  };
+
   return (
     <View style={styles.container}>
-      {/* 頂部標題區 */}
-      <View style={styles.header}>
-        <View style={styles.headerTop}>
-          <View>
-            <Text style={styles.greeting}>探索練習與訓練</Text>
-            <Text style={styles.username}>
-              {isLoggedIn && user ? `歡迎，${user.name}` : '發現適合你的成長之路'}
-            </Text>
-          </View>
-          <View style={styles.iconContainer}>
-            <TouchableOpacity style={styles.iconButton}>
-              <Ionicons name="notifications-outline" size={24} color="#666" />
-            </TouchableOpacity>
-            {/* ⭐ 收藏按鈕 */}
+      {/* App Header */}
+      <AppHeader navigation={navigation} />
+
+      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+        {/* Header Section */}
+        <View style={styles.headerSection}>
+          <View style={styles.headerTop}>
+            <View>
+              <Text style={styles.headerTitle}>練習精選</Text>
+              <Text style={styles.headerSubtitle}>
+                {isLoggedIn && user ? `歡迎，${user.name}` : '發現適合你的成長之路'}
+              </Text>
+            </View>
+            
+            {/* ⭐ 修改後的收藏按鈕 - 只有圖標漸層 */}
             <TouchableOpacity 
-              style={styles.iconButton}
+              style={styles.favoriteButton}
               onPress={() => {
                 if (!isLoggedIn) {
                   Alert.alert(
@@ -315,170 +300,242 @@ const PracticeSelectionScreen = ({ navigation }) => {
                 }
               }}
             >
-              <Ionicons name="bookmark" size={24} color="#666" />
-              {favorites.length > 0 && (
-                <View style={styles.favoriteBadge}>
-                  <Text style={styles.favoriteBadgeText}>{favorites.length}</Text>
-                </View>
-              )}
+              <GradientBookmarkIcon isFavorited={favorites.length > 0} />
             </TouchableOpacity>
           </View>
-        </View>
 
-        {/* 登入狀態提示 */}
-        {!isLoggedIn && !loading && (
-          <TouchableOpacity
-            style={styles.loginPromptBanner}
-            onPress={() => navigation.navigate('Profile')}
-          >
-            <Ionicons name="information-circle-outline" size={20} color="#4A90E2" />
-            <Text style={styles.loginPromptText}>登入以開始您的練習之旅</Text>
-            <Ionicons name="chevron-forward" size={20} color="#4A90E2" />
-          </TouchableOpacity>
-        )}
-
-        {/* 搜尋框 */}
-        <View style={styles.searchContainer}>
-          <Ionicons name="search" size={20} color="#999" style={styles.searchIcon} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="搜尋練習或訓練計畫"
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            placeholderTextColor="#999"
-          />
-        </View>
-
-        {/* 分類標籤 */}
-        <View style={styles.tabContainer}>
-          <TouchableOpacity
-            style={[styles.tab, selectedTab === 'all' && styles.tabActive]}
-            onPress={() => setSelectedTab('all')}
-          >
-            <Text style={[styles.tabText, selectedTab === 'all' && styles.tabTextActive]}>
-              全部
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.tab, selectedTab === 'practice' && styles.tabActive]}
-            onPress={() => setSelectedTab('practice')}
-          >
-            <Text style={[styles.tabText, selectedTab === 'practice' && styles.tabTextActive]}>
-              單個練習
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.tab, selectedTab === 'program' && styles.tabActive]}
-            onPress={() => setSelectedTab('program')}
-          >
-            <Text style={[styles.tabText, selectedTab === 'program' && styles.tabTextActive]}>
-              訓練計畫
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* 內容列表 */}
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>
-            {selectedTab === 'all' && '所有內容'}
-            {selectedTab === 'practice' && '單個練習'}
-            {selectedTab === 'program' && '訓練計畫'}
-          </Text>
-          <Text style={styles.itemCount}>共 {filteredItems.length} 項</Text>
-        </View>
-
-        {/* 練習和訓練計畫卡片 */}
-        <View style={styles.gridContainer}>
-          {filteredItems.map((item) => (
+          {/* 登入狀態提示 */}
+          {!isLoggedIn && !loading && (
             <TouchableOpacity
-              key={item.id}
-              style={[styles.card, { backgroundColor: item.backgroundColor }]}
-              onPress={() => handleItemPress(item)}
-              activeOpacity={0.8}
+              style={styles.loginPromptBanner}
+              onPress={() => navigation.navigate('Profile')}
             >
-              {/* 🔒 未登入遮罩 */}
-              {!isLoggedIn && !loading && (
-                <View style={styles.lockOverlay}>
-                  <View style={styles.lockIconContainer}>
-                    <Ionicons name="lock-closed" size={24} color="#FFF" />
-                  </View>
-                </View>
-              )}
-
-              {/* 類型徽章 */}
-              {item.type === 'plan' && (
-                <View style={styles.planBadgeContainer}>
-                  <View style={styles.planBadge}>
-                    <Ionicons name="layers-outline" size={14} color="#4A90E2" />
-                    <Text style={styles.planBadgeText}>{item.unitCount}單元</Text>
-                  </View>
-                </View>
-              )}
-
-              {/* 卡片內容 */}
-              {item.image && (
-                <Image source={item.image} style={styles.cardImage} />
-              )}
-              <View style={styles.cardContent}>
-                <View style={styles.cardHeader}>
-                  <Text style={styles.cardTitle} numberOfLines={2}>
-                    {item.title}
-                  </Text>
-                  {/* ⭐ 收藏按鈕 - 改進版 */}
-                  <TouchableOpacity 
-                    style={styles.bookmarkButton}
-                    onPress={(e) => {
-                      e.stopPropagation(); // 防止觸發卡片點擊
-                      toggleFavorite(item);
-                    }}
-                  >
-                    <Ionicons 
-                      name={isFavorited(item) ? "bookmark" : "bookmark-outline"} 
-                      size={20} 
-                      color={isFavorited(item) ? "#F59E0B" : "#4A90E2"} 
-                    />
-                  </TouchableOpacity>
-                </View>
-                <Text style={styles.cardDescription} numberOfLines={2}>
-                  {item.description}
-                </Text>
-                {item.type === 'single' ? (
-                  <View style={styles.cardFooter}>
-                    <Text style={styles.cardDuration}>{item.duration}</Text>
-                    {!isLoggedIn && !loading && (
-                      <View style={styles.lockBadge}>
-                        <Ionicons name="lock-closed" size={10} color="#999" />
-                        <Text style={styles.lockBadgeText}>需登入</Text>
-                      </View>
-                    )}
-                  </View>
-                ) : (
-                  <View style={styles.planInfo}>
-                    <Text style={styles.planCategory}>{item.category}</Text>
-                    <Text style={styles.planLevel}> • {item.level}</Text>
-                    {!isLoggedIn && !loading && (
-                      <View style={styles.lockBadge}>
-                        <Ionicons name="lock-closed" size={10} color="#999" />
-                        <Text style={styles.lockBadgeText}>需登入</Text>
-                      </View>
-                    )}
-                  </View>
-                )}
-              </View>
+              <LinearGradient
+                colors={['#EFF6FF', '#DBEAFE']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.loginPromptGradient}
+              >
+                <Ionicons name="information-circle" size={20} color="#166CB5" />
+                <Text style={styles.loginPromptText}>登入以開始您的練習之旅</Text>
+                <Ionicons name="chevron-forward" size={20} color="#166CB5" />
+              </LinearGradient>
             </TouchableOpacity>
-          ))}
+          )}
+
+          {/* 搜尋框 */}
+          <View style={styles.searchContainer}>
+            <Ionicons name="search" size={20} color="#9CA3AF" style={styles.searchIcon} />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="搜尋練習或訓練計畫"
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              placeholderTextColor="#9CA3AF"
+            />
+            {searchQuery.length > 0 && (
+              <TouchableOpacity onPress={() => setSearchQuery('')}>
+                <Ionicons name="close-circle" size={20} color="#9CA3AF" />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* 分類標籤 */}
+          <View style={styles.tabContainer}>
+            <TouchableOpacity
+              style={styles.tabButtonContainer}
+              onPress={() => setSelectedTab('all')}
+            >
+              {selectedTab === 'all' ? (
+                <LinearGradient
+                  colors={['#166CB5', '#31C6FE']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.tabActive}
+                >
+                  <Text style={styles.tabTextActive}>全部</Text>
+                </LinearGradient>
+              ) : (
+                <View style={styles.tabInactive}>
+                  <Text style={styles.tabTextInactive}>全部</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.tabButtonContainer}
+              onPress={() => setSelectedTab('practice')}
+            >
+              {selectedTab === 'practice' ? (
+                <LinearGradient
+                  colors={['#166CB5', '#31C6FE']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.tabActive}
+                >
+                  <Text style={styles.tabTextActive}>單個練習</Text>
+                </LinearGradient>
+              ) : (
+                <View style={styles.tabInactive}>
+                  <Text style={styles.tabTextInactive}>單個練習</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.tabButtonContainer}
+              onPress={() => setSelectedTab('program')}
+            >
+              {selectedTab === 'program' ? (
+                <LinearGradient
+                  colors={['#166CB5', '#31C6FE']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.tabActive}
+                >
+                  <Text style={styles.tabTextActive}>訓練計畫</Text>
+                </LinearGradient>
+              ) : (
+                <View style={styles.tabInactive}>
+                  <Text style={styles.tabTextInactive}>訓練計畫</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          </View>
         </View>
 
-        {/* 空狀態 */}
-        {filteredItems.length === 0 && (
-          <View style={styles.emptyState}>
-            <Ionicons name="search-outline" size={64} color="#CCC" />
-            <Text style={styles.emptyText}>找不到相關內容</Text>
-            <Text style={styles.emptySubtext}>試試其他關鍵字或分類</Text>
+        {/* 內容列表 */}
+        <View style={styles.content}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>
+              {selectedTab === 'all' && '所有內容'}
+              {selectedTab === 'practice' && '單個練習'}
+              {selectedTab === 'program' && '訓練計畫'}
+            </Text>
+            <Text style={styles.itemCount}>共 {filteredItems.length} 項</Text>
           </View>
-        )}
+
+          {/* ⭐ 雙欄卡片網格 */}
+          <View style={styles.cardGrid}>
+            {filteredItems.map((item, index) => {
+              // ⭐ 獲取圖標組件
+              const IconComponent = item.icon;
+              
+              return (
+                <TouchableOpacity
+                  key={item.id}
+                  style={styles.practiceCard}
+                  onPress={() => handleItemPress(item)}
+                  activeOpacity={0.9}
+                >
+                  {/* 🔒 未登入遮罩 */}
+                  {!isLoggedIn && !loading && (
+                    <View style={styles.lockOverlay}>
+                      <View style={styles.lockIconContainer}>
+                        <Ionicons name="lock-closed" size={20} color="#FFF" />
+                      </View>
+                    </View>
+                  )}
+
+                  {/* 漸層頭部 */}
+                  <LinearGradient
+                    colors={item.gradient}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.cardHeader}
+                  >
+                    {/* 裝飾元素 */}
+                    <View style={styles.decorCircle1} />
+                    <View style={styles.decorCircle2} />
+
+                    {/* 頂部：分類 + 收藏 */}
+                    <View style={styles.cardHeaderTop}>
+                      <View style={styles.categoryBadge}>
+                        <Text style={styles.categoryText}>{item.category}</Text>
+                      </View>
+                      <TouchableOpacity
+                        style={styles.bookmarkButton}
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          toggleFavorite(item);
+                        }}
+                      >
+                        <Ionicons 
+                          name={isFavorited(item) ? "bookmark" : "bookmark-outline"} 
+                          size={18} 
+                          color={isFavorited(item) ? "#FFD93D" : "#FFFFFF"} 
+                        />
+                      </TouchableOpacity>
+                    </View>
+
+                    {/* 中間：圖標 - 使用 lucide 圖標組件 */}
+                    <View style={styles.iconContainer}>
+                      <View style={styles.iconCircle}>
+                        <IconComponent size={32} color={item.accentColor} strokeWidth={2} />
+                      </View>
+                    </View>
+
+                    {/* 底部：標題 */}
+                    <View style={styles.cardHeaderBottom}>
+                      <Text style={styles.cardTitle} numberOfLines={1}>{item.title}</Text>
+                      <Text style={styles.cardSubtitle} numberOfLines={1}>{item.subtitle}</Text>
+                    </View>
+                  </LinearGradient>
+
+                  {/* 內容區域 */}
+                  <View style={styles.cardContent}>
+                    <Text style={styles.cardDescription} numberOfLines={2}>
+                      {item.description}
+                    </Text>
+
+                    {/* 底部資訊 */}
+                    <View style={styles.cardFooter}>
+                      <View style={styles.durationBadge}>
+                        <Ionicons name="time-outline" size={12} color="#FFFFFF" />
+                        <Text style={styles.durationText}>
+                          {item.duration || `${item.unitCount}單元`}
+                        </Text>
+                      </View>
+
+                      {!isLoggedIn && !loading ? (
+                        <View style={styles.lockBadge}>
+                          <Ionicons name="lock-closed" size={10} color="#9CA3AF" />
+                        </View>
+                      ) : (
+                        <View style={styles.startButton}>
+                          <Ionicons name="arrow-forward-circle" size={20} color={item.accentColor} />
+                        </View>
+                      )}
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          {/* 空狀態 */}
+          {filteredItems.length === 0 && (
+            <View style={styles.emptyState}>
+              <Ionicons name="search-outline" size={64} color="#D1D5DB" />
+              <Text style={styles.emptyText}>找不到相關內容</Text>
+              <Text style={styles.emptySubtext}>試試其他關鍵字或分類</Text>
+            </View>
+          )}
+        </View>
+
+        {/* 底部提示 */}
+        <View style={styles.bottomTip}>
+          <LinearGradient
+            colors={['rgba(255, 237, 213, 0.8)', 'rgba(255, 247, 237, 0.8)']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.tipGradient}
+          >
+            <Text style={styles.tipText}>
+              ✨ 建議依序完成練習，建立完整的正念基礎
+            </Text>
+          </LinearGradient>
+        </View>
 
         <View style={styles.bottomSpacing} />
       </ScrollView>
@@ -492,15 +549,17 @@ const PracticeSelectionScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#F5F7FA',
   },
-  header: {
-    paddingTop: 50,
+  scrollView: {
+    flex: 1,
+  },
+
+  // Header Section
+  headerSection: {
     paddingHorizontal: 20,
+    paddingTop: 20,
     paddingBottom: 15,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
   },
   headerTop: {
     flexDirection: 'row',
@@ -508,99 +567,125 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 15,
   },
-  greeting: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
+  headerTitle: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#166CB5',
     marginBottom: 4,
+    letterSpacing: -0.5,
   },
-  username: {
-    fontSize: 12,
-    color: '#999',
+  headerSubtitle: {
+    fontSize: 13,
+    color: '#6B7280',
+    fontWeight: '500',
   },
-  iconContainer: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  iconButton: {
+  
+  // ⭐ 修改後的收藏按鈕樣式
+  favoriteButton: {
     padding: 8,
-    position: 'relative',
   },
-  // ⭐ 收藏數量徽章
-  favoriteBadge: {
-    position: 'absolute',
-    top: 4,
-    right: 4,
-    backgroundColor: '#F59E0B',
-    borderRadius: 8,
-    minWidth: 16,
-    height: 16,
+  iconMask: {
+    backgroundColor: 'transparent',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 4,
   },
-  favoriteBadgeText: {
-    color: '#FFF',
-    fontSize: 10,
-    fontWeight: 'bold',
+  gradientIconContainer: {
+    width: 32,
+    height: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  // 🔒 登入提示橫幅
+
+  // 登入提示
   loginPromptBanner: {
+    marginBottom: 15,
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  loginPromptGradient: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#EFF6FF',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 8,
-    marginBottom: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 8,
   },
   loginPromptText: {
     flex: 1,
-    fontSize: 13,
-    color: '#4A90E2',
-    marginLeft: 8,
-    fontWeight: '500',
+    fontSize: 14,
+    color: '#166CB5',
+    fontWeight: '600',
   },
+
+  // 搜尋框
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F5F5F5',
-    borderRadius: 25,
-    paddingHorizontal: 15,
-    paddingVertical: 10,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     marginBottom: 15,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
   },
   searchIcon: {
     marginRight: 10,
   },
   searchInput: {
     flex: 1,
-    fontSize: 14,
-    color: '#333',
+    fontSize: 15,
+    color: '#1F2937',
   },
+
+  // 分類標籤
   tabContainer: {
     flexDirection: 'row',
-    gap: 10,
+    gap: 8,
   },
-  tab: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: '#F5F5F5',
+  tabButtonContainer: {
+    flex: 1,
   },
   tabActive: {
-    backgroundColor: '#4A90E2',
+    paddingVertical: 10,
+    borderRadius: 12,
+    alignItems: 'center',
+    shadowColor: '#166CB5',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  tabText: {
-    fontSize: 13,
-    color: '#666',
-    fontWeight: '500',
+  tabInactive: {
+    paddingVertical: 10,
+    borderRadius: 12,
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
   tabTextActive: {
+    fontSize: 14,
     color: '#FFFFFF',
+    fontWeight: '600',
   },
+  tabTextInactive: {
+    fontSize: 14,
+    color: '#6B7280',
+    fontWeight: '500',
+  },
+
+  // 內容區域
   content: {
-    flex: 1,
     paddingHorizontal: 20,
   },
   sectionHeader: {
@@ -608,171 +693,261 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginTop: 20,
-    marginBottom: 15,
+    marginBottom: 16,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1F2937',
   },
   itemCount: {
     fontSize: 13,
-    color: '#999',
+    color: '#9CA3AF',
+    fontWeight: '500',
   },
-  gridContainer: {
+
+  // ⭐ 雙欄網格布局
+  cardGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    gap: 12,
     justifyContent: 'space-between',
-    marginHorizontal: -6,
   },
-  card: {
+  
+  // ⭐ 卡片寬度為螢幕的一半（扣除邊距和間隙）
+  practiceCard: {
     width: (width - 52) / 2,
-    borderRadius: 15,
-    marginHorizontal: 6,
-    marginBottom: 15,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
     overflow: 'hidden',
-    elevation: 2,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
     position: 'relative',
+    marginBottom: 12,
   },
-  // 🔒 鎖定遮罩
+
+  // 鎖定遮罩
   lockOverlay: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
-    zIndex: 5,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    zIndex: 10,
     justifyContent: 'center',
     alignItems: 'center',
   },
   lockIconContainer: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: 'rgba(74, 144, 226, 0.9)',
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(22, 108, 181, 0.95)',
     justifyContent: 'center',
     alignItems: 'center',
+    shadowColor: '#166CB5',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 5,
   },
-  planBadgeContainer: {
-    position: 'absolute',
-    top: 10,
-    left: 10,
-    zIndex: 10,
-  },
-  planBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  planBadgeText: {
-    fontSize: 11,
-    color: '#4A90E2',
-    marginLeft: 4,
-    fontWeight: '600',
-  },
-  cardImage: {
-    width: '100%',
-    height: 120,
-    resizeMode: 'cover',
-  },
-  cardContent: {
-    padding: 12,
-  },
+
+  // ⭐ 卡片頭部 - 垂直布局
   cardHeader: {
+    height: 180,
+    position: 'relative',
+    overflow: 'hidden',
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    justifyContent: 'space-between',
+  },
+  decorCircle1: {
+    position: 'absolute',
+    top: -30,
+    right: -30,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+  },
+  decorCircle2: {
+    position: 'absolute',
+    bottom: -20,
+    left: -20,
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  
+  // 頭部頂部區域
+  cardHeaderTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 6,
+    alignItems: 'center',
+    zIndex: 1,
   },
-  cardTitle: {
-    flex: 1,
-    fontSize: 15,
-    fontWeight: 'bold',
-    color: '#333',
-    marginRight: 8,
+  categoryBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.4)',
+  },
+  categoryText: {
+    fontSize: 10,
+    color: '#FFFFFF',
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
   bookmarkButton: {
-    padding: 2,
+    padding: 4,
+  },
+
+  // 圖標容器
+  iconContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    flex: 1,
+    zIndex: 1,
+  },
+  iconCircle: {
+    width: 68,
+    height: 68,
+    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+
+  // 頭部底部區域
+  cardHeaderBottom: {
+    zIndex: 1,
+    alignItems: 'center',
+  },
+  cardTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    textAlign: 'center',
+    marginBottom: 2,
+    letterSpacing: 0.2,
+    textShadowColor: 'rgba(0, 0, 0, 0.15)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+  cardSubtitle: {
+    fontSize: 11,
+    color: 'rgba(255, 255, 255, 0.9)',
+    textAlign: 'center',
+    fontWeight: '500',
+  },
+
+  // ⭐ 卡片內容區域
+  cardContent: {
+    padding: 14,
   },
   cardDescription: {
     fontSize: 12,
-    color: '#666',
+    color: '#6B7280',
     lineHeight: 18,
-    marginBottom: 8,
+    marginBottom: 12,
     height: 36,
+    fontWeight: '500',
   },
-  // 🔒 卡片底部區域
+  
+  // 底部資訊
   cardFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
   },
-  cardDuration: {
-    fontSize: 11,
-    color: '#4A90E2',
-    fontWeight: '600',
-  },
-  planInfo: {
+  durationBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    flexWrap: 'wrap',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 10,
+    backgroundColor: '#166CB5',
   },
-  planCategory: {
+  durationText: {
     fontSize: 11,
-    color: '#4A90E2',
-    fontWeight: '600',
+    color: '#FFFFFF',
+    fontWeight: '700',
   },
-  planLevel: {
-    fontSize: 11,
-    color: '#999',
-  },
-  // 🔒 鎖定徽章
   lockBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     backgroundColor: '#F3F4F6',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 8,
-    marginLeft: 6,
-  },
-  lockBadgeText: {
-    fontSize: 10,
-    color: '#999',
-    marginLeft: 3,
-    fontWeight: '500',
-  },
-  emptyState: {
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  startButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // 空狀態
+  emptyState: {
+    alignItems: 'center',
     paddingVertical: 60,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
   },
   emptyText: {
     fontSize: 16,
-    color: '#999',
+    color: '#9CA3AF',
     marginTop: 16,
-    fontWeight: '500',
+    marginBottom: 4,
+    fontWeight: '600',
   },
   emptySubtext: {
-    fontSize: 13,
-    color: '#CCC',
-    marginTop: 8,
+    fontSize: 14,
+    color: '#D1D5DB',
   },
+
+  // 底部提示
+  bottomTip: {
+    paddingHorizontal: 20,
+    paddingTop: 20,
+  },
+  tipGradient: {
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(251, 191, 36, 0.3)',
+  },
+  tipText: {
+    fontSize: 14,
+    color: '#78350F',
+    textAlign: 'center',
+    lineHeight: 20,
+    fontWeight: '500',
+  },
+
   bottomSpacing: {
-    height: 120,
+    height: 100,
   },
 });
 

@@ -1,7 +1,10 @@
 // ==========================================
 // 檔案名稱: Favorites.js
 // 功能: 練習收藏頁面
-// 
+// 🎨 統一設計風格與 PracticeSelectionScreen 一致
+// 🎨 使用 lucide-react-native 圖標
+// 🎨 Header 使用漸層藍色設計
+// ✨ 底部語錄方框
 // ✅ 顯示已收藏的練習和訓練計畫
 // ✅ 支援取消收藏
 // ✅ 分類顯示（全部/單個練習/訓練計畫）
@@ -15,82 +18,85 @@ import {
   TouchableOpacity,
   ScrollView,
   StyleSheet,
-  StatusBar,
-  Image,
   Dimensions,
   Alert,
+  StatusBar,
 } from 'react-native';
-import Ionicons from 'react-native-vector-icons/Ionicons';
+import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import ApiService from '../../../../api';
+// ⭐ 引入 lucide-react-native 圖標
+import { Wind, PenLine, Briefcase } from 'lucide-react-native';
 
 const { width } = Dimensions.get('window');
 
 const Favorites = ({ navigation }) => {
   const [favorites, setFavorites] = useState([]);
-  const [selectedTab, setSelectedTab] = useState('all'); // 'all', 'practice', 'plan'
+  const [selectedTab, setSelectedTab] = useState('all');
   const [loading, setLoading] = useState(true);
 
-  // 所有可收藏的項目（與 PracticeSelectionScreen 保持一致）
+  // ⭐ 所有可收藏的項目 - 與 PracticeSelectionScreen 完全一致
   const allItems = [
     // 單個練習
     {
       id: 1,
-      title: '呼吸穩定力',
-      description: '透過專注的呼吸練習，提升情緒穩定與了解自己',
-      duration: '2~3 mins',
-      image: require('../../../../assets/images/breathing.jpg'),
-      backgroundColor: '#E8F5E9',
+      title: '呼吸練習',
+      subtitle: 'Breathing',
+      description: '透過專注的呼吸練習，提升情緒穩定',
+      duration: '2~3m',
+      icon: Wind,
+      gradient: ['#166CB5', '#31C6FE'],
+      accentColor: '#166CB5',
+      category: '正念',
       route: 'BreathingPractice',
       type: 'single',
     },
     {
-      id: 2,
-      title: '心理韌力練習',
-      description: '強化自我覺察、平靜心情、透露壓力並更了解自己',
-      duration: '7 mins',
-      image: require('../../../../assets/images/resilience.jpg'),
-      backgroundColor: '#FFF3E0',
-      route: 'EmotionPractice',
-      type: 'single',
-    },
-    {
-      id: 3,
-      title: '五感覺察',
-      description: '通過五感體驗，提升當下的覺察力',
-      duration: '5 mins',
-      backgroundColor: '#E3F2FD',
-      route: 'FiveSensesPractice',
-      type: 'single',
-    },
-    {
-      id: 4,
-      title: '自我覺察練習',
-      description: '深入了解自己的想法和感受',
-      duration: '6 mins',
-      backgroundColor: '#F3E5F5',
-      route: 'SelfAwarenessPractice',
+      id: 5,
+      title: '好事書寫',
+      subtitle: 'Good Things',
+      description: '用好事書寫改變負向對話的神經迴路',
+      duration: '10m',
+      icon: PenLine,
+      gradient: ['#FFBC42', '#FF8C42'],
+      accentColor: '#FF8C42',
+      category: '正向',
+      route: 'GoodThingsJournal',
       type: 'single',
     },
     // 訓練計畫
     {
       id: 101,
-      title: '員工抗內耗訓練計畫',
-      description: '幫助你在工作高壓下，快速調整心態、降低內耗',
-      unitCount: 4,
-      category: '職場心理',
+      title: '情緒抗壓力計畫',
+      subtitle: 'Training',
+      description: '快速調整心態、降低內耗',
+      unitCount: 2,
+      category: '計畫',
       level: '初級',
-      backgroundColor: '#E3F2FD',
-      image: require('../../../../assets/images/breathing.jpg'),
+      icon: Briefcase,
+      gradient: ['#8B5CF6', '#A78BFA'],
+      accentColor: '#8B5CF6',
       type: 'plan',
       route: 'TrainingPlanDetail',
-      units: ['呼吸穩定力練習', '情緒理解力練習', '正念安定力練習', '自我覺察力練習'],
+      units: ['呼吸練習', '好事發生練習'],
     },
   ];
 
+  // ⭐ 語錄列表
+  const quotes = [
+    '收集當下的喜悅，蓄積未來的能量',
+    '每一次練習，都是對自己的溫柔以待',
+    '保持覺察，讓心靈更強韌',
+    '用正念擁抱每一個當下',
+  ];
+
+  const [currentQuoteIndex, setCurrentQuoteIndex] = useState(0);
+
   useEffect(() => {
     loadFavorites();
+    // 隨機選擇一句語錄
+    setCurrentQuoteIndex(Math.floor(Math.random() * quotes.length));
   }, []);
 
   useEffect(() => {
@@ -179,7 +185,7 @@ const Favorites = ({ navigation }) => {
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#166CB5" />
       
-      {/* Header */}
+      {/* ⭐ Header - 漸層藍色設計 */}
       <LinearGradient
         colors={['#166CB5', '#31C6FE']}
         start={{ x: 0, y: 0 }}
@@ -190,7 +196,7 @@ const Favorites = ({ navigation }) => {
           style={styles.backButton}
           onPress={() => navigation.goBack()}
         >
-          <Ionicons name="arrow-back" size={24} color="#FFF" />
+          <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>我的收藏</Text>
         <View style={styles.headerPlaceholder} />
@@ -199,28 +205,63 @@ const Favorites = ({ navigation }) => {
       {/* 分類標籤 */}
       <View style={styles.tabContainer}>
         <TouchableOpacity
-          style={[styles.tab, selectedTab === 'all' && styles.tabActive]}
+          style={styles.tabButtonContainer}
           onPress={() => setSelectedTab('all')}
         >
-          <Text style={[styles.tabText, selectedTab === 'all' && styles.tabTextActive]}>
-            全部 ({getFavoriteItems().length})
-          </Text>
+          {selectedTab === 'all' ? (
+            <LinearGradient
+              colors={['#166CB5', '#31C6FE']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.tabActive}
+            >
+              <Text style={styles.tabTextActive}>全部 ({favoriteItems.length})</Text>
+            </LinearGradient>
+          ) : (
+            <View style={styles.tabInactive}>
+              <Text style={styles.tabTextInactive}>全部</Text>
+            </View>
+          )}
         </TouchableOpacity>
+
         <TouchableOpacity
-          style={[styles.tab, selectedTab === 'practice' && styles.tabActive]}
+          style={styles.tabButtonContainer}
           onPress={() => setSelectedTab('practice')}
         >
-          <Text style={[styles.tabText, selectedTab === 'practice' && styles.tabTextActive]}>
-            單個練習
-          </Text>
+          {selectedTab === 'practice' ? (
+            <LinearGradient
+              colors={['#166CB5', '#31C6FE']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.tabActive}
+            >
+              <Text style={styles.tabTextActive}>單個練習</Text>
+            </LinearGradient>
+          ) : (
+            <View style={styles.tabInactive}>
+              <Text style={styles.tabTextInactive}>單個練習</Text>
+            </View>
+          )}
         </TouchableOpacity>
+
         <TouchableOpacity
-          style={[styles.tab, selectedTab === 'plan' && styles.tabActive]}
+          style={styles.tabButtonContainer}
           onPress={() => setSelectedTab('plan')}
         >
-          <Text style={[styles.tabText, selectedTab === 'plan' && styles.tabTextActive]}>
-            訓練計畫
-          </Text>
+          {selectedTab === 'plan' ? (
+            <LinearGradient
+              colors={['#166CB5', '#31C6FE']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.tabActive}
+            >
+              <Text style={styles.tabTextActive}>訓練計畫</Text>
+            </LinearGradient>
+          ) : (
+            <View style={styles.tabInactive}>
+              <Text style={styles.tabTextInactive}>訓練計畫</Text>
+            </View>
+          )}
         </TouchableOpacity>
       </View>
 
@@ -229,67 +270,110 @@ const Favorites = ({ navigation }) => {
         showsVerticalScrollIndicator={false}
       >
         {favoriteItems.length > 0 ? (
-          <View style={styles.gridContainer}>
-            {favoriteItems.map((item) => (
-              <View key={`${item.type}-${item.id}`} style={styles.cardWrapper}>
-                <TouchableOpacity
-                  style={[styles.card, { backgroundColor: item.backgroundColor }]}
-                  onPress={() => handleItemPress(item)}
-                  activeOpacity={0.8}
-                >
-                  {/* 類型徽章 */}
-                  {item.type === 'plan' && (
-                    <View style={styles.planBadgeContainer}>
-                      <View style={styles.planBadge}>
-                        <Ionicons name="layers-outline" size={14} color="#4A90E2" />
-                        <Text style={styles.planBadgeText}>{item.unitCount}單元</Text>
-                      </View>
-                    </View>
-                  )}
+          <>
+            <View style={styles.cardGrid}>
+              {favoriteItems.map((item) => {
+                const IconComponent = item.icon;
+                
+                return (
+                  <TouchableOpacity
+                    key={`${item.type}-${item.id}`}
+                    style={styles.practiceCard}
+                    onPress={() => handleItemPress(item)}
+                    activeOpacity={0.9}
+                  >
+                    {/* 漸層頭部 */}
+                    <LinearGradient
+                      colors={item.gradient}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={styles.cardHeader}
+                    >
+                      {/* 裝飾元素 */}
+                      <View style={styles.decorCircle1} />
+                      <View style={styles.decorCircle2} />
 
-                  {/* 卡片內容 */}
-                  {item.image && (
-                    <Image source={item.image} style={styles.cardImage} />
-                  )}
-                  <View style={styles.cardContent}>
-                    <View style={styles.cardHeader}>
-                      <Text style={styles.cardTitle} numberOfLines={2}>
-                        {item.title}
+                      {/* 頂部：分類 + 收藏按鈕 */}
+                      <View style={styles.cardHeaderTop}>
+                        <View style={styles.categoryBadge}>
+                          <Text style={styles.categoryText}>{item.category}</Text>
+                        </View>
+                        <TouchableOpacity
+                          style={styles.bookmarkButton}
+                          onPress={(e) => {
+                            e.stopPropagation();
+                            removeFavorite(item);
+                          }}
+                        >
+                          <Ionicons 
+                            name="bookmark" 
+                            size={18} 
+                            color="#FFD93D" 
+                          />
+                        </TouchableOpacity>
+                      </View>
+
+                      {/* 中間：圖標 */}
+                      <View style={styles.iconContainer}>
+                        <View style={styles.iconCircle}>
+                          <IconComponent size={32} color={item.accentColor} strokeWidth={2} />
+                        </View>
+                      </View>
+
+                      {/* 底部：標題 */}
+                      <View style={styles.cardHeaderBottom}>
+                        <Text style={styles.cardTitle} numberOfLines={1}>{item.title}</Text>
+                        <Text style={styles.cardSubtitle} numberOfLines={1}>{item.subtitle}</Text>
+                      </View>
+                    </LinearGradient>
+
+                    {/* 內容區域 */}
+                    <View style={styles.cardContent}>
+                      <Text style={styles.cardDescription} numberOfLines={2}>
+                        {item.description}
                       </Text>
-                      {/* 移除收藏按鈕 */}
-                      <TouchableOpacity 
-                        style={styles.removeButton}
-                        onPress={(e) => {
-                          e.stopPropagation();
-                          removeFavorite(item);
-                        }}
-                      >
-                        <Ionicons name="bookmark" size={20} color="#F59E0B" />
-                      </TouchableOpacity>
-                    </View>
-                    <Text style={styles.cardDescription} numberOfLines={2}>
-                      {item.description}
-                    </Text>
-                    {item.type === 'single' ? (
+
+                      {/* 底部資訊 */}
                       <View style={styles.cardFooter}>
-                        <Text style={styles.cardDuration}>{item.duration}</Text>
+                        <View style={styles.durationBadge}>
+                          <Ionicons name="time-outline" size={12} color="#FFFFFF" />
+                          <Text style={styles.durationText}>
+                            {item.duration || `${item.unitCount}單元`}
+                          </Text>
+                        </View>
+
+                        <View style={styles.startButton}>
+                          <Ionicons name="arrow-forward-circle" size={20} color={item.accentColor} />
+                        </View>
                       </View>
-                    ) : (
-                      <View style={styles.planInfo}>
-                        <Text style={styles.planCategory}>{item.category}</Text>
-                        <Text style={styles.planLevel}> • {item.level}</Text>
-                      </View>
-                    )}
-                  </View>
-                </TouchableOpacity>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {/* ⭐ 底部語錄方框 */}
+            <View style={styles.quoteContainer}>
+              <View style={styles.quoteCard}>
+                <View style={styles.quoteIconCircle}>
+                  <Ionicons name="bulb" size={20} color="#FF8C42" />
+                </View>
+                <Text style={styles.quoteText}>{quotes[currentQuoteIndex]}</Text>
               </View>
-            ))}
-          </View>
+            </View>
+          </>
         ) : (
           // 空狀態
           <View style={styles.emptyState}>
             <View style={styles.emptyIconContainer}>
-              <Ionicons name="bookmark-outline" size={64} color="#D1D5DB" />
+              <LinearGradient
+                colors={['#166CB5', '#31C6FE']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.emptyIconGradient}
+              >
+                <Ionicons name="bookmark-outline" size={48} color="#FFFFFF" />
+              </LinearGradient>
             </View>
             <Text style={styles.emptyTitle}>還沒有收藏</Text>
             <Text style={styles.emptyText}>
@@ -298,16 +382,17 @@ const Favorites = ({ navigation }) => {
               {selectedTab === 'plan' && '還沒有收藏任何訓練計畫'}
             </Text>
             <TouchableOpacity 
-              style={styles.exploreButton}
-              onPress={() => navigation.navigate('Explore')}
+              style={styles.exploreButtonContainer}
+              onPress={() => navigation.navigate('PracticeSelection')}
+              activeOpacity={0.9}
             >
               <LinearGradient
                 colors={['#166CB5', '#31C6FE']}
                 start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.exploreButtonGradient}
+                end={{ x: 1, y: 0 }}
+                style={styles.exploreButton}
               >
-                <Ionicons name="compass" size={20} color="#FFF" />
+                <Ionicons name="compass" size={20} color="#FFFFFF" />
                 <Text style={styles.exploreButtonText}>探索練習</Text>
               </LinearGradient>
             </TouchableOpacity>
@@ -323,61 +408,75 @@ const Favorites = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#F5F7FA',
   },
 
-  // Header
+  // ⭐ Header - 漸層藍色設計
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingTop: 50,
-    paddingBottom: 20,
     paddingHorizontal: 20,
+    paddingBottom: 20,
   },
   backButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   headerTitle: {
+    flex: 1,
     fontSize: 20,
-    fontWeight: 'bold',
-    color: '#FFF',
+    fontWeight: '700',
+    color: '#FFFFFF',
+    textAlign: 'center',
   },
   headerPlaceholder: {
     width: 40,
   },
 
-  // Tabs
+  // 分類標籤
   tabContainer: {
     flexDirection: 'row',
     paddingHorizontal: 20,
     paddingVertical: 16,
-    backgroundColor: '#FFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
-    gap: 10,
+    backgroundColor: '#FFFFFF',
+    gap: 8,
   },
-  tab: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: '#F5F5F5',
+  tabButtonContainer: {
+    flex: 1,
   },
   tabActive: {
-    backgroundColor: '#166CB5',
+    paddingVertical: 10,
+    borderRadius: 12,
+    alignItems: 'center',
+    shadowColor: '#166CB5',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  tabText: {
-    fontSize: 13,
-    color: '#666',
-    fontWeight: '500',
+  tabInactive: {
+    paddingVertical: 10,
+    borderRadius: 12,
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
   tabTextActive: {
-    color: '#FFF',
+    fontSize: 14,
+    color: '#FFFFFF',
+    fontWeight: '600',
+  },
+  tabTextInactive: {
+    fontSize: 14,
+    color: '#6B7280',
+    fontWeight: '500',
   },
 
   // ScrollView
@@ -385,108 +484,207 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
-  // Grid
-  gridContainer: {
+  // ⭐ 雙欄網格布局
+  cardGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    paddingHorizontal: 14,
+    gap: 12,
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
     paddingTop: 20,
   },
-  cardWrapper: {
-    width: '50%',
-    padding: 6,
-  },
-  card: {
-    borderRadius: 15,
+  
+  // ⭐ 卡片樣式 - 與 PracticeSelectionScreen 一致
+  practiceCard: {
+    width: (width - 52) / 2,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
     overflow: 'hidden',
-    elevation: 2,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
+    marginBottom: 12,
   },
-  planBadgeContainer: {
-    position: 'absolute',
-    top: 10,
-    left: 10,
-    zIndex: 10,
-  },
-  planBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  planBadgeText: {
-    fontSize: 11,
-    color: '#4A90E2',
-    marginLeft: 4,
-    fontWeight: '600',
-  },
-  cardImage: {
-    width: '100%',
-    height: 120,
-    resizeMode: 'cover',
-  },
-  cardContent: {
-    padding: 12,
-  },
+
+  // 卡片頭部
   cardHeader: {
+    height: 180,
+    position: 'relative',
+    overflow: 'hidden',
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    justifyContent: 'space-between',
+  },
+  decorCircle1: {
+    position: 'absolute',
+    top: -30,
+    right: -30,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+  },
+  decorCircle2: {
+    position: 'absolute',
+    bottom: -20,
+    left: -20,
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  
+  // 頭部頂部區域
+  cardHeaderTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 6,
+    alignItems: 'center',
+    zIndex: 1,
+  },
+  categoryBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.4)',
+  },
+  categoryText: {
+    fontSize: 10,
+    color: '#FFFFFF',
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  bookmarkButton: {
+    padding: 4,
+  },
+
+  // 圖標容器
+  iconContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    flex: 1,
+    zIndex: 1,
+  },
+  iconCircle: {
+    width: 68,
+    height: 68,
+    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+
+  // 頭部底部區域
+  cardHeaderBottom: {
+    zIndex: 1,
+    alignItems: 'center',
   },
   cardTitle: {
-    flex: 1,
     fontSize: 15,
-    fontWeight: 'bold',
-    color: '#333',
-    marginRight: 8,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    textAlign: 'center',
+    marginBottom: 2,
+    letterSpacing: 0.2,
+    textShadowColor: 'rgba(0, 0, 0, 0.15)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
-  removeButton: {
-    padding: 2,
+  cardSubtitle: {
+    fontSize: 11,
+    color: 'rgba(255, 255, 255, 0.9)',
+    textAlign: 'center',
+    fontWeight: '500',
+  },
+
+  // 卡片內容區域
+  cardContent: {
+    padding: 14,
   },
   cardDescription: {
     fontSize: 12,
-    color: '#666',
+    color: '#6B7280',
     lineHeight: 18,
-    marginBottom: 8,
+    marginBottom: 12,
     height: 36,
+    fontWeight: '500',
   },
+  
+  // 底部資訊
   cardFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
   },
-  cardDuration: {
-    fontSize: 11,
-    color: '#4A90E2',
-    fontWeight: '600',
-  },
-  planInfo: {
+  durationBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    flexWrap: 'wrap',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 10,
+    backgroundColor: '#166CB5',
   },
-  planCategory: {
+  durationText: {
     fontSize: 11,
-    color: '#4A90E2',
-    fontWeight: '600',
+    color: '#FFFFFF',
+    fontWeight: '700',
   },
-  planLevel: {
-    fontSize: 11,
-    color: '#999',
+  startButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
-  // Empty State
+  // ⭐ 底部語錄方框
+  quoteContainer: {
+    paddingHorizontal: 20,
+    paddingTop: 20,
+  },
+  quoteCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF7ED',
+    borderRadius: 16,
+    padding: 8,
+    borderWidth: 1,
+    borderColor: '#FFEDD5',
+    /* shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,*/
+  },
+  quoteIconCircle: {
+    width: 40,
+    height: 35,
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  quoteText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#78350F',
+    lineHeight: 20,
+    fontWeight: '450',
+  },
+
+  // 空狀態
   emptyState: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -494,18 +692,27 @@ const styles = StyleSheet.create({
     paddingHorizontal: 40,
   },
   emptyIconContainer: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: '#F3F4F6',
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    overflow: 'hidden',
+    marginBottom: 24,
+    shadowColor: '#166CB5',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  emptyIconGradient: {
+    width: '100%',
+    height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 24,
   },
   emptyTitle: {
     fontSize: 20,
-    fontWeight: 'bold',
-    color: '#111827',
+    fontWeight: '700',
+    color: '#1F2937',
     marginBottom: 12,
   },
   emptyText: {
@@ -514,17 +721,18 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 20,
     marginBottom: 32,
+    fontWeight: '500',
   },
-  exploreButton: {
+  exploreButtonContainer: {
     borderRadius: 12,
     overflow: 'hidden',
     shadowColor: '#166CB5',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
-    elevation: 4,
+    elevation: 5,
   },
-  exploreButtonGradient: {
+  exploreButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -533,13 +741,13 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   exploreButtonText: {
-    color: '#FFF',
+    color: '#FFFFFF',
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
   },
 
   bottomPadding: {
-    height: 40,
+    height: 80,
   },
 });
 
