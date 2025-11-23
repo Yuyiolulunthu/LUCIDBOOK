@@ -87,7 +87,14 @@ const AccountScreen = ({ navigation, route }) => {
           setIsLoggedIn(true);
           
           const savedAvatar = await AsyncStorage.getItem('userAvatar');
-          if (savedAvatar) setAvatar(savedAvatar);
+          if (response.user.avatar) {
+            setAvatar(response.user.avatar);
+            await AsyncStorage.setItem('userAvatar', response.user.avatar);
+          } else {
+            const savedAvatar = await AsyncStorage.getItem('userAvatar');
+            if (savedAvatar) setAvatar(savedAvatar);
+            else setAvatar(null);
+          }
           
           await loadPracticeStats();
           await loadAchievements();
