@@ -1,12 +1,11 @@
 // ==========================================
 // 檔案名稱: LoginScreen.js
 // 功能: 登入頁面
-// 
+// 🎨 統一設計風格
 // ✅ 電子郵件登入
 // ✅ 訪客登入
 // ✅ 登入成功後詢問企業引薦碼
 // ✅ 忘記密碼
-// ✅ 修正 navigation.goBack() 錯誤
 // ==========================================
 
 import React, { useState } from 'react';
@@ -18,19 +17,20 @@ import {
   ScrollView,
   StyleSheet,
   StatusBar,
-  Image,
   Alert,
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   Keyboard,
   TouchableWithoutFeedback,
+  Image,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import ApiService from '../../../api';
 
 const LoginScreen = ({ navigation, route }) => {
-  // 從 route.params 獲取參數
   const { onLoginSuccess: parentOnLoginSuccess, canGoBack = false } = route.params || {};
   
   const [email, setEmail] = useState('');
@@ -52,7 +52,6 @@ const LoginScreen = ({ navigation, route }) => {
 
     setIsLoading(true);
     try {
-      // 🔥 使用真實 API 登入
       const response = await ApiService.login(email, password);
       
       const userData = {
@@ -62,10 +61,8 @@ const LoginScreen = ({ navigation, route }) => {
         isGuest: false
       };
 
-      // 儲存到 AsyncStorage
       await AsyncStorage.setItem('userData', JSON.stringify(userData));
       
-      // ✨ 登入成功後詢問企業引薦碼 ✨
       Alert.alert(
         '登入成功！',
         '您是否有企業引薦碼？\n輸入引薦碼可解鎖專屬功能',
@@ -73,12 +70,10 @@ const LoginScreen = ({ navigation, route }) => {
           {
             text: '輸入引薦碼',
             onPress: () => {
-              // 先執行父組件的回調
               if (parentOnLoginSuccess) {
                 parentOnLoginSuccess(userData);
               }
               
-              // 導航到企業引薦碼頁面
               if (navigation) {
                 navigation.navigate('EnterpriseCode', { 
                   fromLogin: true,
@@ -90,12 +85,10 @@ const LoginScreen = ({ navigation, route }) => {
             text: '稍後再說',
             style: 'cancel',
             onPress: () => {
-              // 先執行父組件的回調
               if (parentOnLoginSuccess) {
                 parentOnLoginSuccess(userData);
               }
               
-              // 返回上一頁
               handleGoBack();
             }
           }
@@ -117,15 +110,12 @@ const LoginScreen = ({ navigation, route }) => {
     };
 
     try {
-      // 儲存訪客資料到 AsyncStorage
       await AsyncStorage.setItem('userData', JSON.stringify(guestData));
       
-      // 先執行父組件的回調
       if (parentOnLoginSuccess) {
         parentOnLoginSuccess(guestData);
       }
       
-      // 返回上一頁
       handleGoBack();
     } catch (error) {
       console.error('訪客登入失敗:', error);
@@ -133,7 +123,6 @@ const LoginScreen = ({ navigation, route }) => {
   };
 
   const handleForgotPassword = () => {
-    // 🔥 導航到忘記密碼頁面（跨平台解決方案）
     if (navigation) {
       navigation.navigate('ForgotPassword', { email });
     }
@@ -147,11 +136,9 @@ const LoginScreen = ({ navigation, route }) => {
 
   const handleGoBack = () => {
     if (navigation) {
-      // 檢查是否可以返回
       if (canGoBack || navigation.canGoBack()) {
         navigation.goBack();
       } else {
-        // 如果無法返回，導航到主畫面
         navigation.reset({
           index: 0,
           routes: [{ name: 'Home' }],
@@ -160,19 +147,23 @@ const LoginScreen = ({ navigation, route }) => {
     }
   };
 
-  const goBack = () => {
-    handleGoBack();
-  };
-
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="rgba(22, 109, 181, 0.95)" />
+      <StatusBar barStyle="light-content" backgroundColor="#166CB5" />
       
-      <View style={styles.loginHeaderContainer}>
-        <TouchableOpacity onPress={goBack} style={styles.backButton}>
-          <Text style={styles.backButtonText}>← 返回</Text>
+      {/* ⭐ Header - 漸層藍色設計 */}
+      <LinearGradient
+        colors={['#166CB5', '#31C6FE']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.header}
+      >
+        <TouchableOpacity onPress={handleGoBack} style={styles.backButton}>
+          <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
         </TouchableOpacity>
-      </View>
+        <Text style={styles.headerTitle}>登入</Text>
+        <View style={styles.headerPlaceholder} />
+      </LinearGradient>
 
       <KeyboardAvoidingView 
         style={styles.keyboardAvoidingView}
@@ -185,40 +176,54 @@ const LoginScreen = ({ navigation, route }) => {
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.scrollViewContent}
           >
-            <View style={styles.loginContainer}>
+            <View style={styles.contentContainer}>
+              {/* Logo 區域 */}
               <View style={styles.logoContainer}>
-                <Image 
-                  source={require('../../../assets/images/lucidbook.png')}
-                  style={styles.logoImage}
-                  resizeMode="contain"
-                />
+                <View style={styles.logoCircle}>
+                  <LinearGradient
+                    colors={['#166CB5', '#31C6FE']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.logoGradient}
+                  >
+                    <Ionicons name="leaf" size={40} color="#FFFFFF" />
+                  </LinearGradient>
+                </View>
                 <Text style={styles.logoText}>LucidBook</Text>
                 <Text style={styles.logoSubtext}>找到內心的平靜</Text>
               </View>
 
-              <View style={styles.formContainer}>
-                <Text style={styles.formTitle}>登入您的帳戶</Text>
+              {/* 表單卡片 */}
+              <View style={styles.formCard}>
+                <Text style={styles.formTitle}>歡迎回來</Text>
+                <Text style={styles.formSubtitle}>登入以繼續您的練習之旅</Text>
                 
+                {/* 電子郵件輸入 */}
                 <View style={styles.inputContainer}>
                   <Text style={styles.inputLabel}>電子郵件</Text>
-                  <TextInput
-                    style={styles.textInput}
-                    value={email}
-                    onChangeText={setEmail}
-                    placeholder="請輸入您的電子郵件"
-                    placeholderTextColor="#9CA3AF"
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                    editable={!isLoading}
-                    returnKeyType="next"
-                  />
+                  <View style={styles.inputWrapper}>
+                    <Ionicons name="mail-outline" size={20} color="#9CA3AF" style={styles.inputIcon} />
+                    <TextInput
+                      style={styles.textInput}
+                      value={email}
+                      onChangeText={setEmail}
+                      placeholder="請輸入您的電子郵件"
+                      placeholderTextColor="#9CA3AF"
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                      editable={!isLoading}
+                      returnKeyType="next"
+                    />
+                  </View>
                 </View>
 
+                {/* 密碼輸入 */}
                 <View style={styles.inputContainer}>
                   <Text style={styles.inputLabel}>密碼</Text>
-                  <View style={styles.passwordContainer}>
+                  <View style={styles.inputWrapper}>
+                    <Ionicons name="lock-closed-outline" size={20} color="#9CA3AF" style={styles.inputIcon} />
                     <TextInput
-                      style={styles.passwordInput}
+                      style={[styles.textInput, { flex: 1 }]}
                       value={password}
                       onChangeText={setPassword}
                       placeholder="請輸入您的密碼"
@@ -232,11 +237,16 @@ const LoginScreen = ({ navigation, route }) => {
                       style={styles.eyeButton}
                       onPress={() => setShowPassword(!showPassword)}
                     >
-                      <Text style={styles.eyeIcon}>{showPassword ? '👁️' : '🙈'}</Text>
+                      <Ionicons 
+                        name={showPassword ? "eye-outline" : "eye-off-outline"} 
+                        size={20} 
+                        color="#9CA3AF" 
+                      />
                     </TouchableOpacity>
                   </View>
                 </View>
 
+                {/* 忘記密碼 */}
                 <TouchableOpacity 
                   style={styles.forgotPassword}
                   onPress={handleForgotPassword}
@@ -246,34 +256,49 @@ const LoginScreen = ({ navigation, route }) => {
                   <Text style={styles.forgotPasswordText}>忘記密碼？</Text>
                 </TouchableOpacity>
 
+                {/* 登入按鈕 */}
                 <TouchableOpacity 
-                  style={[styles.loginButton, isLoading && styles.loginButtonDisabled]}
+                  style={styles.loginButtonContainer}
                   onPress={handleLogin}
                   disabled={isLoading}
-                  activeOpacity={0.8}
+                  activeOpacity={0.9}
                 >
-                  {isLoading ? (
-                    <ActivityIndicator color="white" />
-                  ) : (
-                    <Text style={styles.loginButtonText}>登入</Text>
-                  )}
+                  <LinearGradient
+                    colors={['#166CB5', '#31C6FE']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={styles.loginButton}
+                  >
+                    {isLoading ? (
+                      <ActivityIndicator color="white" />
+                    ) : (
+                      <>
+                        <Text style={styles.loginButtonText}>登入</Text>
+                        <Ionicons name="arrow-forward" size={20} color="#FFFFFF" />
+                      </>
+                    )}
+                  </LinearGradient>
                 </TouchableOpacity>
 
+                {/* 分隔線 */}
                 <View style={styles.divider}>
                   <View style={styles.dividerLine} />
                   <Text style={styles.dividerText}>或</Text>
                   <View style={styles.dividerLine} />
                 </View>
 
+                {/* 訪客登入按鈕 */}
                 <TouchableOpacity 
                   style={styles.guestButton}
                   onPress={handleGuestLogin}
                   disabled={isLoading}
                   activeOpacity={0.8}
                 >
+                  <Ionicons name="person-outline" size={20} color="#6B7280" />
                   <Text style={styles.guestButtonText}>以訪客身份繼續</Text>
                 </TouchableOpacity>
 
+                {/* 註冊連結 */}
                 <View style={styles.signupContainer}>
                   <Text style={styles.signupText}>還沒有帳戶？</Text>
                   <TouchableOpacity onPress={goToRegister} activeOpacity={0.7}>
@@ -292,23 +317,37 @@ const LoginScreen = ({ navigation, route }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#F5F7FA',
   },
-  loginHeaderContainer: {
-    backgroundColor: 'rgba(22, 109, 181, 0.95)',
-    paddingHorizontal: 16,
+
+  // Header
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingTop: 50,
-    paddingBottom: 8,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
   },
   backButton: {
-    alignSelf: 'flex-start',
-    paddingVertical: 8,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  backButtonText: {
-    fontSize: 16,
-    color: 'white',
-    fontWeight: '500',
+  headerTitle: {
+    flex: 1,
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    textAlign: 'center',
   },
+  headerPlaceholder: {
+    width: 40,
+  },
+
   keyboardAvoidingView: {
     flex: 1,
   },
@@ -318,111 +357,141 @@ const styles = StyleSheet.create({
   scrollViewContent: {
     flexGrow: 1,
   },
-  loginContainer: {
+  contentContainer: {
     flex: 1,
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
+    paddingTop: 20,
     paddingBottom: 40,
   },
+
+  // Logo 區域
   logoContainer: {
     alignItems: 'center',
-    marginTop: 20,
-    marginBottom: 30,
+    marginBottom: 32,
   },
-  logoImage: {
+  logoCircle: {
     width: 80,
     height: 80,
+    borderRadius: 40,
+    overflow: 'hidden',
     marginBottom: 16,
+    shadowColor: '#166CB5',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  logoGradient: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   logoText: {
     fontSize: 28,
-    fontWeight: 'bold',
-    color: '#111827',
-    marginBottom: 8,
+    fontWeight: '700',
+    color: '#1F2937',
+    marginBottom: 4,
   },
   logoSubtext: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#6B7280',
+    fontWeight: '500',
   },
-  formContainer: {
-    backgroundColor: 'white',
-    borderRadius: 16,
+
+  // 表單卡片
+  formCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
     padding: 24,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
     elevation: 4,
   },
   formTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#111827',
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#1F2937',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  formSubtitle: {
+    fontSize: 14,
+    color: '#6B7280',
     textAlign: 'center',
     marginBottom: 24,
   },
+
+  // 輸入框
   inputContainer: {
     marginBottom: 16,
   },
   inputLabel: {
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: '600',
     color: '#374151',
     marginBottom: 8,
   },
-  textInput: {
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 16,
-    color: '#111827',
-    backgroundColor: '#F9FAFB',
-  },
-  passwordContainer: {
+  inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#D1D5DB',
-    borderRadius: 8,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
     backgroundColor: '#F9FAFB',
-  },
-  passwordInput: {
-    flex: 1,
     paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 16,
-    color: '#111827',
+  },
+  inputIcon: {
+    marginRight: 12,
+  },
+  textInput: {
+    flex: 1,
+    paddingVertical: 14,
+    fontSize: 15,
+    color: '#1F2937',
   },
   eyeButton: {
-    padding: 12,
+    padding: 8,
   },
-  eyeIcon: {
-    fontSize: 20,
-  },
+
+  // 忘記密碼
   forgotPassword: {
     alignSelf: 'flex-end',
     marginBottom: 24,
   },
   forgotPasswordText: {
     fontSize: 14,
-    color: 'rgba(22, 109, 181, 0.95)',
-  },
-  loginButton: {
-    backgroundColor: 'rgba(22, 109, 181, 0.95)',
-    borderRadius: 8,
-    paddingVertical: 16,
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  loginButtonDisabled: {
-    backgroundColor: '#9CA3AF',
-  },
-  loginButtonText: {
-    color: 'white',
-    fontSize: 16,
+    color: '#166CB5',
     fontWeight: '600',
   },
+
+  // 登入按鈕
+  loginButtonContainer: {
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginBottom: 24,
+    shadowColor: '#166CB5',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  loginButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    gap: 8,
+  },
+  loginButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+
+  // 分隔線
   divider: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -436,21 +505,29 @@ const styles = StyleSheet.create({
   dividerText: {
     paddingHorizontal: 16,
     fontSize: 14,
-    color: '#6B7280',
-  },
-  guestButton: {
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
-    borderRadius: 8,
-    paddingVertical: 16,
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  guestButtonText: {
-    color: '#374151',
-    fontSize: 16,
+    color: '#9CA3AF',
     fontWeight: '500',
   },
+
+  // 訪客按鈕
+  guestButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
+    paddingVertical: 14,
+    marginBottom: 24,
+    gap: 8,
+  },
+  guestButtonText: {
+    color: '#6B7280',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+
+  // 註冊連結
   signupContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
@@ -463,8 +540,8 @@ const styles = StyleSheet.create({
   },
   signupLink: {
     fontSize: 14,
-    color: 'rgba(22, 109, 181, 0.95)',
-    fontWeight: '500',
+    color: '#166CB5',
+    fontWeight: '600',
   },
 });
 

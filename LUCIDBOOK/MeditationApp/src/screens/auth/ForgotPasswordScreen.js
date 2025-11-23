@@ -1,6 +1,8 @@
 // ==========================================
-// 檔案名稱: ForgotPasswordScreen.js (改進版 v2)
-// 功能: 支持後端開發模式令牌直接回傳
+// 檔案名稱: ForgotPasswordScreen.js
+// 功能: 忘記密碼頁面
+// 🎨 統一設計風格 + 鎖頭圖標
+// ✅ 支持後端開發模式令牌直接回傳
 // ==========================================
 
 import React, { useState } from 'react';
@@ -21,6 +23,8 @@ import {
   Clipboard,
   Linking,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 import ApiService from '../../../api';
 
 const ForgotPasswordScreen = ({ navigation, route }) => {
@@ -52,7 +56,6 @@ const ForgotPasswordScreen = ({ navigation, route }) => {
     try {
       console.log('🔍 嘗試發送忘記密碼請求...');
       console.log('📧 電子郵件:', email);
-      console.log('🌐 API 端點: https://curiouscreate.com/api/forgot-password.php');
       
       const response = await ApiService.forgotPassword(email);
       
@@ -60,7 +63,6 @@ const ForgotPasswordScreen = ({ navigation, route }) => {
       
       setEmailSent(true);
       
-      // 檢查是否為開發模式
       if (response.dev_mode && response.token) {
         // 🔧 開發模式：後端直接回傳令牌
         setIsDevelopmentMode(true);
@@ -100,46 +102,33 @@ const ForgotPasswordScreen = ({ navigation, route }) => {
       let errorMessage = error.message || '未知錯誤';
       let detailedError = '';
       
-      // 分析錯誤類型
       if (errorMessage.includes('404') || errorMessage.includes('Not Found')) {
         detailedError = '❌ 錯誤: API 端點不存在\n\n';
         detailedError += '💡 解決方案:\n';
         detailedError += '1. 確認 forgot-password.php 已上傳\n';
         detailedError += '2. 檢查檔案是否在 /api/ 目錄\n';
-        detailedError += '3. 確認檔案權限正確（644 或 755）\n\n';
-        detailedError += '🔍 測試: 在瀏覽器訪問\n';
-        detailedError += 'https://curiouscreate.com/api/forgot-password.php';
+        detailedError += '3. 確認檔案權限正確（644 或 755）';
       } else if (errorMessage.includes('500')) {
         detailedError = '❌ 錯誤: 伺服器內部錯誤\n\n';
         detailedError += '💡 可能原因:\n';
         detailedError += '• 資料庫連線問題\n';
         detailedError += '• PHP 語法錯誤\n';
-        detailedError += '• 郵件服務設定問題\n';
-        detailedError += '• config.php 設定錯誤';
-      } else if (errorMessage.includes('Network request failed') || errorMessage.includes('Failed to fetch')) {
+        detailedError += '• 郵件服務設定問題';
+      } else if (errorMessage.includes('Network request failed')) {
         detailedError = '❌ 錯誤: 無法連接到伺服器\n\n';
         detailedError += '💡 可能原因:\n';
         detailedError += '1. API 檔案不存在（最常見）\n';
         detailedError += '2. 網路連線問題\n';
-        detailedError += '3. API 網址設定錯誤\n';
-        detailedError += '4. CORS 設定問題\n\n';
-        detailedError += '🔍 快速檢查:\n';
-        detailedError += '在瀏覽器訪問:\n';
-        detailedError += 'https://curiouscreate.com/api/test-connection.php';
+        detailedError += '3. API 網址設定錯誤';
       } else {
         detailedError = `❌ 錯誤訊息: ${errorMessage}\n\n`;
         detailedError += '💡 建議:\n';
         detailedError += '• 檢查後端日誌\n';
-        detailedError += '• 確認 API 檔案已上傳\n';
-        detailedError += '• 測試 API 連線';
+        detailedError += '• 確認 API 檔案已上傳';
       }
       
       setErrorDetails(detailedError);
-      
-      Alert.alert(
-        '❌ 發送失敗',
-        errorMessage + '\n\n請查看畫面上的詳細錯誤資訊。'
-      );
+      Alert.alert('❌ 發送失敗', errorMessage + '\n\n請查看畫面上的詳細錯誤資訊。');
       
     } finally {
       setIsLoading(false);
@@ -170,7 +159,7 @@ const ForgotPasswordScreen = ({ navigation, route }) => {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="rgba(22, 109, 181, 0.95)" />
+      <StatusBar barStyle="light-content" backgroundColor="#166CB5" />
       
       {/* 開發模式指示器 */}
       {isDevelopmentMode && (
@@ -179,15 +168,24 @@ const ForgotPasswordScreen = ({ navigation, route }) => {
         </View>
       )}
       
-      <View style={styles.headerContainer}>
+      {/* ⭐ Header - 漸層藍色設計 */}
+      <LinearGradient
+        colors={['#166CB5', '#31C6FE']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.header}
+      >
         <TouchableOpacity onPress={goBack} style={styles.backButton}>
-          <Text style={styles.backButtonText}>← 返回</Text>
+          <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
         </TouchableOpacity>
-      </View>
+        <Text style={styles.headerTitle}>忘記密碼</Text>
+        <View style={styles.headerPlaceholder} />
+      </LinearGradient>
 
       <KeyboardAvoidingView 
         style={styles.keyboardAvoidingView}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
       >
         <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
           <ScrollView 
@@ -196,36 +194,53 @@ const ForgotPasswordScreen = ({ navigation, route }) => {
             contentContainerStyle={styles.scrollViewContent}
           >
             <View style={styles.contentContainer}>
-              <View style={styles.iconContainer}>
-                <Text style={styles.iconText}>🔒</Text>
+              {/* ⭐ Logo 區域 - 使用鎖頭圖標 */}
+              <View style={styles.logoContainer}>
+                <View style={styles.logoCircle}>
+                  <LinearGradient
+                    colors={['#166CB5', '#31C6FE']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.logoGradient}
+                  >
+                    <Ionicons name="lock-open-outline" size={48} color="#FFFFFF" />
+                  </LinearGradient>
+                </View>
+                <Text style={styles.logoText}>密碼重設</Text>
+                <Text style={styles.logoSubtext}>
+                  輸入您的電子郵件，我們將發送重設連結
+                </Text>
               </View>
 
-              <Text style={styles.title}>忘記密碼？</Text>
-              <Text style={styles.subtitle}>
-                請輸入您的電子郵件地址，我們將發送重設密碼的連結給您
-              </Text>
-
-              <View style={styles.formContainer}>
+              {/* 表單卡片 */}
+              <View style={styles.formCard}>
+                {/* 電子郵件輸入 */}
                 <View style={styles.inputContainer}>
                   <Text style={styles.inputLabel}>電子郵件</Text>
-                  <TextInput
-                    style={styles.textInput}
-                    value={email}
-                    onChangeText={setEmail}
-                    placeholder="請輸入您的電子郵件"
-                    placeholderTextColor="#9CA3AF"
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                    editable={!isLoading && !emailSent}
-                    returnKeyType="done"
-                    onSubmitEditing={handleSendResetEmail}
-                  />
+                  <View style={styles.inputWrapper}>
+                    <Ionicons name="mail-outline" size={20} color="#9CA3AF" style={styles.inputIcon} />
+                    <TextInput
+                      style={styles.textInput}
+                      value={email}
+                      onChangeText={setEmail}
+                      placeholder="請輸入您的電子郵件"
+                      placeholderTextColor="#9CA3AF"
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                      editable={!isLoading && !emailSent}
+                      returnKeyType="done"
+                      onSubmitEditing={handleSendResetEmail}
+                    />
+                  </View>
                 </View>
 
                 {/* 顯示錯誤詳情 */}
                 {errorDetails && (
                   <View style={styles.errorDetailsContainer}>
-                    <Text style={styles.errorDetailsTitle}>🔍 錯誤詳情</Text>
+                    <View style={styles.errorHeader}>
+                      <Ionicons name="alert-circle" size={20} color="#DC2626" />
+                      <Text style={styles.errorDetailsTitle}>錯誤詳情</Text>
+                    </View>
                     <ScrollView style={styles.errorDetailsScroll}>
                       <Text style={styles.errorDetailsText} selectable>
                         {errorDetails}
@@ -237,7 +252,10 @@ const ForgotPasswordScreen = ({ navigation, route }) => {
                 {/* 開發模式：顯示令牌 */}
                 {isDevelopmentMode && resetToken && (
                   <View style={styles.devTokenContainer}>
-                    <Text style={styles.devTokenTitle}>🔑 重設令牌（開發模式）</Text>
+                    <View style={styles.devTokenHeader}>
+                      <Ionicons name="code-slash" size={20} color="#F59E0B" />
+                      <Text style={styles.devTokenTitle}>重設令牌（開發模式）</Text>
+                    </View>
                     
                     <View style={styles.tokenBox}>
                       <Text style={styles.tokenLabel}>令牌：</Text>
@@ -248,56 +266,84 @@ const ForgotPasswordScreen = ({ navigation, route }) => {
 
                     <View style={styles.buttonRow}>
                       <TouchableOpacity 
-                        style={[styles.actionButton, styles.copyButton]}
+                        style={styles.copyButtonContainer}
                         onPress={copyToken}
+                        activeOpacity={0.9}
                       >
-                        <Text style={styles.actionButtonText}>📋 複製令牌</Text>
+                        <LinearGradient
+                          colors={['#166CB5', '#31C6FE']}
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 1, y: 0 }}
+                          style={styles.copyButton}
+                        >
+                          <Ionicons name="copy-outline" size={16} color="#FFFFFF" />
+                          <Text style={styles.copyButtonText}>複製令牌</Text>
+                        </LinearGradient>
                       </TouchableOpacity>
 
                       {resetUrl && (
                         <TouchableOpacity 
-                          style={[styles.actionButton, styles.openButton]}
+                          style={styles.openButtonContainer}
                           onPress={openResetUrl}
+                          activeOpacity={0.9}
                         >
-                          <Text style={styles.actionButtonText}>🔗 開啟重設頁面</Text>
+                          <LinearGradient
+                            colors={['#10B981', '#34D399']}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 0 }}
+                            style={styles.openButton}
+                          >
+                            <Ionicons name="open-outline" size={16} color="#FFFFFF" />
+                            <Text style={styles.openButtonText}>開啟頁面</Text>
+                          </LinearGradient>
                         </TouchableOpacity>
                       )}
                     </View>
 
                     <View style={styles.devNote}>
+                      <Ionicons name="information-circle-outline" size={16} color="#92400E" />
                       <Text style={styles.devNoteText}>
-                        ⚠️ 這是開發模式，令牌直接顯示。{'\n'}
-                        正式環境會透過郵件發送。
+                        這是開發模式，令牌直接顯示。正式環境會透過郵件發送。
                       </Text>
                     </View>
                   </View>
                 )}
 
+                {/* 發送按鈕 */}
                 <TouchableOpacity 
-                  style={[
-                    styles.sendButton, 
-                    (isLoading || emailSent) && styles.sendButtonDisabled
-                  ]}
+                  style={styles.sendButtonContainer}
                   onPress={handleSendResetEmail}
                   disabled={isLoading || emailSent}
-                  activeOpacity={0.8}
+                  activeOpacity={0.9}
                 >
-                  {isLoading ? (
-                    <ActivityIndicator color="white" />
-                  ) : (
-                    <Text style={styles.sendButtonText}>
-                      {emailSent ? '✓ 已發送' : '發送重設連結'}
-                    </Text>
-                  )}
+                  <LinearGradient
+                    colors={isLoading || emailSent ? ['#9CA3AF', '#9CA3AF'] : ['#166CB5', '#31C6FE']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={styles.sendButton}
+                  >
+                    {isLoading ? (
+                      <ActivityIndicator color="white" />
+                    ) : (
+                      <>
+                        <Text style={styles.sendButtonText}>
+                          {emailSent ? '已發送' : '發送重設連結'}
+                        </Text>
+                        {emailSent && <Ionicons name="checkmark-circle" size={20} color="#FFFFFF" />}
+                      </>
+                    )}
+                  </LinearGradient>
                 </TouchableOpacity>
 
+                {/* 提示訊息 */}
                 <View style={styles.infoBox}>
-                  <Text style={styles.infoIcon}>ℹ️</Text>
+                  <Ionicons name="information-circle" size={20} color="#166CB5" />
                   <Text style={styles.infoText}>
                     如果該電子郵件已註冊，您將在幾分鐘內收到重設密碼的郵件。請檢查您的垃圾郵件資料夾。
                   </Text>
                 </View>
 
+                {/* 返回登入 */}
                 <TouchableOpacity 
                   style={styles.backToLoginButton}
                   onPress={goBack}
@@ -317,33 +363,49 @@ const ForgotPasswordScreen = ({ navigation, route }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#F5F7FA',
   },
+
+  // 開發模式橫幅
   devModeBanner: {
     backgroundColor: '#FCD34D',
-    paddingVertical: 6,
+    paddingVertical: 8,
     alignItems: 'center',
   },
   devModeText: {
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '700',
     color: '#92400E',
   },
-  headerContainer: {
-    backgroundColor: 'rgba(22, 109, 181, 0.95)',
-    paddingHorizontal: 16,
+
+  // Header
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingTop: 50,
-    paddingBottom: 8,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
   },
   backButton: {
-    alignSelf: 'flex-start',
-    paddingVertical: 8,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  backButtonText: {
-    fontSize: 16,
-    color: 'white',
-    fontWeight: '500',
+  headerTitle: {
+    flex: 1,
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    textAlign: 'center',
   },
+  headerPlaceholder: {
+    width: 40,
+  },
+
   keyboardAvoidingView: {
     flex: 1,
   },
@@ -355,75 +417,109 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     flex: 1,
-    paddingHorizontal: 16,
-    paddingTop: 40,
+    paddingHorizontal: 20,
+    paddingTop: 20,
     paddingBottom: 40,
   },
-  iconContainer: {
+
+  // ⭐ Logo 區域 - 鎖頭圖標設計
+  logoContainer: {
     alignItems: 'center',
-    marginBottom: 24,
-  },
-  iconText: {
-    fontSize: 64,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#111827',
-    textAlign: 'center',
-    marginBottom: 12,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#6B7280',
-    textAlign: 'center',
     marginBottom: 32,
-    lineHeight: 24,
-    paddingHorizontal: 16,
   },
-  formContainer: {
-    backgroundColor: 'white',
-    borderRadius: 16,
+  logoCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 50,
+    overflow: 'hidden',
+    marginBottom: 16,
+    shadowColor: '#166CB5',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 8,
+  },
+  logoGradient: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  logoText: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#1F2937',
+    marginBottom: 8,
+  },
+  logoSubtext: {
+    fontSize: 14,
+    color: '#6B7280',
+    fontWeight: '500',
+    textAlign: 'center',
+    paddingHorizontal: 20,
+    lineHeight: 20,
+  },
+
+  // 表單卡片
+  formCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
     padding: 24,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
     elevation: 4,
   },
+
+  // 輸入框
   inputContainer: {
-    marginBottom: 20,
+    marginBottom: 16,
   },
   inputLabel: {
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: '600',
     color: '#374151',
     marginBottom: 8,
   },
-  textInput: {
+  inputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#D1D5DB',
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 16,
-    color: '#111827',
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
     backgroundColor: '#F9FAFB',
+    paddingHorizontal: 16,
   },
+  inputIcon: {
+    marginRight: 12,
+  },
+  textInput: {
+    flex: 1,
+    paddingVertical: 14,
+    fontSize: 15,
+    color: '#1F2937',
+  },
+
+  // 錯誤詳情
   errorDetailsContainer: {
     backgroundColor: '#FEE2E2',
-    borderRadius: 8,
-    padding: 12,
+    borderRadius: 12,
+    padding: 16,
     marginBottom: 16,
     borderWidth: 1,
     borderColor: '#FCA5A5',
-    maxHeight: 250,
+  },
+  errorHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    gap: 8,
   },
   errorDetailsTitle: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#991B1B',
-    marginBottom: 8,
+    fontWeight: '700',
+    color: '#DC2626',
   },
   errorDetailsScroll: {
     maxHeight: 200,
@@ -434,23 +530,30 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
   },
+
+  // 開發模式令牌
   devTokenContainer: {
     backgroundColor: '#FEF3C7',
-    borderRadius: 8,
+    borderRadius: 12,
     padding: 16,
     marginBottom: 20,
-    borderWidth: 2,
+    borderWidth: 1,
     borderColor: '#FCD34D',
+  },
+  devTokenHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    gap: 8,
   },
   devTokenTitle: {
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '700',
     color: '#92400E',
-    marginBottom: 12,
   },
   tokenBox: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 6,
+    borderRadius: 8,
     padding: 12,
     marginBottom: 12,
   },
@@ -458,6 +561,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#6B7280',
     marginBottom: 4,
+    fontWeight: '600',
   },
   tokenText: {
     fontSize: 11,
@@ -470,74 +574,105 @@ const styles = StyleSheet.create({
     gap: 8,
     marginBottom: 12,
   },
-  actionButton: {
+  copyButtonContainer: {
     flex: 1,
-    borderRadius: 6,
-    paddingVertical: 10,
-    alignItems: 'center',
+    borderRadius: 8,
+    overflow: 'hidden',
   },
   copyButton: {
-    backgroundColor: 'rgba(22, 109, 181, 0.95)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    gap: 6,
+  },
+  copyButtonText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  openButtonContainer: {
+    flex: 1,
+    borderRadius: 8,
+    overflow: 'hidden',
   },
   openButton: {
-    backgroundColor: '#10B981',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    gap: 6,
   },
-  actionButtonText: {
-    color: 'white',
+  openButtonText: {
+    color: '#FFFFFF',
     fontSize: 13,
     fontWeight: '600',
   },
   devNote: {
+    flexDirection: 'row',
     backgroundColor: '#FFFBEB',
-    borderRadius: 6,
-    padding: 10,
+    borderRadius: 8,
+    padding: 12,
+    gap: 8,
+    alignItems: 'flex-start',
   },
   devNoteText: {
-    fontSize: 11,
+    flex: 1,
+    fontSize: 12,
     color: '#92400E',
-    lineHeight: 16,
-    textAlign: 'center',
+    lineHeight: 18,
+  },
+
+  // 發送按鈕
+  sendButtonContainer: {
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginBottom: 20,
+    shadowColor: '#166CB5',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
   },
   sendButton: {
-    backgroundColor: 'rgba(22, 109, 181, 0.95)',
-    borderRadius: 8,
-    paddingVertical: 16,
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 20,
-  },
-  sendButtonDisabled: {
-    backgroundColor: '#9CA3AF',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    gap: 8,
   },
   sendButtonText: {
-    color: 'white',
+    color: '#FFFFFF',
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
   },
+
+  // 提示訊息
   infoBox: {
     flexDirection: 'row',
     backgroundColor: '#EFF6FF',
-    borderRadius: 8,
-    padding: 12,
+    borderRadius: 12,
+    padding: 14,
     marginBottom: 20,
-  },
-  infoIcon: {
-    fontSize: 18,
-    marginRight: 8,
+    gap: 12,
+    alignItems: 'flex-start',
   },
   infoText: {
     flex: 1,
     fontSize: 13,
     color: '#1E40AF',
-    lineHeight: 18,
+    lineHeight: 20,
   },
+
+  // 返回登入
   backToLoginButton: {
     alignItems: 'center',
     paddingVertical: 8,
   },
   backToLoginText: {
     fontSize: 14,
-    color: 'rgba(22, 109, 181, 0.95)',
-    fontWeight: '500',
+    color: '#166CB5',
+    fontWeight: '600',
   },
 });
 
