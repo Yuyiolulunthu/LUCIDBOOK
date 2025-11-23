@@ -1,12 +1,11 @@
 // ==========================================
 // 檔案名稱: ProfileEditScreen.js
-// 功能: 個人資料編輯頁面（完整版）
+// 功能: 個人資料編輯頁面（完整串接 API 版）
 // 
-// ✅ 顯示當前用戶資料
-// ✅ 編輯姓名、email、電話、公司、個人簡介
-// ✅ 上傳/更換頭像（拍照或相簿選擇）
-// ✅ 離開前未保存提醒
-// ✅ 保存變更動畫
+// ✅ 從後端 API 獲取用戶資料
+// ✅ 更新用戶資料到資料庫
+// ✅ 上傳頭像到伺服器
+// ✅ 本地備份（離線支援）
 // 🎨 統一設計風格
 // ==========================================
 
@@ -29,7 +28,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import ApiService from '../../../../../api';
+import ApiService from '../../../../services'; // 根據你的目錄結構
 
 const ProfileEditScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(true);
@@ -57,6 +56,7 @@ const ProfileEditScreen = ({ navigation }) => {
   });
 
   const [avatarChanged, setAvatarChanged] = useState(false);
+  const [newAvatarUri, setNewAvatarUri] = useState(null); // 新頭像的本地 URI
 
   useEffect(() => {
     loadUserProfile();
@@ -74,29 +74,60 @@ const ProfileEditScreen = ({ navigation }) => {
   // 載入用戶資料
   const loadUserProfile = async () => {
     try {
+      console.log('📱 開始載入用戶資料...');
+      
       // 從 API 獲取用戶資料
       const response = await ApiService.getUserProfile();
-      const data = response.data;
+      console.log('✅ API 回應:', response);
       
-      setUserData(data);
-      setFormData(data);
+      // 處理不同的 API 回應格式
+      let data;
+      if (response.user) {
+        // 格式: {"user": {...}}
+        data = response.user;
+      } else if (response.data) {
+        // 格式: {"data": {...}}
+        data = response.data;
+      } else {
+        // 直接格式: {...}
+        data = response;
+      }
+      
+      const profileData = {
+        name: data.name || data.username || '',
+        email: data.email || '',
+        phone: data.phone || data.phone_number || '',
+        company: data.company || data.company_name || '',
+        bio: data.bio || data.description || '',
+        avatar: data.avatar || data.avatar_url || data.profile_image || null,
+      };
+      
+      console.log('📦 處理後的資料:', profileData);
+      
+      setUserData(profileData);
+      setFormData(profileData);
+      
+      // 同時保存到本地（備份）
+      await AsyncStorage.setItem('userProfile', JSON.stringify(profileData));
+      
     } catch (error) {
-      console.error('載入用戶資料失敗:', error);
+      console.error('❌ 載入用戶資料失敗:', error);
       
-      // 如果 API 失敗，從本地存儲載入或使用預設值
+      // 如果 API 失敗，嘗試從本地載入
       try {
         const savedProfile = await AsyncStorage.getItem('userProfile');
         if (savedProfile) {
           const data = JSON.parse(savedProfile);
           setUserData(data);
           setFormData(data);
+          console.log('📱 已從本地載入備份資料');
         } else {
           // 使用預設值
           const defaultData = {
-            name: 'Jennifer',
-            email: 'jennifer@example.com',
-            phone: '+886 912 345 678',
-            company: 'ABC 科技公司',
+            name: '',
+            email: '',
+            phone: '',
+            company: '',
             bio: '',
             avatar: null,
           };
@@ -156,7 +187,9 @@ const ProfileEditScreen = ({ navigation }) => {
           ...prev,
           avatar: result.assets[0].uri
         }));
+        setNewAvatarUri(result.assets[0].uri);
         setAvatarChanged(true);
+        console.log('📸 已選擇新頭像（拍照）:', result.assets[0].uri);
       }
     } catch (error) {
       console.error('拍照失敗:', error);
@@ -179,7 +212,9 @@ const ProfileEditScreen = ({ navigation }) => {
           ...prev,
           avatar: result.assets[0].uri
         }));
+        setNewAvatarUri(result.assets[0].uri);
         setAvatarChanged(true);
+        console.log('🖼️ 已選擇新頭像（相簿）:', result.assets[0].uri);
       }
     } catch (error) {
       console.error('選擇圖片失敗:', error);
@@ -189,12 +224,12 @@ const ProfileEditScreen = ({ navigation }) => {
 
   // 驗證表單
   const validateForm = () => {
-    if (!formData.name.trim()) {
+    if (!formData || !formData.name || !formData.name.trim()) {
       Alert.alert('錯誤', '請輸入姓名');
       return false;
     }
 
-    if (!formData.email.trim()) {
+    if (!formData.email || !formData.email.trim()) {
       Alert.alert('錯誤', '請輸入電子郵件');
       return false;
     }
@@ -217,6 +252,8 @@ const ProfileEditScreen = ({ navigation }) => {
 
   // 檢查是否有變更
   const hasChanges = () => {
+    if (!formData || !userData) return false;
+    
     return (
       formData.name !== userData.name ||
       formData.email !== userData.email ||
@@ -236,32 +273,63 @@ const ProfileEditScreen = ({ navigation }) => {
     setIsSaving(true);
 
     try {
-      // 如果頭像有變更，先上傳頭像
-      let avatarUrl = formData.avatar;
-      if (avatarChanged && formData.avatar) {
-        // 這裡應該調用上傳圖片的 API
-        // const uploadResponse = await ApiService.uploadAvatar(formData.avatar);
-        // avatarUrl = uploadResponse.data.url;
-      }
-
-      // 更新用戶資料
+      console.log('💾 開始保存用戶資料...');
+      
+      // 準備要更新的資料
       const updateData = {
-        name: formData.name,
-        email: formData.email,
-        phone: formData.phone,
-        company: formData.company,
-        bio: formData.bio,
-        avatar: avatarUrl,
+        name: formData?.name || '',
+        email: formData?.email || '',
+        phone: formData?.phone || '',
+        company: formData?.company || '',
+        bio: formData?.bio || '',
+        avatar: formData?.avatar || null,
       };
 
-      await ApiService.updateUserProfile(updateData);
+      let result;
+
+      // 如果有上傳新頭像
+      if (avatarChanged && newAvatarUri) {
+        console.log('🖼️ 偵測到新頭像，使用整合上傳方法...');
+        result = await ApiService.updateProfileWithAvatar(updateData, newAvatarUri);
+      } else {
+        // 只更新文字資料
+        console.log('📝 更新文字資料...');
+        result = await ApiService.updateUserProfile(updateData);
+      }
+
+      console.log('✅ API 更新成功:', result);
       
-      // 保存到本地
-      await AsyncStorage.setItem('userProfile', JSON.stringify(updateData));
+      // 更新成功後的資料（從 API 回應中取得）
+      let updatedData;
+      if (result.user) {
+        // 格式: {"user": {...}}
+        updatedData = result.user;
+      } else if (result.data) {
+        // 格式: {"data": {...}}
+        updatedData = result.data;
+      } else {
+        // 直接格式: {...}
+        updatedData = result;
+      }
+      
+      const finalData = {
+        name: updatedData.name || updateData.name,
+        email: updatedData.email || updateData.email,
+        phone: updatedData.phone || updateData.phone,
+        company: updatedData.company || updateData.company,
+        bio: updatedData.bio || updateData.bio,
+        avatar: updatedData.avatar || updatedData.avatar_url || updateData.avatar,
+      };
+      
+      // 保存到本地（備份）
+      await AsyncStorage.setItem('userProfile', JSON.stringify(finalData));
+      console.log('💾 已備份到本地');
 
       // 更新原始資料
-      setUserData(updateData);
+      setUserData(finalData);
+      setFormData(finalData);
       setAvatarChanged(false);
+      setNewAvatarUri(null);
 
       // 顯示成功動畫
       setIsSaving(false);
@@ -275,9 +343,16 @@ const ProfileEditScreen = ({ navigation }) => {
       }, 1000);
 
     } catch (error) {
-      console.error('保存失敗:', error);
+      console.error('❌ 保存失敗:', error);
       setIsSaving(false);
-      Alert.alert('錯誤', '保存失敗，請稍後再試');
+      
+      // 顯示更詳細的錯誤訊息
+      let errorMessage = '保存失敗，請稍後再試';
+      if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      Alert.alert('錯誤', errorMessage);
     }
   };
 
@@ -303,7 +378,7 @@ const ProfileEditScreen = ({ navigation }) => {
 
   // 渲染頭像
   const renderAvatar = () => {
-    if (formData.avatar) {
+    if (formData && formData.avatar) {
       return (
         <Image 
           source={{ uri: formData.avatar }} 
@@ -311,6 +386,7 @@ const ProfileEditScreen = ({ navigation }) => {
         />
       );
     } else {
+      const displayName = formData && formData.name ? formData.name : 'U';
       return (
         <LinearGradient
           colors={['#166CB5', '#31C6FE']}
@@ -319,7 +395,7 @@ const ProfileEditScreen = ({ navigation }) => {
           style={styles.avatar}
         >
           <Text style={styles.avatarText}>
-            {formData.name ? formData.name.charAt(0).toUpperCase() : 'U'}
+            {displayName.charAt(0).toUpperCase()}
           </Text>
         </LinearGradient>
       );
@@ -349,6 +425,7 @@ const ProfileEditScreen = ({ navigation }) => {
         </LinearGradient>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#166CB5" />
+          <Text style={styles.loadingText}>載入中...</Text>
         </View>
       </View>
     );
@@ -414,7 +491,7 @@ const ProfileEditScreen = ({ navigation }) => {
                 <Ionicons name="person-outline" size={20} color="#9CA3AF" style={styles.inputIcon} />
                 <TextInput
                   style={styles.input}
-                  value={formData.name}
+                  value={formData?.name || ''}
                   onChangeText={(value) => handleInputChange('name', value)}
                   placeholder="請輸入姓名"
                   placeholderTextColor="#9CA3AF"
@@ -429,7 +506,7 @@ const ProfileEditScreen = ({ navigation }) => {
                 <Ionicons name="mail-outline" size={20} color="#9CA3AF" style={styles.inputIcon} />
                 <TextInput
                   style={styles.input}
-                  value={formData.email}
+                  value={formData?.email || ''}
                   onChangeText={(value) => handleInputChange('email', value)}
                   placeholder="請輸入電子郵件"
                   placeholderTextColor="#9CA3AF"
@@ -446,7 +523,7 @@ const ProfileEditScreen = ({ navigation }) => {
                 <Ionicons name="call-outline" size={20} color="#9CA3AF" style={styles.inputIcon} />
                 <TextInput
                   style={styles.input}
-                  value={formData.phone}
+                  value={formData?.phone || ''}
                   onChangeText={(value) => handleInputChange('phone', value)}
                   placeholder="請輸入電話號碼"
                   placeholderTextColor="#9CA3AF"
@@ -462,7 +539,7 @@ const ProfileEditScreen = ({ navigation }) => {
                 <Ionicons name="briefcase-outline" size={20} color="#9CA3AF" style={styles.inputIcon} />
                 <TextInput
                   style={styles.input}
-                  value={formData.company}
+                  value={formData?.company || ''}
                   onChangeText={(value) => handleInputChange('company', value)}
                   placeholder="請輸入公司名稱"
                   placeholderTextColor="#9CA3AF"
@@ -476,7 +553,7 @@ const ProfileEditScreen = ({ navigation }) => {
               <View style={[styles.inputWrapper, styles.textAreaWrapper]}>
                 <TextInput
                   style={[styles.input, styles.textArea]}
-                  value={formData.bio}
+                  value={formData?.bio || ''}
                   onChangeText={(value) => handleInputChange('bio', value)}
                   placeholder="介紹一下自己..."
                   placeholderTextColor="#9CA3AF"
@@ -487,7 +564,7 @@ const ProfileEditScreen = ({ navigation }) => {
                 />
               </View>
               <Text style={styles.charCount}>
-                {formData.bio ? formData.bio.length : 0}/200 字
+                {(formData && formData.bio) ? formData.bio.length : 0}/200 字
               </Text>
             </View>
 
@@ -495,7 +572,7 @@ const ProfileEditScreen = ({ navigation }) => {
             <View style={styles.infoBox}>
               <Ionicons name="information-circle" size={20} color="#3B82F6" />
               <Text style={styles.infoText}>
-                💡 您的個人資料僅用於提供更好的服務體驗，我們會妥善保護您的隱私。
+                💡 您的個人資料會即時同步到伺服器，並自動備份到本地裝置。
               </Text>
             </View>
           </View>
@@ -520,7 +597,10 @@ const ProfileEditScreen = ({ navigation }) => {
               style={styles.saveButton}
             >
               {isSaving ? (
-                <ActivityIndicator color="#FFF" />
+                <>
+                  <ActivityIndicator color="#FFF" size="small" />
+                  <Text style={styles.saveButtonText}>儲存中...</Text>
+                </>
               ) : showSuccess ? (
                 <>
                   <Ionicons name="checkmark-circle" size={20} color="#FFF" />
@@ -548,6 +628,12 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    gap: 12,
+  },
+  loadingText: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginTop: 8,
   },
   
   // Header

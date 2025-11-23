@@ -34,6 +34,9 @@ const ApiService = {
   
   // 用戶服務
   getUserProfile: () => userProfile.getUserProfile(),
+  updateUserProfile: (data) => userProfile.updateUserProfile(data),
+  uploadAvatar: (imageUri) => userProfile.uploadAvatar(imageUri),
+  updateProfileWithAvatar: (profileData, avatarUri) => userProfile.updateProfileWithAvatar(profileData, avatarUri),
   
   // 練習服務
   startPractice: (practiceType) => practiceService.startPractice(practiceType),
@@ -61,8 +64,6 @@ const ApiService = {
     return apiClient.request('/practice/stats.php', {
       method: 'GET',
     });
-
-    
   },
   
   // 成就徽章服務
