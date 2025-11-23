@@ -15,13 +15,14 @@ import {
   Animated,
   KeyboardAvoidingView,
   Platform,
+  Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Slider from '@react-native-community/slider';
 import Svg, { Path } from 'react-native-svg';
 import { Home } from 'lucide-react-native';
 import MaskedView from '@react-native-masked-view/masked-view';
-import ApiService from '../../../api'; // ⭐ 新增：使用你的 practice API
+import ApiService from '../../../api'; // 使用你的 practice API
 
 // 初始表單資料（方便重設／還原）
 const INITIAL_FORM_DATA = {
@@ -42,13 +43,15 @@ const INITIAL_FORM_DATA = {
 // 進度條組件
 const ProgressBar = ({ currentStep, totalSteps, style }) => {
   const progress = (currentStep / totalSteps) * 100;
-  
+
   return (
     <View style={[styles.progressBarContainer, style]}>
       {/* Progress Track */}
       <View style={styles.progressTrack}>
         {/* Progress Fill */}
-        <View style={[styles.progressFillContainer, { width: `${progress}%` }]}>
+        <View
+          style={[styles.progressFillContainer, { width: `${progress}%` }]}
+        >
           <LinearGradient
             colors={['#166CB5', '#31C6FE']}
             start={{ x: 0, y: 0 }}
@@ -57,10 +60,12 @@ const ProgressBar = ({ currentStep, totalSteps, style }) => {
           />
         </View>
       </View>
-      
+
       {/* Step Counter */}
       <View style={styles.stepCounter}>
-        <Text style={styles.stepText}>{currentStep} / {totalSteps}</Text>
+        <Text style={styles.stepText}>
+          {currentStep} / {totalSteps}
+        </Text>
       </View>
     </View>
   );
@@ -69,16 +74,18 @@ const ProgressBar = ({ currentStep, totalSteps, style }) => {
 // 漸層文字組件
 const GradientText = ({ text, style }) => (
   <MaskedView
-    maskElement={
-      <Text style={[styles.gradientTextMask, style]}>{text}</Text>
-    }
+    maskElement={<Text style={[styles.gradientTextMask, style]}>{text}</Text>}
   >
     <LinearGradient
       colors={['#166CB5', '#31C6FE']}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 0 }}
     >
-      <Text style={[styles.gradientTextMask, style, { opacity: 0 }]}>{text}</Text>
+      <Text
+        style={[styles.gradientTextMask, style, { opacity: 0 }]}
+      >
+        {text}
+      </Text>
     </LinearGradient>
   </MaskedView>
 );
@@ -86,12 +93,12 @@ const GradientText = ({ text, style }) => (
 // 自定義箭頭圖標組件
 const ArrowIcon = ({ direction = 'right', color = '#31C6FE', size = 24 }) => {
   const rotation = direction === 'left' ? '180' : '0';
-  
+
   return (
-    <Svg 
-      width={size} 
-      height={size} 
-      viewBox="0 0 24 24" 
+    <Svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
       style={{ transform: [{ rotate: `${rotation}deg` }] }}
     >
       <Path
@@ -108,11 +115,11 @@ const ArrowIcon = ({ direction = 'right', color = '#31C6FE', size = 24 }) => {
 
 export default function GoodThingsJournalNew({ onBack, navigation, route }) {
   const [currentPage, setCurrentPage] = useState('welcome');
-  
+
   // 表單數據
   const [formData, setFormData] = useState(INITIAL_FORM_DATA);
 
-  // === ⭐ 新增：practice 狀態 ===
+  // === practice 狀態 ===
   const [practiceId, setPracticeId] = useState(null);
   const [startTime, setStartTime] = useState(null);
   const [elapsedTime, setElapsedTime] = useState(0); // 秒數累積
@@ -188,15 +195,7 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
     '覺得很放鬆,壓力都釋放了',
   ];
 
-  const emotionTags = [
-    '平靜',
-    '驕傲',
-    '被支持',
-    '開心',
-    '感謝',
-    '滿足',
-    '其他',
-  ];
+  const emotionTags = ['平靜', '驕傲', '被支持', '開心', '感謝', '滿足', '其他'];
 
   const question4Suggestions = [
     '我有主動開啟對話',
@@ -238,7 +237,7 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
     return 3;
   };
 
-  // =============== ⭐ practice 相關：初始化 / 自動累積時間 / 自動儲存 ===============
+  // =============== practice 相關：初始化 / 自動累積時間 / 自動儲存 ===============
 
   // 儲存進度到後端
   const saveProgress = async () => {
@@ -287,6 +286,7 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
       }
     } catch (e) {
       console.log('好事書寫練習初始化失敗:', e);
+      Alert.alert('提示', '初始化練習時遇到問題，稍後再試試。');
     } finally {
       // 無論成功與否，都開始計時（至少前端有時間感）
       setStartTime(Date.now());
@@ -451,7 +451,7 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
       mood: () => setCurrentPage('positiveFeeling'),
       streak: () => setCurrentPage('mood'),
     };
-    
+
     const action = backMap[currentPage];
     if (action) action();
   };
@@ -473,7 +473,7 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
   };
 
   // 切換情緒標籤
-  const toggleEmotion = (emotion) => {
+  const toggleEmotion = emotion => {
     if (emotion === '其他') {
       if (formData.emotions.includes('其他')) {
         setFormData(prev => ({
@@ -500,7 +500,7 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
   };
 
   // 選擇快速行動
-  const handleActionSelect = (action) => {
+  const handleActionSelect = action => {
     if (action === '其他') {
       setShowOtherActionInput(!showOtherActionInput);
       if (!showOtherActionInput) {
@@ -513,7 +513,7 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
   };
 
   // 切換心情標籤
-  const toggleMood = (mood) => {
+  const toggleMood = mood => {
     if (mood === '其他') {
       if (formData.moodEmotions.includes('其他')) {
         setFormData(prev => ({
@@ -540,7 +540,7 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
   };
 
   // 滑桿處理
-  const handlePositiveScoreChange = (value) => {
+  const handlePositiveScoreChange = value => {
     const snappedValue = Math.round(value);
     setFormData(prev => ({ ...prev, positiveScore: snappedValue }));
   };
@@ -550,13 +550,13 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
   // 1. 歡迎頁
   const renderWelcomePage = () => (
     <View style={styles.welcomeContainer}>
-      <ScrollView 
+      <ScrollView
         contentContainerStyle={styles.welcomeScrollContent}
         showsVerticalScrollIndicator={false}
-        bounces={true}
+        bounces
         scrollEventThrottle={16}
       >
-        <TouchableOpacity 
+        <TouchableOpacity
           onPress={handleHome}
           style={styles.welcomeHomeButton}
         >
@@ -575,24 +575,32 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
           </View>
 
           <Text style={styles.welcomeTitle}>歡迎來到好事書寫</Text>
-          <Text style={styles.welcomeSubtitle}>透過書寫,讓美好被看見、被記得</Text>
+          <Text style={styles.welcomeSubtitle}>
+            透過書寫,讓美好被看見、被記得
+          </Text>
 
           <View style={styles.welcomeInfoCards}>
             <View style={styles.infoCard}>
               <Text style={styles.infoCardEmoji}>🌟</Text>
-              <Text style={styles.infoCardText}>捕捉生活中的美好時刻</Text>
+              <Text style={styles.infoCardText}>
+                捕捉生活中的美好時刻
+              </Text>
             </View>
             <View style={styles.infoCard}>
               <Text style={styles.infoCardEmoji}>💛</Text>
-              <Text style={styles.infoCardText}>培養感恩與正向心態</Text>
+              <Text style={styles.infoCardText}>
+                培養感恩與正向心態
+              </Text>
             </View>
             <View style={styles.infoCard}>
               <Text style={styles.infoCardEmoji}>📖</Text>
-              <Text style={styles.infoCardText}>建立專屬於你的幸福日記</Text>
+              <Text style={styles.infoCardText}>
+                建立專屬於你的幸福日記
+              </Text>
             </View>
           </View>
 
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.welcomeStartButton}
             onPress={() => setCurrentPage('intro')}
           >
@@ -614,7 +622,10 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
   const renderIntroPage = () => (
     <View style={styles.pageContainer}>
       <View style={styles.headerContainer}>
-        <TouchableOpacity onPress={handleHome} style={styles.headerHomeButton}>
+        <TouchableOpacity
+          onPress={handleHome}
+          style={styles.headerHomeButton}
+        >
           <View style={styles.homeButtonCircle}>
             <Home size={20} color="#31C6FE" />
           </View>
@@ -622,15 +633,18 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
 
         <Text style={styles.headerTitle}>好事書寫</Text>
 
-        <ProgressBar currentStep={getCurrentStep()} totalSteps={totalSteps} />
+        <ProgressBar
+          currentStep={getCurrentStep()}
+          totalSteps={totalSteps}
+        />
       </View>
 
-      <ScrollView 
+      <ScrollView
         contentContainerStyle={styles.introScrollContent}
         showsVerticalScrollIndicator={false}
-        bounces={true}
+        bounces
         scrollEventThrottle={16}
-        removeClippedSubviews={true}
+        removeClippedSubviews
       >
         <View style={styles.introIconContainer}>
           <LinearGradient
@@ -650,16 +664,22 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
         </View>
 
         <View style={styles.introDescription}>
-          <Text style={styles.introDescText}>大腦天生容易記住不開心的事,</Text>
-          <Text style={styles.introDescText}>一起訓練大腦捕捉正向事務的能力,</Text>
+          <Text style={styles.introDescText}>
+            大腦天生容易記住不開心的事,
+          </Text>
+          <Text style={styles.introDescText}>
+            一起訓練大腦捕捉正向事務的能力,
+          </Text>
           <Text style={styles.introDescText}>並且讓好事再花生!</Text>
         </View>
 
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.introStartButton}
           onPress={() => setCurrentPage('question1')}
         >
-          <Text style={styles.introStartButtonText}>記錄那些小小的好事</Text>
+          <Text style={styles.introStartButtonText}>
+            記錄那些小小的好事
+          </Text>
           <View style={styles.introStartArrow}>
             <ArrowIcon direction="right" color="#31C6FE" size={20} />
           </View>
@@ -667,14 +687,14 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
       </ScrollView>
 
       <View style={styles.bottomNavigation}>
-        <TouchableOpacity 
+        <TouchableOpacity
           onPress={handleBack}
           style={styles.navButton}
         >
           <ArrowIcon direction="left" color="#31C6FE" size={24} />
         </TouchableOpacity>
 
-        <TouchableOpacity 
+        <TouchableOpacity
           onPress={() => setCurrentPage('question1')}
           style={styles.navButton}
         >
@@ -686,14 +706,17 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
 
   // 3. 問題1-1頁
   const renderQuestion1Page = () => (
-    <KeyboardAvoidingView 
+    <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={{ flex: 1 }}
     >
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <View style={styles.pageContainer}>
           <View style={styles.headerContainer}>
-            <TouchableOpacity onPress={handleHome} style={styles.headerHomeButton}>
+            <TouchableOpacity
+              onPress={handleHome}
+              style={styles.headerHomeButton}
+            >
               <View style={styles.homeButtonCircle}>
                 <Home size={20} color="#31C6FE" />
               </View>
@@ -701,7 +724,10 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
 
             <Text style={styles.headerTitle}>好事書寫</Text>
 
-            <ProgressBar currentStep={getCurrentStep()} totalSteps={totalSteps} />
+            <ProgressBar
+              currentStep={getCurrentStep()}
+              totalSteps={totalSteps}
+            />
 
             <View style={styles.questionTitleSection}>
               <Text style={styles.questionMainTitle}>
@@ -713,31 +739,37 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
             </View>
           </View>
 
-          <ScrollView 
+          <ScrollView
             ref={scrollViewRef}
             contentContainerStyle={styles.questionScrollContent}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
-            bounces={true}
+            bounces
             scrollEventThrottle={16}
-            removeClippedSubviews={true}
+            removeClippedSubviews
           >
-            <Text style={styles.questionLabel}>那是在什麼時候、什麼情境下?</Text>
+            <Text style={styles.questionLabel}>
+              那是在什麼時候、什麼情境下?
+            </Text>
             <TextInput
               style={styles.questionTextarea}
               multiline
               placeholder="例如:今天下班時看到美麗的夕陽..."
               placeholderTextColor="#B0B0B0"
               value={formData.goodThing}
-              onChangeText={(text) => setFormData(prev => ({ ...prev, goodThing: text }))}
+              onChangeText={text =>
+                setFormData(prev => ({ ...prev, goodThing: text }))
+              }
               textAlignVertical="top"
             />
 
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.suggestionTrigger}
-              onPress={() => setShowQ1Suggestions(!showQ1Suggestions)}
+              onPress={() =>
+                setShowQ1Suggestions(!showQ1Suggestions)
+              }
             >
-              <Image 
+              <Image
                 source={require('../../../assets/images/Fresh_idea.png')}
                 style={[
                   styles.suggestionIcon,
@@ -745,30 +777,43 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
                 ]}
                 resizeMode="contain"
               />
-              <Text style={[
-                styles.suggestionText,
-                !showQ1Suggestions && styles.suggestionTextInactive,
-              ]}>
+              <Text
+                style={[
+                  styles.suggestionText,
+                  !showQ1Suggestions &&
+                    styles.suggestionTextInactive,
+                ]}
+              >
                 需要靈感嗎?
               </Text>
             </TouchableOpacity>
 
             {showQ1Suggestions && (
               <View style={styles.suggestionBox}>
-                <Text style={styles.suggestionBoxTitle}>可以試試這些方向:</Text>
+                <Text style={styles.suggestionBoxTitle}>
+                  可以試試這些方向:
+                </Text>
                 {question1Suggestions.map((item, index) => (
-                  <Text key={index} style={styles.suggestionBoxItem}>• {item}</Text>
+                  <Text
+                    key={index}
+                    style={styles.suggestionBoxItem}
+                  >
+                    • {item}
+                  </Text>
                 ))}
               </View>
             )}
           </ScrollView>
 
           <View style={styles.bottomNavigation}>
-            <TouchableOpacity onPress={handleBack} style={styles.navButton}>
+            <TouchableOpacity
+              onPress={handleBack}
+              style={styles.navButton}
+            >
               <ArrowIcon direction="left" color="#31C6FE" size={24} />
             </TouchableOpacity>
 
-            <TouchableOpacity 
+            <TouchableOpacity
               onPress={() => setCurrentPage('question1b')}
               style={styles.navButton}
             >
@@ -782,14 +827,17 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
 
   // 4. 問題1-2頁
   const renderQuestion1bPage = () => (
-    <KeyboardAvoidingView 
+    <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={{ flex: 1 }}
     >
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <View style={styles.pageContainer}>
           <View style={styles.headerContainer}>
-            <TouchableOpacity onPress={handleHome} style={styles.headerHomeButton}>
+            <TouchableOpacity
+              onPress={handleHome}
+              style={styles.headerHomeButton}
+            >
               <View style={styles.homeButtonCircle}>
                 <Home size={20} color="#31C6FE" />
               </View>
@@ -797,7 +845,10 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
 
             <Text style={styles.headerTitle}>好事書寫</Text>
 
-            <ProgressBar currentStep={getCurrentStep()} totalSteps={totalSteps} />
+            <ProgressBar
+              currentStep={getCurrentStep()}
+              totalSteps={totalSteps}
+            />
 
             <View style={styles.questionTitleSection}>
               <Text style={styles.questionMainTitle}>
@@ -809,30 +860,36 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
             </View>
           </View>
 
-          <ScrollView 
+          <ScrollView
             contentContainerStyle={styles.questionScrollContent}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
-            bounces={true}
+            bounces
             scrollEventThrottle={16}
-            removeClippedSubviews={true}
+            removeClippedSubviews
           >
-            <Text style={styles.questionLabel}>當時你跟誰在一起呢?</Text>
+            <Text style={styles.questionLabel}>
+              當時你跟誰在一起呢?
+            </Text>
             <TextInput
               style={styles.questionTextarea}
               multiline
               placeholder="例如:和我的好朋友小明"
               placeholderTextColor="#B0B0B0"
               value={formData.whoWith}
-              onChangeText={(text) => setFormData(prev => ({ ...prev, whoWith: text }))}
+              onChangeText={text =>
+                setFormData(prev => ({ ...prev, whoWith: text }))
+              }
               textAlignVertical="top"
             />
 
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.suggestionTrigger}
-              onPress={() => setShowQ1bSuggestions(!showQ1bSuggestions)}
+              onPress={() =>
+                setShowQ1bSuggestions(!showQ1bSuggestions)
+              }
             >
-              <Image 
+              <Image
                 source={require('../../../assets/images/Fresh_idea.png')}
                 style={[
                   styles.suggestionIcon,
@@ -840,30 +897,43 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
                 ]}
                 resizeMode="contain"
               />
-              <Text style={[
-                styles.suggestionText,
-                !showQ1bSuggestions && styles.suggestionTextInactive,
-              ]}>
+              <Text
+                style={[
+                  styles.suggestionText,
+                  !showQ1bSuggestions &&
+                    styles.suggestionTextInactive,
+                ]}
+              >
                 需要靈感嗎?
               </Text>
             </TouchableOpacity>
 
             {showQ1bSuggestions && (
               <View style={styles.suggestionBox}>
-                <Text style={styles.suggestionBoxTitle}>可以試試這些方向:</Text>
+                <Text style={styles.suggestionBoxTitle}>
+                  可以試試這些方向:
+                </Text>
                 {question1bSuggestions.map((item, index) => (
-                  <Text key={index} style={styles.suggestionBoxItem}>• {item}</Text>
+                  <Text
+                    key={index}
+                    style={styles.suggestionBoxItem}
+                  >
+                    • {item}
+                  </Text>
                 ))}
               </View>
             )}
           </ScrollView>
 
           <View style={styles.bottomNavigation}>
-            <TouchableOpacity onPress={handleBack} style={styles.navButton}>
+            <TouchableOpacity
+              onPress={handleBack}
+              style={styles.navButton}
+            >
               <ArrowIcon direction="left" color="#31C6FE" size={24} />
             </TouchableOpacity>
 
-            <TouchableOpacity 
+            <TouchableOpacity
               onPress={() => setCurrentPage('question2')}
               style={styles.navButton}
             >
@@ -877,14 +947,17 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
 
   // 5. 問題1-3頁
   const renderQuestion2Page = () => (
-    <KeyboardAvoidingView 
+    <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={{ flex: 1 }}
     >
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <View style={styles.pageContainer}>
           <View style={styles.headerContainer}>
-            <TouchableOpacity onPress={handleHome} style={styles.headerHomeButton}>
+            <TouchableOpacity
+              onPress={handleHome}
+              style={styles.headerHomeButton}
+            >
               <View style={styles.homeButtonCircle}>
                 <Home size={20} color="#31C6FE" />
               </View>
@@ -892,7 +965,10 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
 
             <Text style={styles.headerTitle}>好事書寫</Text>
 
-            <ProgressBar currentStep={getCurrentStep()} totalSteps={totalSteps} />
+            <ProgressBar
+              currentStep={getCurrentStep()}
+              totalSteps={totalSteps}
+            />
 
             <View style={styles.questionTitleSection}>
               <Text style={styles.questionMainTitle}>
@@ -904,30 +980,36 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
             </View>
           </View>
 
-          <ScrollView 
+          <ScrollView
             contentContainerStyle={styles.questionScrollContent}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
-            bounces={true}
+            bounces
             scrollEventThrottle={16}
-            removeClippedSubviews={true}
+            removeClippedSubviews
           >
-            <Text style={styles.questionLabel}>當下你的想法是什麼呢?</Text>
+            <Text style={styles.questionLabel}>
+              當下你的想法是什麼呢?
+            </Text>
             <TextInput
               style={styles.questionTextarea}
               multiline
               placeholder="例如:這件讓我感覺很感激與溫暖,覺得很幸福很感恩"
               placeholderTextColor="#B0B0B0"
               value={formData.feelings}
-              onChangeText={(text) => setFormData(prev => ({ ...prev, feelings: text }))}
+              onChangeText={text =>
+                setFormData(prev => ({ ...prev, feelings: text }))
+              }
               textAlignVertical="top"
             />
 
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.suggestionTrigger}
-              onPress={() => setShowQ2Suggestions(!showQ2Suggestions)}
+              onPress={() =>
+                setShowQ2Suggestions(!showQ2Suggestions)
+              }
             >
-              <Image 
+              <Image
                 source={require('../../../assets/images/Fresh_idea.png')}
                 style={[
                   styles.suggestionIcon,
@@ -935,30 +1017,43 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
                 ]}
                 resizeMode="contain"
               />
-              <Text style={[
-                styles.suggestionText,
-                !showQ2Suggestions && styles.suggestionTextInactive,
-              ]}>
+              <Text
+                style={[
+                  styles.suggestionText,
+                  !showQ2Suggestions &&
+                    styles.suggestionTextInactive,
+                ]}
+              >
                 需要靈感嗎?
               </Text>
             </TouchableOpacity>
 
             {showQ2Suggestions && (
               <View style={styles.suggestionBox}>
-                <Text style={styles.suggestionBoxTitle}>可以試試這些方向:</Text>
+                <Text style={styles.suggestionBoxTitle}>
+                  可以試試這些方向:
+                </Text>
                 {question2Suggestions.map((item, index) => (
-                  <Text key={index} style={styles.suggestionBoxItem}>• {item}</Text>
+                  <Text
+                    key={index}
+                    style={styles.suggestionBoxItem}
+                  >
+                    • {item}
+                  </Text>
                 ))}
               </View>
             )}
           </ScrollView>
 
           <View style={styles.bottomNavigation}>
-            <TouchableOpacity onPress={handleBack} style={styles.navButton}>
+            <TouchableOpacity
+              onPress={handleBack}
+              style={styles.navButton}
+            >
               <ArrowIcon direction="left" color="#31C6FE" size={24} />
             </TouchableOpacity>
 
-            <TouchableOpacity 
+            <TouchableOpacity
               onPress={() => setCurrentPage('emotions')}
               style={styles.navButton}
             >
@@ -972,14 +1067,17 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
 
   // 6. 問題1-end頁(情緒標籤)
   const renderEmotionsPage = () => (
-    <KeyboardAvoidingView 
+    <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={{ flex: 1 }}
     >
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <View style={styles.pageContainer}>
           <View style={styles.headerContainer}>
-            <TouchableOpacity onPress={handleHome} style={styles.headerHomeButton}>
+            <TouchableOpacity
+              onPress={handleHome}
+              style={styles.headerHomeButton}
+            >
               <View style={styles.homeButtonCircle}>
                 <Home size={20} color="#31C6FE" />
               </View>
@@ -987,29 +1085,37 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
 
             <Text style={styles.headerTitle}>好事書寫</Text>
 
-            <ProgressBar currentStep={getCurrentStep()} totalSteps={totalSteps} />
+            <ProgressBar
+              currentStep={getCurrentStep()}
+              totalSteps={totalSteps}
+            />
 
             <View style={styles.questionTitleSection}>
-              <Text style={styles.questionMainTitle}>今天發生了什麼好事</Text>
+              <Text style={styles.questionMainTitle}>
+                今天發生了什麼好事
+              </Text>
               <Text style={styles.questionSubtitle}>
                 任何讓你感覺好奇、安心、快樂的小事
               </Text>
             </View>
           </View>
 
-          <ScrollView 
+          <ScrollView
             contentContainerStyle={styles.questionScrollContent}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
-            bounces={true}
+            bounces
             scrollEventThrottle={16}
-            removeClippedSubviews={true}
+            removeClippedSubviews
           >
-            <Text style={styles.questionLabel}>這件事讓你感覺⋯</Text>
-            
+            <Text style={styles.questionLabel}>
+              這件事讓你感覺⋯
+            </Text>
+
             <View style={styles.emotionTagsContainer}>
               {emotionTags.map((emotion, index) => {
-                const isSelected = formData.emotions.includes(emotion);
+                const isSelected =
+                  formData.emotions.includes(emotion);
                 return (
                   <TouchableOpacity
                     key={index}
@@ -1019,10 +1125,13 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
                     ]}
                     onPress={() => toggleEmotion(emotion)}
                   >
-                    <Text style={[
-                      styles.emotionTagText,
-                      isSelected && styles.emotionTagTextSelected,
-                    ]}>
+                    <Text
+                      style={[
+                        styles.emotionTagText,
+                        isSelected &&
+                          styles.emotionTagTextSelected,
+                      ]}
+                    >
                       {emotion}
                     </Text>
                   </TouchableOpacity>
@@ -1039,7 +1148,12 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
                   placeholder="寫下我的感受"
                   placeholderTextColor="#B0B0B0"
                   value={formData.otherEmotion}
-                  onChangeText={(text) => setFormData(prev => ({ ...prev, otherEmotion: text }))}
+                  onChangeText={text =>
+                    setFormData(prev => ({
+                      ...prev,
+                      otherEmotion: text,
+                    }))
+                  }
                   textAlignVertical="top"
                 />
               </>
@@ -1047,11 +1161,14 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
           </ScrollView>
 
           <View style={styles.bottomNavigation}>
-            <TouchableOpacity onPress={handleBack} style={styles.navButton}>
+            <TouchableOpacity
+              onPress={handleBack}
+              style={styles.navButton}
+            >
               <ArrowIcon direction="left" color="#31C6FE" size={24} />
             </TouchableOpacity>
 
-            <TouchableOpacity 
+            <TouchableOpacity
               onPress={() => setCurrentPage('transition')}
               style={styles.navButton}
             >
@@ -1067,7 +1184,10 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
   const renderTransitionPage = () => (
     <View style={styles.pageContainer}>
       <View style={styles.headerContainer}>
-        <TouchableOpacity onPress={handleHome} style={styles.headerHomeButton}>
+        <TouchableOpacity
+          onPress={handleHome}
+          style={styles.headerHomeButton}
+        >
           <View style={styles.homeButtonCircle}>
             <Home size={20} color="#31C6FE" />
           </View>
@@ -1075,7 +1195,10 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
 
         <Text style={styles.headerTitle}>好事書寫</Text>
 
-        <ProgressBar currentStep={getCurrentStep()} totalSteps={totalSteps} />
+        <ProgressBar
+          currentStep={getCurrentStep()}
+          totalSteps={totalSteps}
+        />
       </View>
 
       <View style={styles.transitionContent}>
@@ -1086,7 +1209,9 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
         </Text>
 
         <View style={styles.transitionTextBlock}>
-          <Text style={styles.transitionBigText}>好事可以被複製</Text>
+          <Text style={styles.transitionBigText}>
+            好事可以被複製
+          </Text>
           <Text style={styles.transitionSmallText}>
             找出讓好事發生的原因{'\n'}你會更容易抓到生活裡的亮點
           </Text>
@@ -1094,7 +1219,7 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
       </View>
 
       <View style={styles.bottomNavigationRight}>
-        <TouchableOpacity 
+        <TouchableOpacity
           onPress={() => setCurrentPage('question4')}
           style={styles.navButton}
         >
@@ -1106,14 +1231,17 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
 
   // 8. 問題2-1頁
   const renderQuestion4Page = () => (
-    <KeyboardAvoidingView 
+    <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={{ flex: 1 }}
     >
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <View style={styles.pageContainer}>
           <View style={styles.headerContainer}>
-            <TouchableOpacity onPress={handleHome} style={styles.headerHomeButton}>
+            <TouchableOpacity
+              onPress={handleHome}
+              style={styles.headerHomeButton}
+            >
               <View style={styles.homeButtonCircle}>
                 <Home size={20} color="#31C6FE" />
               </View>
@@ -1121,40 +1249,51 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
 
             <Text style={styles.headerTitle}>好事書寫</Text>
 
-            <ProgressBar currentStep={getCurrentStep()} totalSteps={totalSteps} />
+            <ProgressBar
+              currentStep={getCurrentStep()}
+              totalSteps={totalSteps}
+            />
 
             <View style={styles.questionTitleSection}>
-              <Text style={styles.questionMainTitle}>好事可以被複製</Text>
+              <Text style={styles.questionMainTitle}>
+                好事可以被複製
+              </Text>
               <Text style={styles.questionSubtitle}>
                 找出讓好事發生的原因{'\n'}你會更容易抓到生活裡的亮點
               </Text>
             </View>
           </View>
 
-          <ScrollView 
+          <ScrollView
             contentContainerStyle={styles.questionScrollContent}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
-            bounces={true}
+            bounces
             scrollEventThrottle={16}
-            removeClippedSubviews={true}
+            removeClippedSubviews
           >
-            <Text style={styles.questionLabel}>是什麼原因,讓這件好事有機會發生呢?</Text>
+            <Text style={styles.questionLabel}>
+              是什麼原因,讓這件好事有機會發生呢?
+            </Text>
             <TextInput
               style={styles.questionTextarea}
               multiline
               placeholder="例如:我當時想出門,用心觀察周遭環境"
               placeholderTextColor="#B0B0B0"
               value={formData.reason}
-              onChangeText={(text) => setFormData(prev => ({ ...prev, reason: text }))}
+              onChangeText={text =>
+                setFormData(prev => ({ ...prev, reason: text }))
+              }
               textAlignVertical="top"
             />
 
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.suggestionTrigger}
-              onPress={() => setShowQ4Suggestions(!showQ4Suggestions)}
+              onPress={() =>
+                setShowQ4Suggestions(!showQ4Suggestions)
+              }
             >
-              <Image 
+              <Image
                 source={require('../../../assets/images/Fresh_idea.png')}
                 style={[
                   styles.suggestionIcon,
@@ -1162,30 +1301,43 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
                 ]}
                 resizeMode="contain"
               />
-              <Text style={[
-                styles.suggestionText,
-                !showQ4Suggestions && styles.suggestionTextInactive,
-              ]}>
+              <Text
+                style={[
+                  styles.suggestionText,
+                  !showQ4Suggestions &&
+                    styles.suggestionTextInactive,
+                ]}
+              >
                 需要靈感嗎?
               </Text>
             </TouchableOpacity>
 
             {showQ4Suggestions && (
               <View style={styles.suggestionBox}>
-                <Text style={styles.suggestionBoxTitle}>可以試試這些方向:</Text>
+                <Text style={styles.suggestionBoxTitle}>
+                  可以試試這些方向:
+                </Text>
                 {question4Suggestions.map((item, index) => (
-                  <Text key={index} style={styles.suggestionBoxItem}>• {item}</Text>
+                  <Text
+                    key={index}
+                    style={styles.suggestionBoxItem}
+                  >
+                    • {item}
+                  </Text>
                 ))}
               </View>
             )}
           </ScrollView>
 
           <View style={styles.bottomNavigation}>
-            <TouchableOpacity onPress={handleBack} style={styles.navButton}>
+            <TouchableOpacity
+              onPress={handleBack}
+              style={styles.navButton}
+            >
               <ArrowIcon direction="left" color="#31C6FE" size={24} />
             </TouchableOpacity>
 
-            <TouchableOpacity 
+            <TouchableOpacity
               onPress={() => setCurrentPage('question4b')}
               style={styles.navButton}
             >
@@ -1199,14 +1351,17 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
 
   // 9. 問題2-2頁
   const renderQuestion4bPage = () => (
-    <KeyboardAvoidingView 
+    <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={{ flex: 1 }}
     >
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <View style={styles.pageContainer}>
           <View style={styles.headerContainer}>
-            <TouchableOpacity onPress={handleHome} style={styles.headerHomeButton}>
+            <TouchableOpacity
+              onPress={handleHome}
+              style={styles.headerHomeButton}
+            >
               <View style={styles.homeButtonCircle}>
                 <Home size={20} color="#31C6FE" />
               </View>
@@ -1214,40 +1369,54 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
 
             <Text style={styles.headerTitle}>好事書寫</Text>
 
-            <ProgressBar currentStep={getCurrentStep()} totalSteps={totalSteps} />
+            <ProgressBar
+              currentStep={getCurrentStep()}
+              totalSteps={totalSteps}
+            />
 
             <View style={styles.questionTitleSection}>
-              <Text style={styles.questionMainTitle}>好事可以被複製</Text>
+              <Text style={styles.questionMainTitle}>
+                好事可以被複製
+              </Text>
               <Text style={styles.questionSubtitle}>
                 找出讓好事發生的原因{'\n'}你會更容易抓到生活裡的亮點
               </Text>
             </View>
           </View>
 
-          <ScrollView 
+          <ScrollView
             contentContainerStyle={styles.questionScrollContent}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
-            bounces={true}
+            bounces
             scrollEventThrottle={16}
-            removeClippedSubviews={true}
+            removeClippedSubviews
           >
-            <Text style={styles.questionLabel}>可以怎麼做,讓這種好事更常出現?</Text>
+            <Text style={styles.questionLabel}>
+              可以怎麼做,讓這種好事更常出現?
+            </Text>
             <TextInput
               style={styles.questionTextarea}
               multiline
               placeholder="例如:明天也早10分鐘出門"
               placeholderTextColor="#B0B0B0"
               value={formData.howToRepeat}
-              onChangeText={(text) => setFormData(prev => ({ ...prev, howToRepeat: text }))}
+              onChangeText={text =>
+                setFormData(prev => ({
+                  ...prev,
+                  howToRepeat: text,
+                }))
+              }
               textAlignVertical="top"
             />
 
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.suggestionTrigger}
-              onPress={() => setShowQ4bSuggestions(!showQ4bSuggestions)}
+              onPress={() =>
+                setShowQ4bSuggestions(!showQ4bSuggestions)
+              }
             >
-              <Image 
+              <Image
                 source={require('../../../assets/images/Fresh_idea.png')}
                 style={[
                   styles.suggestionIcon,
@@ -1255,30 +1424,43 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
                 ]}
                 resizeMode="contain"
               />
-              <Text style={[
-                styles.suggestionText,
-                !showQ4bSuggestions && styles.suggestionTextInactive,
-              ]}>
+              <Text
+                style={[
+                  styles.suggestionText,
+                  !showQ4bSuggestions &&
+                    styles.suggestionTextInactive,
+                ]}
+              >
                 需要靈感嗎?
               </Text>
             </TouchableOpacity>
 
             {showQ4bSuggestions && (
               <View style={styles.suggestionBox}>
-                <Text style={styles.suggestionBoxTitle}>可以試試這些方向:</Text>
+                <Text style={styles.suggestionBoxTitle}>
+                  可以試試這些方向:
+                </Text>
                 {question4bSuggestions.map((item, index) => (
-                  <Text key={index} style={styles.suggestionBoxItem}>• {item}</Text>
+                  <Text
+                    key={index}
+                    style={styles.suggestionBoxItem}
+                  >
+                    • {item}
+                  </Text>
                 ))}
               </View>
             )}
           </ScrollView>
 
           <View style={styles.bottomNavigation}>
-            <TouchableOpacity onPress={handleBack} style={styles.navButton}>
+            <TouchableOpacity
+              onPress={handleBack}
+              style={styles.navButton}
+            >
               <ArrowIcon direction="left" color="#31C6FE" size={24} />
             </TouchableOpacity>
 
-            <TouchableOpacity 
+            <TouchableOpacity
               onPress={() => setCurrentPage('question5')}
               style={styles.navButton}
             >
@@ -1296,14 +1478,17 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
     const selectedAction = formData.futureAction;
 
     return (
-      <KeyboardAvoidingView 
+      <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={{ flex: 1 }}
       >
         <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
           <View style={styles.pageContainer}>
             <View style={styles.headerContainer}>
-              <TouchableOpacity onPress={handleHome} style={styles.headerHomeButton}>
+              <TouchableOpacity
+                onPress={handleHome}
+                style={styles.headerHomeButton}
+              >
                 <View style={styles.homeButtonCircle}>
                   <Home size={20} color="#31C6FE" />
                 </View>
@@ -1311,26 +1496,33 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
 
               <Text style={styles.headerTitle}>好事書寫</Text>
 
-              <ProgressBar currentStep={getCurrentStep()} totalSteps={totalSteps} />
+              <ProgressBar
+                currentStep={getCurrentStep()}
+                totalSteps={totalSteps}
+              />
 
               <View style={styles.questionTitleSection}>
-                <Text style={styles.questionMainTitle}>好事可以被複製</Text>
+                <Text style={styles.questionMainTitle}>
+                  好事可以被複製
+                </Text>
                 <Text style={styles.questionSubtitle}>
                   找出讓好事發生的原因{'\n'}讓它變成你心裡的答案
                 </Text>
               </View>
             </View>
 
-            <ScrollView 
+            <ScrollView
               contentContainerStyle={styles.questionScrollContent}
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
-              bounces={true}
+              bounces
               scrollEventThrottle={16}
-              removeClippedSubviews={true}
+              removeClippedSubviews
             >
-              <Text style={styles.questionLabel}>選一個好事複製小行動</Text>
-              
+              <Text style={styles.questionLabel}>
+                選一個好事複製小行動
+              </Text>
+
               <View style={styles.actionTagsContainer}>
                 {quickActions.map((action, index) => {
                   const isSelected = selectedAction === action;
@@ -1343,10 +1535,13 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
                       ]}
                       onPress={() => handleActionSelect(action)}
                     >
-                      <Text style={[
-                        styles.actionTagText,
-                        isSelected && styles.actionTagTextSelected,
-                      ]}>
+                      <Text
+                        style={[
+                          styles.actionTagText,
+                          isSelected &&
+                            styles.actionTagTextSelected,
+                        ]}
+                      >
                         {action}
                       </Text>
                     </TouchableOpacity>
@@ -1354,7 +1549,7 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
                 })}
               </View>
 
-              {/* 「其他」按鈕 - 縮小寬度,使用 alignSelf */}
+              {/* 「其他」按鈕 */}
               <View style={styles.otherActionButtonContainer}>
                 <TouchableOpacity
                   style={[
@@ -1364,10 +1559,13 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
                   ]}
                   onPress={() => handleActionSelect('其他')}
                 >
-                  <Text style={[
-                    styles.actionTagText,
-                    showOtherActionInput && styles.actionTagTextSelected,
-                  ]}>
+                  <Text
+                    style={[
+                      styles.actionTagText,
+                      showOtherActionInput &&
+                        styles.actionTagTextSelected,
+                    ]}
+                  >
                     其他
                   </Text>
                 </TouchableOpacity>
@@ -1381,8 +1579,15 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
                     multiline
                     placeholder="寫下你的想法..."
                     placeholderTextColor="#B0B0B0"
-                    value={isCustomAction ? formData.futureAction : ''}
-                    onChangeText={(text) => setFormData(prev => ({ ...prev, futureAction: text }))}
+                    value={
+                      isCustomAction ? formData.futureAction : ''
+                    }
+                    onChangeText={text =>
+                      setFormData(prev => ({
+                        ...prev,
+                        futureAction: text,
+                      }))
+                    }
                     textAlignVertical="top"
                   />
                 </>
@@ -1390,11 +1595,14 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
             </ScrollView>
 
             <View style={styles.bottomNavigation}>
-              <TouchableOpacity onPress={handleBack} style={styles.navButton}>
+              <TouchableOpacity
+                onPress={handleBack}
+                style={styles.navButton}
+              >
                 <ArrowIcon direction="left" color="#31C6FE" size={24} />
               </TouchableOpacity>
 
-              <TouchableOpacity 
+              <TouchableOpacity
                 onPress={() => setCurrentPage('completion')}
                 style={styles.navButton}
               >
@@ -1411,33 +1619,36 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
   const renderCompletionPage = () => (
     <View style={styles.completionContainer}>
       {/* 裝飾元素 */}
-      <Animated.Text 
+      <Animated.Text
         style={[
           styles.decorativeSparkle1,
-          { opacity: sparkle1Opacity }
+          { opacity: sparkle1Opacity },
         ]}
       >
         ✨
       </Animated.Text>
-      <Animated.Text 
+      <Animated.Text
         style={[
           styles.decorativeSparkle2,
-          { opacity: sparkle2Opacity }
+          { opacity: sparkle2Opacity },
         ]}
       >
         💫
       </Animated.Text>
-      <Animated.Text 
+      <Animated.Text
         style={[
           styles.decorativeSparkle3,
-          { opacity: sparkle3Opacity }
+          { opacity: sparkle3Opacity },
         ]}
       >
         🌟
       </Animated.Text>
 
       <View style={styles.headerContainer}>
-        <TouchableOpacity onPress={handleHome} style={styles.headerHomeButton}>
+        <TouchableOpacity
+          onPress={handleHome}
+          style={styles.headerHomeButton}
+        >
           <View style={styles.homeButtonCircle}>
             <Home size={20} color="#31C6FE" />
           </View>
@@ -1446,31 +1657,41 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
         <Text style={styles.headerTitle}>好事書寫</Text>
       </View>
 
-      <ScrollView 
+      <ScrollView
         contentContainerStyle={styles.completionScrollContent}
         showsVerticalScrollIndicator={false}
-        bounces={true}
+        bounces
         scrollEventThrottle={16}
       >
-        <Text style={styles.completionTitle}>你做得很好 🌿</Text>
-        
+        <Text style={styles.completionTitle}>
+          你做得很好 🌿
+        </Text>
+
         <View style={styles.completionDescription}>
-          <Text style={styles.completionDescText}>願意停下來看看生活裡的好</Text>
-          <Text style={styles.completionDescText}>是一件很值得被肯定的事</Text>
+          <Text style={styles.completionDescText}>
+            願意停下來看看生活裡的好
+          </Text>
+          <Text style={styles.completionDescText}>
+            是一件很值得被肯定的事
+          </Text>
         </View>
 
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.completionPrimaryButton}
           onPress={() => setCurrentPage('positiveFeeling')}
         >
-          <Text style={styles.completionPrimaryText}>記錄此刻的感受</Text>
+          <Text style={styles.completionPrimaryText}>
+            記錄此刻的感受
+          </Text>
         </TouchableOpacity>
 
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.completionSecondaryButton}
           onPress={() => setCurrentPage('streak')}
         >
-          <Text style={styles.completionSecondaryText}>靜靜結束練習</Text>
+          <Text style={styles.completionSecondaryText}>
+            靜靜結束練習
+          </Text>
         </TouchableOpacity>
 
         <Text style={styles.completionBottomMessage}>
@@ -1486,7 +1707,10 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
   const renderPositiveFeelingPage = () => (
     <View style={styles.pageContainer}>
       <View style={styles.headerContainer}>
-        <TouchableOpacity onPress={handleHome} style={styles.headerHomeButton}>
+        <TouchableOpacity
+          onPress={handleHome}
+          style={styles.headerHomeButton}
+        >
           <View style={styles.homeButtonCircle}>
             <Home size={20} color="#31C6FE" />
           </View>
@@ -1496,23 +1720,27 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
 
         <View style={styles.feelingTitleSection}>
           <Text style={styles.questionMainTitle}>感受覺察</Text>
-          <Text style={styles.questionSubtitle}>花幾秒看看現在的心情</Text>
+          <Text style={styles.questionSubtitle}>
+            花幾秒看看現在的心情
+          </Text>
         </View>
       </View>
 
-      <ScrollView 
+      <ScrollView
         contentContainerStyle={styles.questionScrollContent}
         showsVerticalScrollIndicator={false}
-        bounces={true}
+        bounces
         scrollEventThrottle={16}
       >
         <View style={styles.sliderCard}>
-          <Text style={styles.sliderCardTitle}>對自己或生活的正向感受</Text>
+          <Text style={styles.sliderCardTitle}>
+            對自己或生活的正向感受
+          </Text>
 
           {/* 分數顯示 */}
           <View style={styles.sliderScoreDisplay}>
-            <GradientText 
-              text={String(formData.positiveScore)} 
+            <GradientText
+              text={String(formData.positiveScore)}
               style={styles.sliderScoreNumber}
             />
             <Text style={styles.sliderScoreTotal}>/10</Text>
@@ -1520,18 +1748,24 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
 
           {/* 刻度在滑桿上方 */}
           <View style={styles.sliderMarkersTop}>
-            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
+            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(num => (
               <View key={num} style={styles.sliderMarkerItem}>
-                <Text style={[
-                  styles.sliderMarkerTextTop,
-                  num === formData.positiveScore && styles.sliderMarkerTextActive,
-                ]}>
+                <Text
+                  style={[
+                    styles.sliderMarkerTextTop,
+                    num === formData.positiveScore &&
+                      styles.sliderMarkerTextActive,
+                  ]}
+                >
                   {num}
                 </Text>
-                <View style={[
-                  styles.sliderMarkerLine,
-                  num <= formData.positiveScore && styles.sliderMarkerLineActive,
-                ]} />
+                <View
+                  style={[
+                    styles.sliderMarkerLine,
+                    num <= formData.positiveScore &&
+                      styles.sliderMarkerLineActive,
+                  ]}
+                />
               </View>
             ))}
           </View>
@@ -1543,7 +1777,14 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
                 colors={['#166CB5', '#31C6FE']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
-                style={[styles.sliderTrackFill, { width: `${(formData.positiveScore / 10) * 100}%` }]}
+                style={[
+                  styles.sliderTrackFill,
+                  {
+                    width: `${
+                      (formData.positiveScore / 10) * 100
+                    }%`,
+                  },
+                ]}
               />
             </View>
             <Slider
@@ -1561,18 +1802,25 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
 
           {/* 標籤 */}
           <View style={styles.sliderLabels}>
-            <Text style={styles.sliderLabelTextBlack}>0 完全沒有</Text>
-            <Text style={styles.sliderLabelTextBlack}>10 踏實愉悅</Text>
+            <Text style={styles.sliderLabelTextBlack}>
+              0 完全沒有
+            </Text>
+            <Text style={styles.sliderLabelTextBlack}>
+              10 踏實愉悅
+            </Text>
           </View>
         </View>
       </ScrollView>
 
       <View style={styles.bottomNavigation}>
-        <TouchableOpacity onPress={handleBack} style={styles.navButton}>
+        <TouchableOpacity
+          onPress={handleBack}
+          style={styles.navButton}
+        >
           <ArrowIcon direction="left" color="#31C6FE" size={24} />
         </TouchableOpacity>
 
-        <TouchableOpacity 
+        <TouchableOpacity
           onPress={() => setCurrentPage('mood')}
           style={styles.navButton}
         >
@@ -1584,14 +1832,17 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
 
   // 13. 書寫後心情頁
   const renderMoodPage = () => (
-    <KeyboardAvoidingView 
+    <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={{ flex: 1 }}
     >
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <View style={styles.pageContainer}>
           <View style={styles.headerContainer}>
-            <TouchableOpacity onPress={handleHome} style={styles.headerHomeButton}>
+            <TouchableOpacity
+              onPress={handleHome}
+              style={styles.headerHomeButton}
+            >
               <View style={styles.homeButtonCircle}>
                 <Home size={20} color="#31C6FE" />
               </View>
@@ -1599,26 +1850,36 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
 
             <Text style={styles.headerTitle}>好事書寫</Text>
 
-            <ProgressBar currentStep={getCurrentStep()} totalSteps={totalSteps} />
+            <ProgressBar
+              currentStep={getCurrentStep()}
+              totalSteps={totalSteps}
+            />
 
             <View style={styles.feelingTitleSection}>
-              <Text style={styles.questionMainTitle}>感受覺察</Text>
-              <Text style={styles.questionSubtitle}>花幾秒看看現在的心情</Text>
+              <Text style={styles.questionMainTitle}>
+                感受覺察
+              </Text>
+              <Text style={styles.questionSubtitle}>
+                花幾秒看看現在的心情
+              </Text>
             </View>
           </View>
 
-          <ScrollView 
+          <ScrollView
             contentContainerStyle={styles.questionScrollContent}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
-            bounces={true}
+            bounces
             scrollEventThrottle={16}
           >
-            <Text style={styles.questionLabel}>書寫完後,今天的心情是</Text>
-            
+            <Text style={styles.questionLabel}>
+              書寫完後,今天的心情是
+            </Text>
+
             <View style={styles.moodTagsContainer}>
               {moodOptions.map((mood, index) => {
-                const isSelected = formData.moodEmotions.includes(mood);
+                const isSelected =
+                  formData.moodEmotions.includes(mood);
                 return (
                   <TouchableOpacity
                     key={index}
@@ -1628,10 +1889,13 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
                     ]}
                     onPress={() => toggleMood(mood)}
                   >
-                    <Text style={[
-                      styles.moodTagText,
-                      isSelected && styles.moodTagTextSelected,
-                    ]}>
+                    <Text
+                      style={[
+                        styles.moodTagText,
+                        isSelected &&
+                          styles.moodTagTextSelected,
+                      ]}
+                    >
                       {mood}
                     </Text>
                   </TouchableOpacity>
@@ -1648,7 +1912,12 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
                   placeholder="寫下這裡好了..."
                   placeholderTextColor="#B0B0B0"
                   value={formData.moodNotes}
-                  onChangeText={(text) => setFormData(prev => ({ ...prev, moodNotes: text }))}
+                  onChangeText={text =>
+                    setFormData(prev => ({
+                      ...prev,
+                      moodNotes: text,
+                    }))
+                  }
                   textAlignVertical="top"
                 />
               </>
@@ -1656,11 +1925,14 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
           </ScrollView>
 
           <View style={styles.bottomNavigation}>
-            <TouchableOpacity onPress={handleBack} style={styles.navButton}>
+            <TouchableOpacity
+              onPress={handleBack}
+              style={styles.navButton}
+            >
               <ArrowIcon direction="left" color="#31C6FE" size={24} />
             </TouchableOpacity>
 
-            <TouchableOpacity 
+            <TouchableOpacity
               onPress={async () => {
                 console.log('保存好事書寫數據:', formData);
                 await saveProgress();
@@ -1687,7 +1959,10 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
     return (
       <View style={styles.streakContainer}>
         <View style={styles.headerContainer}>
-          <TouchableOpacity onPress={handleHome} style={styles.headerHomeButton}>
+          <TouchableOpacity
+            onPress={handleHome}
+            style={styles.headerHomeButton}
+          >
             <View style={styles.homeButtonCircle}>
               <Home size={20} color="#31C6FE" />
             </View>
@@ -1696,43 +1971,49 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
           <Text style={styles.headerTitle}>好事書寫</Text>
         </View>
 
-        <ScrollView 
+        <ScrollView
           contentContainerStyle={styles.streakScrollContent}
           showsVerticalScrollIndicator={false}
-          bounces={true}
+          bounces
           scrollEventThrottle={16}
         >
           <Text style={styles.streakTitle}>太棒了!</Text>
-          
+
           <View style={styles.streakDescription}>
-            <Text style={styles.streakDescText}>你完成了好事書寫練習</Text>
-            <Text style={styles.streakDescText}>今天也替生活多留下一個亮亮的小片段</Text>
+            <Text style={styles.streakDescText}>
+              你完成了好事書寫練習
+            </Text>
+            <Text style={styles.streakDescText}>
+              今天也替生活多留下一個亮亮的小片段
+            </Text>
           </View>
 
           <View style={styles.streakCard}>
-            <Animated.Text 
+            <Animated.Text
               style={[
                 styles.streakEmoji,
                 {
                   transform: [
                     { scale: celebrationScale },
-                    { rotate: rotation }
-                  ]
-                }
+                    { rotate: rotation },
+                  ],
+                },
               ]}
             >
               🎉
             </Animated.Text>
-            <Text style={styles.streakLabel}>你已經連續書寫</Text>
-            <GradientText 
-              text={`${streakDays} 天`} 
+            <Text style={styles.streakLabel}>
+              你已經連續書寫
+            </Text>
+            <GradientText
+              text={`${streakDays} 天`}
               style={styles.streakDays}
             />
           </View>
 
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.streakButton}
-            onPress={handleCompleteJournal} // ⭐ 完成練習 & 通知後端
+            onPress={handleCompleteJournal}
           >
             <Text style={styles.streakButtonText}>查看日記</Text>
           </TouchableOpacity>
@@ -1751,7 +2032,7 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
     >
       <SafeAreaView style={styles.container}>
         <StatusBar barStyle="dark-content" />
-        
+
         {currentPage === 'welcome' && renderWelcomePage()}
         {currentPage === 'intro' && renderIntroPage()}
         {currentPage === 'question1' && renderQuestion1Page()}
@@ -1763,7 +2044,8 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
         {currentPage === 'question4b' && renderQuestion4bPage()}
         {currentPage === 'question5' && renderQuestion5Page()}
         {currentPage === 'completion' && renderCompletionPage()}
-        {currentPage === 'positiveFeeling' && renderPositiveFeelingPage()}
+        {currentPage === 'positiveFeeling' &&
+          renderPositiveFeelingPage()}
         {currentPage === 'mood' && renderMoodPage()}
         {currentPage === 'streak' && renderStreakPage()}
       </SafeAreaView>
@@ -2172,12 +2454,10 @@ const styles = StyleSheet.create({
   actionTagTextSelected: {
     color: '#FFFFFF',
   },
-  // 「其他」按鈕容器 - 新增
   otherActionButtonContainer: {
     alignItems: 'flex-start',
     marginBottom: 16,
   },
-  // 「其他」按鈕 - 新增
   otherActionButton: {
     alignSelf: 'flex-start',
   },
@@ -2329,7 +2609,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 24,
   },
-  // 裝飾元素
   decorativeSparkle1: {
     position: 'absolute',
     top: 80,
@@ -2352,7 +2631,7 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
 
-  // ========== 感受覺察頁樣式(完全重新設計)==========
+  // ========== 感受覺察頁樣式 ==========
   feelingTitleSection: {
     alignItems: 'center',
     marginBottom: 32,
@@ -2390,7 +2669,6 @@ const styles = StyleSheet.create({
     color: '#9CA3AF',
     marginLeft: 4,
   },
-  // 刻度在滑桿上方
   sliderMarkersTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -2420,7 +2698,6 @@ const styles = StyleSheet.create({
     color: '#31C6FE',
     fontWeight: '600',
   },
-  // 滑桿容器 - 使用漸層和加粗
   sliderContainerNew: {
     position: 'relative',
     height: 12,
@@ -2449,7 +2726,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
-  // 標籤改為黑色
   sliderLabelTextBlack: {
     fontSize: 12,
     color: '#1F2937',

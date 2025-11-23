@@ -1,6 +1,6 @@
 // ==========================================
 // 檔案名稱: src/screens/home/HomeScreen.js
-// 首頁畫面 - 完整心情動畫效果版
+// 首頁畫面 - 串接後端統計版
 // ==========================================
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -40,6 +40,30 @@ const HomeScreen = ({ navigation }) => {
   const [todayPracticeStatus, setTodayPracticeStatus] = useState({});
   const [selectedPractice, setSelectedPractice] = useState('breathing');
   const [selectedCategory, setSelectedCategory] = useState('employee');
+
+  // 🔹 首頁統計：心情連續天數 / 總天數
+  const [moodStats, setMoodStats] = useState({
+    consecutiveDays: 0,
+    totalDays: 0,
+  });
+
+  // 🔹 首頁統計：每個練習的月累計 / 週進度
+  const [practiceStats, setPracticeStats] = useState({
+    breathing: {
+      streakDays: 0,
+      monthlyTotal: 0,
+      weeklyCheckIns: Array(7).fill(false),
+    },
+    goodthings: {
+      streakDays: 0,
+      monthlyTotal: 0,
+      weeklyCheckIns: Array(7).fill(false),
+    },
+  });
+
+  // ⚠️ 這兩個要跟你 MySQL practice_type 存的字串一致
+  const PRACTICE_TYPE_BREATHING = 'breathing';
+  const PRACTICE_TYPE_GOODTHINGS = 'goodthings';
 
   // ========== 資料定義 ==========
 
@@ -83,14 +107,54 @@ const HomeScreen = ({ navigation }) => {
     },
   ];
 
-  // 統計數據
-  const consecutiveDays = 1;
-  const totalDays = 20;
-  const monthlyTotal = 0;
+  // ========== 工具函式（用 stats.php 的資料算週進度 / 月累計） ==========
 
-  // 週累積打卡狀態
-  const weeklyCheckIns = [false, false, false, false, false, false, false];
-  const checkInCount = weeklyCheckIns.filter(Boolean).length;
+  // 把 weeklyPractices 轉成 [日, 一, 二, 三, 四, 五, 六] 的 boolean 陣列
+  const computeWeeklyCheckIns = (weeklyPractices, practiceType) => {
+    const result = Array(7).fill(false);
+
+    (weeklyPractices || []).forEach((item) => {
+      const type = item.practice_type || item.practiceType;
+      if (type !== practiceType) return;
+
+      const created =
+        item.created_at || item.createdAt || item.date || item.datetime;
+      const d = new Date(created);
+      if (isNaN(d)) return;
+
+      // JS 的 getDay(): 0=日, 1=一, ... 6=六
+      const dayIndex = d.getDay();
+      result[dayIndex] = true;
+    });
+
+    return result;
+  };
+
+  // 把 monthlyPractices 轉成「本月有完成幾天」（以天數計算，不是次數）
+  const computeMonthlyTotal = (monthlyPractices, practiceType) => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth(); // 0-11
+
+    const daysSet = new Set();
+
+    (monthlyPractices || []).forEach((item) => {
+      const type = item.practice_type || item.practiceType;
+      if (type !== practiceType) return;
+
+      const created =
+        item.created_at || item.createdAt || item.date || item.datetime;
+      const d = new Date(created);
+      if (isNaN(d)) return;
+
+      if (d.getFullYear() === year && d.getMonth() === month) {
+        const key = d.toISOString().slice(0, 10); // YYYY-MM-DD
+        daysSet.add(key);
+      }
+    });
+
+    return daysSet.size;
+  };
 
   // ========== 生命週期 ==========
 
@@ -103,6 +167,7 @@ const HomeScreen = ({ navigation }) => {
       checkLoginStatus();
       if (isLoggedIn) {
         loadTodayData();
+        loadHomeStats();
       }
     });
     return unsubscribe;
@@ -111,6 +176,7 @@ const HomeScreen = ({ navigation }) => {
   useEffect(() => {
     if (isLoggedIn && user && !user.isGuest) {
       loadTodayData();
+      loadHomeStats();
     }
   }, [isLoggedIn, user]);
 
@@ -140,6 +206,7 @@ const HomeScreen = ({ navigation }) => {
 
   const loadTodayData = async () => {
     try {
+      // 今日心情
       const moodResponse = await ApiService.getTodayMood();
       if (moodResponse.success && moodResponse.mood) {
         setTodayMoodRecord(moodResponse.mood);
@@ -147,19 +214,78 @@ const HomeScreen = ({ navigation }) => {
           (m) => m.level === moodResponse.mood.mood_level
         );
         if (moodIndex !== -1) {
-          // 只在沒有選中狀態時才設定
-          setSelectedMood((current) => current === null ? moodIndex : current);
+          setSelectedMood((current) => (current === null ? moodIndex : current));
         }
       } else {
         setTodayMoodRecord(null);
       }
 
+      // 今日練習狀態（你原本的 today-status.php）
       const practiceResponse = await ApiService.getTodayPracticeStatus();
       if (practiceResponse.success) {
         setTodayPracticeStatus(practiceResponse.practices || {});
       }
     } catch (error) {
       console.error('載入今日數據失敗:', error);
+    }
+  };
+
+  // 🔹 新增：從 /practice/stats.php 把「連續天數 / 週進度 / 月累計」抓進來
+  const loadHomeStats = async () => {
+    try {
+      const res = await ApiService.getPracticeStats();
+      // 容錯：可能是 {success, stats}，也可能是直接 stats
+      const success = res?.success !== undefined ? res.success : true;
+
+      const stats =
+        res?.stats ||
+        res?.data?.stats ||
+        res?.data ||
+        (success ? res : null);
+
+      if (!success || !stats) {
+        console.log('練習統計 API 返回格式不符或失敗:', res);
+        return;
+      }
+
+      const weeklyPractices =
+        stats.weeklyPractices || stats.weekly_practices || [];
+      const monthlyPractices =
+        stats.monthlyPractices || stats.monthly_practices || [];
+
+      // 1) 上方卡片：已連續簽到 / 第幾天（先用「有完成任何練習就算簽到」）
+      setMoodStats({
+        consecutiveDays: stats.currentStreak || stats.current_streak || 0,
+        totalDays: stats.totalDays || stats.total_days || 0,
+      });
+
+      // 2) 下方練習卡：呼吸 / 好事書寫的週進度 & 月累計
+      setPracticeStats({
+        breathing: {
+          streakDays: stats.currentStreak || stats.current_streak || 0,
+          monthlyTotal: computeMonthlyTotal(
+            monthlyPractices,
+            PRACTICE_TYPE_BREATHING
+          ),
+          weeklyCheckIns: computeWeeklyCheckIns(
+            weeklyPractices,
+            PRACTICE_TYPE_BREATHING
+          ),
+        },
+        goodthings: {
+          streakDays: stats.currentStreak || stats.current_streak || 0,
+          monthlyTotal: computeMonthlyTotal(
+            monthlyPractices,
+            PRACTICE_TYPE_GOODTHINGS
+          ),
+          weeklyCheckIns: computeWeeklyCheckIns(
+            weeklyPractices,
+            PRACTICE_TYPE_GOODTHINGS
+          ),
+        },
+      });
+    } catch (error) {
+      console.error('載入首頁統計資料失敗:', error);
     }
   };
 
@@ -245,6 +371,7 @@ const HomeScreen = ({ navigation }) => {
       practiceType: '呼吸穩定力練習',
       onPracticeComplete: async () => {
         await loadTodayData();
+        await loadHomeStats(); // 練習完成後更新首頁統計
       },
     });
   };
@@ -255,6 +382,7 @@ const HomeScreen = ({ navigation }) => {
       practiceType: '好事書寫',
       onPracticeComplete: async () => {
         await loadTodayData();
+        await loadHomeStats();
       },
     });
   };
@@ -262,6 +390,20 @@ const HomeScreen = ({ navigation }) => {
   const navigateToResiliencePlan = () => {
     navigation.navigate('EmotionalResiliencePlan');
   };
+
+  // ========= 從 state 推導出首頁要顯示的統計 =========
+
+  const consecutiveDays = moodStats.consecutiveDays || 0;
+  const totalDays = moodStats.totalDays || 0;
+
+  const currentPracticeStats =
+    selectedPractice === 'breathing'
+      ? practiceStats.breathing
+      : practiceStats.goodthings;
+
+  const weeklyCheckIns = currentPracticeStats.weeklyCheckIns || [];
+  const checkInCount = weeklyCheckIns.filter(Boolean).length;
+  const monthlyTotal = currentPracticeStats.monthlyTotal || 0;
 
   // ========== 子組件 ==========
 
@@ -335,16 +477,14 @@ const HomeScreen = ({ navigation }) => {
           )}
 
           {/* 4. 最上層：Emoji 圖標 */}
-          <Text style={styles.moodIcon}>
-            {emotion.icon}
-          </Text>
+          <Text style={styles.moodIcon}>{emotion.icon}</Text>
         </View>
 
         {/* 標籤文字 */}
         <Text
           style={[
             styles.moodText,
-            { 
+            {
               color: isSelected ? emotion.color : '#718096',
               fontWeight: isSelected ? '800' : '600',
             },
@@ -357,16 +497,14 @@ const HomeScreen = ({ navigation }) => {
   });
 
   // ========== 主渲染 ==========
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#166CB5" />
 
       <AppHeader navigation={navigation} />
 
-      <ScrollView
-        style={styles.scrollView}
-        showsVerticalScrollIndicator={false}
-      >
+      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {/* Greeting Section */}
         <View style={styles.greetingSection}>
           <Text style={styles.greetingText}>早安啊！</Text>
@@ -443,7 +581,12 @@ const HomeScreen = ({ navigation }) => {
                 <View
                   style={[
                     styles.progressBarFill,
-                    { width: `${(totalDays / 30) * 100}%` },
+                    {
+                      width: `${Math.min(
+                        100,
+                        (totalDays / 30) * 100 || 0
+                      )}%`,
+                    },
                   ]}
                 />
               </View>
@@ -654,7 +797,11 @@ const HomeScreen = ({ navigation }) => {
                         ]}
                       >
                         {weeklyCheckIns[index] ? (
-                          <Check color="#FFFFFF" size={18} strokeWidth={3} />
+                          <Check
+                            color="#FFFFFF"
+                            size={18}
+                            strokeWidth={3}
+                          />
                         ) : (
                           <View style={styles.dayCircleDot} />
                         )}
@@ -662,7 +809,8 @@ const HomeScreen = ({ navigation }) => {
                       <Text
                         style={[
                           styles.dayText,
-                          weeklyCheckIns[index] && styles.dayTextCompleted,
+                          weeklyCheckIns[index] &&
+                            styles.dayTextCompleted,
                         ]}
                       >
                         {day}
@@ -746,7 +894,11 @@ const HomeScreen = ({ navigation }) => {
                         style={styles.dayCircle}
                       >
                         {weeklyCheckIns[index] ? (
-                          <Check color="#FFFFFF" size={18} strokeWidth={3} />
+                          <Check
+                            color="#FFFFFF"
+                            size={18}
+                            strokeWidth={3}
+                          />
                         ) : (
                           <View style={styles.dayCircleDot} />
                         )}
