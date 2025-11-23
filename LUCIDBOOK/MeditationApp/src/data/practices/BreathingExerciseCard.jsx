@@ -1,4 +1,4 @@
-// BreathingExerciseCard.jsx - 完全修正版
+// BreathingExerciseCard.jsx - 完整版（包含 API 串接）
 import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
@@ -14,6 +14,7 @@ import {
   TouchableWithoutFeedback,
   KeyboardAvoidingView,
   Platform,
+  Alert,
 } from 'react-native';
 import Slider from '@react-native-community/slider';
 import { Audio } from 'expo-av';
@@ -21,6 +22,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import MaskedView from '@react-native-masked-view/masked-view';
 import { Home, ChevronLeft, ChevronRight, Clock, Sparkles, Volume2, VolumeX, Play, Pause } from 'lucide-react-native';
 import ProgressBar from './components/ProgressBar';
+import ApiService from '../../../api'; // ⭐ API import
 
 // 導入自定義圖標
 import AnxietyIcon from './components/AnxietyIcon';
@@ -30,6 +32,9 @@ import AngryIcon from './components/AngryIcon';
 import DepressedIcon from './components/DepressedIcon';
 import SatisfiedIcon from './components/SatisfiedIcon';
 
+// ⭐ 統一練習類型名稱
+const PRACTICE_TYPE = '呼吸穩定力練習';
+
 export default function BreathingExerciseCard({ onBack, navigation, route }) {
   // 頁面狀態
   const [currentPage, setCurrentPage] = useState('welcome');
@@ -37,6 +42,11 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
   // 練習相關狀態
   const [selectedExercise, setSelectedExercise] = useState(null);
   const [selectedState, setSelectedState] = useState(null);
+  
+  // ⭐ API 串接狀態
+  const [practiceId, setPracticeId] = useState(null);
+  const [startTime, setStartTime] = useState(null);
+  const [elapsedTime, setElapsedTime] = useState(0); // 累積秒數
   
   // 第五頁狀態
   const [isPlaying, setIsPlaying] = useState(false);
@@ -119,10 +129,195 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
     { id: 6, label: '其他', isOther: true },
   ];
 
+  // ============================================
+  // ⭐ API 串接函數
+  // ============================================
+
+  // 初始化練習
+  const initializePractice = async (exerciseType) => {
+    console.log('🚀 [呼吸練習卡片] 開始初始化...');
+    try {
+      const response = await ApiService.startPractice(PRACTICE_TYPE);
+      console.log('📥 [呼吸練習卡片] 後端回應:', JSON.stringify(response, null, 2));
+
+      if (response && response.practiceId) {
+        console.log('🔑 [呼吸練習卡片] 成功拿到 practiceId:', response.practiceId);
+        setPracticeId(response.practiceId);
+
+        const restoredSeconds = response.accumulatedSeconds ? Number(response.accumulatedSeconds) : 0;
+        setElapsedTime(restoredSeconds);
+        console.log(`⏱️ [呼吸練習卡片] 恢復累積時間: ${restoredSeconds} 秒`);
+
+        if (response.formData) {
+          try {
+            const parsed = typeof response.formData === 'string' ? JSON.parse(response.formData) : response.formData;
+            console.log('📝 [呼吸練習卡片] 恢復表單數據:', parsed);
+            // 可選：恢復之前的選擇
+            if (parsed.relaxLevel) setRelaxLevel(parsed.relaxLevel);
+            if (parsed.feelingNote) setFeelingNote(parsed.feelingNote);
+          } catch (e) {
+            console.log('⚠️ [呼吸練習卡片] 解析表單數據失敗:', e);
+          }
+        }
+      } else {
+        console.error('❌ [呼吸練習卡片] 未收到 practiceId，後端回應:', response);
+      }
+    } catch (error) {
+      console.error('❌ [呼吸練習卡片] 初始化失敗:', error);
+    } finally {
+      setStartTime(Date.now());
+      console.log('✅ [呼吸練習卡片] 開始前端計時');
+    }
+  };
+
+  // 儲存進度
+  const saveProgress = async () => {
+    if (!practiceId) {
+      console.log('⚠️ [呼吸練習卡片] practiceId 是空的，無法保存進度');
+      return;
+    }
+
+    console.log('💾 [呼吸練習卡片] 準備保存進度...', {
+      practiceId,
+      currentPage,
+      elapsedTime,
+    });
+
+    try {
+      const formData = {
+        exerciseType: selectedExercise?.type || '',
+        exerciseTitle: selectedExercise?.title || '',
+        preMood: emotionalStates.find(st => st.id === selectedState)?.name || '',
+        relaxLevel,
+        selectedMoods: selectedMoods.map(id => moodOptions.find(m => m.id === id)?.label).filter(Boolean),
+        feelingNote,
+        currentPage,
+      };
+
+      const result = await ApiService.updatePracticeProgress(
+        practiceId,
+        0, // currentStep
+        6, // totalSteps
+        formData,
+        elapsedTime
+      );
+      console.log('✅ [呼吸練習卡片] 進度保存成功！回應:', result);
+    } catch (error) {
+      console.error('❌ [呼吸練習卡片] 儲存進度失敗:', error);
+    }
+  };
+
+  // 完成練習
+  const completePractice = async () => {
+    console.log('🎯 [呼吸練習卡片] 準備完成練習...');
+    
+    if (!practiceId) {
+      console.error('❌ [呼吸練習卡片] practiceId 不存在！');
+      return;
+    }
+
+    try {
+      let totalSeconds = elapsedTime || 0;
+      if (!totalSeconds && startTime) {
+        totalSeconds = Math.floor((Date.now() - startTime) / 1000);
+      }
+      if (!totalSeconds) totalSeconds = 60;
+
+      const totalMinutes = Math.max(1, Math.ceil(totalSeconds / 60));
+
+      console.log('📊 [呼吸練習卡片] 練習統計:', {
+        totalSeconds,
+        totalMinutes,
+        elapsedTime,
+      });
+
+      // 先存最後進度
+      await saveProgress();
+
+      const completePayload = {
+        practice_type: PRACTICE_TYPE,
+        duration: totalMinutes,
+        duration_seconds: totalSeconds,
+        
+        // 對應後端的欄位
+        feeling: `練習前：${emotionalStates.find(st => st.id === selectedState)?.name || '未記錄'}，放鬆程度：${relaxLevel}/10`,
+        noticed: selectedMoods.map(id => moodOptions.find(m => m.id === id)?.label).filter(Boolean).join('、') || '未記錄',
+        reflection: feelingNote || '',
+        
+        // 額外結構化資料
+        emotion_data: {
+          exerciseType: selectedExercise?.type,
+          exerciseTitle: selectedExercise?.title,
+          preMood: emotionalStates.find(st => st.id === selectedState)?.name,
+          relaxLevel,
+          postMoods: selectedMoods.map(id => moodOptions.find(m => m.id === id)?.label).filter(Boolean),
+        },
+        
+        formData: {
+          exerciseType: selectedExercise?.type,
+          exerciseTitle: selectedExercise?.title,
+          preMood: emotionalStates.find(st => st.id === selectedState)?.name,
+          relaxLevel,
+          selectedMoods: selectedMoods.map(id => moodOptions.find(m => m.id === id)?.label).filter(Boolean),
+          feelingNote,
+        },
+      };
+
+      console.log('📤 [呼吸練習卡片] 準備送出 completePractice，payload:', JSON.stringify(completePayload, null, 2));
+
+      const result = await ApiService.completePractice(practiceId, completePayload);
+      
+      console.log('✅ [呼吸練習卡片] completePractice 成功！回應:', result);
+
+    } catch (error) {
+      console.error('❌ [呼吸練習卡片] 完成練習失敗:', error);
+    }
+  };
+
+  // ============================================
+  // ⭐ useEffect - API 相關
+  // ============================================
+
+  // 每秒累加 elapsedTime
+  useEffect(() => {
+    let timer;
+    if (startTime) {
+      timer = setInterval(() => {
+        setElapsedTime((prev) => prev + 1);
+      }, 1000);
+    }
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+  }, [startTime]);
+
+  // 自動保存（10 秒一次）
+  useEffect(() => {
+    if (!practiceId) {
+      console.log('⏸️ [呼吸練習卡片] 等待 practiceId，暫不啟動自動保存');
+      return;
+    }
+
+    console.log('▶️ [呼吸練習卡片] 啟動 10 秒自動保存，practiceId:', practiceId);
+
+    const autoSaveInterval = setInterval(() => {
+      console.log('🔄 [呼吸練習卡片] 觸發自動保存...');
+      saveProgress();
+    }, 10000);
+
+    return () => {
+      console.log('⏹️ [呼吸練習卡片] 停止自動保存');
+      clearInterval(autoSaveInterval);
+    };
+  }, [practiceId, selectedExercise, selectedState, relaxLevel, selectedMoods, feelingNote, elapsedTime]);
+
+  // ============================================
+  // 動畫相關 useEffect
+  // ============================================
+
   // 啟動歡迎頁面呼吸動畫
   useEffect(() => {
     if (currentPage === 'welcome') {
-      // 外圈動畫
       Animated.loop(
         Animated.sequence([
           Animated.timing(breathOpacity1, {
@@ -138,7 +333,6 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
         ])
       ).start();
 
-      // 中圈動畫
       Animated.loop(
         Animated.sequence([
           Animated.delay(500),
@@ -155,7 +349,6 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
         ])
       ).start();
 
-      // 核心動畫
       Animated.loop(
         Animated.sequence([
           Animated.delay(1000),
@@ -235,7 +428,6 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
   // 第九頁慶祝動畫
   useEffect(() => {
     if (currentPage === 'streak') {
-      // 初始彈出動畫
       Animated.parallel([
         Animated.spring(celebrationScale, {
           toValue: 1,
@@ -249,7 +441,6 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
           useNativeDriver: true,
         }),
       ]).start(() => {
-        // 然後開始循環擺動
         Animated.loop(
           Animated.sequence([
             Animated.timing(celebrationRotate, {
@@ -277,10 +468,18 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
     }
   }, [currentPage]);
 
-  // 處理練習選擇
-  const handleSelectPractice = (practiceType) => {
+  // ============================================
+  // 事件處理函數
+  // ============================================
+
+  // ⭐ 處理練習選擇 - 初始化 API
+  const handleSelectPractice = async (practiceType) => {
     const exercise = exercises.find(ex => ex.type === practiceType);
     setSelectedExercise(exercise);
+    
+    // ⭐ 初始化練習（調用後端 API）
+    await initializePractice(practiceType);
+    
     setCurrentPage('preState');
   };
 
@@ -294,8 +493,8 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
   const handlePrepareContinue = async () => {
     try {
       const audioFile = selectedExercise.type === '4-6-breathing'
-        ? require('../../../assets/audio/4-6呼吸音檔.mp3')
-        : require('../../../assets/audio/屏息呼吸音檔.mp3');
+        ? { uri: 'https://curiouscreate.com/api/asserts/4-6.mp3' }
+        : { uri: 'https://curiouscreate.com/api/asserts/breath-holding.mp3' };
       
       const { sound: audioSound } = await Audio.Sound.createAsync(audioFile);
       sound.current = audioSound;
@@ -411,8 +610,9 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
     setCurrentPage('relaxation');
   };
 
-  // 處理靜靜結束
-  const handleFinishQuietly = () => {
+  // ⭐ 處理靜靜結束 - 調用 completePractice API
+  const handleFinishQuietly = async () => {
+    await completePractice();
     setCurrentPage('streak');
   };
 
@@ -422,8 +622,8 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
     setCurrentPage('feelings');
   };
 
-  // 處理感受記錄完成
-  const handleFeelingsComplete = (data) => {
+  // ⭐ 處理感受記錄完成 - 調用 completePractice API
+  const handleFeelingsComplete = async (data) => {
     const practiceData = {
       exerciseType: selectedExercise?.title || '呼吸練習',
       duration: totalDuration,
@@ -438,6 +638,9 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
       consecutiveDays: 1,
       ...practiceData,
     });
+    
+    // ⭐ 完成練習並寫入資料庫
+    await completePractice();
     
     setCurrentPage('streak');
   };
@@ -551,6 +754,10 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
     };
   }, []);
 
+  // ============================================
+  // 工具函數
+  // ============================================
+
   // 漸層文字組件
   const GradientText = ({ text, style }) => (
     <MaskedView
@@ -575,12 +782,15 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  // ============================================
+  // 渲染函數
+  // ============================================
+
   // 渲染歡迎頁面 (第1頁)
   const renderWelcomePage = () => (
     <View style={styles.pageContainer}>
       {/* 呼吸動畫 */}
       <View style={styles.welcomeAnimationContainer}>
-        {/* 外圈 */}
         <Animated.View
           style={[
             styles.breathingOuterRing,
@@ -598,7 +808,6 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
           ]}
         />
         
-        {/* 中圈 */}
         <Animated.View
           style={[
             styles.breathingMiddleRing,
@@ -616,7 +825,6 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
           ]}
         />
         
-        {/* 核心圓圈 */}
         <Animated.View 
           style={[
             styles.breathingBubble,
@@ -627,11 +835,9 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
         </Animated.View>
       </View>
 
-      {/* 標題 */}
       <Text style={styles.welcomeTitle}>歡迎來到呼吸練習</Text>
       <Text style={styles.welcomeSubtitle}>透過呼吸，找回內在的平靜與力量</Text>
 
-      {/* 資訊卡片 */}
       <View style={styles.infoCards}>
         {[
           { icon: '💭', text: '覺察當下的身心狀態' },
@@ -645,7 +851,6 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
         ))}
       </View>
 
-      {/* 開始按鈕 */}
       <TouchableOpacity 
         style={styles.welcomeStartButton}
         onPress={() => setCurrentPage('selection')}
@@ -665,16 +870,13 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
   // 渲染練習選擇頁面 (第2頁)
   const renderSelectionPage = () => (
     <View style={styles.pageContainer}>
-      {/* 標題 */}
       <View style={styles.headerSection}>
         <Text style={styles.pageTitle}>呼吸練習</Text>
         <Text style={styles.pageSubtitle}>你想讓自己更放鬆一點還是更穩定呢？選一種呼吸練習吧！</Text>
         
-        {/* 進度條 */}
         <ProgressBar currentStep={1} totalSteps={6} style={{ marginTop: 24 }} />
       </View>
 
-      {/* 練習卡片 */}
       <ScrollView 
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}
@@ -711,7 +913,6 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
         ))}
       </ScrollView>
 
-      {/* 底部導航 */}
       <View style={styles.bottomNavContainer}>
         <TouchableOpacity onPress={handleBack} style={styles.navButton}>
           <ChevronLeft size={24} color="#31C6FE" />
@@ -723,17 +924,14 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
   // 渲染情緒選擇頁面 (第3頁)
   const renderPreStatePage = () => (
     <View style={styles.pageContainer}>
-      {/* 標題 */}
       <View style={styles.headerSection}>
         <Text style={styles.pageTitle}>呼吸練習</Text>
         <Text style={styles.pageMainTitle}>此刻的你，感覺如何呢？</Text>
         <Text style={styles.pageSubtitle}>選擇最貼近你現在狀態的感受</Text>
         
-        {/* 進度條 */}
         <ProgressBar currentStep={2} totalSteps={6} style={{ marginTop: 24 }} />
       </View>
 
-      {/* 情緒網格 */}
       <ScrollView 
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}
@@ -768,7 +966,6 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
           })}
         </View>
 
-        {/* 準備好了按鈕 - 始終顯示 */}
         <TouchableOpacity 
           style={[
             styles.readyButton,
@@ -785,7 +982,6 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
         </TouchableOpacity>
       </ScrollView>
 
-      {/* 底部導航 */}
       <View style={styles.bottomNavContainer}>
         <TouchableOpacity onPress={handleBack} style={styles.navButton}>
           <ChevronLeft size={24} color="#31C6FE" />
@@ -808,15 +1004,12 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
   // 渲染準備頁面 (第4頁)
   const renderPreparePage = () => (
     <View style={styles.pageContainer}>
-      {/* 標題 */}
       <View style={styles.headerSection}>
         <Text style={styles.pageTitle}>{selectedExercise?.title}</Text>
         
-        {/* 進度條 */}
         <ProgressBar currentStep={3} totalSteps={6} style={{ marginTop: 24 }} />
       </View>
 
-      {/* 右上結束按鈕 - 與 Home 按鈕同高度 */}
       <TouchableOpacity 
         style={styles.endButtonTopRight}
         onPress={handleFinishQuietly}
@@ -824,14 +1017,12 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
         <Text style={styles.endButtonText}>結束練習</Text>
       </TouchableOpacity>
 
-      {/* 主要內容 */}
       <View style={styles.prepareContent}>
         <Text style={styles.prepareTitle}>
           找個舒服的姿勢吧，{'\n'}坐著、躺著都可以，輕鬆就好
         </Text>
       </View>
 
-      {/* 底部導航 */}
       <View style={styles.bottomNavContainer}>
         <TouchableOpacity onPress={handleBack} style={styles.navButton}>
           <ChevronLeft size={24} color="#31C6FE" />
@@ -850,18 +1041,15 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
     
     return (
       <View style={styles.pageContainer}>
-        {/* 標題 */}
         <View style={styles.headerSection}>
           <Text style={styles.pageTitle}>{selectedExercise?.title}</Text>
           <Text style={styles.pageSubtitle}>
             {selectedExercise?.type === '4-6-breathing' ? '放鬆減壓' : '提升專注與穩定'}
           </Text>
           
-          {/* 進度條 */}
           <ProgressBar currentStep={4} totalSteps={6} style={{ marginTop: 24 }} />
         </View>
 
-        {/* 右上結束按鈕 - 與 Home 按鈕同高度 */}
         <TouchableOpacity 
           style={styles.endButtonTopRight}
           onPress={handleEndPractice}
@@ -869,9 +1057,7 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
           <Text style={styles.endButtonText}>結束練習</Text>
         </TouchableOpacity>
 
-        {/* 主要內容 */}
         <View style={styles.practiceMainContent}>
-          {/* 時間顯示 - 下移 25px */}
           <View style={styles.practiceTimeContainer}>
             <GradientText 
               text={formatTime(totalDuration - currentTime)} 
@@ -879,9 +1065,7 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
             />
           </View>
 
-          {/* 音頻播放器卡片 */}
           <View style={styles.audioPlayerCard}>
-            {/* 進度條 */}
             <View style={styles.audioProgressRow}>
               <Text style={styles.audioProgressTime}>{formatTime(currentTime)}</Text>
               <View style={styles.audioProgressBarContainer}>
@@ -897,7 +1081,6 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
               <Text style={styles.audioProgressTime}>{formatTime(totalDuration)}</Text>
             </View>
 
-            {/* 控制按鈕 */}
             <View style={styles.audioControls}>
               <TouchableOpacity onPress={toggleMute} style={styles.audioControlButton}>
                 {isMuted ? (
@@ -923,7 +1106,6 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
               </TouchableOpacity>
             </View>
 
-            {/* 音頻波形 - 動態響應 */}
             <View style={styles.audioWave}>
               {waveAnimations.map((anim, i) => (
                 <Animated.View
@@ -942,19 +1124,16 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
               ))}
             </View>
 
-            {/* 狀態提示 */}
             <Text style={styles.audioStatus}>
               {isPlaying ? '播放中...' : '已暫停'}
             </Text>
           </View>
 
-          {/* 提示文字 */}
           <Text style={styles.practiceHint}>
             {isMuted ? '已靜音，請專注於自己的呼吸節奏' : '跟隨音軌引導進行呼吸練習'}
           </Text>
         </View>
 
-        {/* 底部導航 */}
         <View style={styles.bottomNavContainer}>
           <TouchableOpacity onPress={handleBack} style={styles.navButton}>
             <ChevronLeft size={24} color="#31C6FE" />
@@ -968,10 +1147,9 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
     );
   };
 
-  // 渲染完成頁面 (第6頁) - 加入裝飾元素
+  // 渲染完成頁面 (第6頁)
   const renderCompletionPage = () => (
     <View style={styles.pageContainer}>
-      {/* 裝飾元素 */}
       <Animated.Text 
         style={[
           styles.decorativeSparkle1,
@@ -997,13 +1175,11 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
         🌟
       </Animated.Text>
 
-      {/* 主要內容 */}
       <View style={styles.completionContent}>
         <Text style={styles.completionEmoji}>🌿</Text>
         <Text style={styles.completionTitle}>你做得很好</Text>
         <Text style={styles.completionSubtitle}>專注力、穩定力level up</Text>
 
-        {/* 記錄按鈕 */}
         <TouchableOpacity 
           style={styles.completionButton}
           onPress={handleRecordFeelings}
@@ -1018,18 +1194,15 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
           </LinearGradient>
         </TouchableOpacity>
 
-        {/* 跳過按鈕 */}
         <TouchableOpacity onPress={handleFinishQuietly}>
           <Text style={styles.skipText}>靜靜結束練習</Text>
         </TouchableOpacity>
 
-        {/* 底部提示 */}
         <Text style={styles.completionFooter}>
           謝謝你願意花時間陪自己，你的心又比剛剛更穩了一點
         </Text>
       </View>
 
-      {/* 底部導航 */}
       <View style={styles.bottomNavContainerSingle}>
         <TouchableOpacity onPress={handleRecordFeelings} style={styles.navButton}>
           <ChevronRight size={24} color="#31C6FE" />
@@ -1049,28 +1222,23 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
 
     return (
       <View style={styles.pageContainer}>
-        {/* 標題 */}
         <View style={styles.headerSectionRelaxation}>
           <Text style={styles.pageTitleRelaxation}>呼吸練習</Text>
           <Text style={styles.pageMainTitleRelaxation}>感受覺察</Text>
           <Text style={styles.pageSubtitle}>花幾秒看看現在的心情</Text>
           
-          {/* 進度條 */}
           <ProgressBar currentStep={5} totalSteps={6} style={{ marginTop: 24 }} />
         </View>
 
-        {/* 內容 */}
         <View style={styles.relaxationContentContainer}>
           <View style={styles.relaxationCard}>
             <Text style={styles.relaxationTitle}>{title}</Text>
             
-            {/* 分數顯示 */}
             <View style={styles.scoreDisplay}>
               <GradientText text={String(relaxLevel)} style={styles.scoreNumber} />
               <Text style={styles.scoreMax}>/10</Text>
             </View>
 
-            {/* 刻度在滑桿上方 */}
             <View style={styles.scaleContainer}>
               {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
                 <View key={num} style={styles.scaleItem}>
@@ -1092,11 +1260,8 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
               ))}
             </View>
 
-            {/* 滑桿容器 */}
             <View style={styles.sliderContainer}>
-              {/* 背景軌道 */}
               <View style={styles.sliderTrack}>
-                {/* 漸層填充 */}
                 <LinearGradient
                   colors={['#166CB5', '#31C6FE']}
                   start={{ x: 0, y: 0 }}
@@ -1104,7 +1269,6 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
                   style={[styles.sliderFill, { width: `${(relaxLevel / 10) * 100}%` }]}
                 />
               </View>
-              {/* 原生滑桿（透明軌道） */}
               <Slider
                 style={styles.slider}
                 minimumValue={0}
@@ -1118,7 +1282,6 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
               />
             </View>
 
-            {/* 標籤 */}
             <View style={styles.scaleLabels}>
               <Text style={styles.scaleLabelText}>{leftLabel}</Text>
               <Text style={styles.scaleLabelText}>{rightLabel}</Text>
@@ -1126,7 +1289,6 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
           </View>
         </View>
 
-        {/* 底部導航 */}
         <View style={styles.bottomNavContainer}>
           <TouchableOpacity onPress={handleBack} style={styles.navButton}>
             <ChevronLeft size={24} color="#31C6FE" />
@@ -1151,26 +1313,21 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
     >
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <View style={styles.pageContainer}>
-          {/* 標題 */}
           <View style={styles.headerSection}>
             <Text style={styles.pageTitle}>呼吸練習</Text>
             <Text style={styles.pageMainTitle}>感受覺察</Text>
             <Text style={styles.pageSubtitle}>花幾秒看看現在的心情</Text>
             
-            {/* 進度條 */}
             <ProgressBar currentStep={6} totalSteps={6} style={{ marginTop: 24 }} />
           </View>
 
-          {/* 內容 */}
           <ScrollView 
             style={styles.scrollView}
             contentContainerStyle={styles.scrollContent}
             keyboardShouldPersistTaps="handled"
           >
-            {/* 心情提示 */}
             <Text style={styles.feelingsPrompt}>練習完後你感覺...</Text>
 
-            {/* 心情標籤 */}
             <View style={styles.moodTags}>
               {moodOptions.map((mood) => {
                 const isSelected = selectedMoods.includes(mood.id);
@@ -1197,7 +1354,6 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
               })}
             </View>
 
-            {/* 記錄輸入 */}
             {isOtherMoodSelected && (
               <>
                 <Text style={styles.recordPrompt}>記錄下來</Text>
@@ -1214,7 +1370,6 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
               </>
             )}
 
-            {/* 提交按鈕 */}
             <TouchableOpacity 
               style={styles.feelingsButton}
               onPress={() => handleFeelingsComplete({
@@ -1233,7 +1388,6 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
             </TouchableOpacity>
           </ScrollView>
 
-          {/* 底部導航 */}
           <View style={styles.bottomNavContainer}>
             <TouchableOpacity onPress={handleBack} style={styles.navButton}>
               <ChevronLeft size={24} color="#31C6FE" />
@@ -1254,7 +1408,7 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
     </KeyboardAvoidingView>
   );
 
-  // 渲染連續天數頁面 (第9頁) - 加入慶祝動畫
+  // 渲染連續天數頁面 (第9頁)
   const renderStreakPage = () => {
     const rotation = celebrationRotate.interpolate({
       inputRange: [0, 0.25, 0.75, 1, 1.1],
@@ -1263,19 +1417,16 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
 
     return (
       <View style={styles.pageContainer}>
-        {/* 標題 */}
         <View style={styles.streakHeaderSection}>
           <Text style={styles.pageTitleStreak}>呼吸練習</Text>
         </View>
 
-        {/* 主要內容 */}
         <View style={styles.streakContent}>
           <Text style={styles.streakTitle}>太棒了！</Text>
           <Text style={styles.streakSubtitle}>
             你完成了今天的呼吸練習，{'\n'}繼續保持這個美好的習慣吧！
           </Text>
 
-          {/* 連續天數卡片 */}
           <View style={styles.streakCard}>
             <Animated.Text 
               style={[
@@ -1294,7 +1445,6 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
             <GradientText text={`${getStreakCount()} 天`} style={styles.streakDays} />
           </View>
 
-          {/* 查看日記按鈕 */}
           <TouchableOpacity 
             style={styles.streakButton}
             onPress={handleViewJournal}
@@ -1306,7 +1456,10 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
     );
   };
 
-  // 主渲染 - 將 LinearGradient 放在最外層
+  // ============================================
+  // 主渲染
+  // ============================================
+
   return (
     <LinearGradient
       colors={['#E8F4F9', '#F0F9FF', '#E0F2FE']}
@@ -1317,7 +1470,6 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
       <SafeAreaView style={styles.container}>
         <StatusBar barStyle="dark-content" />
         
-        {/* Header - Home 按鈕在左上角 */}
         <View style={styles.header}>
           <TouchableOpacity 
             onPress={handleHome}
@@ -1327,7 +1479,6 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
           </TouchableOpacity>
         </View>
 
-        {/* 頁面內容 */}
         {currentPage === 'welcome' && renderWelcomePage()}
         {currentPage === 'selection' && renderSelectionPage()}
         {currentPage === 'preState' && renderPreStatePage()}
@@ -1341,6 +1492,10 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
     </LinearGradient>
   );
 }
+
+// ============================================
+// 樣式
+// ============================================
 
 const styles = StyleSheet.create({
   container: {
@@ -1755,7 +1910,6 @@ const styles = StyleSheet.create({
   practiceTimeContainer: {
     alignItems: 'center',
     marginBottom: 12,
-    //marginTop: 25,
   },
   practiceTime: {
     fontSize: 80,
