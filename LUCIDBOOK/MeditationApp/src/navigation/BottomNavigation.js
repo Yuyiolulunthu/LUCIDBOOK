@@ -10,7 +10,6 @@ import {
   StyleSheet,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
-import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 
 const BottomNavigation = ({ navigation, activeTab }) => {
   return (
@@ -42,20 +41,6 @@ const BottomNavigation = ({ navigation, activeTab }) => {
             size={28}
             color={activeTab === 'explore' ? '#40A1DD' : '#666'}
           />
-        </TouchableOpacity>
-
-        {/* 中間的每日打卡按鈕 */}
-        <TouchableOpacity 
-          style={styles.centerNavButton}
-          onPress={() => navigation.navigate('DailyCheckIn')}
-        >
-          <View style={styles.centerButtonCircle}>
-            <MaterialCommunityIcons 
-              name="calendar-check"
-              size={32}
-              color="#FFF"
-            />
-          </View>
         </TouchableOpacity>
 
         {/* Record/Journal 按鈕 */}
@@ -92,14 +77,14 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    height: 94,
+    height: 80,
   },
   menuBackground: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    height: 94,
+    height: 80,
     backgroundColor: '#FFF',
     opacity: 0.95,
     shadowColor: '#000',
@@ -119,30 +104,13 @@ const styles = StyleSheet.create({
     justifyContent: 'space-around',
     alignItems: 'center',
     paddingBottom: 20,
+    paddingTop: 15,
     paddingHorizontal: 20,
   },
   navButton: {
     padding: 8,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  centerNavButton: {
-    marginBottom: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  centerButtonCircle: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#40A1DD',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#40A1DD',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
   },
 });
 
