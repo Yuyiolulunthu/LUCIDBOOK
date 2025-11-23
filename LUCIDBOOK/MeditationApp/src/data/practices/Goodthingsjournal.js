@@ -1,4 +1,4 @@
-// GoodThingsJournalNew.js - 完整修改版
+// GoodThingsJournalNew.js - 完整修改版（已接 practice API）
 import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
@@ -19,8 +19,25 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import Slider from '@react-native-community/slider';
 import Svg, { Path } from 'react-native-svg';
-import { Home, ChevronLeft, ChevronRight, Clock, Sparkles, Volume2, VolumeX, Play, Pause } from 'lucide-react-native';
+import { Home } from 'lucide-react-native';
 import MaskedView from '@react-native-masked-view/masked-view';
+import ApiService from '../../../api'; // ⭐ 新增：使用你的 practice API
+
+// 初始表單資料（方便重設／還原）
+const INITIAL_FORM_DATA = {
+  goodThing: '',
+  whoWith: '',
+  feelings: '',
+  emotions: [],
+  otherEmotion: '',
+  reason: '',
+  howToRepeat: '',
+  futureAction: '',
+  positiveScore: 5,
+  moodEmotions: [],
+  moodNotes: '',
+  timestamp: 0,
+};
 
 // 進度條組件
 const ProgressBar = ({ currentStep, totalSteps, style }) => {
@@ -93,20 +110,12 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
   const [currentPage, setCurrentPage] = useState('welcome');
   
   // 表單數據
-  const [formData, setFormData] = useState({
-    goodThing: '',
-    whoWith: '',
-    feelings: '',
-    emotions: [],
-    otherEmotion: '',
-    reason: '',
-    howToRepeat: '',
-    futureAction: '',
-    positiveScore: 5,
-    moodEmotions: [],
-    moodNotes: '',
-    timestamp: 0,
-  });
+  const [formData, setFormData] = useState(INITIAL_FORM_DATA);
+
+  // === ⭐ 新增：practice 狀態 ===
+  const [practiceId, setPracticeId] = useState(null);
+  const [startTime, setStartTime] = useState(null);
+  const [elapsedTime, setElapsedTime] = useState(0); // 秒數累積
 
   // 其他狀態
   const [showQ1Suggestions, setShowQ1Suggestions] = useState(false);
@@ -224,10 +233,128 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
     '其他',
   ];
 
-  // 連續天數計算
+  // 連續天數計算（之後可以改成從後端拉）
   const getStreakDays = () => {
     return 3;
   };
+
+  // =============== ⭐ practice 相關：初始化 / 自動累積時間 / 自動儲存 ===============
+
+  // 儲存進度到後端
+  const saveProgress = async () => {
+    if (!practiceId) return;
+    try {
+      await ApiService.updatePracticeProgress(
+        practiceId,
+        getCurrentStep(),
+        totalSteps,
+        formData,
+        elapsedTime
+      );
+    } catch (err) {
+      console.log('好事書寫練習進度儲存失敗:', err);
+    }
+  };
+
+  // 初始化練習
+  const initializePractice = async () => {
+    try {
+      const response = await ApiService.startPractice('好事書寫練習');
+      if (response && response.practiceId) {
+        setPracticeId(response.practiceId);
+
+        // 如果後端有回傳已累積秒數，可以接起來
+        const restoredSeconds = response.accumulatedSeconds
+          ? Number(response.accumulatedSeconds)
+          : 0;
+        setElapsedTime(restoredSeconds);
+
+        // 如果有舊的 formData，也可以合併
+        if (response.formData) {
+          try {
+            const parsed =
+              typeof response.formData === 'string'
+                ? JSON.parse(response.formData)
+                : response.formData;
+            setFormData(prev => ({
+              ...prev,
+              ...parsed,
+            }));
+          } catch (e) {
+            console.log('解析既有好事書寫資料失敗，改用預設:', e);
+          }
+        }
+      }
+    } catch (e) {
+      console.log('好事書寫練習初始化失敗:', e);
+    } finally {
+      // 無論成功與否，都開始計時（至少前端有時間感）
+      setStartTime(Date.now());
+    }
+  };
+
+  // 完成好事書寫練習，送到後端 completePractice
+  const handleCompleteJournal = async () => {
+    try {
+      let totalSeconds = elapsedTime;
+
+      // 如果 elapsedTime 還是 0，用 startTime 算一次
+      if (!totalSeconds && startTime) {
+        totalSeconds = Math.floor((Date.now() - startTime) / 1000);
+      }
+      if (!totalSeconds) totalSeconds = 60; // 至少算一分鐘練習
+
+      if (practiceId) {
+        await ApiService.completePractice(practiceId, {
+          practice_type: '好事書寫練習',
+          duration: Math.max(1, Math.ceil(totalSeconds / 60)),
+          duration_seconds: totalSeconds,
+          formData, // 這裡整包丟給後端存 JSON
+        });
+
+        // 可以順便存最後一筆 progress
+        await saveProgress();
+      } else {
+        console.log('⚠️ 沒有 practiceId，僅在前端完成好事書寫:', formData);
+      }
+    } catch (err) {
+      console.log('完成好事書寫練習失敗:', err);
+    } finally {
+      // 完成後導回日記頁或 Home
+      if (navigation) {
+        navigation.navigate('Daily');
+      } else if (onBack) {
+        onBack();
+      }
+    }
+  };
+
+  // 初始化練習（component mount）
+  useEffect(() => {
+    initializePractice();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // 每秒累加 elapsedTime
+  useEffect(() => {
+    if (!startTime) return;
+    const timer = setInterval(() => {
+      setElapsedTime(prev => prev + 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [startTime]);
+
+  // 每 10 秒自動保存一次進度
+  useEffect(() => {
+    if (!practiceId) return;
+    const interval = setInterval(() => {
+      saveProgress();
+    }, 10000);
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [practiceId, currentPage, formData, elapsedTime]);
+
+  // ======================== 既有動畫效果 ========================
 
   // 完成頁動畫效果
   useEffect(() => {
@@ -259,7 +386,7 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
       sparkle2Opacity.setValue(0);
       sparkle3Opacity.setValue(0);
     }
-  }, [currentPage]);
+  }, [currentPage, sparkle1Opacity, sparkle2Opacity, sparkle3Opacity]);
 
   // 連續天數頁動畫效果
   useEffect(() => {
@@ -302,7 +429,9 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
       celebrationScale.setValue(0);
       celebrationRotate.setValue(0);
     }
-  }, [currentPage]);
+  }, [currentPage, celebrationScale, celebrationRotate]);
+
+  // ======================== 共用操作 ========================
 
   // 處理返回
   const handleBack = () => {
@@ -327,8 +456,16 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
     if (action) action();
   };
 
-  // 處理 Home 按鈕
-  const handleHome = () => {
+  // 處理 Home 按鈕（順便存一次進度）
+  const handleHome = async () => {
+    try {
+      if (practiceId) {
+        await saveProgress();
+      }
+    } catch (e) {
+      console.log('回首頁前儲存好事書寫進度失敗:', e);
+    }
+
     setCurrentPage('welcome');
     if (navigation) {
       navigation.navigate('Home');
@@ -408,7 +545,7 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
     setFormData(prev => ({ ...prev, positiveScore: snappedValue }));
   };
 
-  // ========== 頁面渲染函數 ==========
+  // ========== 各頁面渲染函數 ==========
 
   // 1. 歡迎頁
   const renderWelcomePage = () => (
@@ -509,7 +646,6 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
         <Text style={styles.introMainTitle}>培養正向注意力</Text>
 
         <View style={styles.introDuration}>
-          <Clock size={20} color="#6B7280" />
           <Text style={styles.introDurationText}> 10 分鐘</Text>
         </View>
 
@@ -1271,7 +1407,7 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
     );
   };
 
-  // 11. 你做得很好頁 - 添加裝飾動畫
+  // 11. 你做得很好頁
   const renderCompletionPage = () => (
     <View style={styles.completionContainer}>
       {/* 裝飾元素 */}
@@ -1346,7 +1482,7 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
     </View>
   );
 
-  // 12. 正向感受滑桿頁(完全重新設計)
+  // 12. 正向感受滑桿頁
   const renderPositiveFeelingPage = () => (
     <View style={styles.pageContainer}>
       <View style={styles.headerContainer}>
@@ -1373,7 +1509,7 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
         <View style={styles.sliderCard}>
           <Text style={styles.sliderCardTitle}>對自己或生活的正向感受</Text>
 
-          {/* 分數顯示 - 使用漸層文字組件 */}
+          {/* 分數顯示 */}
           <View style={styles.sliderScoreDisplay}>
             <GradientText 
               text={String(formData.positiveScore)} 
@@ -1400,7 +1536,7 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
             ))}
           </View>
 
-          {/* 滑桿容器 - 使用漸層和加粗 */}
+          {/* 滑桿容器 */}
           <View style={styles.sliderContainerNew}>
             <View style={styles.sliderTrackBackground}>
               <LinearGradient
@@ -1423,7 +1559,7 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
             />
           </View>
 
-          {/* 標籤 - 改為黑色 */}
+          {/* 標籤 */}
           <View style={styles.sliderLabels}>
             <Text style={styles.sliderLabelTextBlack}>0 完全沒有</Text>
             <Text style={styles.sliderLabelTextBlack}>10 踏實愉悅</Text>
@@ -1525,8 +1661,9 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
             </TouchableOpacity>
 
             <TouchableOpacity 
-              onPress={() => {
+              onPress={async () => {
                 console.log('保存好事書寫數據:', formData);
+                await saveProgress();
                 setCurrentPage('streak');
               }}
               style={styles.navButton}
@@ -1539,7 +1676,7 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
     </KeyboardAvoidingView>
   );
 
-  // 14. 連續天數完成頁 - 添加慶祝動畫
+  // 14. 連續天數完成頁
   const renderStreakPage = () => {
     const streakDays = getStreakDays();
     const rotation = celebrationRotate.interpolate({
@@ -1595,14 +1732,7 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
 
           <TouchableOpacity 
             style={styles.streakButton}
-            onPress={() => {
-              console.log('查看日記');
-              if (navigation) {
-                navigation.navigate('Daily');
-              } else {
-                handleHome();
-              }
-            }}
+            onPress={handleCompleteJournal} // ⭐ 完成練習 & 通知後端
           >
             <Text style={styles.streakButtonText}>查看日記</Text>
           </TouchableOpacity>
