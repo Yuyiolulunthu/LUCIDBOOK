@@ -4,6 +4,7 @@
 // 🎨 統一設計風格
 // ✅ 完整註冊流程
 // ✅ 表單驗證
+// ✅ 隱私政策同意
 // ==========================================
 
 import React, { useState } from 'react';
@@ -21,6 +22,7 @@ import {
   Platform,
   Keyboard,
   TouchableWithoutFeedback,
+  Linking,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -34,6 +36,32 @@ const RegisterScreen = ({ navigation }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [agreedToPrivacy, setAgreedToPrivacy] = useState(false);
+
+  // 開啟隱私政策頁面
+  const openPrivacyPolicy = () => {
+    // 這裡可以改成你的隱私政策網址或導航到隱私政策頁面
+    Alert.alert(
+      '隱私權政策',
+      '即將開啟隱私權政策頁面',
+      [
+        { text: '取消', style: 'cancel' },
+        { 
+          text: '查看',
+          onPress: () => {
+            // 方式 1: 導航到 App 內的隱私政策頁面
+            // navigation.navigate('PrivacyPolicy');
+            
+            // 方式 2: 開啟外部網頁
+            // Linking.openURL('https://lucidbook.tw/privacy-policy');
+            
+            // 暫時示範用
+            Alert.alert('隱私權政策', '這裡將顯示完整的隱私權政策內容');
+          }
+        }
+      ]
+    );
+  };
 
   const handleRegister = async () => {
     if (!name || !email || !password || !confirmPassword) {
@@ -57,13 +85,18 @@ const RegisterScreen = ({ navigation }) => {
       return;
     }
 
+    if (!agreedToPrivacy) {
+      Alert.alert('提醒', '請先閱讀並同意隱私權政策');
+      return;
+    }
+
     setIsLoading(true);
     try {
       await ApiService.register(name, email, password);
       
       Alert.alert(
         '註冊成功', 
-        '恭喜你！帳號已建立，請登入', 
+        '恭喜你！帳號已建立,請登入', 
         [
           { 
             text: '前往登入', 
@@ -76,7 +109,7 @@ const RegisterScreen = ({ navigation }) => {
         ]
       );
     } catch (error) {
-      Alert.alert('註冊失敗', error.message || '註冊失敗，請稍後再試');
+      Alert.alert('註冊失敗', error.message || '註冊失敗,請稍後再試');
     } finally {
       setIsLoading(false);
     }
@@ -233,15 +266,47 @@ const RegisterScreen = ({ navigation }) => {
                   </View>
                 </View>
 
+                {/* 🆕 隱私政策同意區塊 */}
+                <View style={styles.privacyContainer}>
+                  <TouchableOpacity 
+                    style={styles.checkboxContainer}
+                    onPress={() => setAgreedToPrivacy(!agreedToPrivacy)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={[
+                      styles.checkbox,
+                      agreedToPrivacy && styles.checkboxChecked
+                    ]}>
+                      {agreedToPrivacy && (
+                        <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+                      )}
+                    </View>
+                    <View style={styles.privacyTextContainer}>
+                      <Text style={styles.privacyText}>
+                        我已閱讀並同意
+                      </Text>
+                      <TouchableOpacity 
+                        onPress={openPrivacyPolicy}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={styles.privacyLink}>《隱私權政策》</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </TouchableOpacity>
+                </View>
+
                 {/* 註冊按鈕 */}
                 <TouchableOpacity 
-                  style={styles.registerButtonContainer}
+                  style={[
+                    styles.registerButtonContainer,
+                    !agreedToPrivacy && styles.registerButtonDisabled
+                  ]}
                   onPress={handleRegister}
-                  disabled={isLoading}
+                  disabled={isLoading || !agreedToPrivacy}
                   activeOpacity={0.9}
                 >
                   <LinearGradient
-                    colors={['#166CB5', '#31C6FE']}
+                    colors={agreedToPrivacy ? ['#166CB5', '#31C6FE'] : ['#9CA3AF', '#9CA3AF']}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 0 }}
                     style={styles.registerButton}
@@ -269,8 +334,8 @@ const RegisterScreen = ({ navigation }) => {
               {/* 底部語錄 */}
               <View style={styles.quoteContainer}>
                 <View style={styles.quoteCard}>
-                  <Ionicons name="bulb" size={20} color="#FF8C42" />
-                  <Text style={styles.quoteText}>開始練習，讓心靈更強韌</Text>
+                  <Ionicons name="shield-checkmark" size={20} color="#166CB5" />
+                  <Text style={styles.quoteText}>您的資料安全受到完善保護</Text>
                 </View>
               </View>
             </View>
@@ -424,17 +489,62 @@ const styles = StyleSheet.create({
     padding: 8,
   },
 
+  // 🆕 隱私政策同意
+  privacyContainer: {
+    marginTop: 8,
+    marginBottom: 20,
+  },
+  checkboxContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: '#D1D5DB',
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  checkboxChecked: {
+    backgroundColor: '#166CB5',
+    borderColor: '#166CB5',
+  },
+  privacyTextContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+  },
+  privacyText: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginRight: 4,
+  },
+  privacyLink: {
+    fontSize: 14,
+    color: '#166CB5',
+    fontWeight: '600',
+    textDecorationLine: 'underline',
+  },
+
   // 註冊按鈕
   registerButtonContainer: {
     borderRadius: 12,
     overflow: 'hidden',
-    marginTop: 8,
     marginBottom: 24,
     shadowColor: '#166CB5',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 5,
+  },
+  registerButtonDisabled: {
+    shadowOpacity: 0.1,
+    elevation: 2,
   },
   registerButton: {
     flexDirection: 'row',
@@ -474,16 +584,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FFF7ED',
+    backgroundColor: '#EFF6FF',
     borderRadius: 16,
     padding: 16,
     gap: 12,
     borderWidth: 1,
-    borderColor: '#FFEDD5',
+    borderColor: '#DBEAFE',
   },
   quoteText: {
     fontSize: 13,
-    color: '#78350F',
+    color: '#1E40AF',
     fontWeight: '500',
   },
 });
