@@ -9,7 +9,7 @@
 // ✅ 我們想陪你做的事 (6個功能)
 // ✅ 練習哲學 (漸層區塊)
 // ✅ 給你的承諾
-// ✅ Logo 結尾
+// ✅ Logo 結尾 (使用本地 lucidlogo.png)
 // 🎨 依照設計程式風格
 // ==========================================
 
@@ -271,7 +271,7 @@ const AboutUs = ({ navigation }) => {
 
         {/* 7. Logo + Signature Closing */}
         <View style={styles.closingSection}>
-          {/* Logo */}
+          {/* Logo - 藍色漸層圓形背景 */}
           <View style={styles.logoContainer}>
             <LinearGradient
               colors={['#166CB5', '#31C6FE']}
@@ -279,7 +279,11 @@ const AboutUs = ({ navigation }) => {
               end={{ x: 1, y: 1 }}
               style={styles.logoGradient}
             >
-              <Ionicons name="book" size={36} color="#FFF" />
+              <Image
+                source={require('../../../../../assets/images/lucidlogo.png')}
+                style={styles.logoImage}
+                resizeMode="contain"
+              />
             </LinearGradient>
           </View>
 
@@ -664,14 +668,16 @@ const styles = StyleSheet.create({
     lineHeight: 26,
   },
 
-  // Closing Section
+  // Closing Section - 藍色漸層圓形背景
   closingSection: {
     paddingHorizontal: 20,
-    paddingTop: 40,
+    paddingTop: 48,
+    paddingBottom: 20,
     alignItems: 'center',
   },
   logoContainer: {
-    marginBottom: 16,
+    marginBottom: 20,
+    alignItems: 'center',
   },
   logoGradient: {
     width: 80,
@@ -681,18 +687,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     shadowColor: '#166CB5',
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.35,
     shadowRadius: 16,
-    elevation: 10,
+    elevation: 12,
+  },
+  logoImage: {
+    width: 48,
+    height: 48,
+    tintColor: '#FFFFFF',
   },
   closingTitle: {
-    fontSize: 24,
-    fontWeight: '500',
+    fontSize: 22,
+    fontWeight: '600',
     color: '#166CB5',
     marginBottom: 12,
+    letterSpacing: 0.5,
   },
   closingSubtitle: {
-    fontSize: 16,
+    fontSize: 15,
     color: '#6B7280',
     textAlign: 'center',
     lineHeight: 24,
@@ -701,6 +713,10 @@ const styles = StyleSheet.create({
   versionContainer: {
     alignItems: 'center',
     gap: 4,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(156, 163, 175, 0.2)',
+    width: '100%',
   },
   versionText: {
     fontSize: 12,
