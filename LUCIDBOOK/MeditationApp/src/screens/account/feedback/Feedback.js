@@ -2,11 +2,13 @@
 // 檔案名稱: Feedback.js
 // 功能: 意見回饋（報修）頁面
 // 
-// ✅ 問題類型選擇
+// ✅ 問題類型選擇 (2x2 網格卡片)
 // ✅ 詳細描述輸入
 // ✅ 圖片上傳（可選）
 // ✅ 聯繫方式
 // ✅ 提交功能
+// ✅ 成功動畫畫面
+// 🎨 依照設計程式風格更新
 // ==========================================
 
 import React, { useState } from 'react';
@@ -22,41 +24,38 @@ import {
   Image,
   ActivityIndicator,
   Platform,
+  KeyboardAvoidingView,
+  Animated,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
-import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import ApiService from '../../../../api';
 
 const ISSUE_TYPES = [
   { 
-    id: 'bug', 
-    label: '系統錯誤', 
-    icon: 'bug-outline', 
-    color: '#EF4444',
-    bgColor: '#FEE2E2'
-  },
-  { 
     id: 'feature', 
     label: '功能建議', 
     icon: 'bulb-outline', 
-    color: '#F59E0B',
-    bgColor: '#FEF3C7'
+    gradientColors: ['#FBBF24', '#F97316'],
   },
   { 
-    id: 'content', 
-    label: '內容問題', 
-    icon: 'document-text-outline', 
-    color: '#166CB5',
-    bgColor: '#EFF6FF'
+    id: 'bug', 
+    label: '問題回報', 
+    icon: 'bug-outline', 
+    gradientColors: ['#EF4444', '#F43F5E'],
+  },
+  { 
+    id: 'praise', 
+    label: '給予鼓勵', 
+    icon: 'heart-outline', 
+    gradientColors: ['#EC4899', '#F43F5E'],
   },
   { 
     id: 'other', 
     label: '其他意見', 
     icon: 'chatbubble-ellipses-outline', 
-    color: '#10B981',
-    bgColor: '#D1FAE5'
+    gradientColors: ['#3B82F6', '#06B6D4'],
   },
 ];
 
@@ -66,6 +65,7 @@ const Feedback = ({ navigation }) => {
   const [contactInfo, setContactInfo] = useState('');
   const [images, setImages] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [isSubmitted, setIsSubmitted] = useState(false);
 
   const handlePickImage = async () => {
     if (images.length >= 3) {
@@ -133,23 +133,16 @@ const Feedback = ({ navigation }) => {
       const response = await ApiService.submitFeedback(feedbackData);
 
       if (response.success) {
-        Alert.alert(
-          '感謝您的回饋！',
-          '我們已收到您的意見，將盡快處理並回覆您',
-          [
-            {
-              text: '確定',
-              onPress: () => {
-                // 清空表單
-                setSelectedType(null);
-                setDescription('');
-                setContactInfo('');
-                setImages([]);
-                navigation.goBack();
-              }
-            }
-          ]
-        );
+        setIsSubmitted(true);
+        // 2秒後返回
+        setTimeout(() => {
+          // 清空表單
+          setSelectedType(null);
+          setDescription('');
+          setContactInfo('');
+          setImages([]);
+          navigation.goBack();
+        }, 2000);
       } else {
         Alert.alert('提交失敗', response.message || '請稍後再試');
       }
@@ -163,8 +156,29 @@ const Feedback = ({ navigation }) => {
 
   const isFormValid = selectedType && description.trim().length >= 10;
 
+  // 成功畫面
+  if (isSubmitted) {
+    return (
+      <LinearGradient
+        colors={['#166CB5', '#31C6FE']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.successContainer}
+      >
+        <StatusBar barStyle="light-content" backgroundColor="#166CB5" />
+        <View style={styles.successContent}>
+          <View style={styles.successIconContainer}>
+            <Ionicons name="send" size={48} color="#FFF" />
+          </View>
+          <Text style={styles.successTitle}>感謝您的回饋！</Text>
+          <Text style={styles.successText}>我們會仔細閱讀並持續改進</Text>
+        </View>
+      </LinearGradient>
+    );
+  }
+
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#166CB5" />
       
       {/* Header */}
@@ -174,148 +188,102 @@ const Feedback = ({ navigation }) => {
         end={{ x: 1, y: 1 }}
         style={styles.header}
       >
-        <TouchableOpacity 
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Ionicons name="arrow-back" size={24} color="#FFF" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>意見回饋</Text>
-        <View style={styles.headerPlaceholder} />
+        <View style={styles.headerTop}>
+          <TouchableOpacity 
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+          >
+            <Ionicons name="arrow-back" size={20} color="#FFF" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>意見與問題回報</Text>
+          <View style={styles.headerPlaceholder} />
+        </View>
+        <Text style={styles.headerSubtitle}>
+          您的每一份回饋都能幫助我們變得更好
+        </Text>
       </LinearGradient>
 
       <ScrollView 
         style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {/* 說明卡片 */}
-        <View style={styles.infoCard}>
-          <View style={styles.infoIconContainer}>
-            <Ionicons name="heart" size={32} color="#EF4444" />
-          </View>
-          <Text style={styles.infoTitle}>您的意見很重要</Text>
-          <Text style={styles.infoText}>
-            無論是發現問題、有好的建議，或是想給我們鼓勵，都歡迎告訴我們！我們會認真對待每一條意見。
-          </Text>
-        </View>
-
         {/* 問題類型選擇 */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>
-            問題類型 <Text style={styles.required}>*</Text>
-          </Text>
+          <Text style={styles.sectionLabel}>選擇回饋類型</Text>
           
           <View style={styles.typeGrid}>
-            {ISSUE_TYPES.map((type) => (
-              <TouchableOpacity
-                key={type.id}
-                style={[
-                  styles.typeCard,
-                  selectedType === type.id && styles.typeCardSelected,
-                ]}
-                onPress={() => setSelectedType(type.id)}
-                activeOpacity={0.7}
-              >
-                <View style={[
-                  styles.typeIconContainer,
-                  { backgroundColor: type.bgColor }
-                ]}>
-                  <Ionicons 
-                    name={type.icon} 
-                    size={28} 
-                    color={type.color} 
-                  />
-                </View>
-                <Text style={[
-                  styles.typeLabel,
-                  selectedType === type.id && styles.typeLabelSelected,
-                ]}>
-                  {type.label}
-                </Text>
-                {selectedType === type.id && (
-                  <View style={styles.typeCheckmark}>
-                    <Ionicons name="checkmark-circle" size={24} color="#166CB5" />
-                  </View>
-                )}
-              </TouchableOpacity>
-            ))}
+            {ISSUE_TYPES.map((type) => {
+              const isSelected = selectedType === type.id;
+              return (
+                <TouchableOpacity
+                  key={type.id}
+                  style={[
+                    styles.typeCard,
+                    isSelected && styles.typeCardSelected,
+                  ]}
+                  onPress={() => setSelectedType(type.id)}
+                  activeOpacity={0.7}
+                >
+                  <LinearGradient
+                    colors={type.gradientColors}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.typeIconContainer}
+                  >
+                    <Ionicons 
+                      name={type.icon} 
+                      size={24} 
+                      color="#FFF" 
+                    />
+                  </LinearGradient>
+                  <Text style={[
+                    styles.typeLabel,
+                    isSelected && styles.typeLabelSelected,
+                  ]}>
+                    {type.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
         </View>
 
         {/* 詳細描述 */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>
-            詳細描述 <Text style={styles.required}>*</Text>
-          </Text>
-          <Text style={styles.sectionHint}>
-            請詳細描述您遇到的問題或想法（至少10個字）
-          </Text>
+          <Text style={styles.sectionLabel}>詳細說明</Text>
           
           <View style={styles.textAreaContainer}>
             <TextInput
               style={styles.textArea}
               value={description}
               onChangeText={setDescription}
-              placeholder="例如：在練習頁面點擊開始按鈕後，APP閃退了..."
+              placeholder="請詳細描述您的建議或遇到的問題..."
               placeholderTextColor="#9CA3AF"
               multiline
               numberOfLines={6}
               textAlignVertical="top"
               maxLength={500}
             />
-            <Text style={styles.charCount}>
-              {description.length}/500
-            </Text>
           </View>
-        </View>
-
-        {/* 圖片上傳 */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>上傳圖片（選填）</Text>
-          <Text style={styles.sectionHint}>
-            可以上傳截圖幫助我們更好地理解問題（最多3張）
+          <Text style={styles.charCount}>
+            {description.length} / 500 字
           </Text>
-          
-          <View style={styles.imageContainer}>
-            {images.map((image, index) => (
-              <View key={index} style={styles.imageWrapper}>
-                <Image source={{ uri: image.uri }} style={styles.uploadedImage} />
-                <TouchableOpacity 
-                  style={styles.removeImageButton}
-                  onPress={() => handleRemoveImage(index)}
-                >
-                  <Ionicons name="close-circle" size={24} color="#EF4444" />
-                </TouchableOpacity>
-              </View>
-            ))}
-            
-            {images.length < 3 && (
-              <TouchableOpacity 
-                style={styles.addImageButton}
-                onPress={handlePickImage}
-              >
-                <Ionicons name="camera-outline" size={32} color="#9CA3AF" />
-                <Text style={styles.addImageText}>添加圖片</Text>
-              </TouchableOpacity>
-            )}
-          </View>
         </View>
 
         {/* 聯繫方式 */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>聯繫方式（選填）</Text>
-          <Text style={styles.sectionHint}>
-            如需回覆，請留下您的 Email 或電話
+          <Text style={styles.sectionLabel}>
+            聯絡信箱 <Text style={styles.optional}>(選填)</Text>
           </Text>
           
           <View style={styles.inputContainer}>
-            <Ionicons name="mail-outline" size={20} color="#9CA3AF" />
             <TextInput
               style={styles.input}
               value={contactInfo}
               onChangeText={setContactInfo}
-              placeholder="your.email@example.com 或 0912345678"
+              placeholder="如需回覆，請留下您的信箱"
               placeholderTextColor="#9CA3AF"
               keyboardType="email-address"
               autoCapitalize="none"
@@ -323,55 +291,150 @@ const Feedback = ({ navigation }) => {
           </View>
         </View>
 
-        {/* 提交按鈕 */}
+        {/* 圖片上傳 */}
         <View style={styles.section}>
+          <Text style={styles.sectionLabel}>
+            上傳截圖 <Text style={styles.optional}>(選填，最多3張)</Text>
+          </Text>
+          
+          {/* 上傳按鈕 */}
           <TouchableOpacity 
-            style={[
-              styles.submitButton,
-              !isFormValid && styles.submitButtonDisabled
-            ]}
-            onPress={handleSubmit}
-            disabled={!isFormValid || loading}
-            activeOpacity={0.8}
+            style={styles.uploadButton}
+            onPress={handlePickImage}
+            activeOpacity={0.7}
           >
             <LinearGradient
-              colors={isFormValid ? ['#166CB5', '#31C6FE'] : ['#D1D5DB', '#D1D5DB']}
+              colors={['#166CB5', '#31C6FE']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.uploadIconContainer}
+            >
+              <Ionicons name="cloud-upload-outline" size={24} color="#FFF" />
+            </LinearGradient>
+            <View style={styles.uploadTextContainer}>
+              <Text style={styles.uploadTitle}>點擊上傳截圖</Text>
+              <Text style={styles.uploadHint}>支援 JPG、PNG 格式</Text>
+            </View>
+          </TouchableOpacity>
+
+          {/* 已上傳圖片預覽 */}
+          {images.length > 0 && (
+            <View style={styles.imageContainer}>
+              {images.map((image, index) => (
+                <View key={index} style={styles.imageWrapper}>
+                  <Image source={{ uri: image.uri }} style={styles.uploadedImage} />
+                  <TouchableOpacity 
+                    style={styles.removeImageButton}
+                    onPress={() => handleRemoveImage(index)}
+                  >
+                    <View style={styles.removeImageIcon}>
+                      <Ionicons name="close" size={14} color="#FFF" />
+                    </View>
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
+
+        {/* 提示卡片 */}
+        <View style={styles.infoCard}>
+          <Text style={styles.infoText}>
+            💡 <Text style={styles.infoTextBold}>小提示：</Text>我們重視每一份回饋，通常會在 3-5 個工作天內處理。若需要即時協助，請透過客服信箱聯繫我們。
+          </Text>
+        </View>
+
+        <View style={styles.bottomPadding} />
+      </ScrollView>
+
+      {/* 底部提交按鈕 */}
+      <View style={styles.submitContainer}>
+        <TouchableOpacity 
+          style={[
+            styles.submitButton,
+            !isFormValid && styles.submitButtonDisabled
+          ]}
+          onPress={handleSubmit}
+          disabled={!isFormValid || loading}
+          activeOpacity={0.8}
+        >
+          {isFormValid ? (
+            <LinearGradient
+              colors={['#166CB5', '#31C6FE']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.submitButtonGradient}
             >
               {loading ? (
-                <ActivityIndicator color="#FFF" />
+                <>
+                  <ActivityIndicator color="#FFF" size="small" />
+                  <Text style={styles.submitButtonText}>送出中...</Text>
+                </>
               ) : (
                 <>
                   <Ionicons name="send" size={20} color="#FFF" />
-                  <Text style={styles.submitButtonText}>提交回饋</Text>
+                  <Text style={styles.submitButtonText}>送出回饋</Text>
                 </>
               )}
             </LinearGradient>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.bottomPadding} />
-      </ScrollView>
-    </View>
+          ) : (
+            <View style={styles.submitButtonDisabledInner}>
+              <Ionicons name="send" size={20} color="#9CA3AF" />
+              <Text style={styles.submitButtonTextDisabled}>送出回饋</Text>
+            </View>
+          )}
+        </TouchableOpacity>
+      </View>
+    </KeyboardAvoidingView >
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#F5F7FA',
+  },
+
+  // Success Screen
+  successContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  successContent: {
+    alignItems: 'center',
+  },
+  successIconContainer: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  successTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#FFF',
+    marginBottom: 8,
+  },
+  successText: {
+    fontSize: 16,
+    color: 'rgba(255,255,255,0.8)',
   },
 
   // Header
   header: {
+    paddingTop: 50,
+    paddingBottom: 24,
+    paddingHorizontal: 20,
+  },
+  headerTop: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingTop: 50,
-    paddingBottom: 20,
-    paddingHorizontal: 20,
+    marginBottom: 12,
   },
   backButton: {
     width: 40,
@@ -389,69 +452,37 @@ const styles = StyleSheet.create({
   headerPlaceholder: {
     width: 40,
   },
+  headerSubtitle: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.8)',
+    paddingHorizontal: 8,
+  },
 
   // ScrollView
   scrollView: {
     flex: 1,
   },
-
-  // Info Card
-  infoCard: {
-    marginHorizontal: 20,
-    marginTop: 20,
-    backgroundColor: '#FFF',
-    borderRadius: 20,
-    padding: 24,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 5,
-  },
-  infoIconContainer: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: '#FEE2E2',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  infoTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#111827',
-    marginBottom: 8,
-  },
-  infoText: {
-    fontSize: 14,
-    color: '#6B7280',
-    textAlign: 'center',
-    lineHeight: 20,
+  scrollContent: {
+    paddingHorizontal: 20,
+    paddingTop: 24,
   },
 
   // Section
   section: {
-    paddingHorizontal: 20,
-    marginTop: 24,
+    marginBottom: 24,
   },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 8,
-  },
-  required: {
-    color: '#EF4444',
-  },
-  sectionHint: {
-    fontSize: 14,
-    color: '#6B7280',
+  sectionLabel: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: '#374151',
     marginBottom: 12,
   },
+  optional: {
+    color: '#9CA3AF',
+    fontWeight: '400',
+  },
 
-  // Type Selection
+  // Type Selection - 2x2 Grid
   typeGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -459,62 +490,47 @@ const styles = StyleSheet.create({
   },
   typeCard: {
     width: '48%',
-    backgroundColor: '#FFF',
-    borderRadius: 16,
-    padding: 16,
+    backgroundColor: 'rgba(255,255,255,0.8)',
+    borderRadius: 20,
+    paddingVertical: 20,
+    paddingHorizontal: 16,
     alignItems: 'center',
     borderWidth: 2,
     borderColor: '#E5E7EB',
-    position: 'relative',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
   },
   typeCardSelected: {
     borderColor: '#166CB5',
-    backgroundColor: '#EFF6FF',
+    backgroundColor: 'rgba(22,108,181,0.08)',
   },
   typeIconContainer: {
-    width: 56,
-    height: 56,
-    borderRadius: 16,
+    width: 48,
+    height: 48,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 12,
   },
   typeLabel: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#6B7280',
+    fontWeight: '500',
+    color: '#374151',
   },
   typeLabelSelected: {
     color: '#166CB5',
   },
-  typeCheckmark: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-  },
 
   // Text Area
   textAreaContainer: {
-    backgroundColor: '#FFF',
+    backgroundColor: 'rgba(255,255,255,0.8)',
     borderRadius: 16,
-    borderWidth: 1,
+    borderWidth: 2,
     borderColor: '#E5E7EB',
     padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
   },
   textArea: {
     fontSize: 15,
     color: '#111827',
-    minHeight: 120,
+    minHeight: 140,
     textAlignVertical: 'top',
   },
   charCount: {
@@ -524,103 +540,153 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
 
-  // Image Upload
+  // Input
+  inputContainer: {
+    backgroundColor: 'rgba(255,255,255,0.8)',
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: '#E5E7EB',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  input: {
+    fontSize: 15,
+    color: '#111827',
+  },
+
+  // Upload Button
+  uploadButton: {
+    backgroundColor: 'rgba(255,255,255,0.8)',
+    borderRadius: 20,
+    borderWidth: 2,
+    borderStyle: 'dashed',
+    borderColor: '#D1D5DB',
+    padding: 24,
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: 12,
+  },
+  uploadIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  uploadTextContainer: {
+    alignItems: 'center',
+  },
+  uploadTitle: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: '#374151',
+    marginBottom: 4,
+  },
+  uploadHint: {
+    fontSize: 12,
+    color: '#9CA3AF',
+  },
+
+  // Image Preview
   imageContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 12,
+    marginTop: 16,
   },
   imageWrapper: {
     position: 'relative',
-    width: 100,
-    height: 100,
+    width: '31%',
+    aspectRatio: 1,
   },
   uploadedImage: {
     width: '100%',
     height: '100%',
     borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#E5E7EB',
   },
   removeImageButton: {
     position: 'absolute',
     top: -8,
     right: -8,
-    backgroundColor: '#FFF',
+  },
+  removeImageIcon: {
+    width: 24,
+    height: 24,
     borderRadius: 12,
+    backgroundColor: '#EF4444',
+    justifyContent: 'center',
+    alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 4,
     elevation: 3,
   },
-  addImageButton: {
-    width: 100,
-    height: 100,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderStyle: 'dashed',
-    borderColor: '#D1D5DB',
-    backgroundColor: '#F9FAFB',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  addImageText: {
-    fontSize: 12,
-    color: '#9CA3AF',
-    marginTop: 4,
-  },
 
-  // Input
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFF',
-    borderRadius: 16,
+  // Info Card
+  infoCard: {
+    backgroundColor: '#EFF6FF',
     borderWidth: 1,
-    borderColor: '#E5E7EB',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    borderColor: '#BFDBFE',
+    borderRadius: 20,
+    padding: 16,
+    marginBottom: 24,
   },
-  input: {
-    flex: 1,
-    fontSize: 15,
-    color: '#111827',
-    marginLeft: 12,
+  infoText: {
+    fontSize: 14,
+    color: '#1E40AF',
+    lineHeight: 20,
+  },
+  infoTextBold: {
+    fontWeight: '600',
   },
 
   // Submit Button
+  submitContainer: {
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    backgroundColor: '#FFF',
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+  },
   submitButton: {
-    borderRadius: 16,
+    borderRadius: 20,
     overflow: 'hidden',
-    shadowColor: '#166CB5',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
   },
   submitButtonDisabled: {
-    shadowOpacity: 0,
-    elevation: 0,
+    backgroundColor: '#E5E7EB',
   },
   submitButtonGradient: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 18,
+    paddingVertical: 16,
     gap: 8,
+  },
+  submitButtonDisabledInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    gap: 8,
+    backgroundColor: '#E5E7EB',
+    borderRadius: 20,
   },
   submitButtonText: {
     fontSize: 16,
     fontWeight: '600',
     color: '#FFF',
   },
+  submitButtonTextDisabled: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#9CA3AF',
+  },
 
   bottomPadding: {
-    height: 40,
+    height: 20,
   },
 });
 

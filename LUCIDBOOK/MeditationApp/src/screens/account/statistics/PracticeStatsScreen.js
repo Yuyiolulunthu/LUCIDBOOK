@@ -1,13 +1,11 @@
 // ==========================================
 // 檔案名稱: PracticeStatsScreen.js
-// 版本: V3.0 - 設計完整修正版
+// 版本: V4.0 - 統一設計風格
 // 
-// ✅ Header 標題不與返回按鈕平行（垂直排列）
-// ✅ 總覽 4 卡片：白色底 + 彩色淺色圖標背景
-// ✅ 總覽圖標：靶心、時鐘（加粗）、火焰、獎牌
-// ✅ 詳細數據：線條感圖標（風、眼睛、心、冥想）
-// ✅ 黃色提示卡：純色無漸層
-// ✅ 月度進展：實際資料庫數據
+// ✅ 只保留呼吸練習和好事書寫
+// ✅ 滿意度改為心理肌力分數
+// ✅ 使用 lucide-react-native 圖標
+// ✅ 統一配色與練習頁面一致
 // ==========================================
 
 import React, { useState, useEffect } from 'react';
@@ -25,6 +23,8 @@ import Ionicons from 'react-native-vector-icons/Ionicons';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { LinearGradient } from 'expo-linear-gradient';
 import ApiService from '../../../../api';
+// ⭐ 引入 lucide-react-native 圖標
+import { Wind, PenLine } from 'lucide-react-native';
 
 const { width } = Dimensions.get('window');
 
@@ -74,51 +74,34 @@ const PracticeStatsScreen = ({ navigation }) => {
     }
   };
 
+  // ⭐ 只保留呼吸練習和好事書寫
   const generateCategoryStats = (statsData) => {
     const categories = [
       {
         id: 'breathing',
-        name: '呼吸穩定力',
-        icon: 'leaf-outline',
-        iconType: 'ionicons',
-        gradient: ['#166CB5', '#31C6FE'],
-        sessions: Math.floor(statsData.totalPractices * 0.4) || 10,
-        minutes: Math.floor(statsData.totalMinutes * 0.4) || 50,
-        satisfaction: 88,
+        name: '呼吸練習',
+        subtitle: 'Breathing',
+        icon: Wind, // ⭐ 使用 lucide Wind 組件
+        iconType: 'lucide',
+        gradient: ['#166CB5', '#31C6FE'], // ⭐ 與練習頁面一致
+        accentColor: '#166CB5',
+        sessions: Math.floor(statsData.totalPractices * 0.6) || 14,
+        minutes: Math.floor(statsData.totalMinutes * 0.6) || 94,
+        mentalPower: 8, // ⭐ 心理肌力分數
         lastPracticed: statsData.lastPracticeDate || '2025-11-06',
       },
       {
-        id: 'self-awareness',
-        name: '自我覺察力',
-        icon: 'eye-outline',
-        iconType: 'ionicons',
-        gradient: ['#10B981', '#34D399'],
-        sessions: Math.floor(statsData.totalPractices * 0.25) || 6,
-        minutes: Math.floor(statsData.totalMinutes * 0.25) || 42,
-        satisfaction: 85,
+        id: 'good-things',
+        name: '好事書寫',
+        subtitle: 'Good Things',
+        icon: PenLine, // ⭐ 使用 lucide PenLine 組件
+        iconType: 'lucide',
+        gradient: ['#FFBC42', '#FF8C42'], // ⭐ 與練習頁面一致
+        accentColor: '#FF8C42',
+        sessions: Math.floor(statsData.totalPractices * 0.4) || 10,
+        minutes: Math.floor(statsData.totalMinutes * 0.4) || 62,
+        mentalPower: 6, // ⭐ 心理肌力分數
         lastPracticed: statsData.lastPracticeDate || '2025-11-05',
-      },
-      {
-        id: 'emotion',
-        name: '情緒理解力',
-        icon: 'heart-outline',
-        iconType: 'ionicons',
-        gradient: ['#F59E0B', '#FBBF24'],
-        sessions: Math.floor(statsData.totalPractices * 0.2) || 5,
-        minutes: Math.floor(statsData.totalMinutes * 0.2) || 35,
-        satisfaction: 90,
-        lastPracticed: statsData.lastPracticeDate || '2025-11-04',
-      },
-      {
-        id: 'mindfulness',
-        name: '正念安定力',
-        icon: 'body-outline',
-        iconType: 'ionicons',
-        gradient: ['#8B5CF6', '#A78BFA'],
-        sessions: Math.floor(statsData.totalPractices * 0.15) || 3,
-        minutes: Math.floor(statsData.totalMinutes * 0.15) || 29,
-        satisfaction: 86,
-        lastPracticed: statsData.lastPracticeDate || '2025-11-03',
       },
     ];
     setCategoryStats(categories);
@@ -202,6 +185,8 @@ const PracticeStatsScreen = ({ navigation }) => {
         <StatusBar barStyle="light-content" backgroundColor="#166CB5" />
         <LinearGradient
           colors={['#166CB5', '#31C6FE']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
           style={styles.loadingGradient}
         >
           <ActivityIndicator size="large" color="#FFF" />
@@ -217,7 +202,7 @@ const PracticeStatsScreen = ({ navigation }) => {
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#166CB5" />
       
-      {/* Header with Gradient - 修改為垂直排列 */}
+      {/* Header with Gradient */}
       <LinearGradient
         colors={['#166CB5', '#31C6FE']}
         start={{ x: 0, y: 0 }}
@@ -265,14 +250,7 @@ const PracticeStatsScreen = ({ navigation }) => {
               </LinearGradient>
             )}
             {selectedTab !== 'overview' && (
-              <View style={{ 
-                    flexDirection: 'row', 
-                    alignItems: 'center', 
-                    justifyContent: 'center',  // ← 添加這行
-                    gap: 6,
-                    paddingVertical: 10,        // ← 添加這行
-                    paddingHorizontal: 12,      // ← 添加這行
-                }}>
+              <View style={styles.tabInactiveContent}>
                 <MaterialCommunityIcons name="view-dashboard" size={16} color="#6B7280" />
                 <Text style={styles.tabText}>總覽</Text>
               </View>
@@ -296,14 +274,7 @@ const PracticeStatsScreen = ({ navigation }) => {
               </LinearGradient>
             )}
             {selectedTab !== 'details' && (
-              <View style={{ 
-                    flexDirection: 'row', 
-                    alignItems: 'center', 
-                    justifyContent: 'center',  // ← 添加這行
-                    gap: 6,
-                    paddingVertical: 10,        // ← 添加這行
-                    paddingHorizontal: 12,      // ← 添加這行
-                }}>
+              <View style={styles.tabInactiveContent}>
                 <MaterialCommunityIcons name="chart-bar" size={16} color="#6B7280" />
                 <Text style={styles.tabText}>詳細數據</Text>
               </View>
@@ -319,7 +290,7 @@ const PracticeStatsScreen = ({ navigation }) => {
       >
         {selectedTab === 'overview' ? (
           <>
-            {/* Key Stats Grid - 白色底 + 彩色圖標背景 */}
+            {/* Key Stats Grid */}
             <View style={styles.statsGrid}>
               {/* 總練習次數 - 藍色 */}
               <View style={styles.statCard}>
@@ -335,7 +306,7 @@ const PracticeStatsScreen = ({ navigation }) => {
               {/* 總練習分鐘 - 紫色 */}
               <View style={styles.statCard}>
                 <View style={[styles.statIconBg, { backgroundColor: '#F3E8FF' }]}>
-                  <Ionicons name="time-outline" size={28} color="#A855F7" strokeWidth={3} />
+                  <Ionicons name="time-outline" size={28} color="#A855F7" />
                 </View>
                 <Text style={[styles.statValue, { color: '#A855F7' }]}>
                   {stats?.totalMinutes || 0}
@@ -354,15 +325,15 @@ const PracticeStatsScreen = ({ navigation }) => {
                 <Text style={styles.statLabel}>當前連續天</Text>
               </View>
 
-              {/* 平均滿意度 - 綠色 */}
+              {/* ⭐ 心理肌力分數 - 綠色 (滿分10分) */}
               <View style={styles.statCard}>
                 <View style={[styles.statIconBg, { backgroundColor: '#D1FAE5' }]}>
                   <Ionicons name="ribbon-outline" size={28} color="#10B981" />
                 </View>
                 <Text style={[styles.statValue, { color: '#10B981' }]}>
-                  {stats?.averageSatisfaction || 0}%
+                  {Math.min(Math.round((stats?.averageSatisfaction || 0) / 10), 10)}
                 </Text>
-                <Text style={styles.statLabel}>平均滿意度</Text>
+                <Text style={styles.statLabel}>心理肌力分數</Text>
               </View>
             </View>
 
@@ -401,7 +372,7 @@ const PracticeStatsScreen = ({ navigation }) => {
               </View>
             </View>
 
-            {/* Monthly Progress - 實際資料庫數據 */}
+            {/* Monthly Progress */}
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
                 <MaterialCommunityIcons name="chart-line" size={20} color="#166CB5" />
@@ -440,61 +411,67 @@ const PracticeStatsScreen = ({ navigation }) => {
           </>
         ) : (
           <>
-            {/* Category Breakdown - 線條感圖標 */}
+            {/* ⭐ Category Breakdown - 只有呼吸練習和好事書寫 */}
             <View style={styles.categoryContainer}>
-              {categoryStats.map((category, index) => (
-                <View key={category.id} style={styles.categoryCard}>
-                  {/* Header with Gradient */}
-                  <LinearGradient
-                    colors={category.gradient}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    style={styles.categoryHeader}
-                  >
-                    <View style={styles.categoryHeaderContent}>
-                      <View style={styles.categoryIconContainer}>
-                        <Ionicons 
-                          name={category.icon} 
-                          size={28} 
-                          color={category.gradient[0]} 
-                        />
+              {categoryStats.map((category, index) => {
+                // ⭐ 獲取 lucide 圖標組件
+                const IconComponent = category.icon;
+                
+                return (
+                  <View key={category.id} style={styles.categoryCard}>
+                    {/* Header with Gradient */}
+                    <LinearGradient
+                      colors={category.gradient}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={styles.categoryHeader}
+                    >
+                      <View style={styles.categoryHeaderContent}>
+                        <View style={styles.categoryIconContainer}>
+                          {/* ⭐ 使用 lucide 圖標組件 */}
+                          <IconComponent size={28} color={category.accentColor} strokeWidth={2} />
+                        </View>
+                        <View style={styles.categoryTextContainer}>
+                          <Text style={styles.categoryName}>{category.name}</Text>
+                          <Text style={styles.categorySubtitle}>{category.subtitle}</Text>
+                        </View>
                       </View>
-                      <Text style={styles.categoryName}>{category.name}</Text>
-                    </View>
-                  </LinearGradient>
+                    </LinearGradient>
 
-                  {/* Body */}
-                  <View style={styles.categoryBody}>
-                    <View style={styles.categoryStatsGrid}>
-                      <View style={styles.categoryStatItem}>
-                        <Text style={[styles.categoryStatValue, { color: category.gradient[0] }]}>
-                          {category.sessions}
-                        </Text>
-                        <Text style={styles.categoryStatLabel}>次數</Text>
+                    {/* Body */}
+                    <View style={styles.categoryBody}>
+                      <View style={styles.categoryStatsGrid}>
+                        <View style={styles.categoryStatItem}>
+                          <Text style={[styles.categoryStatValue, { color: category.accentColor }]}>
+                            {category.sessions}
+                          </Text>
+                          <Text style={styles.categoryStatLabel}>次數</Text>
+                        </View>
+                        <View style={styles.categoryStatItem}>
+                          <Text style={[styles.categoryStatValue, { color: '#A855F7' }]}>
+                            {category.minutes}
+                          </Text>
+                          <Text style={styles.categoryStatLabel}>分鐘</Text>
+                        </View>
+                        <View style={styles.categoryStatItem}>
+                          {/* ⭐ 心理肌力分數 */}
+                          <Text style={[styles.categoryStatValue, { color: '#10B981' }]}>
+                            {category.mentalPower}
+                          </Text>
+                          <Text style={styles.categoryStatLabel}>心理肌力</Text>
+                        </View>
                       </View>
-                      <View style={styles.categoryStatItem}>
-                        <Text style={[styles.categoryStatValue, { color: '#A855F7' }]}>
-                          {category.minutes}
-                        </Text>
-                        <Text style={styles.categoryStatLabel}>分鐘</Text>
-                      </View>
-                      <View style={styles.categoryStatItem}>
-                        <Text style={[styles.categoryStatValue, { color: '#10B981' }]}>
-                          {category.satisfaction}%
-                        </Text>
-                        <Text style={styles.categoryStatLabel}>滿意度</Text>
-                      </View>
-                    </View>
 
-                    <View style={styles.categoryFooter}>
-                      <Text style={styles.categoryFooterLabel}>最後練習</Text>
-                      <Text style={styles.categoryFooterValue}>
-                        {formatDate(category.lastPracticed)}
-                      </Text>
+                      <View style={styles.categoryFooter}>
+                        <Text style={styles.categoryFooterLabel}>最後練習</Text>
+                        <Text style={styles.categoryFooterValue}>
+                          {formatDate(category.lastPracticed)}
+                        </Text>
+                      </View>
                     </View>
                   </View>
-                </View>
-              ))}
+                );
+              })}
             </View>
 
             {/* Summary Card */}
@@ -522,10 +499,10 @@ const PracticeStatsScreen = ({ navigation }) => {
           </>
         )}
 
-        {/* Bottom Tip - 純色無漸層 */}
+        {/* Bottom Tip */}
         <View style={styles.tipCard}>
           <Text style={styles.tipText}>
-            🎯 持續練習是成長的關鍵,保持每日打卡習慣
+            🎯 持續練習是成長的關鍵，保持每日打卡習慣
           </Text>
         </View>
 
@@ -553,7 +530,7 @@ const styles = StyleSheet.create({
     color: '#FFF',
   },
   
-  // === Header - 修改為垂直排列 ===
+  // === Header ===
   header: {
     paddingTop: 50,
     paddingBottom: 24,
@@ -566,7 +543,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.2)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 16,  // 與標題容器的間距
+    marginBottom: 16,
   },
   headerTitleContainer: {
     flexDirection: 'row',
@@ -632,6 +609,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     gap: 6,
   },
+  tabInactiveContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+  },
   tabText: {
     fontSize: 14,
     fontWeight: '500',
@@ -651,7 +636,7 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
   
-  // === Stats Grid - 白色底 + 彩色圖標背景 ===
+  // === Stats Grid ===
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -832,10 +817,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: 12,
   },
+  categoryTextContainer: {
+    flex: 1,
+  },
   categoryName: {
     fontSize: 18,
     fontWeight: '600',
     color: '#FFF',
+  },
+  categorySubtitle: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.9)',
+    marginTop: 2,
   },
   categoryBody: {
     padding: 20,
@@ -874,7 +867,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   
-  // === Summary Card - 白色背景 ===
+  // === Summary Card ===
   summaryCard: {
     marginTop: 12,
     marginHorizontal: 20,
@@ -907,7 +900,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   
-  // === Tip Card - 純色無漸層 ===
+  // === Tip Card ===
   tipCard: {
     marginTop: 12,
     marginHorizontal: 20,
