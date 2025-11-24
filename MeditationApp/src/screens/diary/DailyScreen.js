@@ -1,5 +1,5 @@
 // ==========================================
-// DailyScreen.js - 完整修正版（完整欄位對應）
+// DailyScreen.js - 完整修正版（使用 API 獲取情緒統計）
 // ==========================================
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -57,6 +57,9 @@ const DailyScreen = ({ navigation }) => {
   });
   const [viewMode, setViewMode] = useState('list');
   const [showInfoCard, setShowInfoCard] = useState(null);
+  
+  // ⭐ 新增：情緒統計狀態
+  const [topEmotions, setTopEmotions] = useState([]);
 
   const [detailModalVisible, setDetailModalVisible] = useState(false);
   const [selectedPractice, setSelectedPractice] = useState(null);
@@ -77,6 +80,8 @@ const DailyScreen = ({ navigation }) => {
 
   useEffect(() => {
     filterDataForCurrentMonth(allPracticeData);
+    // ⭐ 當月份改變時，重新獲取情緒統計
+    fetchEmotionStats();
   }, [currentMonth]);
 
   const fetchAllData = async () => {
@@ -90,11 +95,62 @@ const DailyScreen = ({ navigation }) => {
         hasLoadedData.current = true;
         filterDataForCurrentMonth(practiceResponse.practices);
       }
+      
+      // ⭐ 獲取情緒統計
+      await fetchEmotionStats();
+      
     } catch (error) {
       console.error('❌ 獲取數據失敗:', error);
     } finally {
       setLoading(false);
     }
+  };
+
+  // ⭐ 新增：從 API 獲取情緒統計
+  const fetchEmotionStats = async () => {
+    try {
+      const year = currentMonth.getFullYear();
+      const month = currentMonth.getMonth() + 1;
+      
+      const response = await ApiService.getEmotionStats(year, month);
+      
+      if (response.success && response.emotions) {
+        setTopEmotions(response.emotions);
+        
+        // 如果 API 有返回 averageScore，也更新心理肌力分數
+        if (response.averageScore !== undefined) {
+          setStats(prev => ({
+            ...prev,
+            mentalMuscle: Math.round(response.averageScore),
+          }));
+        }
+      }
+    } catch (error) {
+      console.error('❌ 獲取情緒統計失敗:', error);
+      // 如果 API 失敗，退回到本地計算
+      calculateEmotionsFromData();
+    }
+  };
+  
+  // ⭐ 備用方案：從本地數據計算情緒統計
+  const calculateEmotionsFromData = () => {
+    if (displayData.length === 0) {
+      setTopEmotions([]);
+      return;
+    }
+
+    const emotionCount = {};
+    displayData.forEach((record) => {
+      const mood = record.post_mood || record.mood || '平靜';
+      emotionCount[mood] = (emotionCount[mood] || 0) + 1;
+    });
+
+    const emotions = Object.entries(emotionCount)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([emotion, count]) => ({ emotion, count }));
+    
+    setTopEmotions(emotions);
   };
 
   const filterDataForCurrentMonth = (practices) => {
@@ -141,23 +197,6 @@ const DailyScreen = ({ navigation }) => {
       mentalMuscle,
     });
   };
-
-  const getMostCommonEmotions = () => {
-    if (displayData.length === 0) return [];
-
-    const emotionCount = {};
-    displayData.forEach((record) => {
-      const mood = record.post_mood || record.mood || '平靜';
-      emotionCount[mood] = (emotionCount[mood] || 0) + 1;
-    });
-
-    return Object.entries(emotionCount)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 3)
-      .map(([emotion, count]) => ({ emotion, count }));
-  };
-
-  const topEmotions = getMostCommonEmotions();
 
   const formatDate = (dateStr) => {
     const date = new Date(dateStr);
@@ -1010,6 +1049,7 @@ const DailyScreen = ({ navigation }) => {
   );
 };
 
+// ⭐ 樣式保持不變...
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -1410,7 +1450,7 @@ const styles = StyleSheet.create({
     height: 100,
   },
 
-  // ⭐ Modal 樣式 - 完整還原設計稿
+  // Modal 樣式
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -1521,7 +1561,7 @@ const styles = StyleSheet.create({
     marginVertical: 8,
   },
 
-  // ===== 呼吸練習專屬樣式 =====
+  // 呼吸練習專屬樣式
   preMoodSection: {
     marginBottom: 20,
   },
@@ -1551,7 +1591,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
 
-  // ===== 好事書寫專屬樣式 =====
+  // 好事書寫專屬樣式
   goodThingSection: {
     marginBottom: 20,
   },

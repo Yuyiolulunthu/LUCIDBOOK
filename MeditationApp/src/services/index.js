@@ -67,6 +67,13 @@ const ApiService = {
       method: 'GET',
     });
   },
+
+  // ⭐ 情緒統計服務（用於 DailyScreen 本月心情快照）
+  getEmotionStats: async (year, month) => {
+    return apiClient.request(`/practice/emotion-stats.php?year=${year}&month=${month}`, {
+      method: 'GET',
+    });
+  },
   
   // 成就徽章服務
   getAchievements: async () => {
