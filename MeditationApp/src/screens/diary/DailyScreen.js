@@ -1,5 +1,5 @@
 // ==========================================
-// DailyScreen.js - 完整修正版（使用 API 獲取情緒統計）
+// DailyScreen.js - 完整版（使用 API 獲取情緒統計）
 // ==========================================
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -57,8 +57,8 @@ const DailyScreen = ({ navigation }) => {
   });
   const [viewMode, setViewMode] = useState('list');
   const [showInfoCard, setShowInfoCard] = useState(null);
-  
-  // ⭐ 新增：情緒統計狀態
+
+  // ⭐ 情緒統計 state（從 API 獲取）
   const [topEmotions, setTopEmotions] = useState([]);
 
   const [detailModalVisible, setDetailModalVisible] = useState(false);
@@ -95,10 +95,10 @@ const DailyScreen = ({ navigation }) => {
         hasLoadedData.current = true;
         filterDataForCurrentMonth(practiceResponse.practices);
       }
-      
+
       // ⭐ 獲取情緒統計
       await fetchEmotionStats();
-      
+
     } catch (error) {
       console.error('❌ 獲取數據失敗:', error);
     } finally {
@@ -106,19 +106,19 @@ const DailyScreen = ({ navigation }) => {
     }
   };
 
-  // ⭐ 新增：從 API 獲取情緒統計
+  // ⭐ 從 API 獲取情緒統計
   const fetchEmotionStats = async () => {
     try {
       const year = currentMonth.getFullYear();
       const month = currentMonth.getMonth() + 1;
-      
+
       const response = await ApiService.getEmotionStats(year, month);
-      
+
       if (response.success && response.emotions) {
         setTopEmotions(response.emotions);
-        
+
         // 如果 API 有返回 averageScore，也更新心理肌力分數
-        if (response.averageScore !== undefined) {
+        if (response.averageScore !== undefined && response.averageScore > 0) {
           setStats(prev => ({
             ...prev,
             mentalMuscle: Math.round(response.averageScore),
@@ -131,7 +131,7 @@ const DailyScreen = ({ navigation }) => {
       calculateEmotionsFromData();
     }
   };
-  
+
   // ⭐ 備用方案：從本地數據計算情緒統計
   const calculateEmotionsFromData = () => {
     if (displayData.length === 0) {
@@ -149,7 +149,7 @@ const DailyScreen = ({ navigation }) => {
       .sort((a, b) => b[1] - a[1])
       .slice(0, 3)
       .map(([emotion, count]) => ({ emotion, count }));
-    
+
     setTopEmotions(emotions);
   };
 
@@ -299,7 +299,7 @@ const DailyScreen = ({ navigation }) => {
     return 'breathing';
   };
 
-  // ⭐ 渲染詳情 Modal - 完整還原設計稿
+  // ⭐ 渲染詳情 Modal
   const renderDetailModal = () => {
     if (!selectedPractice) return null;
 
@@ -360,7 +360,7 @@ const DailyScreen = ({ navigation }) => {
                 </View>
               </LinearGradient>
 
-              {/* 基本資訊 - 完成日期 + 投入時間 */}
+              {/* 基本資訊 */}
               <View style={styles.infoSection}>
                 <View style={styles.infoRow}>
                   <View style={styles.iconCircle}>
@@ -389,10 +389,9 @@ const DailyScreen = ({ navigation }) => {
                 </View>
               </View>
 
-              {/* ===== 呼吸練習專屬欄位 ===== */}
+              {/* 呼吸練習專屬欄位 */}
               {practiceType === 'breathing' && (
                 <>
-                  {/* 練習前情緒 */}
                   {selectedPractice.pre_mood && (
                     <View style={styles.preMoodSection}>
                       <View style={styles.sectionHeader}>
@@ -407,7 +406,6 @@ const DailyScreen = ({ navigation }) => {
                     </View>
                   )}
 
-                  {/* 放鬆程度 */}
                   {selectedPractice.relax_level && (
                     <View style={styles.metricSection}>
                       <View style={styles.metricHeader}>
@@ -442,7 +440,6 @@ const DailyScreen = ({ navigation }) => {
                     </View>
                   )}
 
-                  {/* 練習後的感受 - 顯示為標籤 */}
                   {selectedPractice.post_feelings && (
                     <View style={styles.postFeelingsSection}>
                       <View style={styles.sectionHeader}>
@@ -461,10 +458,9 @@ const DailyScreen = ({ navigation }) => {
                 </>
               )}
 
-              {/* ===== 好事書寫專屬欄位 ===== */}
+              {/* 好事書寫專屬欄位 */}
               {practiceType === 'good-things' && (
                 <>
-                  {/* 好事內容 - 合併三個問題 */}
                   {(selectedPractice.good_thing || selectedPractice.who_with || selectedPractice.feelings) && (
                     <View style={styles.goodThingSection}>
                       <View style={styles.sectionHeader}>
@@ -502,7 +498,6 @@ const DailyScreen = ({ navigation }) => {
                     </View>
                   )}
 
-                  {/* 我的感受 - 情緒標籤 */}
                   {selectedPractice.emotions && (
                     <View style={styles.emotionsSection}>
                       <View style={styles.sectionHeader}>
@@ -526,7 +521,6 @@ const DailyScreen = ({ navigation }) => {
                     </View>
                   )}
 
-                  {/* 為什麼是好事 */}
                   {selectedPractice.reason && (
                     <View style={styles.reasonSection}>
                       <View style={styles.sectionHeader}>
@@ -541,7 +535,6 @@ const DailyScreen = ({ navigation }) => {
                     </View>
                   )}
 
-                  {/* 如何讓好事更常出現 */}
                   {selectedPractice.how_to_repeat && (
                     <View style={styles.howToRepeatSection}>
                       <View style={styles.sectionHeader}>
@@ -556,7 +549,6 @@ const DailyScreen = ({ navigation }) => {
                     </View>
                   )}
 
-                  {/* 未來可以做的小行動 */}
                   {selectedPractice.future_action && (
                     <View style={styles.futureSection}>
                       <View style={styles.sectionHeader}>
@@ -571,7 +563,6 @@ const DailyScreen = ({ navigation }) => {
                     </View>
                   )}
 
-                  {/* 正向感受程度 */}
                   {selectedPractice.positive_level && (
                     <View style={styles.metricSection}>
                       <View style={styles.metricHeader}>
@@ -602,7 +593,6 @@ const DailyScreen = ({ navigation }) => {
                     </View>
                   )}
 
-                  {/* 書寫後心情 - 標籤形式 */}
                   {selectedPractice.mood_after_writing && (
                     <View style={styles.moodAfterSection}>
                       <View style={styles.sectionHeader}>
@@ -760,7 +750,7 @@ const DailyScreen = ({ navigation }) => {
             </TouchableOpacity>
           </View>
 
-          {/* 月累計練習和心理肌力分數的介紹卡片 */}
+          {/* 介紹卡片 */}
           {(showInfoCard === 'practice' || showInfoCard === 'mental') && (
             <View style={styles.infoCardContainer}>
               {showInfoCard === 'practice' && (
@@ -832,7 +822,6 @@ const DailyScreen = ({ navigation }) => {
                 </LinearGradient>
               </TouchableOpacity>
 
-              {/* 本月心情快照的介紹卡片 */}
               {showInfoCard === 'mood' && (
                 <View style={styles.infoCardContainer}>
                   <View style={[styles.infoCard, { borderColor: '#FFEDD5' }]}>
@@ -901,14 +890,12 @@ const DailyScreen = ({ navigation }) => {
         {viewMode === 'calendar' && (
           <View style={styles.calendarView}>
             <View style={styles.calendarGrid}>
-              {/* 星期標題 */}
               {['日', '一', '二', '三', '四', '五', '六'].map((day) => (
                 <View key={day} style={styles.calendarWeekday}>
                   <Text style={styles.calendarWeekdayText}>{day}</Text>
                 </View>
               ))}
 
-              {/* 日期格子 */}
               {days.map((day, index) => {
                 if (!day) {
                   return <View key={`empty-${index}`} style={styles.calendarDay} />;
@@ -949,7 +936,6 @@ const DailyScreen = ({ navigation }) => {
               })}
             </View>
 
-            {/* 圖例 */}
             <View style={styles.calendarLegend}>
               <View style={styles.legendItem}>
                 <LinearGradient
@@ -980,7 +966,6 @@ const DailyScreen = ({ navigation }) => {
                     onPress={() => openDetailModal(record)}
                     activeOpacity={0.7}
                   >
-                    {/* 日期圓圈 */}
                     <View
                       style={[
                         styles.recordDateCircle,
@@ -991,7 +976,6 @@ const DailyScreen = ({ navigation }) => {
                       <Text style={styles.recordWeekday}>週{weekday}</Text>
                     </View>
 
-                    {/* 內容 */}
                     <View style={styles.recordContent}>
                       <Text style={styles.recordTitle} numberOfLines={1}>
                         {record.practice_type}
@@ -1049,7 +1033,6 @@ const DailyScreen = ({ navigation }) => {
   );
 };
 
-// ⭐ 樣式保持不變...
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -1058,8 +1041,6 @@ const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
   },
-
-  // 統計卡片
   statsCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 24,
@@ -1141,7 +1122,6 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     textAlign: 'center',
   },
-
   infoCardContainer: {
     marginTop: 8,
   },
@@ -1172,7 +1152,6 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     lineHeight: 20,
   },
-
   moodSnapshot: {
     borderRadius: 16,
     padding: 16,
@@ -1230,8 +1209,6 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontWeight: '600',
   },
-
-  // 視圖模式切換
   viewModeToggle: {
     flexDirection: 'row',
     backgroundColor: '#FFFFFF',
@@ -1277,8 +1254,6 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     fontWeight: '500',
   },
-
-  // 日曆視圖
   calendarView: {
     backgroundColor: '#FFFFFF',
     borderRadius: 24,
@@ -1343,8 +1318,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#6B7280',
   },
-
-  // 列表視圖
   listView: {
     paddingHorizontal: 16,
   },
@@ -1422,8 +1395,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#9CA3AF',
   },
-
-  // 空狀態
   emptyState: {
     alignItems: 'center',
     paddingVertical: 60,
@@ -1445,12 +1416,9 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#D1D5DB',
   },
-
   bottomPadding: {
     height: 100,
   },
-
-  // Modal 樣式
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -1495,8 +1463,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingBottom: 24,
   },
-
-  // 練習後情緒卡片
   moodCard: {
     borderRadius: 20,
     padding: 20,
@@ -1523,8 +1489,6 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontWeight: '600',
   },
-
-  // 基本資訊區塊
   infoSection: {
     marginBottom: 20,
   },
@@ -1560,8 +1524,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#F3F4F6',
     marginVertical: 8,
   },
-
-  // 呼吸練習專屬樣式
   preMoodSection: {
     marginBottom: 20,
   },
@@ -1590,8 +1552,6 @@ const styles = StyleSheet.create({
     color: '#065F46',
     fontWeight: '500',
   },
-
-  // 好事書寫專屬樣式
   goodThingSection: {
     marginBottom: 20,
   },
@@ -1663,8 +1623,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#ECFEFF',
     borderColor: '#CFFAFE',
   },
-
-  // 放鬆程度/正向感受區塊
   metricSection: {
     marginBottom: 20,
   },
@@ -1700,8 +1658,6 @@ const styles = StyleSheet.create({
     color: '#166CB5',
     fontWeight: '600',
   },
-
-  // 共用內容卡片樣式
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1733,8 +1689,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#ECFDF5',
     borderColor: '#D1FAE5',
   },
-
-  // 筆記區塊
   journalSection: {
     marginBottom: 20,
   },
