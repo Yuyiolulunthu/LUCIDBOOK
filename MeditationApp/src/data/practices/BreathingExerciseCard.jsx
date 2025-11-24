@@ -1,4 +1,4 @@
-// BreathingExerciseCard.jsx - 完整版（包含 API 串接）
+// BreathingExerciseCard.jsx - 完整修正版（API 串接 + 正確欄位名稱）
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View,
@@ -22,7 +22,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import MaskedView from '@react-native-masked-view/masked-view';
 import { Home, ChevronLeft, ChevronRight, Clock, Sparkles, Volume2, VolumeX, Play, Pause } from 'lucide-react-native';
 import ProgressBar from './components/ProgressBar';
-import ApiService from '../../../api'; // ⭐ API import
+import ApiService from '../../../api';
 
 // 導入自定義圖標
 import AnxietyIcon from './components/AnxietyIcon';
@@ -46,7 +46,7 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
   // ⭐ API 串接狀態
   const [practiceId, setPracticeId] = useState(null);
   const [startTime, setStartTime] = useState(null);
-  const [elapsedTime, setElapsedTime] = useState(0); // 累積秒數
+  const [elapsedTime, setElapsedTime] = useState(0);
   
   // 第五頁狀態
   const [isPlaying, setIsPlaying] = useState(false);
@@ -138,7 +138,6 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
 
   // 初始化練習
   const initializePractice = async (exerciseType) => {
-    // ⭐ 防止重複初始化
     if (hasInitialized.current) {
       console.log('⚠️ [呼吸練習卡片] 已經初始化過，跳過');
       return;
@@ -163,9 +162,6 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
           try {
             const parsed = typeof response.formData === 'string' ? JSON.parse(response.formData) : response.formData;
             console.log('📝 [呼吸練習卡片] 收到的表單數據:', parsed);
-            
-            // ⭐ 重要：新練習不要恢復舊的情緒選擇
-            // 只在需要時恢復放鬆程度和感受筆記
             console.log('ℹ️ [呼吸練習卡片] 這是新練習，不恢復舊的表單數據');
           } catch (e) {
             console.log('⚠️ [呼吸練習卡片] 解析表單數據失敗:', e);
@@ -173,25 +169,24 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
         }
       } else {
         console.error('❌ [呼吸練習卡片] 未收到 practiceId，後端回應:', response);
-        hasInitialized.current = false; // ⭐ 重置，允許重試
+        hasInitialized.current = false;
       }
     } catch (error) {
       console.error('❌ [呼吸練習卡片] 初始化失敗:', error);
-      hasInitialized.current = false; // ⭐ 重置，允許重試
+      hasInitialized.current = false;
     } finally {
       setStartTime(Date.now());
       console.log('✅ [呼吸練習卡片] 開始前端計時');
     }
   };
 
-  // ⭐ 用 useCallback 包裝 saveProgress
+  // ⭐ 保存進度（修正版 - 使用正確的欄位名稱）
   const saveProgress = useCallback(async () => {
     if (!practiceId) {
       console.log('⚠️ [呼吸練習卡片] practiceId 是空的，無法保存進度');
       return;
     }
 
-    // ⭐ 添加調試日誌
     console.log('💾 [呼吸練習卡片] 當前 selectedState:', selectedState);
     console.log('💾 [呼吸練習卡片] 對應的情緒名稱:', emotionalStates.find(st => st.id === selectedState)?.name);
 
@@ -202,17 +197,26 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
     });
 
     try {
+      // ⭐ 修正：使用正確的欄位名稱
+      const postFeelingsArray = selectedMoods.map(id => moodOptions.find(m => m.id === id)?.label).filter(Boolean);
+      const postMoodValue = postFeelingsArray.length > 0 ? postFeelingsArray[0] : '';
+
       const formData = {
         exerciseType: selectedExercise?.type || '',
         exerciseTitle: selectedExercise?.title || '',
+        // 練習前情緒
         preMood: emotionalStates.find(st => st.id === selectedState)?.name || '',
+        // ⭐ 練習後情緒（取第一個選擇的心情）
+        postMood: postMoodValue,
+        // 放鬆程度
         relaxLevel,
-        selectedMoods: selectedMoods.map(id => moodOptions.find(m => m.id === id)?.label).filter(Boolean),
-        feelingNote,
+        // ⭐ 練習後的感受（陣列形式）
+        postFeelings: postFeelingsArray,
+        // ⭐ 練習筆記
+        journalEntry: feelingNote,
         currentPage,
       };
 
-      // ⭐ 添加日誌
       console.log('💾 [呼吸練習卡片] 要保存的 formData:', JSON.stringify(formData, null, 2));
 
       await ApiService.updatePracticeProgress(
@@ -228,11 +232,10 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
     }
   }, [practiceId, currentPage, selectedExercise, selectedState, relaxLevel, selectedMoods, feelingNote, elapsedTime, emotionalStates, moodOptions]);
 
-  // 完成練習
+  // ⭐ 完成練習（修正版 - 使用正確的欄位名稱）
   const completePractice = async () => {
     console.log('🎯 [呼吸練習卡片] 準備完成練習...');
     
-    // ⭐ 添加調試日誌
     console.log('🎯 [呼吸練習卡片] selectedState:', selectedState);
     console.log('🎯 [呼吸練習卡片] selectedExercise:', selectedExercise);
     console.log('🎯 [呼吸練習卡片] 情緒名稱:', emotionalStates.find(st => st.id === selectedState)?.name);
@@ -257,8 +260,12 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
         elapsedTime,
       });
 
-      // 先存最後進度
+      // ⭐ 先存最後進度（確保 form_data 有最新資料）
       await saveProgress();
+
+      // ⭐ 修正：使用正確的欄位名稱
+      const postFeelingsArray = selectedMoods.map(id => moodOptions.find(m => m.id === id)?.label).filter(Boolean);
+      const postMoodValue = postFeelingsArray.length > 0 ? postFeelingsArray[0] : '';
 
       const completePayload = {
         practice_type: PRACTICE_TYPE,
@@ -267,25 +274,28 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
         
         // 對應後端的欄位
         feeling: `練習前：${emotionalStates.find(st => st.id === selectedState)?.name || '未記錄'}，放鬆程度：${relaxLevel}/10`,
-        noticed: selectedMoods.map(id => moodOptions.find(m => m.id === id)?.label).filter(Boolean).join('、') || '未記錄',
+        noticed: postFeelingsArray.join('、') || '未記錄',
         reflection: feelingNote || '',
+        
+        // ⭐ 修正：formData 使用正確的欄位名稱
+        formData: {
+          exerciseType: selectedExercise?.type || '',
+          exerciseTitle: selectedExercise?.title || '',
+          preMood: emotionalStates.find(st => st.id === selectedState)?.name || '',
+          postMood: postMoodValue,
+          relaxLevel,
+          postFeelings: postFeelingsArray,
+          journalEntry: feelingNote || '',
+        },
         
         // 額外結構化資料
         emotion_data: {
           exerciseType: selectedExercise?.type,
           exerciseTitle: selectedExercise?.title,
           preMood: emotionalStates.find(st => st.id === selectedState)?.name,
+          postMood: postMoodValue,
           relaxLevel,
-          postMoods: selectedMoods.map(id => moodOptions.find(m => m.id === id)?.label).filter(Boolean),
-        },
-        
-        formData: {
-          exerciseType: selectedExercise?.type,
-          exerciseTitle: selectedExercise?.title,
-          preMood: emotionalStates.find(st => st.id === selectedState)?.name,
-          relaxLevel,
-          selectedMoods: selectedMoods.map(id => moodOptions.find(m => m.id === id)?.label).filter(Boolean),
-          feelingNote,
+          postMoods: postFeelingsArray,
         },
       };
 
@@ -317,7 +327,7 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
     };
   }, [startTime]);
 
-  // ⭐ 自動保存（10 秒一次）- 只依賴 practiceId 和 saveProgress
+  // ⭐ 自動保存（10 秒一次）
   useEffect(() => {
     if (!practiceId) {
       console.log('⏸️ [呼吸練習卡片] 等待 practiceId，暫不啟動自動保存');
@@ -335,7 +345,7 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
       console.log('⏹️ [呼吸練習卡片] 停止自動保存');
       clearInterval(autoSaveInterval);
     };
-  }, [practiceId, saveProgress]); // ⭐ 只依賴這兩個
+  }, [practiceId, saveProgress]);
 
   // ============================================
   // 動畫相關 useEffect
@@ -503,18 +513,17 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
     const exercise = exercises.find(ex => ex.type === practiceType);
     setSelectedExercise(exercise);
     
-    // ⭐ 初始化練習（調用後端 API）
     await initializePractice(practiceType);
     
     setCurrentPage('preState');
   };
 
-  // ⭐ 處理情緒選擇完成 - 修正頁面導航
+  // ⭐ 處理情緒選擇完成
   const handlePreStateComplete = (feeling) => {
     console.log('✅ [呼吸練習卡片] 用戶選擇的情緒 ID:', feeling);
     console.log('✅ [呼吸練習卡片] 對應的情緒名稱:', emotionalStates.find(st => st.id === feeling)?.name);
     setSelectedState(feeling);
-    setCurrentPage('prepare'); // ⭐ 改成 'prepare'
+    setCurrentPage('prepare');
   };
 
   // 處理準備頁面繼續
@@ -638,7 +647,7 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
     setCurrentPage('relaxation');
   };
 
-  // ⭐ 處理靜靜結束 - 調用 completePractice API
+  // ⭐ 處理靜靜結束
   const handleFinishQuietly = async () => {
     await completePractice();
     setCurrentPage('streak');
@@ -650,7 +659,7 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
     setCurrentPage('feelings');
   };
 
-  // ⭐ 處理感受記錄完成 - 調用 completePractice API
+  // ⭐ 處理感受記錄完成
   const handleFeelingsComplete = async (data) => {
     const practiceData = {
       exerciseType: selectedExercise?.title || '呼吸練習',
@@ -667,7 +676,6 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
       ...practiceData,
     });
     
-    // ⭐ 完成練習並寫入資料庫
     await completePractice();
     
     setCurrentPage('streak');
@@ -817,7 +825,6 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
   // 渲染歡迎頁面 (第1頁)
   const renderWelcomePage = () => (
     <View style={styles.pageContainer}>
-      {/* 呼吸動畫 */}
       <View style={styles.welcomeAnimationContainer}>
         <Animated.View
           style={[
