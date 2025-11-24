@@ -1,9 +1,9 @@
 // ==========================================
 // 檔案名稱: TrainingPlanProgressScreen.js
-// 訓練計畫進度頁 - 統一設計風格 + 完成次數追蹤
+// 訓練計畫進度頁 - 串接後端 API 版本
 // ==========================================
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -11,16 +11,23 @@ import {
   TouchableOpacity,
   ScrollView,
   Alert,
+  ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Wind, PenLine, CheckCircle2 } from 'lucide-react-native';
+import ApiService from '../../../../api';
 
 const TrainingPlanProgressScreen = ({ route, navigation }) => {
   const { plan } = route.params;
+  const planId = 'stress-resistance'; // 訓練計劃 ID
+  
   const [currentWeek, setCurrentWeek] = useState(1);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-  // ⭐ 訓練週次數據 - 只保留呼吸練習和好事書寫
+  // ⭐ 訓練週次數據 - 初始結構
   const [weeks, setWeeks] = useState([
     {
       week: 1,
@@ -35,10 +42,11 @@ const TrainingPlanProgressScreen = ({ route, navigation }) => {
           id: 1,
           title: '呼吸練習',
           duration: '5 分鐘',
-          description: '學習基礎呼吸技巧，建立身心連結的第一步。透過專注呼吸，提升當下覺察力。',
-          completedCount: 0, // ⭐ 已完成次數
-          recommendedCount: 3, // ⭐ 建議完成次數
+          description: '學習基礎呼吸技巧，建立身心連結的第一步。透過專注呼吸,提升當下覺察力。',
+          completedCount: 0,
+          recommendedCount: 3,
           practiceType: '呼吸穩定力練習',
+          lastCompletedAt: null,
         },
       ],
     },
@@ -56,9 +64,10 @@ const TrainingPlanProgressScreen = ({ route, navigation }) => {
           title: '好事書寫',
           duration: '10 分鐘',
           description: '記住做不好的事情是大腦的原廠設定，用好事書寫改變負向對話的神經迴路。',
-          completedCount: 0, // ⭐ 已完成次數
-          recommendedCount: 3, // ⭐ 建議完成次數
+          completedCount: 0,
+          recommendedCount: 3,
           practiceType: '好事書寫',
+          lastCompletedAt: null,
         },
       ],
     },
@@ -66,6 +75,71 @@ const TrainingPlanProgressScreen = ({ route, navigation }) => {
 
   const currentWeekData = weeks[currentWeek - 1];
   const totalWeeks = weeks.length;
+
+  // ⭐ 載入訓練進度
+  const loadTrainingProgress = async () => {
+    try {
+      setLoading(true);
+      console.log('🔄 開始載入訓練進度...');
+      
+      const response = await ApiService.getTrainingProgress(planId);
+      
+      if (response.success) {
+        console.log('✅ 訓練進度載入成功:', response.progress);
+        
+        // 更新 weeks 中的 completedCount
+        setWeeks(prevWeeks => {
+          const newWeeks = prevWeeks.map(week => {
+            const weekProgress = response.progress[week.week] || {};
+            
+            const updatedSessions = week.sessions.map(session => {
+              const sessionProgress = weekProgress[session.id] || {};
+              
+              return {
+                ...session,
+                completedCount: sessionProgress.completed_count || 0,
+                lastCompletedAt: sessionProgress.last_completed_at || null,
+              };
+            });
+            
+            return {
+              ...week,
+              sessions: updatedSessions,
+            };
+          });
+          
+          return newWeeks;
+        });
+      }
+    } catch (error) {
+      console.error('❌ 載入訓練進度失敗:', error);
+      // 不顯示錯誤，使用預設值（0次）
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  // ⭐ 首次載入
+  useEffect(() => {
+    loadTrainingProgress();
+  }, []);
+
+  // ⭐ 當頁面獲得焦點時重新載入（從練習頁返回時）
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      if (!loading) {
+        loadTrainingProgress();
+      }
+    });
+    return unsubscribe;
+  }, [navigation, loading]);
+
+  // ⭐ 手動刷新
+  const handleRefresh = () => {
+    setRefreshing(true);
+    loadTrainingProgress();
+  };
 
   const handlePreviousWeek = () => {
     if (currentWeek > 1) {
@@ -79,18 +153,45 @@ const TrainingPlanProgressScreen = ({ route, navigation }) => {
     }
   };
 
-  const handleStartSession = (session) => {
+  const handleStartSession = async (session) => {
     navigation.navigate('PracticeNavigator', {
       practiceType: session.practiceType,
-      onPracticeComplete: () => {
-        // ⭐ 練習完成後增加完成次數
-        setWeeks(prevWeeks => {
-          const newWeeks = [...prevWeeks];
-          const weekIndex = newWeeks.findIndex(w => w.week === currentWeek);
-          const sessionIndex = newWeeks[weekIndex].sessions.findIndex(s => s.id === session.id);
-          newWeeks[weekIndex].sessions[sessionIndex].completedCount += 1;
-          return newWeeks;
-        });
+      onPracticeComplete: async () => {
+        try {
+          console.log('🔄 練習完成，更新進度...');
+          
+          // ⭐ 調用 API 更新進度
+          const response = await ApiService.updateTrainingProgress(
+            planId,
+            currentWeek,
+            session.id
+          );
+          
+          if (response.success) {
+            console.log('✅ 進度更新成功:', response.completed_count);
+            
+            // 立即更新本地狀態
+            setWeeks(prevWeeks => {
+              const newWeeks = [...prevWeeks];
+              const weekIndex = newWeeks.findIndex(w => w.week === currentWeek);
+              const sessionIndex = newWeeks[weekIndex].sessions.findIndex(
+                s => s.id === session.id
+              );
+              
+              newWeeks[weekIndex].sessions[sessionIndex] = {
+                ...newWeeks[weekIndex].sessions[sessionIndex],
+                completedCount: response.completed_count,
+                lastCompletedAt: response.last_completed_at,
+              };
+              
+              return newWeeks;
+            });
+          }
+        } catch (error) {
+          console.error('❌ 更新進度失敗:', error);
+          Alert.alert('提示', '練習進度更新失敗，請稍後重試');
+        }
+        
         navigation.goBack();
       },
     });
@@ -130,6 +231,29 @@ const TrainingPlanProgressScreen = ({ route, navigation }) => {
   const totalProgress = getTotalProgress();
   const IconComponent = currentWeekData.icon;
 
+  // ⭐ 載入中畫面
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+          >
+            <Ionicons name="chevron-back" size={24} color="#1F2937" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>情緒抗壓力計畫</Text>
+          <View style={styles.iconButton} />
+        </View>
+        
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#166CB5" />
+          <Text style={styles.loadingText}>載入訓練進度...</Text>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       {/* 頂部導航 */}
@@ -146,7 +270,18 @@ const TrainingPlanProgressScreen = ({ route, navigation }) => {
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        style={styles.content} 
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor="#166CB5"
+            colors={['#166CB5']}
+          />
+        }
+      >
         {/* 總進度卡片 */}
         <View style={styles.progressCard}>
           <LinearGradient
@@ -296,6 +431,18 @@ const TrainingPlanProgressScreen = ({ route, navigation }) => {
                       ]}
                     />
                   </View>
+                  
+                  {/* ⭐ 顯示最後完成時間 */}
+                  {session.lastCompletedAt && (
+                    <Text style={styles.lastCompletedText}>
+                      最後練習：{new Date(session.lastCompletedAt).toLocaleString('zh-TW', {
+                        month: 'numeric',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
+                    </Text>
+                  )}
                 </View>
 
                 {/* 開始按鈕 */}
@@ -327,7 +474,7 @@ const TrainingPlanProgressScreen = ({ route, navigation }) => {
             <Ionicons name="bulb-outline" size={20} color="#FF8C42" />
           </View>
           <Text style={styles.tipText}>
-            每個練習建議完成 3 次，以建立穩定的心理習慣。
+            每個練習建議完成 3 次，以建立穩定的心理習慣。下拉可以刷新進度。
           </Text>
         </View>
 
@@ -341,6 +488,16 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F5F7FA',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: '#6B7280',
   },
   header: {
     flexDirection: 'row',
@@ -610,6 +767,11 @@ const styles = StyleSheet.create({
   completionBarFill: {
     height: '100%',
     borderRadius: 4,
+  },
+  lastCompletedText: {
+    fontSize: 11,
+    color: '#9CA3AF',
+    marginTop: 6,
   },
 
   // 開始按鈕

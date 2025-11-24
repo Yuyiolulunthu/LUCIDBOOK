@@ -9,6 +9,7 @@
 // ✅ 提交功能
 // ✅ 成功動畫畫面
 // 🎨 依照設計程式風格更新
+// 🔧 修復送出問題
 // ==========================================
 
 import React, { useState } from 'react';
@@ -31,6 +32,9 @@ import Ionicons from 'react-native-vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import ApiService from '../../../../api';
+
+// 🔧 開發模式開關
+const DEV_MODE = true; // 設為 false 就會使用真實 API
 
 const ISSUE_TYPES = [
   { 
@@ -127,10 +131,33 @@ const Feedback = ({ navigation }) => {
         description: description.trim(),
         contactInfo: contactInfo.trim(),
         images: images.map(img => img.uri),
+        timestamp: new Date().toISOString(),
+        platform: Platform.OS,
       };
 
-      // 提交到後端
-      const response = await ApiService.submitFeedback(feedbackData);
+      // 記錄到控制台（開發時查看）
+      console.log('📝 回饋資料:', JSON.stringify(feedbackData, null, 2));
+
+      let response;
+
+      if (DEV_MODE) {
+        // === 開發階段：模擬成功 ===
+        console.log('⚠️ 開發模式：使用模擬回應');
+        await new Promise(resolve => setTimeout(resolve, 1500)); // 模擬網路延遲
+        response = { success: true, message: '回饋已收到' };
+      } else {
+        // === 正式環境：呼叫真實 API ===
+        console.log('🌐 正式模式：呼叫後端 API');
+        
+        // 檢查 ApiService 是否有 submitFeedback 方法
+        if (typeof ApiService.submitFeedback !== 'function') {
+          throw new Error('ApiService.submitFeedback 方法不存在，請先實作此方法');
+        }
+        
+        response = await ApiService.submitFeedback(feedbackData);
+      }
+
+      console.log('✅ API 回應:', response);
 
       if (response.success) {
         setIsSubmitted(true);
@@ -141,14 +168,27 @@ const Feedback = ({ navigation }) => {
           setDescription('');
           setContactInfo('');
           setImages([]);
+          setIsSubmitted(false);
           navigation.goBack();
         }, 2000);
       } else {
         Alert.alert('提交失敗', response.message || '請稍後再試');
       }
     } catch (error) {
-      console.error('提交失敗:', error);
-      Alert.alert('錯誤', '提交失敗，請檢查網路連線後重試');
+      console.error('❌ 提交失敗:', error);
+      
+      // 更詳細的錯誤訊息
+      let errorMessage = '提交失敗，請檢查網路連線後重試';
+      
+      if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      if (error.response) {
+        errorMessage = `伺服器錯誤: ${error.response.status}`;
+      }
+      
+      Alert.alert('錯誤', errorMessage);
     } finally {
       setLoading(false);
     }
@@ -168,17 +208,25 @@ const Feedback = ({ navigation }) => {
         <StatusBar barStyle="light-content" backgroundColor="#166CB5" />
         <View style={styles.successContent}>
           <View style={styles.successIconContainer}>
-            <Ionicons name="send" size={48} color="#FFF" />
+            <Ionicons name="checkmark-circle" size={64} color="#FFF" />
           </View>
           <Text style={styles.successTitle}>感謝您的回饋！</Text>
           <Text style={styles.successText}>我們會仔細閱讀並持續改進</Text>
+          {DEV_MODE && (
+            <Text style={styles.devModeText}>
+              (開發模式 - 未真實送出)
+            </Text>
+          )}
         </View>
       </LinearGradient>
     );
   }
 
   return (
-    <KeyboardAvoidingView style={styles.container}>
+    <KeyboardAvoidingView 
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
       <StatusBar barStyle="light-content" backgroundColor="#166CB5" />
       
       {/* Header */}
@@ -201,6 +249,11 @@ const Feedback = ({ navigation }) => {
         <Text style={styles.headerSubtitle}>
           您的每一份回饋都能幫助我們變得更好
         </Text>
+        {DEV_MODE && (
+          <View style={styles.devModeBadge}>
+            <Text style={styles.devModeBadgeText}>🔧 開發模式</Text>
+          </View>
+        )}
       </LinearGradient>
 
       <ScrollView 
@@ -385,7 +438,7 @@ const Feedback = ({ navigation }) => {
           )}
         </TouchableOpacity>
       </View>
-    </KeyboardAvoidingView >
+    </KeyboardAvoidingView>
   );
 };
 
@@ -423,6 +476,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: 'rgba(255,255,255,0.8)',
   },
+  devModeText: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.6)',
+    marginTop: 12,
+  },
 
   // Header
   header: {
@@ -456,6 +514,19 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: 'rgba(255,255,255,0.8)',
     paddingHorizontal: 8,
+  },
+  devModeBadge: {
+    marginTop: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 12,
+    alignSelf: 'flex-start',
+  },
+  devModeBadgeText: {
+    fontSize: 12,
+    color: '#FFF',
+    fontWeight: '600',
   },
 
   // ScrollView
