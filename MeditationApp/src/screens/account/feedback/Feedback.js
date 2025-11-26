@@ -249,11 +249,6 @@ const Feedback = ({ navigation }) => {
         <Text style={styles.headerSubtitle}>
           您的每一份回饋都能幫助我們變得更好
         </Text>
-        {DEV_MODE && (
-          <View style={styles.devModeBadge}>
-            <Text style={styles.devModeBadgeText}>🔧 開發模式</Text>
-          </View>
-        )}
       </LinearGradient>
 
       <ScrollView 

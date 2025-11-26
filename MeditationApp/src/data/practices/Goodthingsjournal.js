@@ -133,6 +133,7 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
   const [showOtherEmotionInput, setShowOtherEmotionInput] = useState(false);
   const [showOtherActionInput, setShowOtherActionInput] = useState(false);
   const [showOtherMoodInput, setShowOtherMoodInput] = useState(false);
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
 
   const scrollViewRef = useRef(null);
   const previousScreen = route?.params?.from;
@@ -353,6 +354,27 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [practiceId, currentPage, formData, elapsedTime]);
+
+  // 監聽鍵盤狀態
+  useEffect(() => {
+    const keyboardDidShowListener = Keyboard.addListener(
+      'keyboardDidShow',
+      () => {
+        setIsKeyboardVisible(true);
+      }
+    );
+    const keyboardDidHideListener = Keyboard.addListener(
+      'keyboardDidHide',
+      () => {
+        setIsKeyboardVisible(false);
+      }
+    );
+
+    return () => {
+      keyboardDidShowListener.remove();
+      keyboardDidHideListener.remove();
+    };
+  }, []);
 
   // ======================== 既有動畫效果 ========================
 
@@ -709,6 +731,7 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={{ flex: 1 }}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
     >
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <View style={styles.pageContainer}>
@@ -741,7 +764,10 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
 
           <ScrollView
             ref={scrollViewRef}
-            contentContainerStyle={styles.questionScrollContent}
+            contentContainerStyle={[
+              styles.questionScrollContent,
+              { paddingBottom: isKeyboardVisible ? 180 : 120 }
+            ]}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
             bounces
@@ -805,21 +831,28 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
             )}
           </ScrollView>
 
-          <View style={styles.bottomNavigation}>
-            <TouchableOpacity
-              onPress={handleBack}
-              style={styles.navButton}
-            >
-              <ArrowIcon direction="left" color="#31C6FE" size={24} />
-            </TouchableOpacity>
+          {!isKeyboardVisible && (
+            <View style={styles.bottomNavigation}>
+              <TouchableOpacity
+                onPress={handleBack}
+                style={styles.navButton}
+              >
+                <ArrowIcon direction="left" color="#31C6FE" size={24} />
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              onPress={() => setCurrentPage('question1b')}
-              style={styles.navButton}
-            >
-              <ArrowIcon direction="right" color="#31C6FE" size={24} />
-            </TouchableOpacity>
-          </View>
+              <TouchableOpacity
+                onPress={() => {
+                  Keyboard.dismiss();
+                  setTimeout(() => {
+                    setCurrentPage('question1b');
+                  }, 100);
+                }}
+                style={styles.navButton}
+              >
+                <ArrowIcon direction="right" color="#31C6FE" size={24} />
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
       </TouchableWithoutFeedback>
     </KeyboardAvoidingView>
@@ -830,6 +863,7 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={{ flex: 1 }}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
     >
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <View style={styles.pageContainer}>
@@ -861,7 +895,10 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
           </View>
 
           <ScrollView
-            contentContainerStyle={styles.questionScrollContent}
+            contentContainerStyle={[
+              styles.questionScrollContent,
+              { paddingBottom: isKeyboardVisible ? 180 : 120 }
+            ]}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
             bounces
@@ -925,21 +962,28 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
             )}
           </ScrollView>
 
-          <View style={styles.bottomNavigation}>
-            <TouchableOpacity
-              onPress={handleBack}
-              style={styles.navButton}
-            >
-              <ArrowIcon direction="left" color="#31C6FE" size={24} />
-            </TouchableOpacity>
+          {!isKeyboardVisible && (
+            <View style={styles.bottomNavigation}>
+              <TouchableOpacity
+                onPress={handleBack}
+                style={styles.navButton}
+              >
+                <ArrowIcon direction="left" color="#31C6FE" size={24} />
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              onPress={() => setCurrentPage('question2')}
-              style={styles.navButton}
-            >
-              <ArrowIcon direction="right" color="#31C6FE" size={24} />
-            </TouchableOpacity>
-          </View>
+              <TouchableOpacity
+                onPress={() => {
+                  Keyboard.dismiss();
+                  setTimeout(() => {
+                    setCurrentPage('question2');
+                  }, 100);
+                }}
+                style={styles.navButton}
+              >
+                <ArrowIcon direction="right" color="#31C6FE" size={24} />
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
       </TouchableWithoutFeedback>
     </KeyboardAvoidingView>
@@ -950,6 +994,7 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={{ flex: 1 }}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
     >
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <View style={styles.pageContainer}>
@@ -981,7 +1026,10 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
           </View>
 
           <ScrollView
-            contentContainerStyle={styles.questionScrollContent}
+            contentContainerStyle={[
+              styles.questionScrollContent,
+              { paddingBottom: isKeyboardVisible ? 180 : 120 }
+            ]}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
             bounces
@@ -1045,21 +1093,28 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
             )}
           </ScrollView>
 
-          <View style={styles.bottomNavigation}>
-            <TouchableOpacity
-              onPress={handleBack}
-              style={styles.navButton}
-            >
-              <ArrowIcon direction="left" color="#31C6FE" size={24} />
-            </TouchableOpacity>
+          {!isKeyboardVisible && (
+            <View style={styles.bottomNavigation}>
+              <TouchableOpacity
+                onPress={handleBack}
+                style={styles.navButton}
+              >
+                <ArrowIcon direction="left" color="#31C6FE" size={24} />
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              onPress={() => setCurrentPage('emotions')}
-              style={styles.navButton}
-            >
-              <ArrowIcon direction="right" color="#31C6FE" size={24} />
-            </TouchableOpacity>
-          </View>
+              <TouchableOpacity
+                onPress={() => {
+                  Keyboard.dismiss();
+                  setTimeout(() => {
+                    setCurrentPage('emotions');
+                  }, 100);
+                }}
+                style={styles.navButton}
+              >
+                <ArrowIcon direction="right" color="#31C6FE" size={24} />
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
       </TouchableWithoutFeedback>
     </KeyboardAvoidingView>
@@ -1070,6 +1125,7 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={{ flex: 1 }}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
     >
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <View style={styles.pageContainer}>
@@ -1101,7 +1157,10 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
           </View>
 
           <ScrollView
-            contentContainerStyle={styles.questionScrollContent}
+            contentContainerStyle={[
+              styles.questionScrollContent,
+              { paddingBottom: isKeyboardVisible ? 180 : 120 }
+            ]}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
             bounces
@@ -1160,21 +1219,28 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
             )}
           </ScrollView>
 
-          <View style={styles.bottomNavigation}>
-            <TouchableOpacity
-              onPress={handleBack}
-              style={styles.navButton}
-            >
-              <ArrowIcon direction="left" color="#31C6FE" size={24} />
-            </TouchableOpacity>
+          {!isKeyboardVisible && (
+            <View style={styles.bottomNavigation}>
+              <TouchableOpacity
+                onPress={handleBack}
+                style={styles.navButton}
+              >
+                <ArrowIcon direction="left" color="#31C6FE" size={24} />
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              onPress={() => setCurrentPage('transition')}
-              style={styles.navButton}
-            >
-              <ArrowIcon direction="right" color="#31C6FE" size={24} />
-            </TouchableOpacity>
-          </View>
+              <TouchableOpacity
+                onPress={() => {
+                  Keyboard.dismiss();
+                  setTimeout(() => {
+                    setCurrentPage('transition');
+                  }, 100);
+                }}
+                style={styles.navButton}
+              >
+                <ArrowIcon direction="right" color="#31C6FE" size={24} />
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
       </TouchableWithoutFeedback>
     </KeyboardAvoidingView>
@@ -1234,6 +1300,7 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={{ flex: 1 }}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
     >
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <View style={styles.pageContainer}>
@@ -1265,7 +1332,10 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
           </View>
 
           <ScrollView
-            contentContainerStyle={styles.questionScrollContent}
+            contentContainerStyle={[
+              styles.questionScrollContent,
+              { paddingBottom: isKeyboardVisible ? 180 : 120 }
+            ]}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
             bounces
@@ -1329,21 +1399,28 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
             )}
           </ScrollView>
 
-          <View style={styles.bottomNavigation}>
-            <TouchableOpacity
-              onPress={handleBack}
-              style={styles.navButton}
-            >
-              <ArrowIcon direction="left" color="#31C6FE" size={24} />
-            </TouchableOpacity>
+          {!isKeyboardVisible && (
+            <View style={styles.bottomNavigation}>
+              <TouchableOpacity
+                onPress={handleBack}
+                style={styles.navButton}
+              >
+                <ArrowIcon direction="left" color="#31C6FE" size={24} />
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              onPress={() => setCurrentPage('question4b')}
-              style={styles.navButton}
-            >
-              <ArrowIcon direction="right" color="#31C6FE" size={24} />
-            </TouchableOpacity>
-          </View>
+              <TouchableOpacity
+                onPress={() => {
+                  Keyboard.dismiss();
+                  setTimeout(() => {
+                    setCurrentPage('question4b');
+                  }, 100);
+                }}
+                style={styles.navButton}
+              >
+                <ArrowIcon direction="right" color="#31C6FE" size={24} />
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
       </TouchableWithoutFeedback>
     </KeyboardAvoidingView>
@@ -1354,6 +1431,7 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={{ flex: 1 }}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
     >
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <View style={styles.pageContainer}>
@@ -1385,7 +1463,10 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
           </View>
 
           <ScrollView
-            contentContainerStyle={styles.questionScrollContent}
+            contentContainerStyle={[
+              styles.questionScrollContent,
+              { paddingBottom: isKeyboardVisible ? 180 : 120 }
+            ]}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
             bounces
@@ -1452,27 +1533,34 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
             )}
           </ScrollView>
 
-          <View style={styles.bottomNavigation}>
-            <TouchableOpacity
-              onPress={handleBack}
-              style={styles.navButton}
-            >
-              <ArrowIcon direction="left" color="#31C6FE" size={24} />
-            </TouchableOpacity>
+          {!isKeyboardVisible && (
+            <View style={styles.bottomNavigation}>
+              <TouchableOpacity
+                onPress={handleBack}
+                style={styles.navButton}
+              >
+                <ArrowIcon direction="left" color="#31C6FE" size={24} />
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              onPress={() => setCurrentPage('question5')}
-              style={styles.navButton}
-            >
-              <ArrowIcon direction="right" color="#31C6FE" size={24} />
-            </TouchableOpacity>
-          </View>
+              <TouchableOpacity
+                onPress={() => {
+                  Keyboard.dismiss();
+                  setTimeout(() => {
+                    setCurrentPage('question5');
+                  }, 100);
+                }}
+                style={styles.navButton}
+              >
+                <ArrowIcon direction="right" color="#31C6FE" size={24} />
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
       </TouchableWithoutFeedback>
     </KeyboardAvoidingView>
   );
 
-  // 10. 問題2-3頁(選擇小行動)
+  // 10. 問題2-3頁(選擇小行動) - 修復版
   const renderQuestion5Page = () => {
     const isCustomAction = showOtherActionInput;
     const selectedAction = formData.futureAction;
@@ -1481,6 +1569,7 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={{ flex: 1 }}
+        keyboardVerticalOffset={0}
       >
         <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
           <View style={styles.pageContainer}>
@@ -1512,12 +1601,16 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
             </View>
 
             <ScrollView
-              contentContainerStyle={styles.questionScrollContent}
+              contentContainerStyle={{
+                flexGrow: 1,
+                paddingHorizontal: 24,
+                paddingBottom: isKeyboardVisible ? 250 : 120,
+              }}
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
-              bounces
-              scrollEventThrottle={16}
-              removeClippedSubviews
+              bounces={true}
+              scrollEnabled={true}
+              nestedScrollEnabled={true}
             >
               <Text style={styles.questionLabel}>
                 選一個好事複製小行動
@@ -1594,21 +1687,28 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
               )}
             </ScrollView>
 
-            <View style={styles.bottomNavigation}>
-              <TouchableOpacity
-                onPress={handleBack}
-                style={styles.navButton}
-              >
-                <ArrowIcon direction="left" color="#31C6FE" size={24} />
-              </TouchableOpacity>
+            {!isKeyboardVisible && (
+              <View style={styles.bottomNavigation}>
+                <TouchableOpacity
+                  onPress={handleBack}
+                  style={styles.navButton}
+                >
+                  <ArrowIcon direction="left" color="#31C6FE" size={24} />
+                </TouchableOpacity>
 
-              <TouchableOpacity
-                onPress={() => setCurrentPage('completion')}
-                style={styles.navButton}
-              >
-                <ArrowIcon direction="right" color="#31C6FE" size={24} />
-              </TouchableOpacity>
-            </View>
+                <TouchableOpacity
+                  onPress={() => {
+                    Keyboard.dismiss();
+                    setTimeout(() => {
+                      setCurrentPage('completion');
+                    }, 100);
+                  }}
+                  style={styles.navButton}
+                >
+                  <ArrowIcon direction="right" color="#31C6FE" size={24} />
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
         </TouchableWithoutFeedback>
       </KeyboardAvoidingView>
@@ -1835,6 +1935,7 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={{ flex: 1 }}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
     >
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <View style={styles.pageContainer}>
@@ -1866,7 +1967,10 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
           </View>
 
           <ScrollView
-            contentContainerStyle={styles.questionScrollContent}
+            contentContainerStyle={[
+              styles.questionScrollContent,
+              { paddingBottom: isKeyboardVisible ? 180 : 120 }
+            ]}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
             bounces
@@ -1924,25 +2028,30 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
             )}
           </ScrollView>
 
-          <View style={styles.bottomNavigation}>
-            <TouchableOpacity
-              onPress={handleBack}
-              style={styles.navButton}
-            >
-              <ArrowIcon direction="left" color="#31C6FE" size={24} />
-            </TouchableOpacity>
+          {!isKeyboardVisible && (
+            <View style={styles.bottomNavigation}>
+              <TouchableOpacity
+                onPress={handleBack}
+                style={styles.navButton}
+              >
+                <ArrowIcon direction="left" color="#31C6FE" size={24} />
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              onPress={async () => {
-                console.log('保存好事書寫數據:', formData);
-                await saveProgress();
-                setCurrentPage('streak');
-              }}
-              style={styles.navButton}
-            >
-              <ArrowIcon direction="right" color="#31C6FE" size={24} />
-            </TouchableOpacity>
-          </View>
+              <TouchableOpacity
+                onPress={async () => {
+                  Keyboard.dismiss();
+                  console.log('保存好事書寫數據:', formData);
+                  await saveProgress();
+                  setTimeout(() => {
+                    setCurrentPage('streak');
+                  }, 100);
+                }}
+                style={styles.navButton}
+              >
+                <ArrowIcon direction="right" color="#31C6FE" size={24} />
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
       </TouchableWithoutFeedback>
     </KeyboardAvoidingView>
