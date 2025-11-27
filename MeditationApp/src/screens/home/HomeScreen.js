@@ -1,9 +1,9 @@
 // ==========================================
 // 檔案名稱: src/screens/home/HomeScreen.js
-// 首頁畫面 - 串接後端統計版
+// 首頁畫面 - 完整整合版
 // ==========================================
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -13,7 +13,6 @@ import {
   Dimensions,
   StatusBar,
   Alert,
-  Animated,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import MaskedView from '@react-native-masked-view/masked-view';
@@ -25,9 +24,13 @@ import {
   Sparkles,
   Clock,
 } from 'lucide-react-native';
-import ApiService from '../../../api';
+import ApiService from '../../services/index';
 import BottomNavigation from '../../navigation/BottomNavigation';
 import AppHeader from '../../navigation/AppHeader';
+import {
+  computeWeeklyCheckIns,
+  computeMonthlyTotal,
+} from './utils/practiceTypeMapping';
 
 const { width } = Dimensions.get('window');
 
@@ -41,13 +44,13 @@ const HomeScreen = ({ navigation }) => {
   const [selectedPractice, setSelectedPractice] = useState('breathing');
   const [selectedCategory, setSelectedCategory] = useState('employee');
 
-  // 🔹 首頁統計：心情連續天數 / 總天數
+  // 首頁統計：心情連續天數 / 總天數
   const [moodStats, setMoodStats] = useState({
     consecutiveDays: 0,
     totalDays: 0,
   });
 
-  // 🔹 首頁統計：每個練習的月累計 / 週進度
+  // 首頁統計：每個練習的月累計 / 週進度
   const [practiceStats, setPracticeStats] = useState({
     breathing: {
       streakDays: 0,
@@ -61,13 +64,9 @@ const HomeScreen = ({ navigation }) => {
     },
   });
 
-  // ⚠️ 這兩個要跟你 MySQL practice_type 存的字串一致
-  const PRACTICE_TYPE_BREATHING = 'breathing';
-  const PRACTICE_TYPE_GOODTHINGS = 'goodthings';
-
   // ========== 資料定義 ==========
 
-  // 情緒選項 - 使用正確的顏色
+  // 情緒選項
   const emotionCards = [
     {
       id: 'happy',
@@ -107,55 +106,6 @@ const HomeScreen = ({ navigation }) => {
     },
   ];
 
-  // ========== 工具函式（用 stats.php 的資料算週進度 / 月累計） ==========
-
-  // 把 weeklyPractices 轉成 [日, 一, 二, 三, 四, 五, 六] 的 boolean 陣列
-  const computeWeeklyCheckIns = (weeklyPractices, practiceType) => {
-    const result = Array(7).fill(false);
-
-    (weeklyPractices || []).forEach((item) => {
-      const type = item.practice_type || item.practiceType;
-      if (type !== practiceType) return;
-
-      const created =
-        item.created_at || item.createdAt || item.date || item.datetime;
-      const d = new Date(created);
-      if (isNaN(d)) return;
-
-      // JS 的 getDay(): 0=日, 1=一, ... 6=六
-      const dayIndex = d.getDay();
-      result[dayIndex] = true;
-    });
-
-    return result;
-  };
-
-  // 把 monthlyPractices 轉成「本月有完成幾天」（以天數計算，不是次數）
-  const computeMonthlyTotal = (monthlyPractices, practiceType) => {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = now.getMonth(); // 0-11
-
-    const daysSet = new Set();
-
-    (monthlyPractices || []).forEach((item) => {
-      const type = item.practice_type || item.practiceType;
-      if (type !== practiceType) return;
-
-      const created =
-        item.created_at || item.createdAt || item.date || item.datetime;
-      const d = new Date(created);
-      if (isNaN(d)) return;
-
-      if (d.getFullYear() === year && d.getMonth() === month) {
-        const key = d.toISOString().slice(0, 10); // YYYY-MM-DD
-        daysSet.add(key);
-      }
-    });
-
-    return daysSet.size;
-  };
-
   // ========== 生命週期 ==========
 
   useEffect(() => {
@@ -174,7 +124,7 @@ const HomeScreen = ({ navigation }) => {
   }, [navigation, isLoggedIn]);
 
   useEffect(() => {
-    if (isLoggedIn && user && !user.isGuest) {
+    if (isLoggedIn && user) {
       loadTodayData();
       loadHomeStats();
     }
@@ -182,17 +132,25 @@ const HomeScreen = ({ navigation }) => {
 
   // ========== 核心功能函數 ==========
 
+  /**
+   * 檢查登入狀態
+   */
   const checkLoginStatus = async () => {
     try {
       const loggedIn = await ApiService.isLoggedIn();
       if (loggedIn) {
         const response = await ApiService.getUserProfile();
-        setUser({
-          id: response.user.id,
-          name: response.user.name,
-          email: response.user.email,
-        });
-        setIsLoggedIn(true);
+        if (response && response.user) {
+          setUser({
+            id: response.user.id,
+            name: response.user.name,
+            email: response.user.email,
+          });
+          setIsLoggedIn(true);
+        } else {
+          setIsLoggedIn(false);
+          setUser(null);
+        }
       } else {
         setIsLoggedIn(false);
         setUser(null);
@@ -204,6 +162,9 @@ const HomeScreen = ({ navigation }) => {
     }
   };
 
+  /**
+   * 載入今日數據（心情 + 練習狀態）
+   */
   const loadTodayData = async () => {
     try {
       // 今日心情
@@ -220,7 +181,7 @@ const HomeScreen = ({ navigation }) => {
         setTodayMoodRecord(null);
       }
 
-      // 今日練習狀態（你原本的 today-status.php）
+      // 今日練習狀態
       const practiceResponse = await ApiService.getTodayPracticeStatus();
       if (practiceResponse.success) {
         setTodayPracticeStatus(practiceResponse.practices || {});
@@ -230,67 +191,68 @@ const HomeScreen = ({ navigation }) => {
     }
   };
 
-  // 🔹 新增：從 /practice/stats.php 把「連續天數 / 週進度 / 月累計」抓進來
+  /**
+   * 載入首頁統計數據
+   * 從 ApiService.getPracticeStats() 獲取連續天數、總天數、週/月數據
+   */
   const loadHomeStats = async () => {
     try {
+      console.log('📊 開始載入首頁統計數據...');
+      
       const res = await ApiService.getPracticeStats();
-      // 容錯：可能是 {success, stats}，也可能是直接 stats
+      
+      // 容錯處理：支持多種返回格式
       const success = res?.success !== undefined ? res.success : true;
-
-      const stats =
-        res?.stats ||
-        res?.data?.stats ||
-        res?.data ||
-        (success ? res : null);
+      const stats = res?.stats || res?.data?.stats || res?.data || (success ? res : null);
 
       if (!success || !stats) {
-        console.log('練習統計 API 返回格式不符或失敗:', res);
+        console.log('⚠️ 練習統計 API 返回格式不符或失敗:', res);
         return;
       }
 
-      const weeklyPractices =
-        stats.weeklyPractices || stats.weekly_practices || [];
-      const monthlyPractices =
-        stats.monthlyPractices || stats.monthly_practices || [];
+      console.log('✅ 統計數據載入成功');
+      console.log('  - 連續天數:', stats.currentStreak || stats.current_streak || 0);
+      console.log('  - 總天數:', stats.totalDays || stats.total_days || 0);
 
-      // 1) 上方卡片：已連續簽到 / 第幾天（先用「有完成任何練習就算簽到」）
+      // 從 stats.php 取得週/月數據
+      const weeklyPractices = stats.weeklyPractices || stats.weekly_practices || [];
+      const monthlyPractices = stats.monthlyPractices || stats.monthly_practices || [];
+
+      console.log('  - 週數據筆數:', weeklyPractices.length);
+      console.log('  - 月數據筆數:', monthlyPractices.length);
+
+      // 1) 設置連續簽到天數和總天數
       setMoodStats({
         consecutiveDays: stats.currentStreak || stats.current_streak || 0,
         totalDays: stats.totalDays || stats.total_days || 0,
       });
 
-      // 2) 下方練習卡：呼吸 / 好事書寫的週進度 & 月累計
+      // 2) 設置各練習的週進度和月累計
+      // 使用 practiceTypeMapping.js 的工具函數處理
       setPracticeStats({
         breathing: {
           streakDays: stats.currentStreak || stats.current_streak || 0,
-          monthlyTotal: computeMonthlyTotal(
-            monthlyPractices,
-            PRACTICE_TYPE_BREATHING
-          ),
-          weeklyCheckIns: computeWeeklyCheckIns(
-            weeklyPractices,
-            PRACTICE_TYPE_BREATHING
-          ),
+          monthlyTotal: computeMonthlyTotal(monthlyPractices, 'breathing'),
+          weeklyCheckIns: computeWeeklyCheckIns(weeklyPractices, 'breathing'),
         },
         goodthings: {
           streakDays: stats.currentStreak || stats.current_streak || 0,
-          monthlyTotal: computeMonthlyTotal(
-            monthlyPractices,
-            PRACTICE_TYPE_GOODTHINGS
-          ),
-          weeklyCheckIns: computeWeeklyCheckIns(
-            weeklyPractices,
-            PRACTICE_TYPE_GOODTHINGS
-          ),
+          monthlyTotal: computeMonthlyTotal(monthlyPractices, 'goodthings'),
+          weeklyCheckIns: computeWeeklyCheckIns(weeklyPractices, 'goodthings'),
         },
       });
+
+      console.log('📊 首頁統計數據設置完成');
     } catch (error) {
-      console.error('載入首頁統計資料失敗:', error);
+      console.error('❌ 載入首頁統計資料失敗:', error);
     }
   };
 
+  /**
+   * 顯示登入提示
+   */
   const showLoginPrompt = () => {
-    if (!isLoggedIn || (user && user.isGuest)) {
+    if (!isLoggedIn) {
       Alert.alert('需要登入', '請登入以享受完整的冥想體驗', [
         { text: '取消', style: 'cancel' },
         {
@@ -309,6 +271,9 @@ const HomeScreen = ({ navigation }) => {
     return false;
   };
 
+  /**
+   * 處理心情選擇
+   */
   const handleMoodSelect = async (emotion, index) => {
     if (showLoginPrompt()) return;
 
@@ -318,17 +283,17 @@ const HomeScreen = ({ navigation }) => {
       return;
     }
 
-    console.log('👆 點擊按鈕:', emotion.label, '(index:', index, ')');
-    console.log('選中情緒:', emotion.label, 'index:', index);
+    console.log('👆 選中情緒:', emotion.label, '(index:', index, ')');
 
     // 先設定選中狀態，觸發動畫
     setSelectedMood(index);
 
     try {
+      // 調用 API 記錄心情
       const response = await ApiService.recordMood(
         emotion.level,
         emotion.label,
-        ''
+        '' // note 參數
       );
 
       if (response.success) {
@@ -339,43 +304,49 @@ const HomeScreen = ({ navigation }) => {
         });
         console.log('✅ 心情記錄成功');
       } else {
-        console.log('API 返回失敗');
+        console.log('⚠️ API 返回失敗');
         // API 失敗時回復到原狀態
-        if (todayMoodRecord) {
-          const originalIndex = emotionCards.findIndex(
-            (m) => m.level === todayMoodRecord.mood_level
-          );
-          setSelectedMood(originalIndex !== -1 ? originalIndex : null);
-        } else {
-          setSelectedMood(null);
-        }
+        restoreMoodState();
       }
     } catch (error) {
-      console.error('記錄心情失敗:', error);
+      console.error('❌ 記錄心情失敗:', error);
       Alert.alert('錯誤', '心情記錄失敗，請稍後再試');
       // 錯誤時回復到原狀態
-      if (todayMoodRecord) {
-        const originalIndex = emotionCards.findIndex(
-          (m) => m.level === todayMoodRecord.mood_level
-        );
-        setSelectedMood(originalIndex !== -1 ? originalIndex : null);
-      } else {
-        setSelectedMood(null);
-      }
+      restoreMoodState();
     }
   };
 
+  /**
+   * 恢復心情狀態（當記錄失敗時）
+   */
+  const restoreMoodState = () => {
+    if (todayMoodRecord) {
+      const originalIndex = emotionCards.findIndex(
+        (m) => m.level === todayMoodRecord.mood_level
+      );
+      setSelectedMood(originalIndex !== -1 ? originalIndex : null);
+    } else {
+      setSelectedMood(null);
+    }
+  };
+
+  /**
+   * 導航到呼吸練習
+   */
   const navigateToBreathing = () => {
     if (showLoginPrompt()) return;
     navigation.navigate('PracticeNavigator', {
       practiceType: '呼吸穩定力練習',
       onPracticeComplete: async () => {
         await loadTodayData();
-        await loadHomeStats(); // 練習完成後更新首頁統計
+        await loadHomeStats();
       },
     });
   };
 
+  /**
+   * 導航到好事書寫
+   */
   const navigateToGoodThings = () => {
     if (showLoginPrompt()) return;
     navigation.navigate('PracticeNavigator', {
@@ -387,6 +358,9 @@ const HomeScreen = ({ navigation }) => {
     });
   };
 
+  /**
+   * 導航到情緒抗壓力計劃
+   */
   const navigateToResiliencePlan = () => {
     navigation.navigate('EmotionalResiliencePlan');
   };
@@ -401,14 +375,14 @@ const HomeScreen = ({ navigation }) => {
       ? practiceStats.breathing
       : practiceStats.goodthings;
 
-  const weeklyCheckIns = currentPracticeStats.weeklyCheckIns || [];
+  const weeklyCheckIns = currentPracticeStats.weeklyCheckIns || Array(7).fill(false);
   const checkInCount = weeklyCheckIns.filter(Boolean).length;
   const monthlyTotal = currentPracticeStats.monthlyTotal || 0;
 
   // ========== 子組件 ==========
 
   /**
-   * 情緒按鈕組件 - 簡化版（無動畫）
+   * 情緒按鈕組件
    */
   const MoodButton = React.memo(({ emotion, index, isSelected, onPress }) => {
     const handlePress = () => {
@@ -1138,7 +1112,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 12,
     overflow: 'hidden',
-    backgroundColor: '#F7FAFC', // 未選中時的背景色
+    backgroundColor: '#F7FAFC',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.08,

@@ -4,7 +4,7 @@ import BreathingExerciseCard from '../data/practices/BreathingExerciseCard';
 import EmotionPractice from '../data/practices/EmotionPractice';
 import MindfulnessPractice from '../data/practices/MindfulnessPractice';
 import SelfAwarenessPractice from '../data/practices/SelfAwarenessPractice';
-import GoodThingsJournal from '../data/practices/GoodThingsjournal';
+import GoodThingsJournal from '../data/practices/Goodthingsjournal';
 
 const PracticeNavigator = ({ route, navigation }) => {
   const { practiceType, onPracticeComplete } = route.params;
