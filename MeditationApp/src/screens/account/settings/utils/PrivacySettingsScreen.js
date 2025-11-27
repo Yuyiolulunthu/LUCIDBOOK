@@ -229,9 +229,17 @@ const PrivacySettingsScreen = ({ navigation }) => {
         {/* Footer Note */}
         <View style={styles.footerNote}>
           <Text style={styles.footerText}>
-            更改隱私設定可能影響應用程式的某些功能。如需了解更多資訊，請參閱我們的
-            <Text style={styles.footerLink}> 隱私權政策</Text>。
+            更改隱私設定可能影響應用程式的某些功能。如需了解更多資訊,請參閱我們的
           </Text>
+          <TouchableOpacity 
+            onPress={() => navigation.navigate('PrivacyPolicy')}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.footerText, styles.footerLink]}>
+              隱私權政策
+            </Text>
+          </TouchableOpacity>
+          <Text style={styles.footerText}>。</Text>
         </View>
 
         <View style={styles.bottomPadding} />
@@ -469,6 +477,8 @@ const styles = StyleSheet.create({
   
   // Footer Note
   footerNote: {
+    flexDirection: 'row',        // 🔄 改為 row
+    flexWrap: 'wrap',            // 🆕 允許換行
     backgroundColor: '#F9FAFB',
     borderWidth: 1,
     borderColor: '#E5E7EB',
@@ -483,6 +493,7 @@ const styles = StyleSheet.create({
   footerLink: {
     color: '#166CB5',
     textDecorationLine: 'underline',
+    fontWeight: '600',           // 🆕 加粗
   },
 
   bottomPadding: {

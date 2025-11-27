@@ -49,8 +49,7 @@ const RegisterScreen = ({ navigation }) => {
         { 
           text: '查看',
           onPress: () => {
-            // 方式 1: 導航到 App 內的隱私政策頁面
-            // navigation.navigate('PrivacyPolicy');
+            navigation.navigate('PrivacyPolicy');
             
             // 方式 2: 開啟外部網頁
             // Linking.openURL('https://lucidbook.tw/privacy-policy');
