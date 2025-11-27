@@ -114,14 +114,16 @@ const HomeScreen = ({ navigation }) => {
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
+      console.log('🔄 [首頁] 頁面獲得焦點，重新載入數據');
       checkLoginStatus();
-      if (isLoggedIn) {
+      // 延遲一下以確保後端數據已更新
+      setTimeout(() => {
         loadTodayData();
         loadHomeStats();
-      }
+      }, 500);
     });
     return unsubscribe;
-  }, [navigation, isLoggedIn]);
+  }, [navigation]);
 
   useEffect(() => {
     if (isLoggedIn && user) {

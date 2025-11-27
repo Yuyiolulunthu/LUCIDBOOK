@@ -1,4 +1,4 @@
-// BreathingExerciseCard.jsx - 完整修正版（API 串接 + 正確欄位名稱）
+// BreathingExerciseCard.jsx - 完整修正版（顯示實際連續天數）
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View,
@@ -15,6 +15,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import Slider from '@react-native-community/slider';
 import { Audio } from 'expo-av';
@@ -60,8 +61,9 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
   const [feelingNote, setFeelingNote] = useState('');
   const [isOtherMoodSelected, setIsOtherMoodSelected] = useState(false);
   
-  // 第九頁狀態
+  // ⭐ 第九頁狀態 - 添加 loading 狀態
   const [completionData, setCompletionData] = useState(null);
+  const [isLoadingStats, setIsLoadingStats] = useState(false);
   
   const sound = useRef(null);
   const timerRef = useRef(null);
@@ -180,7 +182,7 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
     }
   };
 
-  // ⭐ 保存進度（修正版 - 使用正確的欄位名稱）
+  // ⭐ 保存進度
   const saveProgress = useCallback(async () => {
     if (!practiceId) {
       console.log('⚠️ [呼吸練習卡片] practiceId 是空的，無法保存進度');
@@ -197,22 +199,16 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
     });
 
     try {
-      // ⭐ 修正：使用正確的欄位名稱
       const postFeelingsArray = selectedMoods.map(id => moodOptions.find(m => m.id === id)?.label).filter(Boolean);
       const postMoodValue = postFeelingsArray.length > 0 ? postFeelingsArray[0] : '';
 
       const formData = {
         exerciseType: selectedExercise?.type || '',
         exerciseTitle: selectedExercise?.title || '',
-        // 練習前情緒
         preMood: emotionalStates.find(st => st.id === selectedState)?.name || '',
-        // ⭐ 練習後情緒（取第一個選擇的心情）
         postMood: postMoodValue,
-        // 放鬆程度
         relaxLevel,
-        // ⭐ 練習後的感受（陣列形式）
         postFeelings: postFeelingsArray,
-        // ⭐ 練習筆記
         journalEntry: feelingNote,
         currentPage,
       };
@@ -232,7 +228,7 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
     }
   }, [practiceId, currentPage, selectedExercise, selectedState, relaxLevel, selectedMoods, feelingNote, elapsedTime, emotionalStates, moodOptions]);
 
-  // ⭐ 完成練習（修正版 - 使用正確的欄位名稱）
+  // ⭐ 完成練習
   const completePractice = async () => {
     console.log('🎯 [呼吸練習卡片] 準備完成練習...');
     
@@ -260,10 +256,9 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
         elapsedTime,
       });
 
-      // ⭐ 先存最後進度（確保 form_data 有最新資料）
+      // ⭐ 先存最後進度
       await saveProgress();
 
-      // ⭐ 修正：使用正確的欄位名稱
       const postFeelingsArray = selectedMoods.map(id => moodOptions.find(m => m.id === id)?.label).filter(Boolean);
       const postMoodValue = postFeelingsArray.length > 0 ? postFeelingsArray[0] : '';
 
@@ -272,12 +267,10 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
         duration: totalMinutes,
         duration_seconds: totalSeconds,
         
-        // 對應後端的欄位
         feeling: `練習前：${emotionalStates.find(st => st.id === selectedState)?.name || '未記錄'}，放鬆程度：${relaxLevel}/10`,
         noticed: postFeelingsArray.join('、') || '未記錄',
         reflection: feelingNote || '',
         
-        // ⭐ 修正：formData 使用正確的欄位名稱
         formData: {
           exerciseType: selectedExercise?.type || '',
           exerciseTitle: selectedExercise?.title || '',
@@ -288,7 +281,6 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
           journalEntry: feelingNote || '',
         },
         
-        // 額外結構化資料
         emotion_data: {
           exerciseType: selectedExercise?.type,
           exerciseTitle: selectedExercise?.title,
@@ -307,6 +299,79 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
 
     } catch (error) {
       console.error('❌ [呼吸練習卡片] 完成練習失敗:', error);
+    }
+  };
+
+  // ⭐⭐⭐ 新增：完成練習並獲取最新統計 ⭐⭐⭐
+  const completeAndLoadStats = async () => {
+    console.log('🎯 [呼吸練習卡片] 準備完成練習並獲取統計...');
+    
+    if (!practiceId) {
+      console.error('❌ [呼吸練習卡片] practiceId 不存在！');
+      return;
+    }
+
+    try {
+      setIsLoadingStats(true);
+
+      // 1. 完成練習
+      await completePractice();
+
+      // 2. 等待後端更新完成
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // 3. 獲取最新統計
+      console.log('📊 [呼吸練習卡片] 獲取最新統計數據...');
+      const statsResponse = await ApiService.getPracticeStats();
+      
+      console.log('📊 [呼吸練習卡片] 統計數據回應:', statsResponse);
+
+      const stats = statsResponse?.stats || statsResponse;
+      
+      // 4. 更新完成數據
+      const practiceData = {
+        exerciseType: selectedExercise?.title || '呼吸練習',
+        duration: totalDuration,
+        preMood: emotionalStates.find(st => st.id === selectedState)?.name || '未記錄',
+        postMood: selectedMoods.map(id => moodOptions.find(m => m.id === id)?.label).filter(Boolean).join(', ') || '未記錄',
+        relaxLevel: relaxLevel,
+        journalEntry: feelingNote,
+        completedAt: new Date().toISOString(),
+      };
+      
+      setCompletionData({
+        consecutiveDays: stats.currentStreak || 0,  // ⭐ 使用實際的連續天數
+        totalDays: stats.totalDays || 0,            // ⭐ 添加總天數
+        ...practiceData,
+      });
+
+      console.log('✅ [呼吸練習卡片] 統計數據載入成功:', {
+        currentStreak: stats.currentStreak,
+        totalDays: stats.totalDays,
+      });
+
+      setIsLoadingStats(false);
+
+    } catch (error) {
+      console.error('❌ [呼吸練習卡片] 完成練習或獲取統計失敗:', error);
+      setIsLoadingStats(false);
+      
+      // 即使失敗也設置默認值
+      const practiceData = {
+        exerciseType: selectedExercise?.title || '呼吸練習',
+        duration: totalDuration,
+        preMood: emotionalStates.find(st => st.id === selectedState)?.name || '未記錄',
+        postMood: selectedMoods.map(id => moodOptions.find(m => m.id === id)?.label).filter(Boolean).join(', ') || '未記錄',
+        relaxLevel: relaxLevel,
+        journalEntry: feelingNote,
+        completedAt: new Date().toISOString(),
+      };
+      
+      setCompletionData({
+        consecutiveDays: 1,
+        totalDays: 1,
+        ...practiceData,
+      });
     }
   };
 
@@ -647,9 +712,9 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
     setCurrentPage('relaxation');
   };
 
-  // ⭐ 處理靜靜結束
+  // ⭐⭐⭐ 修正：處理靜靜結束 ⭐⭐⭐
   const handleFinishQuietly = async () => {
-    await completePractice();
+    await completeAndLoadStats();
     setCurrentPage('streak');
   };
 
@@ -659,25 +724,9 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
     setCurrentPage('feelings');
   };
 
-  // ⭐ 處理感受記錄完成
+  // ⭐⭐⭐ 修正：處理感受記錄完成 ⭐⭐⭐
   const handleFeelingsComplete = async (data) => {
-    const practiceData = {
-      exerciseType: selectedExercise?.title || '呼吸練習',
-      duration: totalDuration,
-      preMood: emotionalStates.find(st => st.id === selectedState)?.name || '未記錄',
-      postMood: data.feelings.length > 0 ? data.feelings.join(', ') : '未記錄',
-      relaxLevel: relaxLevel,
-      journalEntry: data.notes,
-      completedAt: new Date().toISOString(),
-    };
-    
-    setCompletionData({
-      consecutiveDays: 1,
-      ...practiceData,
-    });
-    
-    await completePractice();
-    
+    await completeAndLoadStats();
     setCurrentPage('streak');
   };
 
@@ -770,9 +819,14 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
     setRelaxLevel(snappedValue);
   };
 
-  // 獲取連續天數
+  // ⭐ 獲取連續天數
   const getStreakCount = () => {
-    return completionData?.consecutiveDays || 1;
+    return completionData?.consecutiveDays || 0;
+  };
+
+  // ⭐ 獲取總天數
+  const getTotalDays = () => {
+    return completionData?.totalDays || 0;
   };
 
   // 清理
@@ -1443,7 +1497,7 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
     </KeyboardAvoidingView>
   );
 
-  // 渲染連續天數頁面 (第9頁)
+  // ⭐⭐⭐ 修正：渲染連續天數頁面 (第9頁) ⭐⭐⭐
   const renderStreakPage = () => {
     const rotation = celebrationRotate.interpolate({
       inputRange: [0, 0.25, 0.75, 1, 1.1],
@@ -1457,35 +1511,53 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
         </View>
 
         <View style={styles.streakContent}>
-          <Text style={styles.streakTitle}>太棒了！</Text>
-          <Text style={styles.streakSubtitle}>
-            你完成了今天的呼吸練習，{'\n'}繼續保持這個美好的習慣吧！
-          </Text>
+          {isLoadingStats ? (
+            // ⭐ 載入中狀態
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#31C6FE" />
+              <Text style={styles.loadingText}>正在更新統計...</Text>
+            </View>
+          ) : (
+            <>
+              <Text style={styles.streakTitle}>太棒了！</Text>
+              <Text style={styles.streakSubtitle}>
+                你完成了今天的呼吸練習，{'\n'}繼續保持這個美好的習慣吧！
+              </Text>
 
-          <View style={styles.streakCard}>
-            <Animated.Text 
-              style={[
-                styles.streakEmoji,
-                {
-                  transform: [
-                    { scale: celebrationScale },
-                    { rotate: rotation }
-                  ]
-                }
-              ]}
-            >
-              🎉
-            </Animated.Text>
-            <Text style={styles.streakLabel}>你已經連續完成練習</Text>
-            <GradientText text={`${getStreakCount()} 天`} style={styles.streakDays} />
-          </View>
+              <View style={styles.streakCard}>
+                <Animated.Text 
+                  style={[
+                    styles.streakEmoji,
+                    {
+                      transform: [
+                        { scale: celebrationScale },
+                        { rotate: rotation }
+                      ]
+                    }
+                  ]}
+                >
+                  🎉
+                </Animated.Text>
+                <Text style={styles.streakLabel}>你已經連續完成練習</Text>
+                <GradientText 
+                  text={`${getStreakCount()} 天`} 
+                  style={styles.streakDays} 
+                />
+                {getTotalDays() > 0 && (
+                  <Text style={styles.totalDaysText}>
+                    累積總共 {getTotalDays()} 天
+                  </Text>
+                )}
+              </View>
 
-          <TouchableOpacity 
-            style={styles.streakButton}
-            onPress={handleViewJournal}
-          >
-            <Text style={styles.streakButtonText}>查看日記</Text>
-          </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.streakButton}
+                onPress={handleViewJournal}
+              >
+                <Text style={styles.streakButtonText}>查看日記</Text>
+              </TouchableOpacity>
+            </>
+          )}
         </View>
       </View>
     );
@@ -2294,12 +2366,24 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   
-  // 連續天數頁面樣式
+  // ⭐ 連續天數頁面樣式
   streakContent: {
     flex: 1,
     paddingHorizontal: 24,
     paddingTop: 40,
     alignItems: 'center',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingTop: 100,
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 14,
+    fontWeight: '400',
+    color: '#6B7280',
   },
   streakTitle: {
     fontSize: 36,
@@ -2342,6 +2426,12 @@ const styles = StyleSheet.create({
   streakDays: {
     fontSize: 64,
     fontWeight: '400',
+  },
+  totalDaysText: {
+    fontSize: 14,
+    fontWeight: '400',
+    color: '#6B7280',
+    marginTop: 8,
   },
   streakButton: {
     width: '100%',
