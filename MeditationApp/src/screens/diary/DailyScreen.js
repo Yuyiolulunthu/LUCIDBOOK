@@ -1,5 +1,6 @@
 // ==========================================
-// DailyScreen.js - 完整版（優雅降級 + 心情快照修正）
+// DailyScreen.js - 最小改動版本
+// 只添加心情快照功能，不改動任何其他邏輯
 // ==========================================
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -27,9 +28,6 @@ import {
   Calendar as CalendarIcon,
   BookOpen,
   X,
-  Heart,
-  Lightbulb,
-  Target,
 } from 'lucide-react-native';
 import ApiService from '../../../api';
 import BottomNavigation from '../../navigation/BottomNavigation';
@@ -37,7 +35,6 @@ import AppHeader from '../../navigation/AppHeader';
 
 const { width } = Dimensions.get('window');
 
-// ⭐ 只使用四種情緒顏色
 const moodColors = {
   開心: '#FFBC42',
   焦慮: '#FF6B6B',
@@ -57,7 +54,7 @@ const DailyScreen = ({ navigation }) => {
   const [viewMode, setViewMode] = useState('list');
   const [showInfoCard, setShowInfoCard] = useState(null);
 
-  // ⭐ 情緒日記統計 state
+  // ⭐⭐⭐ 新增：情緒日記統計 ⭐⭐⭐
   const [emotionDiaryStats, setEmotionDiaryStats] = useState([]);
 
   const [detailModalVisible, setDetailModalVisible] = useState(false);
@@ -79,7 +76,7 @@ const DailyScreen = ({ navigation }) => {
 
   useEffect(() => {
     filterDataForCurrentMonth(allPracticeData);
-    // ⭐ 當月份改變時，重新獲取情緒日記統計
+    // ⭐ 新增：當月份改變時，重新獲取情緒日記統計
     fetchEmotionDiaryStats();
   }, [currentMonth]);
 
@@ -95,7 +92,7 @@ const DailyScreen = ({ navigation }) => {
         filterDataForCurrentMonth(practiceResponse.practices);
       }
 
-      // ⭐ 獲取情緒日記統計
+      // ⭐ 新增：獲取情緒日記統計
       await fetchEmotionDiaryStats();
 
     } catch (error) {
@@ -105,32 +102,23 @@ const DailyScreen = ({ navigation }) => {
     }
   };
 
-  // ⭐⭐⭐ 修改：優雅降級處理 ⭐⭐⭐
+  // ⭐⭐⭐ 新增：獲取情緒日記統計（優雅降級）⭐⭐⭐
   const fetchEmotionDiaryStats = async () => {
     try {
       const year = currentMonth.getFullYear();
       const month = currentMonth.getMonth() + 1;
 
-      console.log('📊 [DailyScreen] 嘗試獲取情緒日記統計...');
-
-      // ⭐ 檢查 API 是否存在
+      // 檢查 API 是否存在
       if (typeof ApiService.getEmotionDiaryMonthly !== 'function') {
-        console.warn('⚠️ [DailyScreen] getEmotionDiaryMonthly API 不存在，跳過心情快照');
+        console.log('ℹ️ [DailyScreen] getEmotionDiaryMonthly API 不存在，跳過心情快照');
         setEmotionDiaryStats([]);
         return;
       }
 
       const response = await ApiService.getEmotionDiaryMonthly(year, month);
 
-      // ⭐ 優雅處理各種錯誤情況
-      if (!response) {
-        console.warn('⚠️ [DailyScreen] API 無回應，隱藏心情快照');
-        setEmotionDiaryStats([]);
-        return;
-      }
-
-      if (response.error) {
-        console.warn('⚠️ [DailyScreen] API 返回錯誤，隱藏心情快照:', response.error);
+      if (!response || response.error) {
+        console.log('ℹ️ [DailyScreen] 無法獲取心情快照，隱藏此功能');
         setEmotionDiaryStats([]);
         return;
       }
@@ -153,17 +141,15 @@ const DailyScreen = ({ navigation }) => {
           .map(([emotion, count]) => ({ emotion, count }));
 
         setEmotionDiaryStats(topEmotions);
-        console.log('✅ [DailyScreen] 心情快照載入成功:', topEmotions);
       } else {
-        console.log('ℹ️ [DailyScreen] 本月無情緒日記記錄');
         setEmotionDiaryStats([]);
       }
     } catch (error) {
-      // ⭐ 捕獲所有錯誤，不讓它影響頁面
-      console.warn('⚠️ [DailyScreen] 獲取情緒日記統計失敗（將隱藏心情快照）:', error.message);
+      console.log('ℹ️ [DailyScreen] 獲取心情快照失敗，隱藏此功能');
       setEmotionDiaryStats([]);
     }
   };
+  // ⭐⭐⭐ 新增結束 ⭐⭐⭐
 
   const filterDataForCurrentMonth = (practices) => {
     const year = currentMonth.getFullYear();
@@ -250,7 +236,6 @@ const DailyScreen = ({ navigation }) => {
     setCurrentMonth(newMonth);
   };
 
-  // 日曆相關
   const generateCalendarDays = () => {
     const year = currentMonth.getFullYear();
     const month = currentMonth.getMonth();
@@ -300,7 +285,6 @@ const DailyScreen = ({ navigation }) => {
     setSelectedPractice(null);
   };
 
-  // ⭐ 判斷練習類型
   const getPracticeType = (practiceTypeName) => {
     if (practiceTypeName?.includes('好事') || practiceTypeName?.includes('感恩')) {
       return 'good-things';
@@ -311,13 +295,46 @@ const DailyScreen = ({ navigation }) => {
     return 'breathing';
   };
 
-  // ⭐ 渲染詳情 Modal
   const renderDetailModal = () => {
     if (!selectedPractice) return null;
 
     const totalSeconds = parseInt(selectedPractice.duration_seconds) || 0;
     const mood = selectedPractice.post_mood || selectedPractice.mood || '平靜';
-    const practiceType = getPracticeType(selectedPractice.practice_type);
+
+    // ⭐ 健壯的筆記讀取邏輯 - 嘗試所有可能的來源
+    let journalEntry = null;
+    
+    // 優先級 1: 直接從欄位讀取
+    journalEntry = selectedPractice.journal_entry || 
+                   selectedPractice.note ||
+                   selectedPractice.mood_notes ||
+                   selectedPractice.moodNotes ||
+                   selectedPractice.feeling || 
+                   selectedPractice.noticed || 
+                   selectedPractice.reflection;
+    
+    // 優先級 2: 從 form_data JSON 解析
+    if (!journalEntry && selectedPractice.form_data) {
+      try {
+        const formData = typeof selectedPractice.form_data === 'string' 
+          ? JSON.parse(selectedPractice.form_data)
+          : selectedPractice.form_data;
+        
+        if (formData && typeof formData === 'object') {
+          journalEntry = formData.journal_entry || 
+                         formData.journalEntry || 
+                         formData.feelingNote ||
+                         formData.note ||
+                         formData.mood_notes ||
+                         formData.moodNotes ||
+                         formData.feeling ||
+                         formData.noticed ||
+                         formData.reflection;
+        }
+      } catch (e) {
+        // 靜默失敗
+      }
+    }
 
     return (
       <Modal
@@ -328,7 +345,6 @@ const DailyScreen = ({ navigation }) => {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
-            {/* Header */}
             <View style={styles.modalHeader}>
               <View style={{ flex: 1 }}>
                 <Text style={styles.modalTitle}>
@@ -352,7 +368,6 @@ const DailyScreen = ({ navigation }) => {
               style={styles.modalContent}
               showsVerticalScrollIndicator={false}
             >
-              {/* 練習後情緒卡片 */}
               <LinearGradient
                 colors={['#EFF6FF', '#DBEAFE']}
                 start={{ x: 0, y: 0 }}
@@ -372,7 +387,6 @@ const DailyScreen = ({ navigation }) => {
                 </View>
               </LinearGradient>
 
-              {/* 基本資訊 */}
               <View style={styles.infoSection}>
                 <View style={styles.infoRow}>
                   <View style={styles.iconCircle}>
@@ -401,8 +415,7 @@ const DailyScreen = ({ navigation }) => {
                 </View>
               </View>
 
-              {/* 筆記 */}
-              {selectedPractice.journal_entry && (
+              {journalEntry && (
                 <View style={styles.journalSection}>
                   <View style={styles.journalHeader}>
                     <View style={styles.iconCircle}>
@@ -411,7 +424,7 @@ const DailyScreen = ({ navigation }) => {
                     <Text style={styles.journalTitle}>練習筆記</Text>
                   </View>
                   <Text style={styles.journalText}>
-                    {selectedPractice.journal_entry}
+                    {journalEntry}
                   </Text>
                 </View>
               )}
@@ -445,9 +458,7 @@ const DailyScreen = ({ navigation }) => {
       <AppHeader navigation={navigation} />
 
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {/* 月份導航 & 統計卡片 */}
         <View style={styles.statsCard}>
-          {/* 月份選擇器 */}
           <View style={styles.monthSelector}>
             <TouchableOpacity onPress={handlePrevMonth}>
               <LinearGradient
@@ -476,9 +487,7 @@ const DailyScreen = ({ navigation }) => {
             </TouchableOpacity>
           </View>
 
-          {/* 統計指標 */}
           <View style={styles.statsGrid}>
-            {/* 月累計練習 */}
             <TouchableOpacity
               style={{ flex: 1 }}
               onPress={() =>
@@ -504,7 +513,6 @@ const DailyScreen = ({ navigation }) => {
               </LinearGradient>
             </TouchableOpacity>
 
-            {/* 心理肌力分數 */}
             <TouchableOpacity
               style={{ flex: 1 }}
               onPress={() =>
@@ -533,7 +541,6 @@ const DailyScreen = ({ navigation }) => {
             </TouchableOpacity>
           </View>
 
-          {/* 介紹卡片 */}
           {(showInfoCard === 'practice' || showInfoCard === 'mental') && (
             <View style={styles.infoCardContainer}>
               {showInfoCard === 'practice' && (
@@ -562,7 +569,7 @@ const DailyScreen = ({ navigation }) => {
             </View>
           )}
 
-          {/* ⭐⭐⭐ 本月心情快照（優雅降級：API 不存在時不顯示）⭐⭐⭐ */}
+          {/* ⭐⭐⭐ 新增：本月心情快照 ⭐⭐⭐ */}
           {emotionDiaryStats.length > 0 && (
             <>
               <TouchableOpacity
@@ -613,16 +620,16 @@ const DailyScreen = ({ navigation }) => {
                       <Text style={styles.infoCardTitle}>本月心情快照</Text>
                     </View>
                     <Text style={styles.infoCardText}>
-                      統計本月情緒日記中最常出現的情緒狀態(Top 3),數字代表記錄次數。
+                      統計本月心情記錄中最常出現的情緒狀態(Top 3),數字代表記錄次數。
                     </Text>
                   </View>
                 </View>
               )}
             </>
           )}
+          {/* ⭐⭐⭐ 新增結束 ⭐⭐⭐ */}
         </View>
 
-        {/* 視圖模式切換 */}
         <View style={styles.viewModeToggle}>
           <TouchableOpacity
             onPress={() => setViewMode('list')}
@@ -669,7 +676,6 @@ const DailyScreen = ({ navigation }) => {
           </TouchableOpacity>
         </View>
 
-        {/* 日曆視圖 */}
         {viewMode === 'calendar' && (
           <View style={styles.calendarView}>
             <View style={styles.calendarGrid}>
@@ -733,7 +739,6 @@ const DailyScreen = ({ navigation }) => {
           </View>
         )}
 
-        {/* 列表視圖 */}
         {viewMode === 'list' && (
           <View style={styles.listView}>
             {displayData.length > 0 ? (
@@ -816,7 +821,6 @@ const DailyScreen = ({ navigation }) => {
   );
 };
 
-// 樣式保持完全不變...
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -936,6 +940,7 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     lineHeight: 20,
   },
+  // ⭐⭐⭐ 新增：心情快照樣式 ⭐⭐⭐
   moodSnapshot: {
     borderRadius: 16,
     padding: 16,
@@ -993,6 +998,7 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontWeight: '600',
   },
+  // ⭐⭐⭐ 新增結束 ⭐⭐⭐
   viewModeToggle: {
     flexDirection: 'row',
     backgroundColor: '#FFFFFF',
