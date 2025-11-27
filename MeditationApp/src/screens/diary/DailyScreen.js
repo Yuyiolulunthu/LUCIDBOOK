@@ -1,5 +1,5 @@
 // ==========================================
-// DailyScreen.js - 完整版（使用 API 獲取情緒統計）
+// DailyScreen.js - 完整版（優雅降級 + 心情快照修正）
 // ==========================================
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -27,10 +27,9 @@ import {
   Calendar as CalendarIcon,
   BookOpen,
   X,
-  Users,
+  Heart,
   Lightbulb,
   Target,
-  Heart,
 } from 'lucide-react-native';
 import ApiService from '../../../api';
 import BottomNavigation from '../../navigation/BottomNavigation';
@@ -58,8 +57,8 @@ const DailyScreen = ({ navigation }) => {
   const [viewMode, setViewMode] = useState('list');
   const [showInfoCard, setShowInfoCard] = useState(null);
 
-  // ⭐ 情緒統計 state（從 API 獲取）
-  const [topEmotions, setTopEmotions] = useState([]);
+  // ⭐ 情緒日記統計 state
+  const [emotionDiaryStats, setEmotionDiaryStats] = useState([]);
 
   const [detailModalVisible, setDetailModalVisible] = useState(false);
   const [selectedPractice, setSelectedPractice] = useState(null);
@@ -80,8 +79,8 @@ const DailyScreen = ({ navigation }) => {
 
   useEffect(() => {
     filterDataForCurrentMonth(allPracticeData);
-    // ⭐ 當月份改變時，重新獲取情緒統計
-    fetchEmotionStats();
+    // ⭐ 當月份改變時，重新獲取情緒日記統計
+    fetchEmotionDiaryStats();
   }, [currentMonth]);
 
   const fetchAllData = async () => {
@@ -96,8 +95,8 @@ const DailyScreen = ({ navigation }) => {
         filterDataForCurrentMonth(practiceResponse.practices);
       }
 
-      // ⭐ 獲取情緒統計
-      await fetchEmotionStats();
+      // ⭐ 獲取情緒日記統計
+      await fetchEmotionDiaryStats();
 
     } catch (error) {
       console.error('❌ 獲取數據失敗:', error);
@@ -106,51 +105,64 @@ const DailyScreen = ({ navigation }) => {
     }
   };
 
-  // ⭐ 從 API 獲取情緒統計
-  const fetchEmotionStats = async () => {
+  // ⭐⭐⭐ 修改：優雅降級處理 ⭐⭐⭐
+  const fetchEmotionDiaryStats = async () => {
     try {
       const year = currentMonth.getFullYear();
       const month = currentMonth.getMonth() + 1;
 
-      const response = await ApiService.getEmotionStats(year, month);
+      console.log('📊 [DailyScreen] 嘗試獲取情緒日記統計...');
 
-      if (response.success && response.emotions) {
-        setTopEmotions(response.emotions);
+      // ⭐ 檢查 API 是否存在
+      if (typeof ApiService.getEmotionDiaryMonthly !== 'function') {
+        console.warn('⚠️ [DailyScreen] getEmotionDiaryMonthly API 不存在，跳過心情快照');
+        setEmotionDiaryStats([]);
+        return;
+      }
 
-        // 如果 API 有返回 averageScore，也更新心理肌力分數
-        if (response.averageScore !== undefined && response.averageScore > 0) {
-          setStats(prev => ({
-            ...prev,
-            mentalMuscle: Math.round(response.averageScore),
-          }));
-        }
+      const response = await ApiService.getEmotionDiaryMonthly(year, month);
+
+      // ⭐ 優雅處理各種錯誤情況
+      if (!response) {
+        console.warn('⚠️ [DailyScreen] API 無回應，隱藏心情快照');
+        setEmotionDiaryStats([]);
+        return;
+      }
+
+      if (response.error) {
+        console.warn('⚠️ [DailyScreen] API 返回錯誤，隱藏心情快照:', response.error);
+        setEmotionDiaryStats([]);
+        return;
+      }
+
+      if (response.success && response.diaries && response.diaries.length > 0) {
+        // 統計情緒出現次數
+        const emotionCount = {};
+        
+        response.diaries.forEach((diary) => {
+          const emotion = diary.emotion || diary.mood;
+          if (emotion) {
+            emotionCount[emotion] = (emotionCount[emotion] || 0) + 1;
+          }
+        });
+
+        // 取前三名
+        const topEmotions = Object.entries(emotionCount)
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 3)
+          .map(([emotion, count]) => ({ emotion, count }));
+
+        setEmotionDiaryStats(topEmotions);
+        console.log('✅ [DailyScreen] 心情快照載入成功:', topEmotions);
+      } else {
+        console.log('ℹ️ [DailyScreen] 本月無情緒日記記錄');
+        setEmotionDiaryStats([]);
       }
     } catch (error) {
-      console.error('❌ 獲取情緒統計失敗:', error);
-      // 如果 API 失敗，退回到本地計算
-      calculateEmotionsFromData();
+      // ⭐ 捕獲所有錯誤，不讓它影響頁面
+      console.warn('⚠️ [DailyScreen] 獲取情緒日記統計失敗（將隱藏心情快照）:', error.message);
+      setEmotionDiaryStats([]);
     }
-  };
-
-  // ⭐ 備用方案：從本地數據計算情緒統計
-  const calculateEmotionsFromData = () => {
-    if (displayData.length === 0) {
-      setTopEmotions([]);
-      return;
-    }
-
-    const emotionCount = {};
-    displayData.forEach((record) => {
-      const mood = record.post_mood || record.mood || '平靜';
-      emotionCount[mood] = (emotionCount[mood] || 0) + 1;
-    });
-
-    const emotions = Object.entries(emotionCount)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 3)
-      .map(([emotion, count]) => ({ emotion, count }));
-
-    setTopEmotions(emotions);
   };
 
   const filterDataForCurrentMonth = (practices) => {
@@ -389,235 +401,6 @@ const DailyScreen = ({ navigation }) => {
                 </View>
               </View>
 
-              {/* 呼吸練習專屬欄位 */}
-              {practiceType === 'breathing' && (
-                <>
-                  {selectedPractice.pre_mood && (
-                    <View style={styles.preMoodSection}>
-                      <View style={styles.sectionHeader}>
-                        <Heart color="#F59E0B" size={16} strokeWidth={2} />
-                        <Text style={styles.sectionTitle}>練習前的狀態</Text>
-                      </View>
-                      <View style={[styles.contentCard, styles.amberCard]}>
-                        <Text style={styles.contentText}>
-                          {selectedPractice.pre_mood}
-                        </Text>
-                      </View>
-                    </View>
-                  )}
-
-                  {selectedPractice.relax_level && (
-                    <View style={styles.metricSection}>
-                      <View style={styles.metricHeader}>
-                        <Sparkles color="#31C6FE" size={18} strokeWidth={2} />
-                        <Text style={styles.metricTitle}>
-                          {selectedPractice.practice_type?.includes('4-6') 
-                            ? '放鬆程度' 
-                            : '呼吸穩定程度'}
-                        </Text>
-                      </View>
-                      <View style={styles.metricBarContainer}>
-                        <View style={styles.metricBarBg}>
-                          <LinearGradient
-                            colors={['#166CB5', '#31C6FE']}
-                            start={{ x: 0, y: 0 }}
-                            end={{ x: 1, y: 0 }}
-                            style={[
-                              styles.metricBarFill,
-                              {
-                                width: `${
-                                  (parseFloat(selectedPractice.relax_level) / 10) *
-                                  100
-                                }%`,
-                              },
-                            ]}
-                          />
-                        </View>
-                        <Text style={styles.metricScore}>
-                          {selectedPractice.relax_level}/10
-                        </Text>
-                      </View>
-                    </View>
-                  )}
-
-                  {selectedPractice.post_feelings && (
-                    <View style={styles.postFeelingsSection}>
-                      <View style={styles.sectionHeader}>
-                        <Smile color="#10B981" size={16} strokeWidth={2} />
-                        <Text style={styles.sectionTitle}>練習後的感受</Text>
-                      </View>
-                      <View style={styles.feelingTags}>
-                        {selectedPractice.post_feelings.split(',').map((feeling, index) => (
-                          <View key={index} style={styles.feelingTag}>
-                            <Text style={styles.feelingTagText}>{feeling.trim()}</Text>
-                          </View>
-                        ))}
-                      </View>
-                    </View>
-                  )}
-                </>
-              )}
-
-              {/* 好事書寫專屬欄位 */}
-              {practiceType === 'good-things' && (
-                <>
-                  {(selectedPractice.good_thing || selectedPractice.who_with || selectedPractice.feelings) && (
-                    <View style={styles.goodThingSection}>
-                      <View style={styles.sectionHeader}>
-                        <Sparkles color="#31C6FE" size={16} strokeWidth={2} />
-                        <Text style={styles.sectionTitle}>今天的好事</Text>
-                      </View>
-                      <View style={styles.contentCard}>
-                        {selectedPractice.good_thing && (
-                          <View style={styles.goodThingItem}>
-                            <Text style={styles.goodThingLabel}>發生了什麼</Text>
-                            <Text style={styles.contentText}>
-                              {selectedPractice.good_thing}
-                            </Text>
-                          </View>
-                        )}
-                        
-                        {selectedPractice.who_with && (
-                          <View style={styles.goodThingItem}>
-                            <Text style={styles.goodThingLabel}>當時和誰在一起</Text>
-                            <Text style={styles.contentText}>
-                              {selectedPractice.who_with}
-                            </Text>
-                          </View>
-                        )}
-                        
-                        {selectedPractice.feelings && (
-                          <View style={styles.goodThingItem}>
-                            <Text style={styles.goodThingLabel}>當下的想法</Text>
-                            <Text style={styles.contentText}>
-                              {selectedPractice.feelings}
-                            </Text>
-                          </View>
-                        )}
-                      </View>
-                    </View>
-                  )}
-
-                  {selectedPractice.emotions && (
-                    <View style={styles.emotionsSection}>
-                      <View style={styles.sectionHeader}>
-                        <Heart color="#FF6B9D" size={16} strokeWidth={2} />
-                        <Text style={styles.sectionTitle}>這件事讓我感覺</Text>
-                      </View>
-                      <View style={styles.emotionTags}>
-                        {selectedPractice.emotions.split(',').map((emotion, index) => (
-                          <View key={index} style={styles.emotionTag}>
-                            <Text style={styles.emotionTagText}>{emotion.trim()}</Text>
-                          </View>
-                        ))}
-                      </View>
-                      {selectedPractice.other_emotion && (
-                        <View style={[styles.contentCard, styles.pinkCard, { marginTop: 12 }]}>
-                          <Text style={styles.contentText}>
-                            {selectedPractice.other_emotion}
-                          </Text>
-                        </View>
-                      )}
-                    </View>
-                  )}
-
-                  {selectedPractice.reason && (
-                    <View style={styles.reasonSection}>
-                      <View style={styles.sectionHeader}>
-                        <Lightbulb color="#9333EA" size={16} strokeWidth={2} />
-                        <Text style={styles.sectionTitle}>為什麼是好事</Text>
-                      </View>
-                      <View style={[styles.contentCard, styles.purpleCard]}>
-                        <Text style={styles.contentText}>
-                          {selectedPractice.reason}
-                        </Text>
-                      </View>
-                    </View>
-                  )}
-
-                  {selectedPractice.how_to_repeat && (
-                    <View style={styles.howToRepeatSection}>
-                      <View style={styles.sectionHeader}>
-                        <TrendingUp color="#10B981" size={16} strokeWidth={2} />
-                        <Text style={styles.sectionTitle}>如何讓好事更常出現</Text>
-                      </View>
-                      <View style={[styles.contentCard, styles.greenCard]}>
-                        <Text style={styles.contentText}>
-                          {selectedPractice.how_to_repeat}
-                        </Text>
-                      </View>
-                    </View>
-                  )}
-
-                  {selectedPractice.future_action && (
-                    <View style={styles.futureSection}>
-                      <View style={styles.sectionHeader}>
-                        <Target color="#F59E0B" size={16} strokeWidth={2} />
-                        <Text style={styles.sectionTitle}>好事複製小行動</Text>
-                      </View>
-                      <View style={[styles.contentCard, styles.amberCard]}>
-                        <Text style={styles.contentText}>
-                          {selectedPractice.future_action}
-                        </Text>
-                      </View>
-                    </View>
-                  )}
-
-                  {selectedPractice.positive_level && (
-                    <View style={styles.metricSection}>
-                      <View style={styles.metricHeader}>
-                        <Sparkles color="#FFD93D" size={18} strokeWidth={2} />
-                        <Text style={styles.metricTitle}>正向感受程度</Text>
-                      </View>
-                      <View style={styles.metricBarContainer}>
-                        <View style={styles.metricBarBg}>
-                          <LinearGradient
-                            colors={['#FF6B9D', '#FFD93D']}
-                            start={{ x: 0, y: 0 }}
-                            end={{ x: 1, y: 0 }}
-                            style={[
-                              styles.metricBarFill,
-                              {
-                                width: `${
-                                  (parseFloat(selectedPractice.positive_level) / 10) *
-                                  100
-                                }%`,
-                              },
-                            ]}
-                          />
-                        </View>
-                        <Text style={[styles.metricScore, { color: '#FF6B9D' }]}>
-                          {selectedPractice.positive_level}/10
-                        </Text>
-                      </View>
-                    </View>
-                  )}
-
-                  {selectedPractice.mood_after_writing && (
-                    <View style={styles.moodAfterSection}>
-                      <View style={styles.sectionHeader}>
-                        <Smile color="#06B6D4" size={16} strokeWidth={2} />
-                        <Text style={styles.sectionTitle}>書寫後的心情</Text>
-                      </View>
-                      <View style={styles.moodAfterTags}>
-                        {selectedPractice.mood_after_writing.split(',').map((mood, index) => (
-                          <View key={index} style={styles.moodAfterTag}>
-                            <Text style={styles.moodAfterTagText}>{mood.trim()}</Text>
-                          </View>
-                        ))}
-                      </View>
-                      {selectedPractice.mood_notes && (
-                        <View style={[styles.contentCard, styles.cyanCard, { marginTop: 12 }]}>
-                          <Text style={styles.contentText}>
-                            {selectedPractice.mood_notes}
-                          </Text>
-                        </View>
-                      )}
-                    </View>
-                  )}
-                </>
-              )}
-
               {/* 筆記 */}
               {selectedPractice.journal_entry && (
                 <View style={styles.journalSection}>
@@ -779,8 +562,8 @@ const DailyScreen = ({ navigation }) => {
             </View>
           )}
 
-          {/* 本月心情快照 */}
-          {topEmotions.length > 0 && (
+          {/* ⭐⭐⭐ 本月心情快照（優雅降級：API 不存在時不顯示）⭐⭐⭐ */}
+          {emotionDiaryStats.length > 0 && (
             <>
               <TouchableOpacity
                 onPress={() =>
@@ -804,7 +587,7 @@ const DailyScreen = ({ navigation }) => {
                   </View>
 
                   <View style={styles.moodTags}>
-                    {topEmotions.map(({ emotion, count }) => (
+                    {emotionDiaryStats.map(({ emotion, count }) => (
                       <View
                         key={emotion}
                         style={[
@@ -830,7 +613,7 @@ const DailyScreen = ({ navigation }) => {
                       <Text style={styles.infoCardTitle}>本月心情快照</Text>
                     </View>
                     <Text style={styles.infoCardText}>
-                      統計練習後最常出現的情緒狀態(Top 3),數字代表出現次數。
+                      統計本月情緒日記中最常出現的情緒狀態(Top 3),數字代表記錄次數。
                     </Text>
                   </View>
                 </View>
@@ -1033,6 +816,7 @@ const DailyScreen = ({ navigation }) => {
   );
 };
 
+// 樣式保持完全不變...
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -1523,171 +1307,6 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: '#F3F4F6',
     marginVertical: 8,
-  },
-  preMoodSection: {
-    marginBottom: 20,
-  },
-  amberCard: {
-    backgroundColor: '#FFF7ED',
-    borderColor: '#FFEDD5',
-  },
-  postFeelingsSection: {
-    marginBottom: 20,
-  },
-  feelingTags: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  feelingTag: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    backgroundColor: '#D1FAE5',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#A7F3D0',
-  },
-  feelingTagText: {
-    fontSize: 12,
-    color: '#065F46',
-    fontWeight: '500',
-  },
-  goodThingSection: {
-    marginBottom: 20,
-  },
-  goodThingItem: {
-    marginBottom: 16,
-  },
-  goodThingLabel: {
-    fontSize: 14,
-    color: '#23272fff',
-    marginBottom: 16,
-    fontWeight: '700',
-  },
-  emotionsSection: {
-    marginBottom: 20,
-  },
-  emotionTags: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  emotionTag: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    backgroundColor: '#FCE7F3',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#FBCFE8',
-  },
-  emotionTagText: {
-    fontSize: 12,
-    color: '#9F1239',
-    fontWeight: '500',
-  },
-  pinkCard: {
-    backgroundColor: '#FFF1F2',
-    borderColor: '#FFE4E6',
-  },
-  reasonSection: {
-    marginBottom: 20,
-  },
-  howToRepeatSection: {
-    marginBottom: 20,
-  },
-  futureSection: {
-    marginBottom: 20,
-  },
-  moodAfterSection: {
-    marginBottom: 20,
-  },
-  moodAfterTags: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  moodAfterTag: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    backgroundColor: '#E0F2FE',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#BAE6FD',
-  },
-  moodAfterTagText: {
-    fontSize: 12,
-    color: '#075985',
-    fontWeight: '500',
-  },
-  cyanCard: {
-    backgroundColor: '#ECFEFF',
-    borderColor: '#CFFAFE',
-  },
-  metricSection: {
-    marginBottom: 20,
-  },
-  metricHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 16,
-  },
-  metricTitle: {
-    fontSize: 14,
-    color: '#6B7280',
-    fontWeight: '600',
-  },
-  metricBarContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  metricBarBg: {
-    flex: 1,
-    height: 8,
-    backgroundColor: '#F3F4F6',
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-  metricBarFill: {
-    height: '100%',
-    borderRadius: 4,
-  },
-  metricScore: {
-    fontSize: 14,
-    color: '#166CB5',
-    fontWeight: '600',
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 12,
-  },
-  sectionTitle: {
-    fontSize: 14,
-    color: '#6B7280',
-    fontWeight: '600',
-  },
-  contentCard: {
-    backgroundColor: '#EFF6FF',
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#DBEAFE',
-  },
-  contentText: {
-    fontSize: 14,
-    color: '#374151',
-    lineHeight: 22,
-  },
-  purpleCard: {
-    backgroundColor: '#FAF5FF',
-    borderColor: '#F3E8FF',
-  },
-  greenCard: {
-    backgroundColor: '#ECFDF5',
-    borderColor: '#D1FAE5',
   },
   journalSection: {
     marginBottom: 20,

@@ -60,6 +60,30 @@ const ApiService = {
   // 情緒日記服務
   saveEmotionDiary: (diaryData) => emotionDiaryService.saveEmotionDiary(diaryData),
   getTodayEmotionDiary: () => emotionDiaryService.getTodayEmotionDiary(),
+  
+  // ⭐⭐⭐ 情緒日記月度統計（啟用版本）⭐⭐⭐
+  getEmotionDiaryMonthly: async (year, month) => {
+    try {
+      console.log('📊 [API] 獲取情緒日記月度統計:', { year, month });
+      
+      const response = await apiClient.request(
+        `/emotion-diary/monthly.php?year=${year}&month=${month}`, 
+        { method: 'GET' }
+      );
+      
+      if (response.success) {
+        console.log('✅ [API] 情緒日記月度統計載入成功:', 
+          response.diaries?.length || 0, '筆記錄');
+        return response;
+      } else {
+        console.warn('⚠️ [API] 情緒日記月度統計無數據');
+        return { success: false, diaries: [] };
+      }
+    } catch (error) {
+      console.error('❌ [API] 獲取情緒日記月度統計失敗:', error);
+      return { success: false, diaries: [], error: error.message };
+    }
+  },
 
   // 練習統計服務
   getPracticeStats: async () => {
