@@ -577,42 +577,47 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
   // 事件處理函數
   // ============================================
 
-  // ⭐ 處理練習選擇 - 初始化 API
-  // ⭐ 處理練習選擇 - 初始化 API + 提前載入音檔(帶載入狀態)
+  // ⭐ 處理練習選擇 - 初始化 API + 完全異步載入音檔
   const handleSelectPractice = async (practiceType) => {
     const exercise = exercises.find(ex => ex.type === practiceType);
     setSelectedExercise(exercise);
     
-    // 🎵 提前載入音檔
+    // 🎵 完全異步載入音檔 - 不阻塞 UI
     setIsAudioLoading(true);
     setAudioLoadError(null);
     
-    try {
-      console.log('🎵 [呼吸練習卡片] 開始提前載入音檔...');
-      
-      const audioFile = practiceType === '4-6-breathing'
-        ? { uri: 'https://curiouscreate.com/api/asserts/4-6.mp3' }
-        : { uri: 'https://curiouscreate.com/api/asserts/breath-holding.mp3' };
-      
-      const { sound: audioSound } = await Audio.Sound.createAsync(audioFile);
-      sound.current = audioSound;
-      
-      // 取得音檔時長
-      const status = await audioSound.getStatusAsync();
-      if (status.isLoaded) {
-        const durationInSeconds = Math.floor(status.durationMillis / 1000);
-        setTotalDuration(durationInSeconds);
-        console.log('✅ [呼吸練習卡片] 音檔載入完成,時長:', durationInSeconds, '秒');
-      }
-    } catch (error) {
-      console.error('❌ [呼吸練習卡片] 音檔載入失敗:', error);
-      setAudioLoadError(error.message);
-    } finally {
-      setIsAudioLoading(false);
-    }
+    // ⭐ 重點：不使用 await，讓音檔在背景載入
+    const audioFile = practiceType === '4-6-breathing'
+      ? { uri: 'https://curiouscreate.com/api/asserts/4-6.mp3' }
+      : { uri: 'https://curiouscreate.com/api/asserts/breath-holding.mp3' };
     
-    await initializePractice(practiceType);
+    // 在背景執行音檔載入，不阻塞 UI
+    Audio.Sound.createAsync(audioFile)
+      .then(({ sound: audioSound }) => {
+        sound.current = audioSound;
+        console.log('🎵 [呼吸練習卡片] 音檔物件建立完成');
+        
+        // 取得音檔時長
+        return audioSound.getStatusAsync();
+      })
+      .then((status) => {
+        if (status.isLoaded) {
+          const durationInSeconds = Math.floor(status.durationMillis / 1000);
+          setTotalDuration(durationInSeconds);
+          console.log('✅ [呼吸練習卡片] 音檔載入完成，時長:', durationInSeconds, '秒');
+        }
+        setIsAudioLoading(false);
+      })
+      .catch((error) => {
+        console.error('❌ [呼吸練習卡片] 音檔載入失敗:', error);
+        setAudioLoadError(error.message);
+        setIsAudioLoading(false);
+      });
     
+    // ⭐ API 初始化也可以同時進行
+    initializePractice(practiceType);
+    
+    // ⭐ 立即切換頁面，不等待音檔載入完成
     setCurrentPage('preState');
   };
 
@@ -625,11 +630,14 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
   };
 
   // 處理準備頁面繼續
-  // 處理準備頁面繼續
   const handlePrepareContinue = async () => {
-    // 🎵 檢查音檔是否已經載入
+    // 🎵 檢查音檔是否已經載入完成
     if (!sound.current) {
-      console.log('⚠️ [呼吸練習卡片] 音檔未載入,嘗試重新載入...');
+      console.log('⏳ [呼吸練習卡片] 音檔尚未載入完成，等待中...');
+      
+      // 顯示載入提示
+      setIsAudioLoading(true);
+      
       try {
         const audioFile = selectedExercise.type === '4-6-breathing'
           ? { uri: 'https://curiouscreate.com/api/asserts/4-6.mp3' }
@@ -642,12 +650,33 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
         if (status.isLoaded) {
           const durationInSeconds = Math.floor(status.durationMillis / 1000);
           setTotalDuration(durationInSeconds);
+          console.log('✅ [呼吸練習卡片] 音檔補載完成');
         }
       } catch (error) {
-        console.error('❌ [呼吸練習卡片] 重新載入音檔失敗:', error);
+        console.error('❌ [呼吸練習卡片] 音檔載入失敗:', error);
+        // 可選：顯示錯誤提示
+        Alert.alert('音檔載入失敗', '請檢查網路連線後重試');
+        return; // 不進入播放頁面
+      } finally {
+        setIsAudioLoading(false);
       }
     } else {
-      console.log('✅ [呼吸練習卡片] 音檔已提前載入完成');
+      // 檢查音檔狀態
+      try {
+        const status = await sound.current.getStatusAsync();
+        if (status.isLoaded) {
+          console.log('✅ [呼吸練習卡片] 音檔已提前載入完成');
+        } else {
+          console.log('⚠️ [呼吸練習卡片] 音檔狀態異常，重新載入');
+          sound.current = null;
+          // 遞迴呼叫自己重新載入
+          return handlePrepareContinue();
+        }
+      } catch (error) {
+        console.error('❌ [呼吸練習卡片] 檢查音檔狀態失敗:', error);
+        sound.current = null;
+        return handlePrepareContinue();
+      }
     }
     
     setCurrentPage('practice');
