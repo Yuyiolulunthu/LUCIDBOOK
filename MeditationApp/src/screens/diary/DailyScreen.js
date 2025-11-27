@@ -300,39 +300,90 @@ const DailyScreen = ({ navigation }) => {
 
     const totalSeconds = parseInt(selectedPractice.duration_seconds) || 0;
     const mood = selectedPractice.post_mood || selectedPractice.mood || '平靜';
+    const practiceType = getPracticeType(selectedPractice.practice_type);
 
-    // ⭐ 健壯的筆記讀取邏輯 - 嘗試所有可能的來源
-    let journalEntry = null;
-    
-    // 優先級 1: 直接從欄位讀取
-    journalEntry = selectedPractice.journal_entry || 
-                   selectedPractice.note ||
-                   selectedPractice.mood_notes ||
-                   selectedPractice.moodNotes ||
-                   selectedPractice.feeling || 
-                   selectedPractice.noticed || 
-                   selectedPractice.reflection;
-    
-    // 優先級 2: 從 form_data JSON 解析
-    if (!journalEntry && selectedPractice.form_data) {
-      try {
-        const formData = typeof selectedPractice.form_data === 'string' 
-          ? JSON.parse(selectedPractice.form_data)
-          : selectedPractice.form_data;
-        
-        if (formData && typeof formData === 'object') {
-          journalEntry = formData.journal_entry || 
-                         formData.journalEntry || 
-                         formData.feelingNote ||
-                         formData.note ||
-                         formData.mood_notes ||
-                         formData.moodNotes ||
-                         formData.feeling ||
-                         formData.noticed ||
-                         formData.reflection;
+    // ⭐ 判斷是否為好事練習
+    const isGoodThingsPractice = practiceType === 'good-things' || 
+                                  selectedPractice.practice_type?.includes('好事') ||
+                                  selectedPractice.practice_type?.includes('感恩');
+
+    // ⭐ 好事練習的特殊欄位
+    let goodThingData = null;
+    if (isGoodThingsPractice) {
+      // 嘗試從直接欄位讀取
+      goodThingData = {
+        goodThing: selectedPractice.good_thing || null,
+        whoWith: selectedPractice.who_with || null,
+        feelings: selectedPractice.feelings || null,
+        emotions: selectedPractice.emotions || null,
+        otherEmotion: selectedPractice.other_emotion || null,
+        reason: selectedPractice.reason || null,
+        howToRepeat: selectedPractice.how_to_repeat || null,
+        futureAction: selectedPractice.future_action || null,
+        positiveLevel: selectedPractice.positive_level || null,
+        moodAfterWriting: selectedPractice.mood_after_writing || null,
+        moodNotes: selectedPractice.mood_notes || null,
+      };
+
+      // 如果直接欄位都沒有，嘗試從 form_data 解析
+      if (!goodThingData.goodThing && selectedPractice.form_data) {
+        try {
+          const formData = typeof selectedPractice.form_data === 'string' 
+            ? JSON.parse(selectedPractice.form_data)
+            : selectedPractice.form_data;
+          
+          if (formData && typeof formData === 'object') {
+            goodThingData = {
+              goodThing: formData.good_thing || formData.goodThing || null,
+              whoWith: formData.who_with || formData.whoWith || null,
+              feelings: formData.feelings || null,
+              emotions: formData.emotions || null,
+              otherEmotion: formData.other_emotion || formData.otherEmotion || null,
+              reason: formData.reason || null,
+              howToRepeat: formData.how_to_repeat || formData.howToRepeat || null,
+              futureAction: formData.future_action || formData.futureAction || null,
+              positiveLevel: formData.positive_level || formData.positiveLevel || null,
+              moodAfterWriting: formData.mood_after_writing || formData.moodAfterWriting || null,
+              moodNotes: formData.mood_notes || formData.moodNotes || null,
+            };
+          }
+        } catch (e) {
+          // 靜默失敗
         }
-      } catch (e) {
-        // 靜默失敗
+      }
+    }
+
+    // ⭐ 一般練習的筆記邏輯（呼吸練習等）
+    let journalEntry = null;
+    if (!isGoodThingsPractice) {
+      journalEntry = selectedPractice.journal_entry || 
+                     selectedPractice.note ||
+                     selectedPractice.mood_notes ||
+                     selectedPractice.moodNotes ||
+                     selectedPractice.feeling || 
+                     selectedPractice.noticed || 
+                     selectedPractice.reflection;
+      
+      if (!journalEntry && selectedPractice.form_data) {
+        try {
+          const formData = typeof selectedPractice.form_data === 'string' 
+            ? JSON.parse(selectedPractice.form_data)
+            : selectedPractice.form_data;
+          
+          if (formData && typeof formData === 'object') {
+            journalEntry = formData.journal_entry || 
+                           formData.journalEntry || 
+                           formData.feelingNote ||
+                           formData.note ||
+                           formData.mood_notes ||
+                           formData.moodNotes ||
+                           formData.feeling ||
+                           formData.noticed ||
+                           formData.reflection;
+          }
+        } catch (e) {
+          // 靜默失敗
+        }
       }
     }
 
@@ -368,6 +419,7 @@ const DailyScreen = ({ navigation }) => {
               style={styles.modalContent}
               showsVerticalScrollIndicator={false}
             >
+              {/* 練習後情緒 */}
               <LinearGradient
                 colors={['#EFF6FF', '#DBEAFE']}
                 start={{ x: 0, y: 0 }}
@@ -387,6 +439,7 @@ const DailyScreen = ({ navigation }) => {
                 </View>
               </LinearGradient>
 
+              {/* 基本資訊 */}
               <View style={styles.infoSection}>
                 <View style={styles.infoRow}>
                   <View style={styles.iconCircle}>
@@ -415,7 +468,195 @@ const DailyScreen = ({ navigation }) => {
                 </View>
               </View>
 
-              {journalEntry && (
+              {/* ⭐⭐⭐ 好事練習的詳細內容 ⭐⭐⭐ */}
+              {isGoodThingsPractice && goodThingData && (
+                <View style={styles.goodThingsContent}>
+                  {/* 好事內容 */}
+                  {goodThingData.goodThing && (
+                    <LinearGradient
+                      colors={['#FFF7ED', '#FFEDD5']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={styles.goodThingCard}
+                    >
+                      <View style={styles.goodThingHeader}>
+                        <View style={styles.goodThingIconCircle}>
+                          <Text style={styles.goodThingEmoji}>✨</Text>
+                        </View>
+                        <Text style={styles.goodThingLabel}>發生了什麼好事</Text>
+                      </View>
+                      <Text style={styles.goodThingText}>{goodThingData.goodThing}</Text>
+                    </LinearGradient>
+                  )}
+
+                  {/* 與誰一起 */}
+                  {goodThingData.whoWith && (
+                    <LinearGradient
+                      colors={['#F0F9FF', '#E0F2FE']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={styles.goodThingCard}
+                    >
+                      <View style={styles.goodThingHeader}>
+                        <View style={styles.goodThingIconCircle}>
+                          <Text style={styles.goodThingEmoji}>👥</Text>
+                        </View>
+                        <Text style={styles.goodThingLabel}>與誰一起</Text>
+                      </View>
+                      <Text style={styles.goodThingText}>{goodThingData.whoWith}</Text>
+                    </LinearGradient>
+                  )}
+
+                  {/* 感受 */}
+                  {goodThingData.feelings && (
+                    <LinearGradient
+                      colors={['#F5F3FF', '#EDE9FE']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={styles.goodThingCard}
+                    >
+                      <View style={styles.goodThingHeader}>
+                        <View style={styles.goodThingIconCircle}>
+                          <Text style={styles.goodThingEmoji}>💭</Text>
+                        </View>
+                        <Text style={styles.goodThingLabel}>當時的感受</Text>
+                      </View>
+                      <Text style={styles.goodThingText}>{goodThingData.feelings}</Text>
+                    </LinearGradient>
+                  )}
+
+                  {/* 情緒標籤 */}
+                  {goodThingData.emotions && (
+                    <LinearGradient
+                      colors={['#FFF1F2', '#FFE4E6']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={styles.goodThingCard}
+                    >
+                      <View style={styles.goodThingHeader}>
+                        <View style={styles.goodThingIconCircle}>
+                          <Text style={styles.goodThingEmoji}>😊</Text>
+                        </View>
+                        <Text style={styles.goodThingLabel}>情緒</Text>
+                      </View>
+                      <View style={styles.emotionTagsContainer}>
+                        {(Array.isArray(goodThingData.emotions) 
+                          ? goodThingData.emotions 
+                          : goodThingData.emotions.split(',')
+                        ).map((emotion, idx) => (
+                          <View key={idx} style={styles.emotionTag}>
+                            <Text style={styles.emotionTagText}>{emotion.trim()}</Text>
+                          </View>
+                        ))}
+                      </View>
+                    </LinearGradient>
+                  )}
+
+                  {/* 為什麼好 */}
+                  {goodThingData.reason && (
+                    <LinearGradient
+                      colors={['#FFFBEB', '#FEF3C7']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={styles.goodThingCard}
+                    >
+                      <View style={styles.goodThingHeader}>
+                        <View style={styles.goodThingIconCircle}>
+                          <Text style={styles.goodThingEmoji}>💡</Text>
+                        </View>
+                        <Text style={styles.goodThingLabel}>為什麼覺得這件事很好</Text>
+                      </View>
+                      <Text style={styles.goodThingText}>{goodThingData.reason}</Text>
+                    </LinearGradient>
+                  )}
+
+                  {/* 如何重複 */}
+                  {goodThingData.howToRepeat && (
+                    <LinearGradient
+                      colors={['#ECFDF5', '#D1FAE5']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={styles.goodThingCard}
+                    >
+                      <View style={styles.goodThingHeader}>
+                        <View style={styles.goodThingIconCircle}>
+                          <Text style={styles.goodThingEmoji}>🔄</Text>
+                        </View>
+                        <Text style={styles.goodThingLabel}>如何讓好事再次發生</Text>
+                      </View>
+                      <Text style={styles.goodThingText}>{goodThingData.howToRepeat}</Text>
+                    </LinearGradient>
+                  )}
+
+                  {/* 未來行動 */}
+                  {goodThingData.futureAction && (
+                    <LinearGradient
+                      colors={['#EFF6FF', '#DBEAFE']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={styles.goodThingCard}
+                    >
+                      <View style={styles.goodThingHeader}>
+                        <View style={styles.goodThingIconCircle}>
+                          <Text style={styles.goodThingEmoji}>🎯</Text>
+                        </View>
+                        <Text style={styles.goodThingLabel}>未來的行動</Text>
+                      </View>
+                      <Text style={styles.goodThingText}>{goodThingData.futureAction}</Text>
+                    </LinearGradient>
+                  )}
+
+                  {/* 正向感受程度 */}
+                  {goodThingData.positiveLevel && (
+                    <LinearGradient
+                      colors={['#FEF3C7', '#FDE68A']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={styles.goodThingCard}
+                    >
+                      <View style={styles.goodThingHeader}>
+                        <View style={styles.goodThingIconCircle}>
+                          <Text style={styles.goodThingEmoji}>⭐</Text>
+                        </View>
+                        <Text style={styles.goodThingLabel}>正向感受程度</Text>
+                      </View>
+                      <View style={styles.ratingContainer}>
+                        <Text style={styles.ratingNumber}>{goodThingData.positiveLevel}</Text>
+                        <Text style={styles.ratingMax}>/ 10</Text>
+                        <View style={styles.ratingBar}>
+                          <View 
+                            style={[
+                              styles.ratingFill, 
+                              { width: `${(goodThingData.positiveLevel / 10) * 100}%` }
+                            ]} 
+                          />
+                        </View>
+                      </View>
+                    </LinearGradient>
+                  )}
+
+                  {/* 書寫後心情 */}
+                  {goodThingData.moodNotes && (
+                    <LinearGradient
+                      colors={['#FAF5FF', '#F3E8FF']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={styles.goodThingCard}
+                    >
+                      <View style={styles.goodThingHeader}>
+                        <View style={styles.goodThingIconCircle}>
+                          <Text style={styles.goodThingEmoji}>📝</Text>
+                        </View>
+                        <Text style={styles.goodThingLabel}>書寫後的感想</Text>
+                      </View>
+                      <Text style={styles.goodThingText}>{goodThingData.moodNotes}</Text>
+                    </LinearGradient>
+                  )}
+                </View>
+              )}
+
+              {/* ⭐⭐⭐ 一般練習的筆記 ⭐⭐⭐ */}
+              {!isGoodThingsPractice && journalEntry && (
                 <View style={styles.journalSection}>
                   <View style={styles.journalHeader}>
                     <View style={styles.iconCircle}>
@@ -1332,6 +1573,101 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: '#4B5563',
     lineHeight: 24,
+  },
+  // ⭐⭐⭐ 好事練習樣式 - 精美設計 ⭐⭐⭐
+  goodThingsContent: {
+    marginBottom: 20,
+  },
+  goodThingCard: {
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  goodThingHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  goodThingIconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  goodThingEmoji: {
+    fontSize: 18,
+  },
+  goodThingLabel: {
+    fontSize: 14,
+    color: '#374151',
+    fontWeight: '600',
+  },
+  goodThingText: {
+    fontSize: 15,
+    color: '#1F2937',
+    lineHeight: 24,
+  },
+  emotionTagsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  emotionTag: {
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  emotionTagText: {
+    fontSize: 13,
+    color: '#374151',
+    fontWeight: '500',
+  },
+  ratingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  ratingNumber: {
+    fontSize: 32,
+    fontWeight: '700',
+    color: '#F59E0B',
+  },
+  ratingMax: {
+    fontSize: 18,
+    color: '#9CA3AF',
+    fontWeight: '500',
+  },
+  ratingBar: {
+    flex: 1,
+    height: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.6)',
+    borderRadius: 4,
+    overflow: 'hidden',
+    marginLeft: 12,
+  },
+  ratingFill: {
+    height: '100%',
+    backgroundColor: '#F59E0B',
+    borderRadius: 4,
   },
 });
 
