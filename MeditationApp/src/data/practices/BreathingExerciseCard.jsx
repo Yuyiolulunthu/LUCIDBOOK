@@ -43,6 +43,10 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
   // 練習相關狀態
   const [selectedExercise, setSelectedExercise] = useState(null);
   const [selectedState, setSelectedState] = useState(null);
+
+  // 音檔載入狀態
+  const [isAudioLoading, setIsAudioLoading] = useState(false);
+  const [audioLoadError, setAudioLoadError] = useState(null);
   
   // ⭐ API 串接狀態
   const [practiceId, setPracticeId] = useState(null);
@@ -574,9 +578,38 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
   // ============================================
 
   // ⭐ 處理練習選擇 - 初始化 API
+  // ⭐ 處理練習選擇 - 初始化 API + 提前載入音檔(帶載入狀態)
   const handleSelectPractice = async (practiceType) => {
     const exercise = exercises.find(ex => ex.type === practiceType);
     setSelectedExercise(exercise);
+    
+    // 🎵 提前載入音檔
+    setIsAudioLoading(true);
+    setAudioLoadError(null);
+    
+    try {
+      console.log('🎵 [呼吸練習卡片] 開始提前載入音檔...');
+      
+      const audioFile = practiceType === '4-6-breathing'
+        ? { uri: 'https://curiouscreate.com/api/asserts/4-6.mp3' }
+        : { uri: 'https://curiouscreate.com/api/asserts/breath-holding.mp3' };
+      
+      const { sound: audioSound } = await Audio.Sound.createAsync(audioFile);
+      sound.current = audioSound;
+      
+      // 取得音檔時長
+      const status = await audioSound.getStatusAsync();
+      if (status.isLoaded) {
+        const durationInSeconds = Math.floor(status.durationMillis / 1000);
+        setTotalDuration(durationInSeconds);
+        console.log('✅ [呼吸練習卡片] 音檔載入完成,時長:', durationInSeconds, '秒');
+      }
+    } catch (error) {
+      console.error('❌ [呼吸練習卡片] 音檔載入失敗:', error);
+      setAudioLoadError(error.message);
+    } finally {
+      setIsAudioLoading(false);
+    }
     
     await initializePractice(practiceType);
     
@@ -592,22 +625,29 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
   };
 
   // 處理準備頁面繼續
+  // 處理準備頁面繼續
   const handlePrepareContinue = async () => {
-    try {
-      const audioFile = selectedExercise.type === '4-6-breathing'
-        ? { uri: 'https://curiouscreate.com/api/asserts/4-6.mp3' }
-        : { uri: 'https://curiouscreate.com/api/asserts/breath-holding.mp3' };
-      
-      const { sound: audioSound } = await Audio.Sound.createAsync(audioFile);
-      sound.current = audioSound;
-      
-      const status = await audioSound.getStatusAsync();
-      if (status.isLoaded) {
-        const durationInSeconds = Math.floor(status.durationMillis / 1000);
-        setTotalDuration(durationInSeconds);
+    // 🎵 檢查音檔是否已經載入
+    if (!sound.current) {
+      console.log('⚠️ [呼吸練習卡片] 音檔未載入,嘗試重新載入...');
+      try {
+        const audioFile = selectedExercise.type === '4-6-breathing'
+          ? { uri: 'https://curiouscreate.com/api/asserts/4-6.mp3' }
+          : { uri: 'https://curiouscreate.com/api/asserts/breath-holding.mp3' };
+        
+        const { sound: audioSound } = await Audio.Sound.createAsync(audioFile);
+        sound.current = audioSound;
+        
+        const status = await audioSound.getStatusAsync();
+        if (status.isLoaded) {
+          const durationInSeconds = Math.floor(status.durationMillis / 1000);
+          setTotalDuration(durationInSeconds);
+        }
+      } catch (error) {
+        console.error('❌ [呼吸練習卡片] 重新載入音檔失敗:', error);
       }
-    } catch (error) {
-      console.error('載入音頻錯誤:', error);
+    } else {
+      console.log('✅ [呼吸練習卡片] 音檔已提前載入完成');
     }
     
     setCurrentPage('practice');
@@ -761,8 +801,18 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
     } else if (currentPage === 'prepare') {
       setCurrentPage('preState');
     } else if (currentPage === 'preState') {
+      // 清理已載入的音檔
+      if (sound.current) {
+        console.log('🧹 [呼吸練習卡片] 清理音檔...');
+        sound.current.unloadAsync().catch(err => 
+          console.error('清理音檔失敗:', err)
+        );
+        sound.current = null;
+      }
+      
       setCurrentPage('selection');
       setSelectedState(null);
+      setSelectedExercise(null);
     } else if (currentPage === 'selection') {
       setCurrentPage('welcome');
     } else {
