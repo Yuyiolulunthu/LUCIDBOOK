@@ -32,6 +32,8 @@ import {
 import ApiService from '../../../api';
 import BottomNavigation from '../../navigation/BottomNavigation';
 import AppHeader from '../../navigation/AppHeader';
+import LockedOverlay from '../../navigation/LockedOverlay';
+import { useFocusEffect } from '@react-navigation/native';
 
 const { width } = Dimensions.get('window');
 
@@ -53,6 +55,8 @@ const DailyScreen = ({ navigation }) => {
   });
   const [viewMode, setViewMode] = useState('list');
   const [showInfoCard, setShowInfoCard] = useState(null);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [hasEnterpriseCode, setHasEnterpriseCode] = useState(false);
 
   // ⭐⭐⭐ 新增：情緒日記統計 ⭐⭐⭐
   const [emotionDiaryStats, setEmotionDiaryStats] = useState([]);
@@ -62,23 +66,61 @@ const DailyScreen = ({ navigation }) => {
 
   const hasLoadedData = useRef(false);
 
-  useEffect(() => {
-    const unsubscribe = navigation.addListener('focus', () => {
-      fetchAllData();
-    });
-
-    if (!hasLoadedData.current) {
-      fetchAllData();
-    }
-
-    return unsubscribe;
-  }, [navigation]);
+  // ✅ 使用 useFocusEffect 替代 useEffect
+  useFocusEffect(
+    React.useCallback(() => {
+      console.log('📱 [DailyScreen] 頁面獲得焦點');
+      
+      // 重新檢查權限
+      checkAccess();
+      
+      // 重新載入數據
+      if (!hasLoadedData.current) {
+        fetchAllData();
+      }
+      
+      return () => {
+        console.log('📱 [DailyScreen] 頁面失去焦點');
+      };
+    }, [])
+  );
 
   useEffect(() => {
     filterDataForCurrentMonth(allPracticeData);
     // ⭐ 新增：當月份改變時，重新獲取情緒日記統計
     fetchEmotionDiaryStats();
   }, [currentMonth]);
+
+  // ✅ 改進的權限檢查函數
+  const checkAccess = async () => {
+    try {
+      console.log('🔍 [DailyScreen] 開始檢查權限...');
+      
+      // 檢查登入狀態
+      const loggedIn = await ApiService.isLoggedIn();
+      console.log('📋 [DailyScreen] 登入狀態:', loggedIn);
+      setIsLoggedIn(loggedIn);
+
+      if (loggedIn) {
+        // 檢查是否有企業引薦碼
+        const profile = await ApiService.getUserProfile();
+        const hasCode = !!profile.user.enterprise_code;
+        console.log('📋 [DailyScreen] 企業引薦碼:', hasCode, '| 值:', profile.user.enterprise_code);
+        setHasEnterpriseCode(hasCode);
+      } else {
+        console.log('⚠️ [DailyScreen] 用戶未登入，清除引薦碼狀態');
+        setHasEnterpriseCode(false);
+      }
+      
+      console.log('✅ [DailyScreen] 權限檢查完成');
+    } catch (error) {
+      console.error('❌ [DailyScreen] 檢查權限失敗:', error);
+      setIsLoggedIn(false);
+      setHasEnterpriseCode(false);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const fetchAllData = async () => {
     try {
@@ -1058,6 +1100,29 @@ const DailyScreen = ({ navigation }) => {
 
       {renderDetailModal()}
       <BottomNavigation navigation={navigation} currentRoute="Daily" />
+
+      {/* 🔒 鎖定遮罩 - 添加調試信息 */}
+      {!isLoggedIn && (
+        <>
+          {console.log('🔒 [DailyScreen] 顯示登入遮罩')}
+          <LockedOverlay 
+            navigation={navigation} 
+            reason="login"
+            message="登入後查看你的練習日記"
+          />
+        </>
+      )}
+      
+      {isLoggedIn && !hasEnterpriseCode && (
+        <>
+          {console.log('🔒 [DailyScreen] 顯示引薦碼遮罩')}
+          <LockedOverlay 
+            navigation={navigation} 
+            reason="enterprise-code"
+            message="輸入企業引薦碼以解鎖日記功能"
+          />
+        </>
+      )}
     </View>
   );
 };

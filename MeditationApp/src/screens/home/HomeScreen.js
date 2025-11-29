@@ -13,6 +13,7 @@ import {
   Dimensions,
   StatusBar,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import MaskedView from '@react-native-masked-view/masked-view';
@@ -27,6 +28,7 @@ import {
 import ApiService from '../../services/index';
 import BottomNavigation from '../../navigation/BottomNavigation';
 import AppHeader from '../../navigation/AppHeader';
+import LockedOverlay from '../../navigation/LockedOverlay';
 import {
   computeWeeklyCheckIns,
   computeMonthlyTotal,
@@ -40,9 +42,11 @@ const HomeScreen = ({ navigation }) => {
   const [todayMoodRecord, setTodayMoodRecord] = useState(null);
   const [user, setUser] = useState(null);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(true);
   const [todayPracticeStatus, setTodayPracticeStatus] = useState({});
   const [selectedPractice, setSelectedPractice] = useState('breathing');
   const [selectedCategory, setSelectedCategory] = useState('employee');
+  const [hasEnterpriseCode, setHasEnterpriseCode] = useState(false);
 
   // 首頁統計：心情連續天數 / 總天數
   const [moodStats, setMoodStats] = useState({
@@ -149,18 +153,30 @@ const HomeScreen = ({ navigation }) => {
             email: response.user.email,
           });
           setIsLoggedIn(true);
+
+          // ⭐ 新增：檢查企業引薦碼
+          const hasCode = !!response.user.enterprise_code;
+          console.log('📋 [HomeScreen] 企業引薦碼:', hasCode, '| 值:', response.user.enterprise_code);
+          setHasEnterpriseCode(hasCode);
         } else {
           setIsLoggedIn(false);
           setUser(null);
+          setHasEnterpriseCode(false);
         }
       } else {
         setIsLoggedIn(false);
         setUser(null);
+        setHasEnterpriseCode(false);
       }
     } catch (error) {
       console.log('未登入或 Token 已過期');
       setIsLoggedIn(false);
       setUser(null);
+      setHasEnterpriseCode(false);
+    } finally {
+      // ⭐ 無論成功或失敗，都結束初始化狀態
+      setIsInitializing(false);
+      console.log('🏁 [HomeScreen] 初始化完成');
     }
   };
 
@@ -473,6 +489,23 @@ const HomeScreen = ({ navigation }) => {
   });
 
   // ========== 主渲染 ==========
+
+  // ⭐ 如果還在初始化，顯示載入畫面
+  if (isInitializing) {
+    return (
+      <View style={styles.loadingContainer}>
+        <StatusBar barStyle="light-content" backgroundColor="#166CB5" />
+        <AppHeader navigation={navigation} />
+        
+        <View style={styles.loadingContent}>
+          <ActivityIndicator size="large" color="#166CB5" />
+          <Text style={styles.loadingText}>載入中...</Text>
+        </View>
+        
+        <BottomNavigation navigation={navigation} currentRoute="Home" />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -913,6 +946,22 @@ const HomeScreen = ({ navigation }) => {
       </ScrollView>
 
       <BottomNavigation navigation={navigation} currentRoute="Home" />
+      {/* ⭐ 新增：鎖定遮罩 */}
+      {!isLoggedIn && (
+        <LockedOverlay 
+          navigation={navigation} 
+          reason="login"
+          message="登入後開始你的練習之旅"
+        />
+      )}
+      
+      {isLoggedIn && !hasEnterpriseCode && (
+        <LockedOverlay 
+          navigation={navigation} 
+          reason="enterprise-code"
+          message="輸入企業引薦碼以解鎖完整功能"
+        />
+      )}
     </View>
   );
 };
@@ -927,6 +976,23 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
+  },
+
+  // ⭐ 新增：載入畫面樣式
+  loadingContainer: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
+  loadingContent: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#6B7280',
+    fontWeight: '500',
   },
 
   greetingSection: {

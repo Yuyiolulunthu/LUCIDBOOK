@@ -1,11 +1,11 @@
 // ==========================================
 // 檔案名稱: AccountScreen.js
-// 版本: V4.2 - 修正滾動和 AppHeader 整合
+// 版本: V4.3 - 修正企業引薦碼鎖定邏輯
 // 
 // ✅ AppHeader 固定在頂部，融入漸層背景
 // ✅ 個人資料卡片跟著內容滾動
 // ✅ 漸層背景和 AppHeader 無縫整合
-// ✅ 完美符合設計稿
+// ✅ 企業引薦碼鎖定邏輯修正
 // ==========================================
 
 import React, { useState, useEffect } from 'react';
@@ -29,6 +29,7 @@ import BottomNavigation from '../../navigation/BottomNavigation';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import ApiService from '../../../api';
 import AppHeader from '../../navigation/AppHeader';
+import LockedOverlay from '../../navigation/LockedOverlay';
 
 const { width, height } = Dimensions.get('window');
 
@@ -37,6 +38,7 @@ const AccountScreen = ({ navigation, route }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [avatar, setAvatar] = useState(null);
+  const [hasEnterpriseCode, setHasEnterpriseCode] = useState(false);
   
   const [practiceStats, setPracticeStats] = useState({
     totalPractices: 0,
@@ -56,6 +58,7 @@ const AccountScreen = ({ navigation, route }) => {
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
+      console.log('🔄 [AccountScreen] 頁面獲得焦點，重新載入數據');
       loadUserData();
     });
     return unsubscribe;
@@ -71,10 +74,14 @@ const AccountScreen = ({ navigation, route }) => {
     try {
       setLoading(true);
       
+      console.log('🔍 [AccountScreen] 開始檢查登入狀態...');
+      
       const loggedIn = await ApiService.isLoggedIn();
       
       if (loggedIn) {
         try {
+          console.log('✅ [AccountScreen] 已登入，獲取用戶資料...');
+          
           const response = await ApiService.getUserProfile();
           const userData = {
             id: response.user.id,
@@ -85,8 +92,16 @@ const AccountScreen = ({ navigation, route }) => {
           
           setUser(userData);
           setIsLoggedIn(true);
+
+          // 檢查企業引薦碼
+          const hasCode = !!response.user.enterprise_code;
+          console.log('📋 [AccountScreen] 企業引薦碼狀態:', {
+            hasCode,
+            codeValue: response.user.enterprise_code,
+          });
+          setHasEnterpriseCode(hasCode);
           
-          const savedAvatar = await AsyncStorage.getItem('userAvatar');
+          // 處理頭像
           if (response.user.avatar) {
             setAvatar(response.user.avatar);
             await AsyncStorage.setItem('userAvatar', response.user.avatar);
@@ -98,25 +113,32 @@ const AccountScreen = ({ navigation, route }) => {
           
           await loadPracticeStats();
           await loadAchievements();
+          
+          console.log('✅ [AccountScreen] 用戶資料載入完成');
         } catch (error) {
-          console.log('Token 無效，清除登入狀態');
+          console.log('❌ [AccountScreen] Token 無效，清除登入狀態');
           await ApiService.clearToken();
           setIsLoggedIn(false);
           setUser(null);
           setAchievements([]);
+          setHasEnterpriseCode(false);
         }
       } else {
+        console.log('❌ [AccountScreen] 未登入');
         setIsLoggedIn(false);
         setUser(null);
         setAchievements([]);
+        setHasEnterpriseCode(false);
       }
     } catch (error) {
-      console.error('載入用戶資料失敗:', error);
+      console.error('❌ [AccountScreen] 載入用戶資料失敗:', error);
       setIsLoggedIn(false);
       setUser(null);
       setAchievements([]);
+      setHasEnterpriseCode(false);
     } finally {
       setLoading(false);
+      console.log('🏁 [AccountScreen] 載入完成');
     }
   };
 
@@ -244,6 +266,11 @@ const AccountScreen = ({ navigation, route }) => {
     navigation.navigate('Feedback');
   };
 
+  // ========================================
+  // 渲染邏輯
+  // ========================================
+
+  // 1️⃣ 載入中狀態
   if (loading) {
     return (
       <View style={styles.container}>
@@ -257,6 +284,7 @@ const AccountScreen = ({ navigation, route }) => {
     );
   }
 
+  // 2️⃣ 未登入狀態
   if (!isLoggedIn) {
     return (
       <View style={styles.container}>
@@ -318,6 +346,66 @@ const AccountScreen = ({ navigation, route }) => {
       </View>
     );
   }
+
+  // 3️⃣ 已登入但沒有企業引薦碼 - 顯示鎖定畫面
+  if (isLoggedIn && !hasEnterpriseCode) {
+    console.log('🔒 [AccountScreen] 顯示企業引薦碼鎖定畫面');
+    
+    return (
+      <View style={styles.container}>
+        <StatusBar barStyle="light-content" backgroundColor="#166CB5" />
+        
+        {/* Fixed Header */}
+        <View style={styles.fixedHeaderContainer}>
+          <LinearGradient
+            colors={['#166CB5', '#31C6FE']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.fixedHeaderGradient}
+          >
+            <AppHeader navigation={navigation} transparent={true} />
+          </LinearGradient>
+        </View>
+
+        {/* 模糊的背景內容 */}
+        <ScrollView 
+          style={styles.scrollView}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
+          scrollEnabled={false}
+        >
+          <LinearGradient
+            colors={['#166CB5', '#2B9FD9', '#31C6FE']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.gradientSection}
+          >
+            <View style={styles.gradientContent}>
+              <Text style={styles.pageTitle}>我的練心書</Text>
+            </View>
+          </LinearGradient>
+
+          <View style={styles.profileCardWrapper}>
+            <View style={[styles.profileCard, { opacity: 0.3 }]}>
+              <View style={{ height: 200 }} />
+            </View>
+          </View>
+        </ScrollView>
+
+        <BottomNavigation navigation={navigation} activeTab="profile" />
+        
+        {/* 企業引薦碼鎖定遮罩 */}
+        <LockedOverlay 
+          navigation={navigation} 
+          reason="enterprise-code"
+          message="輸入企業引薦碼以查看完整個人資料"
+        />
+      </View>
+    );
+  }
+
+  // 4️⃣ 已登入且有企業引薦碼 - 顯示完整內容
+  console.log('✅ [AccountScreen] 顯示完整個人資料頁面');
 
   return (
     <View style={styles.container}>
@@ -716,8 +804,8 @@ const styles = StyleSheet.create({
 
   // Gradient Section
   gradientSection: {
-    paddingTop: 135, // 減少 AppHeader 預留空間
-    paddingBottom: 60, // 增加底部空間，讓標題和卡片有距離
+    paddingTop: 135,
+    paddingBottom: 60,
   },
   gradientContent: {
     paddingHorizontal: 20,
@@ -726,12 +814,12 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: 'bold',
     color: '#FFF',
-    marginBottom: 0, // 移除底部 margin，讓間距由 paddingBottom 控制
+    marginBottom: 0,
   },
 
-  // Profile Card Wrapper - 向上移動到漸層區域
+  // Profile Card Wrapper
   profileCardWrapper: {
-    marginTop: -40, // 減少向上移動的距離
+    marginTop: -40,
     paddingHorizontal: 20,
     marginBottom: 20,
   },
@@ -1050,7 +1138,7 @@ const styles = StyleSheet.create({
 
   // Login State
   loginHeader: {
-    paddingTop: 19, // 與已登入狀態一致
+    paddingTop: 19,
     paddingBottom: 24,
     paddingHorizontal: 20,
   },

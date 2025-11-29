@@ -172,52 +172,71 @@ const ApiService = {
     }
   },
 
-  // 企業引薦碼驗證
+  // ==========================================
+  // ⭐⭐⭐ 企業引薦碼驗證服務（修正版）⭐⭐⭐
+  // ==========================================
+
+  /**
+   * 驗證企業引薦碼
+   * @param {string} code - 企業引薦碼
+   * @returns {Promise<Object>} 驗證結果
+   */
   async verifyEnterpriseCode(code) {
-    console.log('驗證代碼:', code);
-    
-    // 模擬網路延遲
-    await new Promise(resolve => setTimeout(resolve, 1000));
-
-    // 測試代碼
-    const validCodes = {
-      'ABC123': {
-        enterpriseId: 'ent_001',
-        enterpriseName: '測試企業有限公司',
-        features: ['enterprise_practices', 'advanced_reports', 'team_statistics']
-      },
-      'TEST01': {
-        enterpriseId: 'ent_002',
-        enterpriseName: 'NTHU 國立清華大學',
-        features: ['enterprise_practices', 'custom_content']
-      },
-      '00AA99': {
-        enterpriseId: 'ent_003',
-        enterpriseName: '範例科技公司',
-        features: ['enterprise_practices', 'priority_support']
+    try {
+      console.log('🔐 [API] 驗證企業引薦碼:', code);
+      
+      // ⭐ 呼叫後端 API 驗證並儲存
+      const response = await apiClient.request('/enterprise/verify.php', {
+        method: 'POST',
+        body: { code },
+      });
+      
+      if (response.success) {
+        console.log('✅ [API] 企業引薦碼驗證成功:', response.enterprise?.name);
+        console.log('📋 [API] 企業資訊:', {
+          id: response.enterprise?.id,
+          name: response.enterprise?.name,
+          features: response.enterprise?.features
+        });
+        return response;
+      } else {
+        console.error('❌ [API] 企業引薦碼無效:', response.message);
+        return response;
       }
-    };
-
-    const upperCode = code.toUpperCase();
-
-    if (validCodes[upperCode]) {
+    } catch (error) {
+      console.error('❌ [API] 驗證企業引薦碼失敗:', error);
       return {
-        success: true,
-        enterprise: {
-          id: validCodes[upperCode].enterpriseId,
-          name: validCodes[upperCode].enterpriseName,
-          features: validCodes[upperCode].features
-        },
-        message: '驗證成功'
+        success: false,
+        enterprise: null,
+        message: error.message || '網路錯誤，請稍後再試',
       };
     }
-
-    return {
-      success: false,
-      enterprise: null,
-      message: '引薦碼無效或已過期'
-    };
-  }
+  },
+  
+  // ⭐ 清除企業引薦碼
+  async clearEnterpriseCode() {
+    try {
+      console.log('🗑️ [API] 清除企業引薦碼');
+      
+      const response = await apiClient.request('/enterprise/clear.php', {
+        method: 'POST',
+      });
+      
+      if (response.success) {
+        console.log('✅ [API] 企業引薦碼已清除');
+        return response;
+      } else {
+        console.error('❌ [API] 清除失敗:', response.message);
+        return response;
+      }
+    } catch (error) {
+      console.error('❌ [API] 清除企業引薦碼失敗:', error);
+      return {
+        success: false,
+        message: error.message || '網路錯誤，請稍後再試',
+      };
+    }
+  },
 };
 
 export default ApiService;

@@ -4,7 +4,7 @@
 // 🎨 統一設計風格
 // ✅ 電子郵件登入
 // ✅ 訪客登入
-// ✅ 登入成功後詢問企業引薦碼
+// ✅ 登入成功後詢問企業引薦碼（只在沒有引薦碼時）
 // ✅ 忘記密碼
 // ==========================================
 
@@ -52,6 +52,7 @@ const LoginScreen = ({ navigation, route }) => {
 
     setIsLoading(true);
     try {
+      // ⭐ 修改點 1: 登入
       const response = await ApiService.login(email, password);
       
       const userData = {
@@ -63,39 +64,85 @@ const LoginScreen = ({ navigation, route }) => {
 
       await AsyncStorage.setItem('userData', JSON.stringify(userData));
       
-      Alert.alert(
-        '登入成功！',
-        '您是否有企業引薦碼？\n輸入引薦碼可解鎖專屬功能',
-        [
-          {
-            text: '輸入引薦碼',
-            onPress: () => {
-              if (parentOnLoginSuccess) {
-                parentOnLoginSuccess(userData);
-              }
-              
-              if (navigation) {
-                navigation.navigate('EnterpriseCode', { 
-                  fromLogin: true,
-                });
+      // ⭐ 修改點 2: 獲取完整用戶資料（包含企業引薦碼）
+      console.log('🔍 [LoginScreen] 檢查企業引薦碼狀態...');
+      
+      let hasEnterpriseCode = false;
+      try {
+        const userProfile = await ApiService.getUserProfile();
+        hasEnterpriseCode = !!userProfile.user.enterprise_code;
+        
+        console.log('📋 [LoginScreen] 企業引薦碼狀態:', {
+          hasCode: hasEnterpriseCode,
+          codeValue: userProfile.user.enterprise_code,
+        });
+      } catch (error) {
+        console.error('❌ [LoginScreen] 獲取用戶資料失敗:', error);
+        // 如果獲取失敗，假設沒有企業引薦碼
+        hasEnterpriseCode = false;
+      }
+      
+      // ⭐ 修改點 3: 根據是否有企業引薦碼決定是否顯示提示
+      if (hasEnterpriseCode) {
+        // 已有企業引薦碼，直接登入成功
+        console.log('✅ [LoginScreen] 用戶已有企業引薦碼，直接登入');
+        
+        Alert.alert(
+          '登入成功！',
+          '歡迎回來',
+          [
+            {
+              text: '確定',
+              onPress: () => {
+                if (parentOnLoginSuccess) {
+                  parentOnLoginSuccess(userData);
+                }
+                
+                handleGoBack();
               }
             }
-          },
-          {
-            text: '稍後再說',
-            style: 'cancel',
-            onPress: () => {
-              if (parentOnLoginSuccess) {
-                parentOnLoginSuccess(userData);
+          ],
+          { cancelable: false }
+        );
+      } else {
+        // 沒有企業引薦碼，詢問是否要輸入
+        console.log('📝 [LoginScreen] 用戶尚未設定企業引薦碼，顯示提示');
+        
+        Alert.alert(
+          '登入成功！',
+          '您是否有企業引薦碼？\n輸入引薦碼可解鎖專屬功能',
+          [
+            {
+              text: '輸入引薦碼',
+              onPress: () => {
+                if (parentOnLoginSuccess) {
+                  parentOnLoginSuccess(userData);
+                }
+                
+                if (navigation) {
+                  navigation.navigate('EnterpriseCode', { 
+                    fromLogin: true,
+                  });
+                }
               }
-              
-              handleGoBack();
+            },
+            {
+              text: '稍後再說',
+              style: 'cancel',
+              onPress: () => {
+                if (parentOnLoginSuccess) {
+                  parentOnLoginSuccess(userData);
+                }
+                
+                handleGoBack();
+              }
             }
-          }
-        ],
-        { cancelable: false }
-      );
+          ],
+          { cancelable: false }
+        );
+      }
     } catch (error) {
+      console.error('❌ [LoginScreen] 登入失敗:', error);
       Alert.alert('登入失敗', error.message || '請檢查您的電子郵件和密碼');
     } finally {
       setIsLoading(false);

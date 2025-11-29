@@ -34,6 +34,7 @@ import {
   formatExpiryDate,
   getEnterpriseFeatures,
 } from './utils/enterpriseCodeUtils';
+import ApiService from '../../../../api';
 
 const EnterpriseCodeManagement = ({ navigation }) => {
   const [loading, setLoading] = useState(true);
@@ -57,17 +58,57 @@ const EnterpriseCodeManagement = ({ navigation }) => {
   // 載入企業引薦碼資訊
   const loadCodeInfo = async () => {
     try {
-      const info = await getEnterpriseCodeInfo();
-      setCodeInfo(info);
+      console.log('🔍 [EnterpriseCodeManagement] 開始載入引薦碼資訊...');
       
-      if (info.code) {
-        const enterpriseFeatures = await getEnterpriseFeatures();
-        setFeatures(enterpriseFeatures);
+      // ⭐ 從 API 獲取用戶資料（包含企業引薦碼）
+      const response = await ApiService.getUserProfile();
+      
+      if (response && response.user) {
+        const enterpriseCode = response.user.enterprise_code;
+        console.log('📋 [EnterpriseCodeManagement] 企業引薦碼:', enterpriseCode);
+        
+        if (enterpriseCode) {
+          // 有企業引薦碼
+          setCodeInfo({
+            code: enterpriseCode,
+            enterpriseName: response.user.enterprise_name || '企業用戶',
+            expiryDate: null, // 如果後端有效期資料，從這裡獲取
+            daysRemaining: null,
+          });
+          
+          // 獲取企業功能列表
+          const enterpriseFeatures = await getEnterpriseFeatures();
+          setFeatures(enterpriseFeatures);
+        } else {
+          // 沒有企業引薦碼
+          console.log('⚠️ [EnterpriseCodeManagement] 用戶沒有企業引薦碼');
+          setCodeInfo({
+            code: null,
+            enterpriseName: null,
+            expiryDate: null,
+            daysRemaining: null,
+          });
+          setFeatures([]);
+        }
       } else {
+        console.log('⚠️ [EnterpriseCodeManagement] 無法獲取用戶資料');
+        setCodeInfo({
+          code: null,
+          enterpriseName: null,
+          expiryDate: null,
+          daysRemaining: null,
+        });
         setFeatures([]);
       }
     } catch (error) {
-      console.error('載入企業引薦碼資訊失敗:', error);
+      console.error('❌ [EnterpriseCodeManagement] 載入企業引薦碼資訊失敗:', error);
+      setCodeInfo({
+        code: null,
+        enterpriseName: null,
+        expiryDate: null,
+        daysRemaining: null,
+      });
+      setFeatures([]);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -111,20 +152,34 @@ const EnterpriseCodeManagement = ({ navigation }) => {
 
     setIsSaving(true);
     
-    // 這裡應該呼叫 API 驗證和儲存
-    // 模擬 API 呼叫
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    setIsSaving(false);
-    setCodeInfo(prev => ({ ...prev, code: newCode }));
-    setNewCode('');
-    setIsEditing(false);
-    setShowSuccess(true);
+    try {
+      console.log('💾 [EnterpriseCodeManagement] 開始驗證新引薦碼:', newCode);
+      
+      // ⭐ 呼叫 API 驗證引薦碼
+      const response = await ApiService.verifyEnterpriseCode(newCode.toUpperCase());
+      
+      if (response && response.success) {
+        console.log('✅ [EnterpriseCodeManagement] 引薦碼驗證成功');
+        
+        setIsSaving(false);
+        setNewCode('');
+        setIsEditing(false);
+        setShowSuccess(true);
 
-    setTimeout(() => {
-      setShowSuccess(false);
-      loadCodeInfo();
-    }, 2000);
+        setTimeout(() => {
+          setShowSuccess(false);
+          loadCodeInfo(); // 重新載入
+        }, 2000);
+      } else {
+        console.error('❌ [EnterpriseCodeManagement] 引薦碼無效');
+        setError(response.message || '引薦碼無效或已過期');
+        setIsSaving(false);
+      }
+    } catch (error) {
+      console.error('❌ [EnterpriseCodeManagement] 驗證失敗:', error);
+      setError('驗證失敗，請稍後再試');
+      setIsSaving(false);
+    }
   };
 
   const handleCancelEdit = () => {
@@ -139,18 +194,37 @@ const EnterpriseCodeManagement = ({ navigation }) => {
 
   const confirmDeleteCode = async () => {
     setIsSaving(true);
-    const success = await clearEnterpriseCode();
-    setIsSaving(false);
     
-    if (success) {
-      setShowRemoveConfirm(false);
-      setShowSuccess(true);
-      setTimeout(() => {
-        setShowSuccess(false);
-        loadCodeInfo();
-      }, 2000);
-    } else {
+    try {
+      console.log('🗑️ [EnterpriseCodeManagement] 開始刪除引薦碼...');
+      
+      // ⭐ 呼叫 API 清除資料庫中的引薦碼
+      // 假設你有一個 API 端點可以清除引薦碼
+      // 如果沒有，需要在後端創建一個
+      const response = await ApiService.clearEnterpriseCode();
+      
+      if (response && response.success) {
+        console.log('✅ [EnterpriseCodeManagement] 引薦碼已刪除');
+        
+        // 同時清除本地 AsyncStorage
+        await clearEnterpriseCode();
+        
+        setShowRemoveConfirm(false);
+        setShowSuccess(true);
+        
+        setTimeout(() => {
+          setShowSuccess(false);
+          loadCodeInfo(); // 重新載入
+        }, 2000);
+      } else {
+        console.error('❌ [EnterpriseCodeManagement] API 返回失敗');
+        Alert.alert('錯誤', '刪除失敗，請稍後再試');
+      }
+    } catch (error) {
+      console.error('❌ [EnterpriseCodeManagement] 刪除失敗:', error);
       Alert.alert('錯誤', '刪除失敗，請稍後再試');
+    } finally {
+      setIsSaving(false);
     }
   };
 

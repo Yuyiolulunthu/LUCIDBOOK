@@ -85,6 +85,19 @@ class ApiClient {
       console.log('⚠️ 未添加 Authorization header (沒有 token)');
     }
 
+    // ⭐⭐⭐ 關鍵修改：確保 body 被正確序列化 ⭐⭐⭐
+    let body = undefined;
+    if (options.body) {
+      // 如果 body 已經是字串，直接使用
+      if (typeof options.body === 'string') {
+        body = options.body;
+      } else {
+        // 否則轉換為 JSON 字串
+        body = JSON.stringify(options.body);
+      }
+      console.log('📦 Body 已序列化，長度:', body.length);
+    }
+
     try {
       const fullUrl = `${API_BASE_URL}${endpoint}`;
       console.log(`\n📡 [API 請求] ${options.method || 'GET'} ${fullUrl}`);
@@ -97,11 +110,13 @@ class ApiClient {
       }
       console.log('📋 Request Headers:', JSON.stringify(safeHeaders, null, 2));
       
+      // 顯示原始 body 對象（序列化前）
       console.log('📦 傳送內容:', options.body || '(無)');
 
       const response = await fetch(fullUrl, {
-        ...options,
+        method: options.method || 'GET',
         headers,
+        body,  // ⭐ 使用已序列化的 body
       });
 
       const status = response.status;
@@ -132,7 +147,7 @@ class ApiClient {
           console.error('\n建議動作: 請重新登入');
         }
         
-        throw new Error(data.error || `HTTP Error: ${status}`);
+        throw new Error(data.error || data.message || `HTTP Error: ${status}`);
       }
 
       console.log(`✅ [API 成功] ${endpoint}`);

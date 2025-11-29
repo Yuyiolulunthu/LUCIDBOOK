@@ -22,6 +22,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import BottomNavigation from '../../navigation/BottomNavigation';
 import AppHeader from '../../navigation/AppHeader';
+import LockedOverlay from '../../navigation/LockedOverlay';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import ApiService from '../../../api';
@@ -38,6 +39,7 @@ const PracticeSelectionScreen = ({ navigation }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [favorites, setFavorites] = useState([]);
+  const [hasEnterpriseCode, setHasEnterpriseCode] = useState(false);
 
   // ⭐ 單個練習 - 使用 lucide 圖標組件，與 HomeScreen 完全一致
   const practices = [
@@ -115,20 +117,27 @@ const PracticeSelectionScreen = ({ navigation }) => {
             email: response.user.email,
           });
           setIsLoggedIn(true);
+          // ⭐ 新增：檢查企業引薦碼
+          const hasCode = !!response.user.enterprise_code;
+          console.log('📋 [PracticeSelection] 企業引薦碼:', hasCode, '| 值:', response.user.enterprise_code);
+          setHasEnterpriseCode(hasCode);
         } catch (error) {
           console.log('Token 無效，清除並設為未登入');
           await ApiService.clearToken();
           setIsLoggedIn(false);
           setUser(null);
+          setHasEnterpriseCode(false);
         }
       } else {
         setIsLoggedIn(false);
         setUser(null);
+        setHasEnterpriseCode(false);
       }
     } catch (error) {
       console.log('檢查登入狀態失敗:', error);
       setIsLoggedIn(false);
       setUser(null);
+      setHasEnterpriseCode(false);
     } finally {
       setLoading(false);
     }
@@ -542,6 +551,23 @@ const PracticeSelectionScreen = ({ navigation }) => {
 
       {/* 底部導航欄 */}
       <BottomNavigation navigation={navigation} activeTab="explore" />
+
+      {/* ⭐ 新增：鎖定遮罩 */}
+      {!isLoggedIn && !loading && (
+        <LockedOverlay 
+          navigation={navigation} 
+          reason="login"
+          message="登入後探索所有練習"
+        />
+      )}
+      
+      {isLoggedIn && !hasEnterpriseCode && !loading && (
+        <LockedOverlay 
+          navigation={navigation} 
+          reason="enterprise-code"
+          message="輸入企業引薦碼以解鎖練習功能"
+        />
+      )}
     </View>
   );
 };
