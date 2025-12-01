@@ -1,36 +1,22 @@
-// ==========================================
-// 檔案名稱: PracticeStatsScreen.js
-// 版本: V4.0 - 統一設計風格
-// 
-// ✅ 只保留呼吸練習和好事書寫
-// ✅ 滿意度改為心理肌力分數
-// ✅ 使用 lucide-react-native 圖標
-// ✅ 統一配色與練習頁面一致
-// ==========================================
-
 import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
-  TouchableOpacity,
-  ScrollView,
   StyleSheet,
-  StatusBar,
+  ScrollView,
+  TouchableOpacity,
   ActivityIndicator,
   Dimensions,
 } from 'react-native';
-import Ionicons from 'react-native-vector-icons/Ionicons';
-import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { LinearGradient } from 'expo-linear-gradient';
-import ApiService from '../../../../api';
-// ⭐ 引入 lucide-react-native 圖標
-import { Wind, PenLine } from 'lucide-react-native';
+import { CheckCircle, Clock, Flame, Award, TrendingUp, Calendar } from 'lucide-react-native';
+import ApiService from '../services/api';
 
 const { width } = Dimensions.get('window');
 
 const PracticeStatsScreen = ({ navigation }) => {
+  const [activeTab, setActiveTab] = useState('overview');
   const [loading, setLoading] = useState(true);
-  const [selectedTab, setSelectedTab] = useState('overview');
   const [stats, setStats] = useState(null);
   const [categoryStats, setCategoryStats] = useState([]);
   const [weeklyData, setWeeklyData] = useState([]);
@@ -43,470 +29,333 @@ const PracticeStatsScreen = ({ navigation }) => {
   const loadStats = async () => {
     try {
       setLoading(true);
+      console.log('📊 開始載入練習統計...');
+      
       const response = await ApiService.getPracticeStats();
+      console.log('✅ API 響應:', response);
       
       if (response.success) {
         setStats(response.stats);
-        generateCategoryStats(response.stats);
-        generateWeeklyData(response.stats.weeklyPractices || []);
-        generateMonthlyData(response.stats.monthlyPractices || []);
+        
+        // ⭐ API 已經返回 categoryStats，直接使用
+        if (response.stats.categoryStats) {
+          console.log('📋 分類統計:', response.stats.categoryStats);
+          setCategoryStats(response.stats.categoryStats);
+        }
+        
+        // 處理週數據
+        if (response.stats.weeklyPractices) {
+          console.log('📅 週數據:', response.stats.weeklyPractices.length, '筆');
+          generateWeeklyData(response.stats.weeklyPractices);
+        }
+        
+        // 處理月數據
+        if (response.stats.monthlyPractices) {
+          console.log('📈 月數據:', response.stats.monthlyPractices.length, '筆');
+          generateMonthlyData(response.stats.monthlyPractices);
+        }
+        
+        console.log('✅ 統計數據載入完成');
+      } else {
+        console.warn('⚠️ API 返回失敗:', response.error);
       }
     } catch (error) {
-      console.error('載入統計失敗:', error);
-      
-      // 模擬數據
-      const mockStats = {
-        totalPractices: 24,
-        totalMinutes: 156,
-        currentStreak: 5,
-        longestStreak: 8,
-        totalDays: 18,
-        averageSatisfaction: 87,
-        weeklyPractices: [],
-        monthlyPractices: [],
-      };
-      setStats(mockStats);
-      generateCategoryStats(mockStats);
-      generateWeeklyData([]);
-      generateMonthlyData([]);
+      console.error('❌ 載入統計失敗:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  // ⭐ 只保留呼吸練習和好事書寫
-  const generateCategoryStats = (statsData) => {
-    const categories = [
-      {
-        id: 'breathing',
-        name: '呼吸練習',
-        subtitle: 'Breathing',
-        icon: Wind, // ⭐ 使用 lucide Wind 組件
-        iconType: 'lucide',
-        gradient: ['#166CB5', '#31C6FE'], // ⭐ 與練習頁面一致
-        accentColor: '#166CB5',
-        sessions: Math.floor(statsData.totalPractices * 0.6) || 14,
-        minutes: Math.floor(statsData.totalMinutes * 0.6) || 94,
-        mentalPower: 8, // ⭐ 心理肌力分數
-        lastPracticed: statsData.lastPracticeDate || '2025-11-06',
-      },
-      {
-        id: 'good-things',
-        name: '好事書寫',
-        subtitle: 'Good Things',
-        icon: PenLine, // ⭐ 使用 lucide PenLine 組件
-        iconType: 'lucide',
-        gradient: ['#FFBC42', '#FF8C42'], // ⭐ 與練習頁面一致
-        accentColor: '#FF8C42',
-        sessions: Math.floor(statsData.totalPractices * 0.4) || 10,
-        minutes: Math.floor(statsData.totalMinutes * 0.4) || 62,
-        mentalPower: 6, // ⭐ 心理肌力分數
-        lastPracticed: statsData.lastPracticeDate || '2025-11-05',
-      },
-    ];
-    setCategoryStats(categories);
-  };
-
+  // 生成週數據（過去 7 天）
   const generateWeeklyData = (practices) => {
-    const weekDays = ['日', '一', '二', '三', '四', '五', '六'];
+    const days = ['週一', '週二', '週三', '週四', '週五', '週六', '週日'];
     const today = new Date();
-    const currentDay = today.getDay();
-    
-    const weeklyActivity = weekDays.map((day, index) => {
-      const sessionsCount = practices.filter(p => {
-        const practiceDate = new Date(p.created_at);
-        return practiceDate.getDay() === index;
-      }).length;
-      
+    const weekStart = new Date(today);
+    weekStart.setDate(today.getDate() - today.getDay() + 1); // 本週一
+
+    const weekData = days.map((day, index) => {
+      const date = new Date(weekStart);
+      date.setDate(weekStart.getDate() + index);
+      const dateStr = date.toISOString().split('T')[0];
+
+      // 計算當天的練習次數
+      const dayPractices = practices.filter(p => {
+        const practiceDate = new Date(p.created_at).toISOString().split('T')[0];
+        return practiceDate === dateStr;
+      });
+
       return {
         day,
-        sessions: sessionsCount,
-        active: sessionsCount > 0,
-        isToday: index === currentDay,
+        count: dayPractices.length,
+        minutes: dayPractices.reduce((sum, p) => sum + (p.duration || 0), 0),
       };
     });
-    
-    setWeeklyData(weeklyActivity);
+
+    setWeeklyData(weekData);
   };
 
+  // 生成月數據（過去 4 個月）
   const generateMonthlyData = (practices) => {
-    const currentDate = new Date();
-    const currentYear = currentDate.getFullYear();
-    const currentMonth = currentDate.getMonth();
+    const months = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
+    const currentMonth = new Date().getMonth();
     
-    // 生成最近 4 個月的數據
-    const months = [];
+    const last4Months = [];
     for (let i = 3; i >= 0; i--) {
-      const targetMonth = currentMonth - i;
-      const monthDate = new Date(currentYear, targetMonth, 1);
-      months.push({
-        month: `${monthDate.getMonth() + 1}月`,
-        monthIndex: monthDate.getMonth(),
-        year: monthDate.getFullYear(),
-      });
+      const monthIndex = (currentMonth - i + 12) % 12;
+      last4Months.push(months[monthIndex]);
     }
-    
-    const monthlyProgress = months.map(({ month, monthIndex, year }) => {
-      // 計算該月的練習次數
-      const sessionsCount = practices.filter(p => {
-        const practiceDate = new Date(p.created_at);
-        return practiceDate.getMonth() === monthIndex && 
-               practiceDate.getFullYear() === year;
-      }).length;
+
+    const monthData = last4Months.map((month, index) => {
+      const targetMonth = (currentMonth - (3 - index) + 12) % 12 + 1;
       
-      // 計算該月的總分鐘數
-      const totalMinutes = practices
-        .filter(p => {
-          const practiceDate = new Date(p.created_at);
-          return practiceDate.getMonth() === monthIndex && 
-                 practiceDate.getFullYear() === year;
-        })
-        .reduce((sum, p) => sum + (parseInt(p.duration) || 0), 0);
-      
+      const monthPractices = practices.filter(p => {
+        const practiceMonth = new Date(p.created_at).getMonth() + 1;
+        return practiceMonth === targetMonth;
+      });
+
       return {
         month,
-        sessions: sessionsCount,
-        minutes: totalMinutes,
+        count: monthPractices.length,
+        minutes: monthPractices.reduce((sum, p) => sum + (p.duration || 0), 0),
       };
     });
-    
-    setMonthlyData(monthlyProgress);
+
+    setMonthlyData(monthData);
   };
 
-  const formatDate = (dateStr) => {
-    if (!dateStr) return '--';
-    const date = new Date(dateStr);
-    return `${date.getMonth() + 1}月${date.getDate()}日`;
+  // 統計卡片
+  const StatCard = ({ icon: Icon, label, value, color }) => (
+    <View style={styles.statCard}>
+      <View style={[styles.statIconContainer, { backgroundColor: color + '20' }]}>
+        <Icon size={24} color={color} />
+      </View>
+      <Text style={styles.statValue}>{value}</Text>
+      <Text style={styles.statLabel}>{label}</Text>
+    </View>
+  );
+
+  // 週活動柱狀圖
+  const WeeklyChart = () => {
+    const maxCount = Math.max(...weeklyData.map(d => d.count), 1);
+
+    return (
+      <View style={styles.chartContainer}>
+        <Text style={styles.chartTitle}>本週活動</Text>
+        <View style={styles.barChartContainer}>
+          {weeklyData.map((data, index) => (
+            <View key={index} style={styles.barWrapper}>
+              <View style={styles.barContainer}>
+                <View
+                  style={[
+                    styles.bar,
+                    {
+                      height: `${(data.count / maxCount) * 100}%`,
+                      backgroundColor: data.count > 0 ? '#31C6FE' : '#E0E0E0',
+                    },
+                  ]}
+                />
+              </View>
+              <Text style={styles.barLabel}>{data.day}</Text>
+            </View>
+          ))}
+        </View>
+      </View>
+    );
+  };
+
+  // 月度進展趨勢圖
+  const MonthlyChart = () => {
+    const maxMinutes = Math.max(...monthlyData.map(d => d.minutes), 1);
+
+    return (
+      <View style={styles.chartContainer}>
+        <Text style={styles.chartTitle}>月度進展</Text>
+        <View style={styles.lineChartContainer}>
+          {monthlyData.map((data, index) => (
+            <View key={index} style={styles.linePointWrapper}>
+              <View style={styles.linePointContainer}>
+                <View
+                  style={[
+                    styles.linePoint,
+                    {
+                      bottom: `${(data.minutes / maxMinutes) * 80}%`,
+                      backgroundColor: '#31C6FE',
+                    },
+                  ]}
+                />
+              </View>
+              <Text style={styles.lineLabel}>{data.month}</Text>
+              <Text style={styles.lineValue}>{data.minutes}分</Text>
+            </View>
+          ))}
+        </View>
+      </View>
+    );
+  };
+
+  // 分類詳細統計
+  const CategoryDetail = ({ category }) => {
+    // 練習類型圖標映射
+    const typeIcons = {
+      breathing: '🫁',
+      'good-things': '✍️',
+      'emotion-understanding': '🧠',
+      meditation: '🧘',
+      default: '⭐',
+    };
+
+    const icon = typeIcons[category.type] || typeIcons.default;
+
+    return (
+      <View style={styles.categoryCard}>
+        <View style={styles.categoryHeader}>
+          <Text style={styles.categoryIcon}>{icon}</Text>
+          <View style={styles.categoryInfo}>
+            <Text style={styles.categoryName}>{category.name}</Text>
+            <Text style={styles.categoryLastPracticed}>
+              最近練習：{category.lastPracticed ? new Date(category.lastPracticed).toLocaleDateString('zh-TW') : '尚未練習'}
+            </Text>
+          </View>
+        </View>
+        <View style={styles.categoryStats}>
+          <View style={styles.categoryStatItem}>
+            <Text style={styles.categoryStatValue}>{category.sessions}</Text>
+            <Text style={styles.categoryStatLabel}>次數</Text>
+          </View>
+          <View style={styles.categoryStatItem}>
+            <Text style={styles.categoryStatValue}>{category.minutes}</Text>
+            <Text style={styles.categoryStatLabel}>分鐘</Text>
+          </View>
+          <View style={styles.categoryStatItem}>
+            <Text style={styles.categoryStatValue}>{category.satisfaction || 0}</Text>
+            <Text style={styles.categoryStatLabel}>心理肌力</Text>
+          </View>
+        </View>
+      </View>
+    );
   };
 
   if (loading) {
     return (
-      <View style={styles.container}>
-        <StatusBar barStyle="light-content" backgroundColor="#166CB5" />
-        <LinearGradient
-          colors={['#166CB5', '#31C6FE']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={styles.loadingGradient}
-        >
-          <ActivityIndicator size="large" color="#FFF" />
-          <Text style={styles.loadingText}>載入統計中...</Text>
-        </LinearGradient>
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#31C6FE" />
+        <Text style={styles.loadingText}>載入統計數據中...</Text>
       </View>
     );
   }
 
-  const maxMonthSessions = Math.max(...monthlyData.map(m => m.sessions), 1);
+  if (!stats) {
+    return (
+      <View style={styles.emptyContainer}>
+        <Text style={styles.emptyText}>暫無統計數據</Text>
+        <Text style={styles.emptySubText}>完成練習後即可查看統計</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#166CB5" />
-      
-      {/* Header with Gradient */}
-      <LinearGradient
-        colors={['#166CB5', '#31C6FE']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-        style={styles.header}
-      >
-        {/* 返回按鈕獨立一行 */}
-        <TouchableOpacity 
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="arrow-back" size={24} color="#FFF" />
-        </TouchableOpacity>
-
-        {/* 標題容器 */}
-        <View style={styles.headerTitleContainer}>
-          <View style={styles.headerIcon}>
-            <MaterialCommunityIcons name="chart-line" size={24} color="#166CB5" />
-          </View>
-          <View style={styles.headerTextContainer}>
-            <Text style={styles.headerTitle}>練習統計</Text>
-            <Text style={styles.headerSubtitle}>追蹤你的成長軌跡</Text>
-          </View>
-        </View>
+      <LinearGradient colors={['#166CB5', '#31C6FE']} style={styles.header}>
+        <Text style={styles.headerTitle}>練習統計</Text>
+        <Text style={styles.headerSubtitle}>追蹤你的成長軌跡</Text>
       </LinearGradient>
 
-      {/* Tab Navigation */}
       <View style={styles.tabContainer}>
-        <View style={styles.tabBackground}>
-          <TouchableOpacity
-            style={[styles.tab, selectedTab === 'overview' && styles.tabActive]}
-            onPress={() => setSelectedTab('overview')}
-            activeOpacity={0.8}
-          >
-            {selectedTab === 'overview' && (
-              <LinearGradient
-                colors={['#166CB5', '#31C6FE']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.tabGradient}
-              >
-                <MaterialCommunityIcons name="view-dashboard" size={16} color="#FFF" />
-                <Text style={styles.tabTextActive}>總覽</Text>
-              </LinearGradient>
-            )}
-            {selectedTab !== 'overview' && (
-              <View style={styles.tabInactiveContent}>
-                <MaterialCommunityIcons name="view-dashboard" size={16} color="#6B7280" />
-                <Text style={styles.tabText}>總覽</Text>
-              </View>
-            )}
-          </TouchableOpacity>
-          
-          <TouchableOpacity
-            style={[styles.tab, selectedTab === 'details' && styles.tabActive]}
-            onPress={() => setSelectedTab('details')}
-            activeOpacity={0.8}
-          >
-            {selectedTab === 'details' && (
-              <LinearGradient
-                colors={['#166CB5', '#31C6FE']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.tabGradient}
-              >
-                <MaterialCommunityIcons name="chart-bar" size={16} color="#FFF" />
-                <Text style={styles.tabTextActive}>詳細數據</Text>
-              </LinearGradient>
-            )}
-            {selectedTab !== 'details' && (
-              <View style={styles.tabInactiveContent}>
-                <MaterialCommunityIcons name="chart-bar" size={16} color="#6B7280" />
-                <Text style={styles.tabText}>詳細數據</Text>
-              </View>
-            )}
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'overview' && styles.activeTab]}
+          onPress={() => setActiveTab('overview')}
+        >
+          <Text style={[styles.tabText, activeTab === 'overview' && styles.activeTabText]}>
+            總覽
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'details' && styles.activeTab]}
+          onPress={() => setActiveTab('details')}
+        >
+          <Text style={[styles.tabText, activeTab === 'details' && styles.activeTabText]}>
+            詳細數據
+          </Text>
+        </TouchableOpacity>
       </View>
 
-      <ScrollView 
-        style={styles.scrollView}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-      >
-        {selectedTab === 'overview' ? (
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {activeTab === 'overview' ? (
           <>
-            {/* Key Stats Grid */}
+            {/* 統計卡片 */}
             <View style={styles.statsGrid}>
-              {/* 總練習次數 - 藍色 */}
-              <View style={styles.statCard}>
-                <View style={[styles.statIconBg, { backgroundColor: '#DBEAFE' }]}>
-                  <Ionicons name="checkmark-done-outline" size={28} color="#166CB5" />
-                </View>
-                <Text style={[styles.statValue, { color: '#166CB5' }]}>
-                  {stats?.totalPractices || 0}
-                </Text>
-                <Text style={styles.statLabel}>總練習次數</Text>
-              </View>
-
-              {/* 總練習分鐘 - 紫色 */}
-              <View style={styles.statCard}>
-                <View style={[styles.statIconBg, { backgroundColor: '#F3E8FF' }]}>
-                  <Ionicons name="time-outline" size={28} color="#A855F7" />
-                </View>
-                <Text style={[styles.statValue, { color: '#A855F7' }]}>
-                  {stats?.totalMinutes || 0}
-                </Text>
-                <Text style={styles.statLabel}>總練習分鐘</Text>
-              </View>
-
-              {/* 當前連續天 - 橙色 */}
-              <View style={styles.statCard}>
-                <View style={[styles.statIconBg, { backgroundColor: '#FEF3C7' }]}>
-                  <Ionicons name="flame-outline" size={28} color="#F59E0B" />
-                </View>
-                <Text style={[styles.statValue, { color: '#F59E0B' }]}>
-                  {stats?.currentStreak || 0}
-                </Text>
-                <Text style={styles.statLabel}>當前連續天</Text>
-              </View>
-
-              {/* ⭐ 心理肌力分數 - 綠色 (滿分10分) */}
-              <View style={styles.statCard}>
-                <View style={[styles.statIconBg, { backgroundColor: '#D1FAE5' }]}>
-                  <Ionicons name="ribbon-outline" size={28} color="#10B981" />
-                </View>
-                <Text style={[styles.statValue, { color: '#10B981' }]}>
-                  {Math.min(Math.round((stats?.averageSatisfaction || 0) / 10), 10)}
-                </Text>
-                <Text style={styles.statLabel}>心理肌力分數</Text>
-              </View>
+              <StatCard
+                icon={CheckCircle}
+                label="總練習次數"
+                value={stats.totalPractices || 0}
+                color="#4CAF50"
+              />
+              <StatCard
+                icon={Clock}
+                label="總練習分鐘"
+                value={stats.totalMinutes || 0}
+                color="#2196F3"
+              />
+              <StatCard
+                icon={Flame}
+                label="當前連續天"
+                value={stats.currentStreak || 0}
+                color="#FF9800"
+              />
+              <StatCard
+                icon={Award}
+                label="心理肌力分數"
+                value={stats.averageSatisfaction || 0}
+                color="#9C27B0"
+              />
             </View>
 
-            {/* Weekly Activity */}
-            <View style={styles.section}>
-              <View style={styles.sectionHeader}>
-                <Ionicons name="calendar-outline" size={20} color="#166CB5" />
-                <Text style={styles.sectionTitle}>本週活動</Text>
-              </View>
+            {/* 週活動圖表 */}
+            {weeklyData.length > 0 && <WeeklyChart />}
 
-              <View style={styles.weeklyChart}>
-                {weeklyData.map((day, index) => (
-                  <View key={index} style={styles.weeklyBarContainer}>
-                    <View style={styles.weeklyBar}>
-                      <LinearGradient
-                        colors={day.active ? ['#166CB5', '#31C6FE'] : ['#E5E7EB', '#E5E7EB']}
-                        start={{ x: 0, y: 1 }}
-                        end={{ x: 0, y: 0 }}
-                        style={[
-                          styles.weeklyBarFill,
-                          { 
-                            height: day.sessions > 0 ? `${Math.min((day.sessions / 3) * 100, 100)}%` : '8%',
-                          }
-                        ]}
-                      />
-                    </View>
-                    <Text style={[
-                      styles.weeklyDay,
-                      day.active && styles.weeklyDayActive,
-                      day.isToday && styles.weeklyDayToday
-                    ]}>
-                      {day.day}
-                    </Text>
-                  </View>
-                ))}
-              </View>
-            </View>
+            {/* 月度進展圖表 */}
+            {monthlyData.length > 0 && <MonthlyChart />}
 
-            {/* Monthly Progress */}
-            <View style={styles.section}>
-              <View style={styles.sectionHeader}>
-                <MaterialCommunityIcons name="chart-line" size={20} color="#166CB5" />
-                <Text style={styles.sectionTitle}>月度進展</Text>
-                <Text style={styles.sectionSubtitle}>練習次數</Text>
+            {/* 額外統計信息 */}
+            <View style={styles.additionalStats}>
+              <View style={styles.additionalStatRow}>
+                <Text style={styles.additionalStatLabel}>總練習天數</Text>
+                <Text style={styles.additionalStatValue}>{stats.totalDays || 0} 天</Text>
               </View>
-
-              <View style={styles.monthlyChart}>
-                {monthlyData.map((month, index) => (
-                  <View key={index} style={styles.monthlyItem}>
-                    <View style={styles.monthlyRow}>
-                      <Text style={styles.monthLabel}>{month.month}</Text>
-                      <View style={styles.monthlyBarTrack}>
-                        <LinearGradient
-                          colors={['#166CB5', '#31C6FE']}
-                          start={{ x: 0, y: 0 }}
-                          end={{ x: 1, y: 0 }}
-                          style={[
-                            styles.monthlyBarFill,
-                            { 
-                              width: month.sessions > 0 
-                                ? `${Math.max((month.sessions / maxMonthSessions) * 100, 15)}%` 
-                                : '15%'
-                            }
-                          ]}
-                        >
-                          <Text style={styles.monthlyBarText}>{month.sessions}</Text>
-                        </LinearGradient>
-                      </View>
-                    </View>
-                    <Text style={styles.monthlyMinutes}>{month.minutes} 分鐘</Text>
-                  </View>
-                ))}
+              <View style={styles.additionalStatRow}>
+                <Text style={styles.additionalStatLabel}>最長連續天</Text>
+                <Text style={styles.additionalStatValue}>{stats.longestStreak || 0} 天</Text>
+              </View>
+              <View style={styles.additionalStatRow}>
+                <Text style={styles.additionalStatLabel}>最愛練習</Text>
+                <Text style={styles.additionalStatValue}>{stats.favoriteExercise || '尚未開始'}</Text>
+              </View>
+              <View style={styles.additionalStatRow}>
+                <Text style={styles.additionalStatLabel}>最後練習</Text>
+                <Text style={styles.additionalStatValue}>
+                  {stats.lastPracticeDate ? new Date(stats.lastPracticeDate).toLocaleDateString('zh-TW') : '尚未練習'}
+                </Text>
               </View>
             </View>
           </>
         ) : (
           <>
-            {/* ⭐ Category Breakdown - 只有呼吸練習和好事書寫 */}
-            <View style={styles.categoryContainer}>
-              {categoryStats.map((category, index) => {
-                // ⭐ 獲取 lucide 圖標組件
-                const IconComponent = category.icon;
-                
-                return (
-                  <View key={category.id} style={styles.categoryCard}>
-                    {/* Header with Gradient */}
-                    <LinearGradient
-                      colors={category.gradient}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      style={styles.categoryHeader}
-                    >
-                      <View style={styles.categoryHeaderContent}>
-                        <View style={styles.categoryIconContainer}>
-                          {/* ⭐ 使用 lucide 圖標組件 */}
-                          <IconComponent size={28} color={category.accentColor} strokeWidth={2} />
-                        </View>
-                        <View style={styles.categoryTextContainer}>
-                          <Text style={styles.categoryName}>{category.name}</Text>
-                          <Text style={styles.categorySubtitle}>{category.subtitle}</Text>
-                        </View>
-                      </View>
-                    </LinearGradient>
-
-                    {/* Body */}
-                    <View style={styles.categoryBody}>
-                      <View style={styles.categoryStatsGrid}>
-                        <View style={styles.categoryStatItem}>
-                          <Text style={[styles.categoryStatValue, { color: category.accentColor }]}>
-                            {category.sessions}
-                          </Text>
-                          <Text style={styles.categoryStatLabel}>次數</Text>
-                        </View>
-                        <View style={styles.categoryStatItem}>
-                          <Text style={[styles.categoryStatValue, { color: '#A855F7' }]}>
-                            {category.minutes}
-                          </Text>
-                          <Text style={styles.categoryStatLabel}>分鐘</Text>
-                        </View>
-                        <View style={styles.categoryStatItem}>
-                          {/* ⭐ 心理肌力分數 */}
-                          <Text style={[styles.categoryStatValue, { color: '#10B981' }]}>
-                            {category.mentalPower}
-                          </Text>
-                          <Text style={styles.categoryStatLabel}>心理肌力</Text>
-                        </View>
-                      </View>
-
-                      <View style={styles.categoryFooter}>
-                        <Text style={styles.categoryFooterLabel}>最後練習</Text>
-                        <Text style={styles.categoryFooterValue}>
-                          {formatDate(category.lastPracticed)}
-                        </Text>
-                      </View>
-                    </View>
-                  </View>
-                );
-              })}
-            </View>
-
-            {/* Summary Card */}
-            <View style={styles.summaryCard}>
-              <Text style={styles.summaryTitle}>練習分布</Text>
-              <View style={styles.summaryItem}>
-                <Text style={styles.summaryLabel}>本週練習</Text>
-                <Text style={[styles.summaryValue, { color: '#166CB5' }]}>
-                  {weeklyData.filter(d => d.active).length} 次
-                </Text>
-              </View>
-              <View style={styles.summaryItem}>
-                <Text style={styles.summaryLabel}>本月練習</Text>
-                <Text style={[styles.summaryValue, { color: '#166CB5' }]}>
-                  {stats?.totalPractices || 0} 次
-                </Text>
-              </View>
-              <View style={styles.summaryItem}>
-                <Text style={styles.summaryLabel}>最長連續</Text>
-                <Text style={[styles.summaryValue, { color: '#F59E0B' }]}>
-                  {stats?.longestStreak || 0} 天
-                </Text>
-              </View>
+            {/* 分類詳細統計 */}
+            <View style={styles.detailsContainer}>
+              <Text style={styles.detailsTitle}>練習分類統計</Text>
+              {categoryStats.length > 0 ? (
+                categoryStats.map((category, index) => (
+                  <CategoryDetail key={index} category={category} />
+                ))
+              ) : (
+                <View style={styles.emptyCategory}>
+                  <Text style={styles.emptyCategoryText}>暫無分類數據</Text>
+                  <Text style={styles.emptyCategorySubText}>完成練習後即可查看</Text>
+                </View>
+              )}
             </View>
           </>
         )}
-
-        {/* Bottom Tip */}
-        <View style={styles.tipCard}>
-          <Text style={styles.tipText}>
-            🎯 持續練習是成長的關鍵，保持每日打卡習慣
-          </Text>
-        </View>
-
-        <View style={styles.bottomPadding} />
       </ScrollView>
     </View>
   );
@@ -515,328 +364,235 @@ const PracticeStatsScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#F5F5F5',
   },
-  
-  // === Loading ===
-  loadingGradient: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 16,
-    color: '#FFF',
-  },
-  
-  // === Header ===
   header: {
-    paddingTop: 50,
-    paddingBottom: 24,
+    paddingTop: 60,
+    paddingBottom: 20,
     paddingHorizontal: 20,
   },
-  backButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  headerTitleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  headerIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 16,
-    backgroundColor: '#FFF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  headerTextContainer: {
-    flex: 1,
-  },
   headerTitle: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: 'bold',
-    color: '#FFF',
+    color: '#FFFFFF',
+    marginBottom: 4,
   },
   headerSubtitle: {
     fontSize: 14,
-    color: 'rgba(255,255,255,0.9)',
-    marginTop: 2,
+    color: '#FFFFFF',
+    opacity: 0.9,
   },
-  
-  // === Tab Navigation ===
   tabContainer: {
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 8,
-  },
-  tabBackground: {
     flexDirection: 'row',
-    backgroundColor: '#FFF',
-    borderRadius: 12,
-    padding: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 20,
+    paddingTop: 10,
   },
   tab: {
     flex: 1,
-    borderRadius: 8,
-    overflow: 'hidden',
-  },
-  tabActive: {
-    shadowColor: '#166CB5',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  tabGradient: {
-    flexDirection: 'row',
+    paddingVertical: 12,
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    gap: 6,
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
   },
-  tabInactiveContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
+  activeTab: {
+    borderBottomColor: '#31C6FE',
   },
   tabText: {
-    fontSize: 14,
+    fontSize: 16,
+    color: '#666',
     fontWeight: '500',
-    color: '#6B7280',
   },
-  tabTextActive: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#FFF',
+  activeTabText: {
+    color: '#31C6FE',
+    fontWeight: '600',
   },
-  
-  // === ScrollView ===
-  scrollView: {
+  content: {
     flex: 1,
+    padding: 20,
   },
-  scrollContent: {
-    paddingBottom: 20,
-  },
-  
-  // === Stats Grid ===
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    padding: 16,
+    marginBottom: 20,
     gap: 12,
   },
   statCard: {
     width: (width - 52) / 2,
-    backgroundColor: '#FFF',
-    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
     padding: 16,
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
+    shadowOpacity: 0.1,
     shadowRadius: 4,
-    elevation: 2,
+    elevation: 3,
   },
-  statIconBg: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+  statIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 8,
   },
   statValue: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: 'bold',
+    color: '#333',
     marginBottom: 4,
   },
   statLabel: {
     fontSize: 12,
-    color: '#6B7280',
+    color: '#666',
     textAlign: 'center',
   },
-  
-  // === Section ===
-  section: {
-    marginTop: 8,
-    marginHorizontal: 20,
-    backgroundColor: '#FFF',
-    borderRadius: 20,
-    padding: 20,
+  chartContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
+    shadowOpacity: 0.1,
     shadowRadius: 4,
-    elevation: 2,
+    elevation: 3,
   },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  sectionTitle: {
+  chartTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#111827',
-    marginLeft: 8,
-    flex: 1,
+    color: '#333',
+    marginBottom: 16,
   },
-  sectionSubtitle: {
-    fontSize: 12,
-    color: '#6B7280',
-  },
-  
-  // === Weekly Chart ===
-  weeklyChart: {
+  barChartContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    height: 120,
-    gap: 8,
-  },
-  weeklyBarContainer: {
-    flex: 1,
-    alignItems: 'center',
-    gap: 8,
-  },
-  weeklyBar: {
-    flex: 1,
-    width: '100%',
-    justifyContent: 'flex-end',
-    borderRadius: 8,
-    overflow: 'hidden',
-  },
-  weeklyBarFill: {
-    width: '100%',
-    borderTopLeftRadius: 4,
-    borderTopRightRadius: 4,
-  },
-  weeklyDay: {
-    fontSize: 12,
-    color: '#9CA3AF',
-  },
-  weeklyDayActive: {
-    color: '#166CB5',
-    fontWeight: '600',
-  },
-  weeklyDayToday: {
-    color: '#F59E0B',
-    fontWeight: 'bold',
-  },
-  
-  // === Monthly Chart ===
-  monthlyChart: {
-    gap: 12,
-  },
-  monthlyItem: {
-    gap: 6,
-  },
-  monthlyRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  monthLabel: {
-    fontSize: 14,
-    color: '#6B7280',
-    width: 40,
-  },
-  monthlyBarTrack: {
-    flex: 1,
-    height: 32,
-    backgroundColor: '#F3F4F6',
-    borderRadius: 16,
-    overflow: 'hidden',
-  },
-  monthlyBarFill: {
-    height: '100%',
-    borderRadius: 16,
-    justifyContent: 'center',
-    paddingRight: 12,
+    justifyContent: 'space-around',
     alignItems: 'flex-end',
+    height: 150,
   },
-  monthlyBarText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#FFF',
+  barWrapper: {
+    alignItems: 'center',
+    flex: 1,
   },
-  monthlyMinutes: {
-    fontSize: 12,
-    color: '#6B7280',
-    marginLeft: 52,
+  barContainer: {
+    height: 120,
+    justifyContent: 'flex-end',
+    marginBottom: 8,
   },
-  
-  // === Category Cards ===
-  categoryContainer: {
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    gap: 20,
+  bar: {
+    width: 20,
+    borderRadius: 4,
+    minHeight: 4,
   },
-  categoryCard: {
-    backgroundColor: '#FFF',
-    borderRadius: 20,
-    overflow: 'hidden',
+  barLabel: {
+    fontSize: 10,
+    color: '#666',
+    marginTop: 4,
+  },
+  lineChartContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    height: 150,
+  },
+  linePointWrapper: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  linePointContainer: {
+    height: 100,
+    justifyContent: 'flex-end',
+    position: 'relative',
+    marginBottom: 8,
+  },
+  linePoint: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    position: 'absolute',
+  },
+  lineLabel: {
+    fontSize: 10,
+    color: '#666',
+    marginTop: 4,
+  },
+  lineValue: {
+    fontSize: 10,
+    color: '#999',
+    marginTop: 2,
+  },
+  additionalStats: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
+    shadowOpacity: 0.1,
     shadowRadius: 4,
-    elevation: 2,
+    elevation: 3,
+  },
+  additionalStatRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  additionalStatLabel: {
+    fontSize: 14,
+    color: '#666',
+  },
+  additionalStatValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+  },
+  detailsContainer: {
+    marginBottom: 20,
+  },
+  detailsTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 16,
+  },
+  categoryCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   categoryHeader: {
-    height: 80,
-    padding: 20,
-    justifyContent: 'center',
-  },
-  categoryHeaderContent: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: 12,
   },
-  categoryIconContainer: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.95)',
-    justifyContent: 'center',
-    alignItems: 'center',
+  categoryIcon: {
+    fontSize: 32,
     marginRight: 12,
   },
-  categoryTextContainer: {
+  categoryInfo: {
     flex: 1,
   },
   categoryName: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '600',
-    color: '#FFF',
+    color: '#333',
+    marginBottom: 4,
   },
-  categorySubtitle: {
+  categoryLastPracticed: {
     fontSize: 12,
-    color: 'rgba(255,255,255,0.9)',
-    marginTop: 2,
+    color: '#999',
   },
-  categoryBody: {
-    padding: 20,
-  },
-  categoryStatsGrid: {
+  categoryStats: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    marginBottom: 16,
   },
   categoryStatItem: {
     alignItems: 'center',
@@ -844,79 +600,55 @@ const styles = StyleSheet.create({
   categoryStatValue: {
     fontSize: 20,
     fontWeight: 'bold',
+    color: '#31C6FE',
     marginBottom: 4,
   },
   categoryStatLabel: {
     fontSize: 12,
-    color: '#6B7280',
+    color: '#666',
   },
-  categoryFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F5F5F5',
   },
-  categoryFooterLabel: {
-    fontSize: 12,
-    color: '#6B7280',
-  },
-  categoryFooterValue: {
-    fontSize: 12,
-    color: '#111827',
-    fontWeight: '500',
-  },
-  
-  // === Summary Card ===
-  summaryCard: {
+  loadingText: {
     marginTop: 12,
-    marginHorizontal: 20,
-    backgroundColor: '#EFF6FF',
-    borderRadius: 20,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    fontSize: 14,
+    color: '#666',
   },
-  summaryTitle: {
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F5F5F5',
+    padding: 40,
+  },
+  emptyText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 8,
+  },
+  emptySubText: {
+    fontSize: 14,
+    color: '#999',
+    textAlign: 'center',
+  },
+  emptyCategory: {
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  emptyCategoryText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#111827',
-    marginBottom: 12,
+    color: '#333',
+    marginBottom: 8,
   },
-  summaryItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 8,
-  },
-  summaryLabel: {
+  emptyCategorySubText: {
     fontSize: 14,
-    color: '#6B7280',
-  },
-  summaryValue: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  
-  // === Tip Card ===
-  tipCard: {
-    marginTop: 12,
-    marginHorizontal: 20,
-    backgroundColor: '#FEF3C7',
-    borderRadius: 16,
-    padding: 16,
-  },
-  tipText: {
-    fontSize: 14,
-    color: '#78350F',
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-  
-  bottomPadding: {
-    height: 20,
+    color: '#999',
   },
 });
 
