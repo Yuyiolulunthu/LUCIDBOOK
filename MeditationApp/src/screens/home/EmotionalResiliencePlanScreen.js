@@ -1,6 +1,6 @@
 // ==========================================
 // 檔案名稱: src/screens/home/EmotionalResiliencePlanScreen.js
-// 情緒抗壓力計畫頁面（完整修正版 - 背景模糊）
+// 情緒抗壓力計畫頁面（完整版 - 串接後端進度）
 // ==========================================
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -13,6 +13,8 @@ import {
   StatusBar,
   Animated,
   Platform,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
@@ -26,72 +28,169 @@ import {
   Clock,
   ChevronRight,
 } from 'lucide-react-native';
+import ApiService from '../../../api';
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
-
-// ==========================================
-// 練習模組資料
-// ==========================================
-const planModules = [
-  {
-    id: 'breathing',
-    title: '呼吸練習',
-    subtitle: '快速調節神經系統',
-    description: '運用呼吸調節副交感神經，快速降低焦慮與壓力反應。',
-    icon: Wind,
-    iconBgColor: '#EFF6FF',
-    iconColor: '#3B82F6',
-    gradientColors: ['#60A5FA', '#3B82F6'],
-    frequency: '每日 1 次',
-    progress: 0,
-    target: 7,
-    duration: '3-5 分鐘',
-  },
-  {
-    id: 'goodthings',
-    title: '好事書寫',
-    subtitle: '強化自我效能',
-    description: '紀錄生活中的微小成就與好事，累積正向心理資本。',
-    icon: PenLine,
-    iconBgColor: '#FFF7ED',
-    iconColor: '#F97316',
-    gradientColors: ['#FB923C', '#F97316'],
-    frequency: '每週 3 次',
-    progress: 0,
-    target: 3,
-    duration: '5 分鐘',
-  },
-];
 
 // ==========================================
 // 主組件
 // ==========================================
 const EmotionalResiliencePlanScreen = ({ navigation }) => {
   const [showInfo, setShowInfo] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [planModules, setPlanModules] = useState([
+    {
+      id: 'breathing',
+      title: '呼吸練習',
+      subtitle: '快速調節神經系統',
+      description: '運用呼吸調節副交感神經，快速降低焦慮與壓力反應。',
+      icon: Wind,
+      iconBgColor: '#EFF6FF',
+      iconColor: '#3B82F6',
+      gradientColors: ['#60A5FA', '#3B82F6'],
+      frequency: '每日 1 次',
+      progress: 0,
+      target: 7,
+      duration: '3-5 分鐘',
+    },
+    {
+      id: 'goodthings',
+      title: '好事書寫',
+      subtitle: '強化自我效能',
+      description: '紀錄生活中的微小成就與好事，累積正向心理資本。',
+      icon: PenLine,
+      iconBgColor: '#FFF7ED',
+      iconColor: '#F97316',
+      gradientColors: ['#FB923C', '#F97316'],
+      frequency: '每週 3 次',
+      progress: 0,
+      target: 3,
+      duration: '5 分鐘',
+    },
+  ]);
+  const [overallPercentage, setOverallPercentage] = useState(0);
   const progressAnim = useRef(new Animated.Value(0)).current;
 
-  // 計算整體進度 - 假設 30%
-  const overallPercentage = 30;
-
   useEffect(() => {
-    // 進度圓圈動畫
-    Animated.timing(progressAnim, {
-      toValue: overallPercentage,
-      duration: 1500,
-      useNativeDriver: true,
-    }).start();
-  }, []);
+    loadTrainingProgress();
+    
+    // 監聽練習完成事件（從其他頁面返回時刷新）
+    const unsubscribe = navigation.addListener('focus', () => {
+      loadTrainingProgress();
+    });
+
+    return unsubscribe;
+  }, [navigation]);
+
+  // 載入訓練進度
+  const loadTrainingProgress = async () => {
+    try {
+      setLoading(true);
+      console.log('📊 載入訓練計劃進度...');
+
+      // 調用 API 獲取進度
+      const response = await ApiService.getTrainingProgress('stress-resistance');
+      
+      if (response.success) {
+        console.log('✅ 訓練進度載入成功:', response);
+        
+        // 更新模組進度
+        const updatedModules = planModules.map(module => {
+          // 根據 module.id 找到對應的進度數據
+          // 假設 API 返回格式：
+          // {
+          //   sessions: {
+          //     breathing: { completed: 5, target: 7 },
+          //     goodthings: { completed: 2, target: 3 }
+          //   }
+          // }
+          
+          const sessionData = response.sessions?.[module.id];
+          
+          if (sessionData) {
+            return {
+              ...module,
+              progress: sessionData.completed || 0,
+              target: sessionData.target || module.target,
+            };
+          }
+          
+          return module;
+        });
+        
+        setPlanModules(updatedModules);
+        
+        // 計算整體進度百分比
+        const totalProgress = updatedModules.reduce((sum, m) => sum + m.progress, 0);
+        const totalTarget = updatedModules.reduce((sum, m) => sum + m.target, 0);
+        const percentage = totalTarget > 0 ? Math.round((totalProgress / totalTarget) * 100) : 0;
+        
+        setOverallPercentage(percentage);
+        
+        // 動畫更新進度
+        Animated.timing(progressAnim, {
+          toValue: percentage,
+          duration: 1500,
+          useNativeDriver: true,
+        }).start();
+        
+        console.log('📈 整體進度:', percentage + '%');
+      } else {
+        console.warn('⚠️ 訓練進度載入失敗:', response.error);
+        // 使用默認值
+        setOverallPercentage(0);
+      }
+    } catch (error) {
+      console.error('❌ 載入訓練進度失敗:', error);
+      Alert.alert('載入失敗', '無法載入訓練進度，請稍後再試');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // 導航到練習頁面
   const handleStartPractice = (practiceId) => {
     if (practiceId === 'breathing') {
       navigation.navigate('PracticeNavigator', {
         practiceType: '呼吸穩定力練習',
+        planId: 'stress-resistance',
+        onComplete: () => {
+          // 練習完成後更新進度
+          updatePracticeProgress('breathing');
+        },
       });
     } else if (practiceId === 'goodthings') {
       navigation.navigate('PracticeNavigator', {
         practiceType: '好事書寫',
+        planId: 'stress-resistance',
+        onComplete: () => {
+          // 練習完成後更新進度
+          updatePracticeProgress('goodthings');
+        },
       });
+    }
+  };
+
+  // 更新練習進度（練習完成後調用）
+  const updatePracticeProgress = async (sessionId) => {
+    try {
+      console.log('🔄 更新練習進度:', sessionId);
+      
+      const response = await ApiService.updateTrainingProgress(
+        'stress-resistance',
+        1, // weekNumber（可以根據實際情況調整）
+        sessionId
+      );
+      
+      if (response.success) {
+        console.log('✅ 練習進度更新成功');
+        // 重新載入進度
+        await loadTrainingProgress();
+      } else {
+        console.warn('⚠️ 練習進度更新失敗:', response.error);
+      }
+    } catch (error) {
+      console.error('❌ 更新練習進度失敗:', error);
     }
   };
 
@@ -102,6 +201,15 @@ const EmotionalResiliencePlanScreen = ({ navigation }) => {
   const circumference = radius * 2 * Math.PI;
   const strokeDashoffset = circumference - (circumference * overallPercentage) / 100;
 
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#3B82F6" />
+        <Text style={styles.loadingText}>載入訓練計劃...</Text>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <StatusBar
@@ -110,7 +218,7 @@ const EmotionalResiliencePlanScreen = ({ navigation }) => {
         translucent
       />
 
-      {/* Custom Header - 加高度避免被系統狀態欄遮擋 */}
+      {/* Custom Header */}
       <BlurView intensity={80} tint="light" style={styles.headerBlur}>
         <View style={styles.header}>
           <TouchableOpacity
@@ -141,14 +249,11 @@ const EmotionalResiliencePlanScreen = ({ navigation }) => {
             end={{ x: 1, y: 1 }}
             style={styles.heroGradient}
           >
-            {/* Aurora Background Effects - 彩色圓圈 + 模糊層 */}
+            {/* Aurora Background Effects */}
             <View style={styles.auroraContainer}>
-              {/* 三個彩色圓圈 */}
               <View style={[styles.auroraBlob, styles.auroraBlob1]} />
               <View style={[styles.auroraBlob, styles.auroraBlob2]} />
               <View style={[styles.auroraBlob, styles.auroraBlob3]} />
-              
-              {/* 模糊層覆蓋在彩色圓圈上方 */}
               <BlurView intensity={50} tint="dark" style={StyleSheet.absoluteFill} />
             </View>
 
@@ -169,10 +274,9 @@ const EmotionalResiliencePlanScreen = ({ navigation }) => {
                 的整合計畫，每天一點練習，累積面對挑戰的勇氣。
               </Text>
 
-              {/* Overall Progress Ring - 使用 SVG 繪製圓弧 */}
+              {/* Overall Progress Ring */}
               <View style={styles.progressRingContainer}>
                 <Svg width={size} height={size} style={styles.progressSvg}>
-                  {/* 背景圓圈 */}
                   <Circle
                     stroke="rgba(255, 255, 255, 0.1)"
                     fill="none"
@@ -181,8 +285,6 @@ const EmotionalResiliencePlanScreen = ({ navigation }) => {
                     r={radius}
                     strokeWidth={strokeWidth}
                   />
-                  
-                  {/* 進度圓圈 - 帶圓弧頭尾 */}
                   <AnimatedCircle
                     stroke="#5EEAD4"
                     fill="none"
@@ -192,13 +294,12 @@ const EmotionalResiliencePlanScreen = ({ navigation }) => {
                     strokeWidth={strokeWidth}
                     strokeDasharray={`${circumference} ${circumference}`}
                     strokeDashoffset={strokeDashoffset}
-                    strokeLinecap="round" // 圓弧頭尾
+                    strokeLinecap="round"
                     rotation="-90"
                     origin={`${size / 2}, ${size / 2}`}
                   />
                 </Svg>
 
-                {/* Center Text */}
                 <View style={styles.progressRingCenter}>
                   <Text style={styles.progressPercentage}>
                     {overallPercentage}%
@@ -239,7 +340,7 @@ const EmotionalResiliencePlanScreen = ({ navigation }) => {
           <View style={styles.modulesSectionHeader}>
             <Text style={styles.modulesSectionTitle}>練習單元</Text>
             <View style={styles.modulesCountBadge}>
-              <Text style={styles.modulesCountText}>共 2 個單元</Text>
+              <Text style={styles.modulesCountText}>共 {planModules.length} 個單元</Text>
             </View>
           </View>
 
@@ -253,7 +354,6 @@ const EmotionalResiliencePlanScreen = ({ navigation }) => {
 
             return (
               <View key={module.id} style={styles.moduleCard}>
-                {/* Highlight Line */}
                 <LinearGradient
                   colors={module.gradientColors}
                   start={{ x: 0, y: 0 }}
@@ -262,7 +362,6 @@ const EmotionalResiliencePlanScreen = ({ navigation }) => {
                 />
 
                 <View style={styles.moduleContent}>
-                  {/* Icon */}
                   <View
                     style={[
                       styles.moduleIconContainer,
@@ -272,9 +371,7 @@ const EmotionalResiliencePlanScreen = ({ navigation }) => {
                     <Icon color={module.iconColor} size={24} />
                   </View>
 
-                  {/* Details */}
                   <View style={styles.moduleDetails}>
-                    {/* Header */}
                     <View style={styles.moduleHeader}>
                       <Text style={styles.moduleTitle}>{module.title}</Text>
                       <View style={styles.moduleDurationBadge}>
@@ -285,12 +382,10 @@ const EmotionalResiliencePlanScreen = ({ navigation }) => {
                       </View>
                     </View>
 
-                    {/* Subtitle */}
                     <Text style={styles.moduleSubtitle}>
                       {module.subtitle}
                     </Text>
 
-                    {/* Description */}
                     <Text
                       style={styles.moduleDescription}
                       numberOfLines={2}
@@ -299,7 +394,6 @@ const EmotionalResiliencePlanScreen = ({ navigation }) => {
                       {module.description}
                     </Text>
 
-                    {/* Progress Section */}
                     <View style={styles.moduleProgressSection}>
                       <View style={styles.moduleProgressHeader}>
                         <Text style={styles.moduleFrequency}>
@@ -313,7 +407,6 @@ const EmotionalResiliencePlanScreen = ({ navigation }) => {
                         </View>
                       </View>
 
-                      {/* Progress Bar */}
                       <View style={styles.moduleProgressBarBg}>
                         <LinearGradient
                           colors={module.gradientColors}
@@ -327,7 +420,6 @@ const EmotionalResiliencePlanScreen = ({ navigation }) => {
                       </View>
                     </View>
 
-                    {/* Action Button */}
                     <TouchableOpacity
                       onPress={() => handleStartPractice(module.id)}
                       style={styles.moduleButton}
@@ -360,8 +452,19 @@ const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F9FAFB',
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: '#6B7280',
+  },
 
-  // Header - 加高避免被狀態欄遮擋
+  // Header
   headerBlur: {
     paddingTop: Platform.OS === 'ios' ? 44 : StatusBar.currentHeight || 24,
     borderBottomWidth: 1,
@@ -405,7 +508,7 @@ const styles = StyleSheet.create({
   auroraBlob: {
     position: 'absolute',
     borderRadius: 9999,
-    opacity: 0.4, // 增加一點透明度讓模糊效果更明顯
+    opacity: 0.4,
   },
   auroraBlob1: {
     top: '-50%',

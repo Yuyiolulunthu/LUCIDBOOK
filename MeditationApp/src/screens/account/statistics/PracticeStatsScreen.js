@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { CheckCircle, Clock, Flame, Award, TrendingUp, Calendar } from 'lucide-react-native';
-import ApiService from '../services/api';
+import ApiService from '../../../../api';
 
 const { width } = Dimensions.get('window');
 
