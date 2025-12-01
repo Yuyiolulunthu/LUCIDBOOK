@@ -403,15 +403,12 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
       return;
     }
 
-    console.log('▶️ [呼吸練習卡片] 啟動 10 秒自動保存，practiceId:', practiceId);
-
     const autoSaveInterval = setInterval(() => {
       console.log('🔄 [呼吸練習卡片] 觸發自動保存...');
       saveProgress();
     }, 10000);
 
     return () => {
-      console.log('⏹️ [呼吸練習卡片] 停止自動保存');
       clearInterval(autoSaveInterval);
     };
   }, [practiceId, saveProgress]);
