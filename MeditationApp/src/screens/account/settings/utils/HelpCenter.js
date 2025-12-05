@@ -1,16 +1,9 @@
 // ==========================================
 // 檔案名稱: HelpCenter.js
-// 功能: 幫助中心頁面
-// 
-// ✅ 搜尋功能
-// ✅ 分類篩選 (全部/概念/練習/科學)
-// ✅ FAQ 手風琴展開/收合
-// ✅ 預設展開第一題
-// ✅ 底部聯繫客服按鈕
-// 🎨 依照設計程式風格
+// 功能: 幫助中心頁面 - 含郵件功能
 // ==========================================
 
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -19,19 +12,12 @@ import {
   StyleSheet,
   StatusBar,
   TextInput,
-  Animated,
   Linking,
-  LayoutAnimation,
+  Alert,
   Platform,
-  UIManager,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
-
-// 啟用 Android LayoutAnimation
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
 
 const CATEGORIES = [
   { name: '全部', icon: 'grid-outline' },
@@ -44,48 +30,39 @@ const FAQS = [
   {
     id: 1,
     category: '概念',
-    question: '什麼是心理肌力訓練？',
-    answer: '這不是心理諮商，而是大腦的健身房！結合 CBT 與正念，我們提供每日 7 分鐘的練習，幫助您建立心理韌性。'
+    question: '什麼是心理肌力訓練?',
+    answer: '這不是心理諮商,而是大腦的健身房!結合 CBT 與正念,我們提供每日 7 分鐘的練習,幫助您建立心理韌性。'
   },
   {
     id: 2,
     category: '概念',
-    question: '我需要具備心理學背景嗎？',
-    answer: '完全不需要！我們的練習專為大眾設計，引導語簡單易懂，讓任何人都能輕鬆應用在日常生活中。'
+    question: '我需要具備心理學背景嗎?',
+    answer: '完全不需要!我們的練習專為大眾設計,引導語簡單易懂,讓任何人都能輕鬆應用在日常生活中。'
   },
   {
     id: 3,
     category: '練習',
-    question: '每天需要花多少時間？',
+    question: '每天需要花多少時間?',
     answer: '我們知道您很忙碌。因此「心理肌力訓練」設計為每天僅需約 7 分鐘。持續練習比時間長短更重要。'
   },
   {
     id: 4,
     category: '練習',
-    question: '如果錯過幾天怎麼辦？',
-    answer: '別擔心！這很正常。只要隨時重新開始即可，沒有懲罰。對自己溫柔一點，接續練習就好。'
+    question: '如果錯過幾天怎麼辦?',
+    answer: '別擔心!這很正常。只要隨時重新開始即可,沒有懲罰。對自己溫柔一點,接續練習就好。'
   },
   {
     id: 5,
     category: '科學',
-    question: '為什麼重複練習很必要？',
-    answer: '神經可塑性需要透過重複來建立。就像在健身房練肌肉需要重複舉重，建立「心理肌力」也需要持續的心智練習來形成新的、健康的神經迴路。'
+    question: '為什麼重複練習很必要?',
+    answer: '神經可塑性需要透過重複來建立。就像在健身房練肉需要重複舉重,建立「心理肌力」也需要持續的心智練習來形成新的、健康的神經迴路。'
   }
 ];
 
 const HelpCenter = ({ navigation }) => {
-  // 預設展開第一題
-  const [expandedId, setExpandedId] = useState(1);
+  const [expandedId, setExpandedId] = useState(1); // 預設展開第一題
   const [selectedCategory, setSelectedCategory] = useState('全部');
   const [searchQuery, setSearchQuery] = useState('');
-  
-  // 動畫值
-  const rotationValues = useRef(
-    FAQS.reduce((acc, faq) => {
-      acc[faq.id] = new Animated.Value(faq.id === 1 ? 1 : 0);
-      return acc;
-    }, {})
-  ).current;
 
   // 篩選 FAQ
   const filteredFaqs = FAQS.filter(faq => {
@@ -98,34 +75,49 @@ const HelpCenter = ({ navigation }) => {
 
   // 切換 FAQ 展開/收合
   const toggleFaq = (id) => {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    
-    const newExpandedId = expandedId === id ? null : id;
-    
-    // 收合舊的
-    if (expandedId !== null && rotationValues[expandedId]) {
-      Animated.timing(rotationValues[expandedId], {
-        toValue: 0,
-        duration: 200,
-        useNativeDriver: true,
-      }).start();
-    }
-    
-    // 展開新的
-    if (newExpandedId !== null && rotationValues[newExpandedId]) {
-      Animated.timing(rotationValues[newExpandedId], {
-        toValue: 1,
-        duration: 200,
-        useNativeDriver: true,
-      }).start();
-    }
-    
-    setExpandedId(newExpandedId);
+    setExpandedId(expandedId === id ? null : id);
   };
 
-  // 聯繫客服
-  const handleContactSupport = () => {
-    Linking.openURL('mailto:team@lucidbook.tw');
+  // ⭐ 開啟郵件應用程式
+  const handleContactSupport = async () => {
+    const email = 'team@lucidbook.tw';
+    const subject = 'LUCIDBOOK 客服諮詢'; // 郵件主旨
+    const body = '您好,我想諮詢關於 LUCIDBOOK 的問題:\n\n'; // 郵件內容模板
+    
+    // 構建 mailto URL
+    const mailtoUrl = `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    
+    try {
+      // 檢查是否可以開啟郵件應用程式
+      const canOpen = await Linking.canOpenURL(mailtoUrl);
+      
+      if (canOpen) {
+        await Linking.openURL(mailtoUrl);
+      } else {
+        // 如果無法開啟,顯示錯誤訊息
+        Alert.alert(
+          '無法開啟郵件應用程式',
+          `請手動發送郵件至:\n${email}`,
+          [
+            {
+              text: '複製郵件地址',
+              onPress: () => {
+                // 如果有 Clipboard API 可以複製到剪貼簿
+                Alert.alert('郵件地址', email);
+              }
+            },
+            { text: '確定', style: 'cancel' }
+          ]
+        );
+      }
+    } catch (error) {
+      console.error('開啟郵件應用程式失敗:', error);
+      Alert.alert(
+        '發生錯誤',
+        `請手動發送郵件至:\n${email}`,
+        [{ text: '確定' }]
+      );
+    }
   };
 
   return (
@@ -210,10 +202,6 @@ const HelpCenter = ({ navigation }) => {
         {filteredFaqs.length > 0 ? (
           filteredFaqs.map((faq) => {
             const isOpen = expandedId === faq.id;
-            const rotation = rotationValues[faq.id]?.interpolate({
-              inputRange: [0, 1],
-              outputRange: ['0deg', '180deg'],
-            }) || '0deg';
 
             return (
               <View
@@ -234,19 +222,20 @@ const HelpCenter = ({ navigation }) => {
                   ]}>
                     {faq.question}
                   </Text>
-                  <Animated.View 
-                    style={[
-                      styles.chevronContainer,
-                      isOpen && styles.chevronContainerOpen,
-                      { transform: [{ rotate: rotation }] }
-                    ]}
-                  >
+                  <View style={[
+                    styles.chevronContainer,
+                    isOpen && styles.chevronContainerOpen,
+                  ]}>
                     <Ionicons 
                       name="chevron-down" 
                       size={20} 
-                      color={isOpen ? '#166CB5' : '#9CA3AF'} 
+                      color={isOpen ? '#166CB5' : '#9CA3AF'}
+                      style={[
+                        styles.chevronIcon,
+                        isOpen && styles.chevronIconRotated,
+                      ]}
                     />
-                  </Animated.View>
+                  </View>
                 </TouchableOpacity>
 
                 {isOpen && (
@@ -269,7 +258,7 @@ const HelpCenter = ({ navigation }) => {
         )}
       </ScrollView>
 
-      {/* Floating Contact Support Button */}
+      {/* Floating Contact Support Button - ⭐ 按下開啟郵件應用程式 */}
       <View style={styles.floatingButtonContainer}>
         <TouchableOpacity
           style={styles.floatingButton}
@@ -299,15 +288,14 @@ const styles = StyleSheet.create({
 
   // Header
   header: {
-    paddingTop: 50,
+    paddingTop: 47,
     paddingBottom: 24,
-    paddingHorizontal: 20,
+    paddingHorizontal: 24,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,
     shadowRadius: 12,
     elevation: 8,
-    zIndex: 10,
   },
   headerTop: {
     flexDirection: 'row',
@@ -325,7 +313,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 20,
-    fontWeight: 'bold',
+    fontWeight: '700',
     color: '#FFF',
   },
   headerPlaceholder: {
@@ -357,12 +345,11 @@ const styles = StyleSheet.create({
 
   // Categories
   categoriesContainer: {
-    paddingVertical: 20,
+    paddingVertical: 24,
     backgroundColor: '#F5F7FA',
   },
   categoriesScroll: {
-    paddingHorizontal: 20,
-    gap: 12,
+    paddingHorizontal: 24,
   },
   categoryButton: {
     flexDirection: 'row',
@@ -398,6 +385,7 @@ const styles = StyleSheet.create({
   },
   categoryTextActive: {
     color: '#FFF',
+    fontWeight: '600',
   },
 
   // ScrollView
@@ -405,7 +393,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 24,
     paddingBottom: 120,
   },
 
@@ -415,7 +403,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.5)',
+    borderColor: 'rgba(229, 231, 235, 0.5)',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
@@ -424,11 +412,13 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   faqCardOpen: {
-    borderColor: 'rgba(49,198,254,0.3)',
+    borderWidth: 2,
+    borderColor: '#31c7fe62',
     shadowColor: '#31C6FE',
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.35,
+    shadowRadius: 16,
+    elevation: 12,
   },
   faqHeader: {
     flexDirection: 'row',
@@ -440,7 +430,7 @@ const styles = StyleSheet.create({
   faqQuestion: {
     flex: 1,
     fontSize: 15,
-    fontWeight: '600',
+    fontWeight: '700',
     color: '#374151',
     paddingRight: 16,
     lineHeight: 22,
@@ -457,6 +447,12 @@ const styles = StyleSheet.create({
   },
   chevronContainerOpen: {
     backgroundColor: '#E8F4F9',
+  },
+  chevronIcon: {
+    transform: [{ rotate: '0deg' }],
+  },
+  chevronIconRotated: {
+    transform: [{ rotate: '180deg' }],
   },
   faqContent: {
     paddingHorizontal: 20,
@@ -490,7 +486,8 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     alignItems: 'center',
-    paddingHorizontal: 20,
+    paddingHorizontal: 24,
+    pointerEvents: 'box-none',
   },
   floatingButton: {
     borderRadius: 28,

@@ -1,7 +1,6 @@
 // ==========================================
 // 檔案名稱: ResetPasswordScreen.js
-// 功能: 重設密碼頁面
-// 🎨 統一設計風格 + 密碼強度指示器
+// 功能: 重設密碼頁面 - 新前端設計風格
 // ==========================================
 
 import React, { useState, useEffect } from 'react';
@@ -19,7 +18,6 @@ import {
   Platform,
   Keyboard,
   TouchableWithoutFeedback,
-  Animated,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -151,26 +149,36 @@ const ResetPasswordScreen = ({ navigation, route }) => {
     try {
       let response;
       if (isFromSettings) {
-        // 從設定頁面來的，呼叫修改密碼 API
+        // ⭐ 從設定頁面來的,呼叫修改密碼 API
         response = await ApiService.changePassword(currentPassword, newPassword);
       } else {
-        // 忘記密碼流程，呼叫重設密碼 API
+        // ⭐ 忘記密碼流程,呼叫重設密碼 API (參考 ForgotPassword 的寫法)
         response = await ApiService.resetPassword(token, newPassword);
       }
       
       if (response.success) {
         setShowSuccess(true);
-        setTimeout(() => {
-          setShowSuccess(false);
-          if (isFromSettings) {
-            navigation.goBack();
-          } else {
-            navigation.navigate('Login');
-          }
-        }, 2000);
+        Alert.alert(
+          '✅ 成功',
+          isFromSettings ? '密碼已成功變更！' : '密碼已成功重設！',
+          [
+            {
+              text: '確定',
+              onPress: () => {
+                if (isFromSettings) {
+                  navigation.goBack();
+                } else {
+                  navigation.navigate('Login');
+                }
+              }
+            }
+          ]
+        );
       }
     } catch (error) {
-      setError(error.message || '密碼變更失敗，請稍後再試');
+      console.error('❌ 密碼變更失敗:', error);
+      setError(error.message || '密碼變更失敗,請稍後再試');
+      Alert.alert('❌ 變更失敗', error.message || '密碼變更失敗,請稍後再試');
     } finally {
       setIsLoading(false);
     }
@@ -270,7 +278,7 @@ const ResetPasswordScreen = ({ navigation, route }) => {
           <View style={styles.headerPlaceholder} />
         </View>
         <Text style={styles.headerSubtitle}>
-          為了您的帳號安全，請定期更新密碼
+          為了您的帳號安全,請定期更新密碼
         </Text>
       </LinearGradient>
 
@@ -646,7 +654,7 @@ const styles = StyleSheet.create({
   // Header
   header: {
     paddingTop: 50,
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
     paddingBottom: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
@@ -669,8 +677,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   headerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
+    fontSize: 20,
+    fontWeight: '700',
     color: '#FFFFFF',
   },
   headerPlaceholder: {
@@ -679,8 +687,8 @@ const styles = StyleSheet.create({
   headerSubtitle: {
     fontSize: 14,
     color: 'rgba(255, 255, 255, 0.8)',
-    paddingHorizontal: 8,
     textAlign: 'center',
+    paddingHorizontal: 20,
   },
 
   keyboardAvoidingView: {
@@ -694,7 +702,7 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
   contentContainer: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
     paddingTop: 20,
   },
 
@@ -719,11 +727,11 @@ const styles = StyleSheet.create({
 
   // 輸入區塊
   inputSection: {
-    marginBottom: 16,
+    marginBottom: 20,
   },
   inputLabel: {
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: '600',
     color: '#374151',
     marginBottom: 8,
     paddingHorizontal: 4,
@@ -731,7 +739,7 @@ const styles = StyleSheet.create({
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    backgroundColor: '#FFFFFF',
     borderWidth: 2,
     borderColor: '#E5E7EB',
     borderRadius: 16,
@@ -797,6 +805,7 @@ const styles = StyleSheet.create({
   matchText: {
     fontSize: 12,
     color: '#10B981',
+    fontWeight: '600',
   },
 
   // 密碼要求卡片
@@ -827,13 +836,14 @@ const styles = StyleSheet.create({
     color: '#6B7280',
   },
   requirementTextActive: {
-    color: '#1E40AF',
+    color: '#10B981',
+    fontWeight: '600',
   },
 
   // 底部按鈕區域
   bottomContainer: {
-    padding: 16,
-    paddingBottom: Platform.OS === 'ios' ? 34 : 16,
+    padding: 20,
+    paddingBottom: Platform.OS === 'ios' ? 34 : 20,
     backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
     borderTopColor: '#E5E7EB',
@@ -855,7 +865,7 @@ const styles = StyleSheet.create({
   submitButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   loadingButtonContent: {
     flexDirection: 'row',

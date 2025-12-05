@@ -1,5 +1,5 @@
 // src/services/api/index.js
-// 統一匯出所有服務，方便導入使用
+// 統一匯出所有服務,方便導入使用
 
 export { default as apiClient } from './client';
 export { default as authService } from './authService';
@@ -33,6 +33,7 @@ const ApiService = {
   forgotPassword: (email) => authService.forgotPassword(email),
   validateResetToken: (token) => authService.validateResetToken(token),
   resetPassword: (token, newPassword) => authService.resetPassword(token, newPassword),
+  changePassword: (currentPassword, newPassword) => authService.changePassword(currentPassword, newPassword), // ⭐ 新增這行
   
   // 用戶服務
   getUserProfile: () => userProfile.getUserProfile(),
@@ -208,7 +209,7 @@ const ApiService = {
       return {
         success: false,
         enterprise: null,
-        message: error.message || '網路錯誤，請稍後再試',
+        message: error.message || '網路錯誤,請稍後再試',
       };
     }
   },
@@ -233,7 +234,7 @@ const ApiService = {
       console.error('❌ [API] 清除企業引薦碼失敗:', error);
       return {
         success: false,
-        message: error.message || '網路錯誤，請稍後再試',
+        message: error.message || '網路錯誤,請稍後再試',
       };
     }
   },

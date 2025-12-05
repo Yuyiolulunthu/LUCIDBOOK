@@ -46,11 +46,19 @@ class AuthService {
     });
   }
 
-  /** 重設密碼 */
+  /** 重設密碼 (忘記密碼流程) */
   async resetPassword(token, newPassword) {
     return apiClient.request('/reset-password.php', {
       method: 'POST',
       body: JSON.stringify({ token, newPassword }),
+    });
+  }
+
+  /** ⭐ 修改密碼 (從設定頁面) */
+  async changePassword(currentPassword, newPassword) {
+    return apiClient.request('/change-password.php', {
+      method: 'POST',
+      body: JSON.stringify({ currentPassword, newPassword }),
     });
   }
 
