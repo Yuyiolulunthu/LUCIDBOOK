@@ -33,7 +33,8 @@ const ApiService = {
   forgotPassword: (email) => authService.forgotPassword(email),
   validateResetToken: (token) => authService.validateResetToken(token),
   resetPassword: (token, newPassword) => authService.resetPassword(token, newPassword),
-  changePassword: (currentPassword, newPassword) => authService.changePassword(currentPassword, newPassword), // ⭐ 新增這行
+  changePassword: (currentPassword, newPassword) => authService.changePassword(currentPassword, newPassword),
+  deleteAccount: () => authService.deleteAccount(), // ⭐ 新增刪除帳號
   
   // 用戶服務
   getUserProfile: () => userProfile.getUserProfile(),
@@ -62,7 +63,7 @@ const ApiService = {
   saveEmotionDiary: (diaryData) => emotionDiaryService.saveEmotionDiary(diaryData),
   getTodayEmotionDiary: () => emotionDiaryService.getTodayEmotionDiary(),
   
-  // ⭐⭐⭐ 情緒日記月度統計（啟用版本）⭐⭐⭐
+  // 情緒日記月度統計
   getEmotionDiaryMonthly: async (year, month) => {
     try {
       console.log('📊 [API] 獲取情緒日記月度統計:', { year, month });
@@ -93,7 +94,7 @@ const ApiService = {
     });
   },
 
-  // ⭐ 情緒統計服務（用於 DailyScreen 本月心情快照）
+  // 情緒統計服務
   getEmotionStats: async (year, month) => {
     return apiClient.request(`/practice/emotion-stats.php?year=${year}&month=${month}`, {
       method: 'GET',
@@ -112,15 +113,7 @@ const ApiService = {
   getFeedbackHistory: () => feedbackService.getFeedbackHistory(),
   getFeedbackDetail: (feedbackId) => feedbackService.getFeedbackDetail(feedbackId),
 
-  // ==========================================
-  // ⭐ 訓練計劃進度追蹤服務
-  // ==========================================
-
-  /**
-   * 獲取訓練進度
-   * @param {string} planId - 訓練計劃ID (如: 'stress-resistance')
-   * @returns {Promise<Object>} 進度數據
-   */
+  // 訓練計劃進度追蹤服務
   async getTrainingProgress(planId) {
     try {
       console.log('🔄 [API] 獲取訓練進度:', planId);
@@ -141,13 +134,6 @@ const ApiService = {
     }
   },
 
-  /**
-   * 更新練習完成次數
-   * @param {string} planId - 訓練計劃ID
-   * @param {number} weekNumber - 週次
-   * @param {number} sessionId - 練習單元ID
-   * @returns {Promise<Object>} 更新結果
-   */
   async updateTrainingProgress(planId, weekNumber, sessionId) {
     try {
       console.log('🔄 [API] 更新練習進度:', { planId, weekNumber, sessionId });
@@ -173,20 +159,11 @@ const ApiService = {
     }
   },
 
-  // ==========================================
-  // ⭐⭐⭐ 企業引薦碼驗證服務（修正版）⭐⭐⭐
-  // ==========================================
-
-  /**
-   * 驗證企業引薦碼
-   * @param {string} code - 企業引薦碼
-   * @returns {Promise<Object>} 驗證結果
-   */
+  // 企業引薦碼驗證服務
   async verifyEnterpriseCode(code) {
     try {
       console.log('🔐 [API] 驗證企業引薦碼:', code);
       
-      // ⭐ 呼叫後端 API 驗證並儲存
       const response = await apiClient.request('/enterprise/verify.php', {
         method: 'POST',
         body: { code },
@@ -197,6 +174,7 @@ const ApiService = {
         console.log('📋 [API] 企業資訊:', {
           id: response.enterprise?.id,
           name: response.enterprise?.name,
+          subscriptionEndDate: response.enterprise?.subscriptionEndDate,
           features: response.enterprise?.features
         });
         return response;
@@ -209,12 +187,11 @@ const ApiService = {
       return {
         success: false,
         enterprise: null,
-        message: error.message || '網路錯誤,請稍後再試',
+        message: error.message || '網路錯誤，請稍後再試',
       };
     }
   },
   
-  // ⭐ 清除企業引薦碼
   async clearEnterpriseCode() {
     try {
       console.log('🗑️ [API] 清除企業引薦碼');
@@ -234,7 +211,7 @@ const ApiService = {
       console.error('❌ [API] 清除企業引薦碼失敗:', error);
       return {
         success: false,
-        message: error.message || '網路錯誤,請稍後再試',
+        message: error.message || '網路錯誤，請稍後再試',
       };
     }
   },

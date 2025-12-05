@@ -1,13 +1,13 @@
 // ==========================================
 // 檔案名稱: PrivacyPolicy.js
-// 功能: 隱私權政策頁面
+// 功能: 隱私權政策頁面 (更新版樣式)
 // 
-// ✅ 漸層 Header
-// ✅ 多段落內容展示
-// ✅ 表格資料呈現
-// ✅ 承諾/提示卡片
-// ✅ 聯絡資訊底部
-// 🎨 依照設計程式風格
+// ✅ 現代化漸層 Header
+// ✅ 卡片式內容設計
+// ✅ 優化表格呈現
+// ✅ 視覺化承諾卡片
+// ✅ 改進的排版與間距
+// 🎨 符合最新設計規範
 // ==========================================
 
 import React from 'react';
@@ -72,7 +72,7 @@ const PrivacyPolicy = ({ navigation }) => {
           
           <View style={styles.introCard}>
             <Text style={styles.introTitle}>
-              您的心理健康值得被認真對待，您在本App中留下的每一份紀錄—無論是一行反思、一次深呼吸、或是一個自我評分—都屬於您自己。
+              您的心理健康值得被認真對待,您在本App中留下的每一份紀錄—無論是一行反思、一次深呼吸、或是一個自我評分—都屬於您自己。
             </Text>
             <Text style={styles.introText}>
               我們承諾，以透明、友善、穩固的方式守護您的每一份資料。請花一點時間閱讀這份政策，它會告訴您，我們如何收集、保護、使用、與分享您的資料。
@@ -105,30 +105,33 @@ const PrivacyPolicy = ({ navigation }) => {
             {/* Table 1 */}
             <View style={styles.table}>
               <View style={styles.tableHeader}>
-                <Text style={[styles.tableHeaderCell, { flex: 1.2 }]}>資料類型</Text>
-                <Text style={[styles.tableHeaderCell, { flex: 1.2 }]}>描述</Text>
+                <Text style={[styles.tableHeaderCell, { flex: 1 }]}>資料類型</Text>
+                <Text style={[styles.tableHeaderCell, { flex: 1 }]}>描述</Text>
                 <Text style={[styles.tableHeaderCell, { flex: 1 }]}>目的</Text>
               </View>
               <View style={styles.tableRow}>
-                <Text style={[styles.tableCell, styles.tableCellBold, { flex: 1.2 }]}>Email、密碼或登入方式</Text>
-                <Text style={[styles.tableCell, { flex: 1.2 }]}>註冊或登入使用者帳號</Text>
+                <Text style={[styles.tableCell, styles.tableCellBold, { flex: 1 }]}>Email、密碼或登入方式</Text>
+                <Text style={[styles.tableCell, { flex: 1 }]}>註冊或登入使用者帳號</Text>
                 <Text style={[styles.tableCell, { flex: 1 }]}>保存使用進度與建立個人化內容</Text>
               </View>
               <View style={styles.tableRow}>
-                <Text style={[styles.tableCell, styles.tableCellBold, { flex: 1.2 }]}>心理練習紀錄</Text>
-                <Text style={[styles.tableCell, { flex: 1.2 }]}>您在App內完成與書寫的內容</Text>
+                <Text style={[styles.tableCell, styles.tableCellBold, { flex: 1 }]}>心理練習紀錄</Text>
+                <Text style={[styles.tableCell, { flex: 1 }]}>您在App內完成與書寫的內容</Text>
                 <Text style={[styles.tableCell, { flex: 1 }]}>讓您自行回顧狀態與成長</Text>
               </View>
               <View style={styles.tableRow}>
-                <Text style={[styles.tableCell, styles.tableCellBold, { flex: 1.2 }]}>心理自評資料</Text>
-                <Text style={[styles.tableCell, { flex: 1.2 }]}>心理師設計的自我測驗題目與您的作答結果</Text>
+                <Text style={[styles.tableCell, styles.tableCellBold, { flex: 1 }]}>心理自評資料</Text>
+                <Text style={[styles.tableCell, { flex: 1 }]}>心理師設計的自我測驗題目與您的作答結果</Text>
                 <Text style={[styles.tableCell, { flex: 1 }]}>記錄成長趨勢、生成個人歷程或匿名統計用</Text>
               </View>
             </View>
 
             {/* Commitment Box */}
             <View style={styles.commitmentBox}>
-              <Text style={styles.commitmentTitle}>✨ 關於心理練習的承諾</Text>
+              <View style={styles.commitmentHeader}>
+                <Text style={styles.commitmentIcon}>✨</Text>
+                <Text style={styles.commitmentTitle}>關於心理練習的承諾</Text>
+              </View>
               <Text style={styles.commitmentText}>
                 🌿 您在 App 裡寫的每一段思考、情緒文字，只有您能看到，我們無法查看這些內容。
               </Text>
@@ -225,10 +228,18 @@ const PrivacyPolicy = ({ navigation }) => {
                 <Text style={styles.canSeeTitle}>企業端可以看到的內容（僅限整體統計資料）</Text>
               </View>
               <View style={styles.bulletList}>
-                <Text style={styles.bulletItem}>• <Text style={styles.boldText}>使用活躍比例：</Text>例如 80% 員工本月登入並使用 App</Text>
-                <Text style={styles.bulletItem}>• <Text style={styles.boldText}>訓練完成率：</Text>例如平均完成率達 12 天／14 天</Text>
-                <Text style={styles.bulletItem}>• <Text style={styles.boldText}>自評平均結果趨勢：</Text>例如壓力自評平均下降 15%</Text>
-                <Text style={styles.bulletItem}>• <Text style={styles.boldText}>整體滿意度或回饋（匿名）：</Text>如「90% 參加者認為心情有改善」</Text>
+                <Text style={styles.bulletItem}>
+                  • <Text style={styles.boldText}>使用活躍比例：</Text>例如 80% 員工本月登入並使用 App
+                </Text>
+                <Text style={styles.bulletItem}>
+                  • <Text style={styles.boldText}>訓練完成率：</Text>例如平均完成率達 12 天／14 天
+                </Text>
+                <Text style={styles.bulletItem}>
+                  • <Text style={styles.boldText}>自評平均結果趨勢：</Text>例如壓力自評平均下降 15%
+                </Text>
+                <Text style={styles.bulletItem}>
+                  • <Text style={styles.boldText}>整體滿意度或回饋（匿名）：</Text>如「90% 參加者認為心情有改善」
+                </Text>
               </View>
             </View>
 
@@ -239,9 +250,15 @@ const PrivacyPolicy = ({ navigation }) => {
                 <Text style={styles.cannotSeeTitle}>企業端無法看到的內容</Text>
               </View>
               <View style={styles.bulletList}>
-                <Text style={styles.bulletItem}>• <Text style={styles.boldText}>個別使用者的心理日記或練習內容：</Text>企業無法查看任何文字、情緒或行動紀錄</Text>
-                <Text style={styles.bulletItem}>• <Text style={styles.boldText}>單一使用者的心理自評結果：</Text>不會顯示個別人員分數或回答</Text>
-                <Text style={styles.bulletItem}>• <Text style={styles.boldText}>所有個人身份資料：</Text>包含Email、姓名、打卡紀錄等</Text>
+                <Text style={styles.bulletItem}>
+                  • <Text style={styles.boldText}>個別使用者的心理日記或練習內容：</Text>企業無法查看任何文字、情緒或行動紀錄
+                </Text>
+                <Text style={styles.bulletItem}>
+                  • <Text style={styles.boldText}>單一使用者的心理自評結果：</Text>不會顯示個別人員分數或回答
+                </Text>
+                <Text style={styles.bulletItem}>
+                  • <Text style={styles.boldText}>所有個人身份資料：</Text>包含Email、姓名、打卡紀錄等
+                </Text>
               </View>
             </View>
 
@@ -345,14 +362,14 @@ const styles = StyleSheet.create({
     backgroundColor: '#F5F7FA',
   },
 
-  // Header
+  // ========== Header ==========
   header: {
-    paddingTop: 50,
+    paddingTop: Platform.OS === 'ios' ? 50 : 40,
     paddingBottom: 16,
     paddingHorizontal: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
+    shadowOpacity: 0.2,
     shadowRadius: 12,
     elevation: 8,
   },
@@ -365,140 +382,149 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
+    backdropFilter: 'blur(10px)',
   },
   headerTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#FFF',
+    color: '#FFFFFF',
+    letterSpacing: 0.5,
   },
   headerPlaceholder: {
     width: 40,
   },
 
-  // ScrollView
+  // ========== ScrollView ==========
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 20,
-    paddingTop: 24,
+    paddingHorizontal: 24,
+    paddingTop: 32,
+    paddingBottom: 24,
   },
 
-  // Sections
+  // ========== Sections ==========
   section: {
-    marginBottom: 24,
+    marginBottom: 32,
   },
   updateDate: {
     fontSize: 14,
     color: '#718096',
     marginBottom: 16,
+    fontWeight: '500',
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#2D3748',
     marginBottom: 12,
+    letterSpacing: 0.3,
   },
 
-  // Intro Card
+  // ========== Intro Card ==========
   introCard: {
-    backgroundColor: '#FFF',
+    backgroundColor: '#FFFFFF',
     borderRadius: 16,
     padding: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
+    shadowOpacity: 0.08,
     shadowRadius: 8,
-    elevation: 2,
+    elevation: 3,
     borderWidth: 1,
-    borderColor: '#F3F4F6',
+    borderColor: '#E5E7EB',
   },
   introTitle: {
     fontSize: 14,
     fontWeight: 'bold',
     color: '#2D3748',
-    lineHeight: 22,
+    lineHeight: 24,
     marginBottom: 12,
   },
   introText: {
     fontSize: 14,
     color: '#4A5568',
-    lineHeight: 22,
+    lineHeight: 24,
   },
 
-  // Content Card
+  // ========== Content Card ==========
   contentCard: {
-    backgroundColor: '#FFF',
+    backgroundColor: '#FFFFFF',
     borderRadius: 16,
     padding: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
+    shadowOpacity: 0.08,
     shadowRadius: 8,
-    elevation: 2,
+    elevation: 3,
     borderWidth: 1,
-    borderColor: '#F3F4F6',
+    borderColor: '#E5E7EB',
   },
   cardText: {
     fontSize: 14,
     color: '#4A5568',
-    lineHeight: 22,
+    lineHeight: 24,
     marginBottom: 12,
   },
   subTitle: {
     fontSize: 15,
     fontWeight: 'bold',
     color: '#166CB5',
-    marginBottom: 12,
+    marginBottom: 16,
+    marginTop: 4,
   },
 
-  // Bullet List
+  // ========== Bullet List ==========
   bulletList: {
     marginBottom: 12,
   },
   bulletItem: {
     fontSize: 14,
     color: '#4A5568',
-    lineHeight: 22,
-    marginBottom: 4,
-    paddingLeft: 8,
+    lineHeight: 24,
+    marginBottom: 6,
+    paddingLeft: 4,
   },
   boldText: {
     fontWeight: '600',
     color: '#2D3748',
   },
 
-  // Table
+  // ========== Table ==========
   table: {
-    marginBottom: 16,
+    marginBottom: 20,
+    marginTop: 4,
     borderWidth: 1,
     borderColor: '#E5E7EB',
-    borderRadius: 8,
+    borderRadius: 12,
     overflow: 'hidden',
+    backgroundColor: '#FFFFFF',
   },
   tableHeader: {
     flexDirection: 'row',
     backgroundColor: '#F9FAFB',
     borderBottomWidth: 1,
     borderBottomColor: '#E5E7EB',
-    paddingVertical: 8,
-    paddingHorizontal: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
   },
   tableHeaderCell: {
     fontSize: 11,
     fontWeight: '600',
     color: '#6B7280',
     textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   tableRow: {
     flexDirection: 'row',
     borderBottomWidth: 1,
     borderBottomColor: '#F3F4F6',
-    paddingVertical: 10,
-    paddingHorizontal: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
   },
   tableCell: {
     fontSize: 12,
@@ -507,48 +533,60 @@ const styles = StyleSheet.create({
     paddingRight: 8,
   },
   tableCellBold: {
-    fontWeight: '500',
+    fontWeight: '600',
     color: '#2D3748',
   },
 
-  // Commitment Box
+  // ========== Commitment Box ==========
   commitmentBox: {
     backgroundColor: '#F0F9F4',
     borderWidth: 1,
     borderColor: '#C6F6D5',
     borderRadius: 12,
     padding: 16,
-    marginTop: 8,
+    marginTop: 12,
+    marginBottom: 8,
+  },
+  commitmentHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  commitmentIcon: {
+    fontSize: 16,
+    marginRight: 6,
   },
   commitmentTitle: {
     fontSize: 14,
     fontWeight: 'bold',
     color: '#2F855A',
-    marginBottom: 8,
+    flex: 1,
   },
   commitmentText: {
     fontSize: 14,
     color: '#276749',
-    lineHeight: 20,
+    lineHeight: 22,
   },
 
-  // Small Note
+  // ========== Small Note ==========
   smallNote: {
     fontSize: 12,
     color: '#9CA3AF',
-    marginTop: 4,
+    marginTop: 8,
+    fontStyle: 'italic',
   },
 
-  // Check List
+  // ========== Check List ==========
   checkList: {
     marginBottom: 16,
   },
   checkItem: {
     flexDirection: 'row',
-    marginBottom: 12,
+    marginBottom: 16,
+    alignItems: 'flex-start',
   },
   checkIcon: {
-    marginRight: 8,
+    marginRight: 10,
     marginTop: 2,
   },
   checkContent: {
@@ -558,43 +596,47 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#2D3748',
-    marginBottom: 2,
+    marginBottom: 4,
+    lineHeight: 20,
   },
   checkDesc: {
     fontSize: 12,
     color: '#6B7280',
+    lineHeight: 18,
   },
 
-  // Info Box
+  // ========== Info Box ==========
   infoBox: {
     backgroundColor: '#EFF6FF',
     borderWidth: 1,
     borderColor: '#BFDBFE',
-    borderRadius: 8,
+    borderRadius: 12,
     padding: 12,
+    marginTop: 4,
   },
   infoBoxText: {
     fontSize: 14,
     fontWeight: '500',
     color: '#1E40AF',
-    lineHeight: 20,
+    lineHeight: 22,
   },
 
-  // Can/Cannot See Sections
+  // ========== Can/Cannot See Sections ==========
   canSeeSection: {
-    marginTop: 16,
+    marginTop: 20,
     marginBottom: 16,
   },
   canSeeHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 12,
   },
   canSeeTitle: {
     fontSize: 14,
     fontWeight: 'bold',
     color: '#10B981',
     marginLeft: 8,
+    flex: 1,
   },
   cannotSeeSection: {
     marginBottom: 16,
@@ -602,38 +644,41 @@ const styles = StyleSheet.create({
   cannotSeeHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 12,
   },
   cannotSeeTitle: {
     fontSize: 14,
     fontWeight: 'bold',
     color: '#EF4444',
     marginLeft: 8,
+    flex: 1,
   },
 
-  // Promise Box
+  // ========== Promise Box ==========
   promiseBox: {
     backgroundColor: '#F9FAFB',
     borderWidth: 1,
     borderColor: '#E5E7EB',
-    borderRadius: 8,
-    padding: 12,
+    borderRadius: 12,
+    padding: 16,
+    marginTop: 8,
   },
   promiseText: {
     fontSize: 14,
     fontWeight: '500',
     color: '#374151',
     textAlign: 'center',
-    lineHeight: 20,
+    lineHeight: 22,
   },
 
-  // Link Text
+  // ========== Link Text ==========
   linkText: {
     color: '#166CB5',
     textDecorationLine: 'underline',
+    fontWeight: '600',
   },
 
-  // Contact Footer
+  // ========== Contact Footer ==========
   contactFooter: {
     backgroundColor: '#F5F7FA',
     borderWidth: 1,
@@ -641,22 +686,24 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 20,
     alignItems: 'center',
+    marginTop: 8,
     marginBottom: 24,
   },
   contactTitle: {
     fontSize: 16,
     fontWeight: 'bold',
     color: '#2D3748',
-    marginBottom: 8,
+    marginBottom: 12,
   },
   contactText: {
     fontSize: 14,
     color: '#4A5568',
-    marginBottom: 4,
+    marginBottom: 6,
+    textAlign: 'center',
   },
 
   bottomPadding: {
-    height: 40,
+    height: 60,
   },
 });
 

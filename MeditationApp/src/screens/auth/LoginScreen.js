@@ -26,6 +26,7 @@ import {
   Image,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { CommonActions } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import ApiService from '../../../api';
@@ -183,16 +184,19 @@ const LoginScreen = ({ navigation, route }) => {
 
   const handleGoBack = () => {
     if (navigation) {
-      if (canGoBack || navigation.canGoBack()) {
+      if (navigation.canGoBack()) {
         navigation.goBack();
       } else {
-        navigation.reset({
-          index: 0,
-          routes: [{ name: 'Home' }],
-        });
+        // 如果無法返回，重置到 Home 頁面
+        navigation.dispatch(
+          CommonActions.reset({
+            index: 0,
+            routes: [{ name: 'Home' }],
+          })
+        );
       }
     }
-  };
+  }
 
   return (
     <View style={styles.container}>

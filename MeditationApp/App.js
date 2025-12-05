@@ -1,6 +1,7 @@
 // ==========================================
 // 檔案名稱: App.js 
 // 應用主入口 - 只負責導航配置
+// 版本: V2.0 - 新增刪除帳號頁面
 // ==========================================
 
 import React from 'react';
@@ -41,13 +42,14 @@ import Favorites from './src/screens/account/bookmarks/Favorites';
 import SelectGoals from './src/screens/account/settings/SelectGoals';
 import EnterpriseCodeManagement from './src/screens/account/settings/EnterpriseCodeManagement';
 
-// 🆕 新增的設定工具頁面
+// 設定工具頁面
 import ProfileEditScreen from './src/screens/account/settings/utils/ProfileEditScreen';
 import PrivacySettingsScreen from './src/screens/account/settings/utils/PrivacySettingsScreen';
 import TermsOfServiceScreen from './src/screens/account/settings/utils/TermsOfServiceScreen';
 import HelpCenter from './src/screens/account/settings/utils/HelpCenter';
 import PrivacyPolicy from './src/screens/account/settings/utils/PrivacyPolicy';
 import AboutUs from './src/screens/account/settings/utils/AboutUs';
+import DeleteAccountScreen from './src/screens/account/settings/utils/DeleteAccountScreen'; // 🆕 刪除帳號頁面
 
 const Stack = createNativeStackNavigator();
 
@@ -118,7 +120,7 @@ const App = () => {
           options={{ headerShown: false }}
         />
 
-        {/* 🆕 設定工具頁面 */}
+        {/* 設定工具頁面 */}
         <Stack.Screen 
           name="ProfileEdit" 
           component={ProfileEditScreen}
@@ -147,6 +149,12 @@ const App = () => {
         <Stack.Screen 
           name="AboutUs" 
           component={AboutUs}
+          options={{ headerShown: false }}
+        />
+        {/* 🆕 刪除帳號頁面 */}
+        <Stack.Screen 
+          name="DeleteAccount" 
+          component={DeleteAccountScreen}
           options={{ headerShown: false }}
         />
       </Stack.Navigator>

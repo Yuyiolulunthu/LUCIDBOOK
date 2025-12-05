@@ -25,6 +25,7 @@ import {
   Linking,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { CommonActions } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import ApiService from '../../../api';
 
@@ -101,7 +102,16 @@ const RegisterScreen = ({ navigation }) => {
             text: '前往登入', 
             onPress: () => {
               if (navigation) {
-                navigation.goBack();
+                if (navigation.canGoBack()) {
+                  navigation.goBack();
+                } else {
+                  navigation.dispatch(
+                    CommonActions.reset({
+                      index: 0,
+                      routes: [{ name: 'Login' }],
+                    })
+                  );
+                }
               }
             }
           }
@@ -116,7 +126,16 @@ const RegisterScreen = ({ navigation }) => {
 
   const goToLogin = () => {
     if (navigation) {
-      navigation.goBack();
+      if (navigation.canGoBack()) {
+        navigation.goBack();
+      } else {
+        navigation.dispatch(
+          CommonActions.reset({
+            index: 0,
+            routes: [{ name: 'Login' }],
+          })
+        );
+      }
     }
   };
 
