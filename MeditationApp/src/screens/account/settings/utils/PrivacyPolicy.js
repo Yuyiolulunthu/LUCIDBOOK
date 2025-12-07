@@ -8,9 +8,10 @@
 // ✅ 視覺化承諾卡片
 // ✅ 改進的排版與間距
 // 🎨 符合最新設計規範
+// 🆕 支援從註冊頁面進入，「我已了解」返回時自動打勾
 // ==========================================
 
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -25,10 +26,53 @@ import {
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 
-const PrivacyPolicy = ({ navigation }) => {
+const PrivacyPolicy = ({ navigation, route }) => {
+  // 🆕 從 route.params 獲取參數
+  const { 
+    fromRegister = false, 
+    savedFormData = null,
+  } = route?.params || {};
+
+  // 🆕 追蹤是否滾動到底部（可選功能）
+  const [hasScrolledToBottom, setHasScrolledToBottom] = useState(false);
 
   const handleEmailPress = () => {
     Linking.openURL('mailto:team@lucidbook.tw');
+  };
+
+  // 🆕 處理返回按鈕
+  const handleGoBack = () => {
+    if (fromRegister && savedFormData) {
+      // 從註冊頁面進入，返回時保留表單資料但不勾選
+      navigation.navigate('Register', {
+        savedFormData: savedFormData,
+        agreedFromPrivacy: false,
+      });
+    } else {
+      navigation.goBack();
+    }
+  };
+
+  // 🆕 處理「我已了解」按鈕
+  const handleAgree = () => {
+    if (fromRegister) {
+      // 返回註冊頁面，並帶入同意狀態
+      navigation.navigate('Register', {
+        agreedFromPrivacy: true,
+        savedFormData: savedFormData,
+      });
+    } else {
+      navigation.goBack();
+    }
+  };
+
+  // 🆕 檢測是否滾動到底部
+  const handleScroll = (event) => {
+    const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
+    const paddingToBottom = 100;
+    if (layoutMeasurement.height + contentOffset.y >= contentSize.height - paddingToBottom) {
+      setHasScrolledToBottom(true);
+    }
   };
 
   return (
@@ -48,7 +92,7 @@ const PrivacyPolicy = ({ navigation }) => {
         <View style={styles.headerContent}>
           <TouchableOpacity 
             style={styles.backButton}
-            onPress={() => navigation.goBack()}
+            onPress={handleGoBack}
             activeOpacity={0.7}
           >
             <Ionicons name="chevron-back" size={24} color="#FFF" />
@@ -63,8 +107,13 @@ const PrivacyPolicy = ({ navigation }) => {
       {/* Content */}
       <ScrollView 
         style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[
+          styles.scrollContent,
+          fromRegister && styles.scrollContentWithButton // 🆕 為底部按鈕留空間
+        ]}
         showsVerticalScrollIndicator={false}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
       >
         {/* Intro Section */}
         <View style={styles.section}>
@@ -352,6 +401,30 @@ const PrivacyPolicy = ({ navigation }) => {
 
         <View style={styles.bottomPadding} />
       </ScrollView>
+
+      {/* 🆕 從註冊頁面進入時顯示底部按鈕 */}
+      {fromRegister && (
+        <View style={styles.bottomButtonContainer}>
+          <TouchableOpacity
+            style={styles.agreeButtonContainer}
+            onPress={handleAgree}
+            activeOpacity={0.9}
+          >
+            <LinearGradient
+              colors={['#166CB5', '#31C6FE']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.agreeButton}
+            >
+              <Ionicons name="checkmark-circle" size={22} color="#FFFFFF" />
+              <Text style={styles.agreeButtonText}>我已了解</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+          <Text style={styles.bottomHint}>
+            點擊「我已了解」即表示您同意本隱私權政策
+          </Text>
+        </View>
+      )}
     </KeyboardAvoidingView>
   );
 };
@@ -405,6 +478,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingTop: 32,
     paddingBottom: 24,
+  },
+  // 🆕 為底部按鈕留空間
+  scrollContentWithButton: {
+    paddingBottom: 140,
   },
 
   // ========== Sections ==========
@@ -704,6 +781,52 @@ const styles = StyleSheet.create({
 
   bottomPadding: {
     height: 60,
+  },
+
+  // 🆕 ========== Bottom Button Container ==========
+  bottomButtonContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 24,
+    paddingTop: 16,
+    paddingBottom: Platform.OS === 'ios' ? 34 : 24,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  agreeButtonContainer: {
+    borderRadius: 12,
+    overflow: 'hidden',
+    shadowColor: '#166CB5',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  agreeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    gap: 8,
+  },
+  agreeButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  bottomHint: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    textAlign: 'center',
+    marginTop: 12,
   },
 });
 
