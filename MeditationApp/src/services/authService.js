@@ -54,12 +54,36 @@ class AuthService {
     });
   }
 
-  /** ⭐ 修改密碼 (從設定頁面) */
+  /** 修改密碼 (從設定頁面) */
   async changePassword(currentPassword, newPassword) {
     return apiClient.request('/change-password.php', {
       method: 'POST',
       body: JSON.stringify({ currentPassword, newPassword }),
     });
+  }
+
+  /** ⭐ 刪除帳號 */
+  async deleteAccount() {
+    console.log('🗑️ [AuthService] 開始刪除帳號');
+    
+    try {
+      const response = await apiClient.request('/user/delete-account.php', {
+        method: 'DELETE',
+      });
+      
+      if (response.success) {
+        console.log('✅ [AuthService] 帳號刪除成功');
+        // 清除本地 token
+        await apiClient.clearToken();
+        return response;
+      } else {
+        console.error('❌ [AuthService] 刪除失敗:', response.message);
+        throw new Error(response.message || '刪除帳號失敗');
+      }
+    } catch (error) {
+      console.error('❌ [AuthService] 刪除帳號失敗:', error);
+      throw error;
+    }
   }
 
   /** 檢查是否已登入 */
