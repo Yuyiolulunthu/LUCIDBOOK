@@ -1,6 +1,7 @@
 // ==========================================
 // 檔案名稱: src/screens/home/HomeScreen.js
-// 首頁畫面 - 完整整合版
+// 首頁畫面 - 完整修復版
+// 版本: V3.4 - 修復心情溫度計樣式 + Modal 導航
 // ==========================================
 
 import React, { useState, useEffect } from 'react';
@@ -14,21 +15,23 @@ import {
   StatusBar,
   Alert,
   ActivityIndicator,
+  Pressable,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import MaskedView from '@react-native-masked-view/masked-view';
 import {
-  Flame,
   Wind,
   PenLine,
-  Check,
-  Sparkles,
-  Clock,
+  GitBranch,
+  Heart,
+  ThermometerSun,
+  Info,
+  ChevronRight,
 } from 'lucide-react-native';
 import ApiService from '../../services/index';
 import BottomNavigation from '../../navigation/BottomNavigation';
 import AppHeader from '../../navigation/AppHeader';
 import LockedOverlay from '../../navigation/LockedOverlay';
+import PlanDetailsModal from './components/PlanDetailsModal';
 import {
   computeWeeklyCheckIns,
   computeMonthlyTotal,
@@ -38,77 +41,21 @@ const { width } = Dimensions.get('window');
 
 const HomeScreen = ({ navigation }) => {
   // ========== 狀態管理 ==========
-  const [selectedMood, setSelectedMood] = useState(null);
-  const [todayMoodRecord, setTodayMoodRecord] = useState(null);
   const [user, setUser] = useState(null);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
-  const [todayPracticeStatus, setTodayPracticeStatus] = useState({});
-  const [selectedPractice, setSelectedPractice] = useState('breathing');
-  const [selectedCategory, setSelectedCategory] = useState('employee');
+  const [selectedCategory, setSelectedCategory] = useState('plan');
   const [hasEnterpriseCode, setHasEnterpriseCode] = useState(false);
+  const [showPlanDetails, setShowPlanDetails] = useState(false);
 
-  // 首頁統計：心情連續天數 / 總天數
-  const [moodStats, setMoodStats] = useState({
-    consecutiveDays: 0,
-    totalDays: 0,
+  // 進度數據
+  const [goals, setGoals] = useState({
+    breathing: { current: 0, target: 3, label: '呼吸練習' },
+    goodthings: { current: 0, target: 3, label: '好事書寫' },
+    abcd: { current: 0, target: 3, label: '思維調節' },
+    gratitude: { current: 0, target: 3, label: '感恩練習' },
+    thermometer: { current: 0, target: 1, label: '心情溫度計' },
   });
-
-  // 首頁統計：每個練習的月累計 / 週進度
-  const [practiceStats, setPracticeStats] = useState({
-    breathing: {
-      streakDays: 0,
-      monthlyTotal: 0,
-      weeklyCheckIns: Array(7).fill(false),
-    },
-    goodthings: {
-      streakDays: 0,
-      monthlyTotal: 0,
-      weeklyCheckIns: Array(7).fill(false),
-    },
-  });
-
-  // ========== 資料定義 ==========
-
-  // 情緒選項
-  const emotionCards = [
-    {
-      id: 'happy',
-      label: '開心',
-      icon: '☀️',
-      color: '#FFBC42',
-      particleType: 'up',
-      delay: 0,
-      level: 5,
-    },
-    {
-      id: 'anxious',
-      label: '焦慮',
-      icon: '⚡',
-      color: '#FF6B6B',
-      particleType: 'burst',
-      delay: 0.5,
-      level: 4,
-    },
-    {
-      id: 'calm',
-      label: '平靜',
-      icon: '🌱',
-      color: '#4ECDC4',
-      particleType: 'float',
-      delay: 1,
-      level: 3,
-    },
-    {
-      id: 'sad',
-      label: '難過',
-      icon: '💧',
-      color: '#556270',
-      particleType: 'down',
-      delay: 1.5,
-      level: 2,
-    },
-  ];
 
   // ========== 生命週期 ==========
 
@@ -120,10 +67,8 @@ const HomeScreen = ({ navigation }) => {
     const unsubscribe = navigation.addListener('focus', () => {
       console.log('🔄 [首頁] 頁面獲得焦點，重新載入數據');
       checkLoginStatus();
-      // 延遲一下以確保後端數據已更新
       setTimeout(() => {
-        loadTodayData();
-        loadHomeStats();
+        loadHomeProgress();
       }, 500);
     });
     return unsubscribe;
@@ -131,8 +76,7 @@ const HomeScreen = ({ navigation }) => {
 
   useEffect(() => {
     if (isLoggedIn && user) {
-      loadTodayData();
-      loadHomeStats();
+      loadHomeProgress();
     }
   }, [isLoggedIn, user]);
 
@@ -154,9 +98,9 @@ const HomeScreen = ({ navigation }) => {
           });
           setIsLoggedIn(true);
 
-          // ⭐ 新增：檢查企業引薦碼
+          // 檢查企業引薦碼
           const hasCode = !!response.user.enterprise_code;
-          console.log('📋 [HomeScreen] 企業引薦碼:', hasCode, '| 值:', response.user.enterprise_code);
+          console.log('📋 [HomeScreen] 企業引薦碼:', hasCode);
           setHasEnterpriseCode(hasCode);
         } else {
           setIsLoggedIn(false);
@@ -174,95 +118,60 @@ const HomeScreen = ({ navigation }) => {
       setUser(null);
       setHasEnterpriseCode(false);
     } finally {
-      // ⭐ 無論成功或失敗，都結束初始化狀態
       setIsInitializing(false);
       console.log('🏁 [HomeScreen] 初始化完成');
     }
   };
 
   /**
-   * 載入今日數據（心情 + 練習狀態）
+   * 載入首頁進度數據
    */
-  const loadTodayData = async () => {
+  const loadHomeProgress = async () => {
     try {
-      // 今日心情
-      const moodResponse = await ApiService.getTodayMood();
-      if (moodResponse.success && moodResponse.mood) {
-        setTodayMoodRecord(moodResponse.mood);
-        const moodIndex = emotionCards.findIndex(
-          (m) => m.level === moodResponse.mood.mood_level
-        );
-        if (moodIndex !== -1) {
-          setSelectedMood((current) => (current === null ? moodIndex : current));
-        }
-      } else {
-        setTodayMoodRecord(null);
-      }
-
-      // 今日練習狀態
-      const practiceResponse = await ApiService.getTodayPracticeStatus();
-      if (practiceResponse.success) {
-        setTodayPracticeStatus(practiceResponse.practices || {});
-      }
-    } catch (error) {
-      console.error('載入今日數據失敗:', error);
-    }
-  };
-
-  /**
-   * 載入首頁統計數據
-   * 從 ApiService.getPracticeStats() 獲取連續天數、總天數、週/月數據
-   */
-  const loadHomeStats = async () => {
-    try {
-      console.log('📊 開始載入首頁統計數據...');
+      console.log('📊 [首頁] 開始載入練習統計...');
       
       const res = await ApiService.getPracticeStats();
-      
-      // 容錯處理：支持多種返回格式
       const success = res?.success !== undefined ? res.success : true;
       const stats = res?.stats || res?.data?.stats || res?.data || (success ? res : null);
 
       if (!success || !stats) {
-        console.log('⚠️ 練習統計 API 返回格式不符或失敗:', res);
+        console.log('⚠️ 練習統計 API 返回格式不符或失敗');
         return;
       }
 
-      console.log('✅ 統計數據載入成功');
-      console.log('  - 連續天數:', stats.currentStreak || stats.current_streak || 0);
-      console.log('  - 總天數:', stats.totalDays || stats.total_days || 0);
+      console.log('✅ [首頁] 統計數據載入成功');
 
-      // 從 stats.php 取得週/月數據
       const weeklyPractices = stats.weeklyPractices || stats.weekly_practices || [];
-      const monthlyPractices = stats.monthlyPractices || stats.monthly_practices || [];
 
-      console.log('  - 週數據筆數:', weeklyPractices.length);
-      console.log('  - 月數據筆數:', monthlyPractices.length);
+      // 計算各練習的完成次數（本週）
+      const breathingCount = weeklyPractices.filter(
+        p => p.practice_type === 'breathing' || 
+             p.practice_type === '呼吸練習' ||
+             p.practice_type === '呼吸穩定力練習'
+      ).length;
+      
+      const goodthingsCount = weeklyPractices.filter(
+        p => p.practice_type === 'good-things' || 
+             p.practice_type === 'goodthings' ||
+             p.practice_type === '好事書寫' ||
+             p.practice_type === '好事書寫練習'
+      ).length;
 
-      // 1) 設置連續簽到天數和總天數
-      setMoodStats({
-        consecutiveDays: stats.currentStreak || stats.current_streak || 0,
-        totalDays: stats.totalDays || stats.total_days || 0,
+      console.log('📋 [首頁] 本週練習統計:', {
+        breathing: breathingCount,
+        goodthings: goodthingsCount,
       });
 
-      // 2) 設置各練習的週進度和月累計
-      // 使用 practiceTypeMapping.js 的工具函數處理
-      setPracticeStats({
-        breathing: {
-          streakDays: stats.currentStreak || stats.current_streak || 0,
-          monthlyTotal: computeMonthlyTotal(monthlyPractices, 'breathing'),
-          weeklyCheckIns: computeWeeklyCheckIns(weeklyPractices, 'breathing'),
-        },
-        goodthings: {
-          streakDays: stats.currentStreak || stats.current_streak || 0,
-          monthlyTotal: computeMonthlyTotal(monthlyPractices, 'goodthings'),
-          weeklyCheckIns: computeWeeklyCheckIns(weeklyPractices, 'goodthings'),
-        },
-      });
+      // 更新進度
+      setGoals(prev => ({
+        ...prev,
+        breathing: { ...prev.breathing, current: breathingCount },
+        goodthings: { ...prev.goodthings, current: goodthingsCount },
+      }));
 
-      console.log('📊 首頁統計數據設置完成');
+      console.log('📊 [首頁] 進度數據更新完成');
     } catch (error) {
-      console.error('❌ 載入首頁統計資料失敗:', error);
+      console.error('❌ [首頁] 載入進度失敗:', error);
     }
   };
 
@@ -290,207 +199,113 @@ const HomeScreen = ({ navigation }) => {
   };
 
   /**
-   * 處理心情選擇
-   */
-  const handleMoodSelect = async (emotion, index) => {
-    if (showLoginPrompt()) return;
-
-    // 如果已經選中同一個，直接返回
-    if (selectedMood === index) {
-      console.log('已經選中，跳過');
-      return;
-    }
-
-    console.log('👆 選中情緒:', emotion.label, '(index:', index, ')');
-
-    // 先設定選中狀態，觸發動畫
-    setSelectedMood(index);
-
-    try {
-      // 調用 API 記錄心情
-      const response = await ApiService.recordMood(
-        emotion.level,
-        emotion.label,
-        '' // note 參數
-      );
-
-      if (response.success) {
-        setTodayMoodRecord({
-          mood_level: emotion.level,
-          mood_name: emotion.label,
-          recorded_at: new Date().toISOString(),
-        });
-        console.log('✅ 心情記錄成功');
-      } else {
-        console.log('⚠️ API 返回失敗');
-        // API 失敗時回復到原狀態
-        restoreMoodState();
-      }
-    } catch (error) {
-      console.error('❌ 記錄心情失敗:', error);
-      Alert.alert('錯誤', '心情記錄失敗，請稍後再試');
-      // 錯誤時回復到原狀態
-      restoreMoodState();
-    }
-  };
-
-  /**
-   * 恢復心情狀態（當記錄失敗時）
-   */
-  const restoreMoodState = () => {
-    if (todayMoodRecord) {
-      const originalIndex = emotionCards.findIndex(
-        (m) => m.level === todayMoodRecord.mood_level
-      );
-      setSelectedMood(originalIndex !== -1 ? originalIndex : null);
-    } else {
-      setSelectedMood(null);
-    }
-  };
-
-  /**
-   * 導航到呼吸練習
+   * 🔧 導航函數 - 確保關閉 Modal
    */
   const navigateToBreathing = () => {
     if (showLoginPrompt()) return;
-    navigation.navigate('PracticeNavigator', {
-      practiceType: '呼吸穩定力練習',
-      onPracticeComplete: async () => {
-        await loadTodayData();
-        await loadHomeStats();
-      },
-    });
+    
+    console.log('🎯 [首頁] 準備導航到呼吸練習，先關閉 Modal');
+    setShowPlanDetails(false);
+    
+    setTimeout(() => {
+      console.log('🎯 [首頁] 導航到呼吸練習');
+      navigation.navigate('PracticeNavigator', {
+        practiceType: '呼吸穩定力練習',
+        onPracticeComplete: async () => {
+          console.log('✅ [首頁] 呼吸練習完成，重新載入進度');
+          await loadHomeProgress();
+        },
+      });
+    }, 100);
   };
 
-  /**
-   * 導航到好事書寫
-   */
   const navigateToGoodThings = () => {
     if (showLoginPrompt()) return;
-    navigation.navigate('PracticeNavigator', {
-      practiceType: '好事書寫',
-      onPracticeComplete: async () => {
-        await loadTodayData();
-        await loadHomeStats();
-      },
-    });
+    
+    console.log('🎯 [首頁] 準備導航到好事書寫，先關閉 Modal');
+    setShowPlanDetails(false);
+    
+    setTimeout(() => {
+      console.log('🎯 [首頁] 導航到好事書寫');
+      navigation.navigate('PracticeNavigator', {
+        practiceType: '好事書寫',
+        onPracticeComplete: async () => {
+          console.log('✅ [首頁] 好事書寫完成，重新載入進度');
+          await loadHomeProgress();
+        },
+      });
+    }, 100);
   };
 
-  /**
-   * 導航到情緒抗壓力計劃
-   */
   const navigateToResiliencePlan = () => {
     navigation.navigate('EmotionalResiliencePlan');
   };
 
-  // ========= 從 state 推導出首頁要顯示的統計 =========
+  // 暫不實作的功能
+  const handleNotImplemented = (featureName) => {
+    Alert.alert('功能開發中', `${featureName}功能即將推出，敬請期待！`);
+  };
 
-  const consecutiveDays = moodStats.consecutiveDays || 0;
-  const totalDays = moodStats.totalDays || 0;
+  // ========== 計算完成度 ==========
+  const totalTasks = Object.values(goals).reduce((acc, curr) => acc + curr.target, 0);
+  const completedTasks = Object.values(goals).reduce((acc, curr) => acc + curr.current, 0);
+  const progressPercentage = Math.round((completedTasks / totalTasks) * 100);
 
-  const currentPracticeStats =
-    selectedPractice === 'breathing'
-      ? practiceStats.breathing
-      : practiceStats.goodthings;
+  // ========== 練習模組配置 ==========
+  const practiceModules = [
+    { 
+      id: 'breathing', 
+      title: '呼吸練習', 
+      icon: Wind,
+      color: 'blue',
+      bgColor: '#EFF6FF',
+      iconColor: '#3B82F6',
+      gradientColors: ['#31C6FE', '#166CB5'],
+      action: navigateToBreathing,
+      current: goals.breathing.current,
+      target: goals.breathing.target
+    },
+    { 
+      id: 'goodthings', 
+      title: '好事書寫', 
+      icon: PenLine,
+      color: 'orange',
+      bgColor: '#FFF7ED',
+      iconColor: '#F97316',
+      gradientColors: ['#FFBC42', '#FF8C42'],
+      action: navigateToGoodThings,
+      current: goals.goodthings.current,
+      target: goals.goodthings.target
+    },
+    { 
+      id: 'abcd', 
+      title: '思維調節', 
+      icon: GitBranch,
+      color: 'purple',
+      bgColor: '#F5F3FF',
+      iconColor: '#A855F7',
+      gradientColors: ['#C084FC', '#A855F7'],
+      action: () => handleNotImplemented('思維調節'),
+      current: goals.abcd.current,
+      target: goals.abcd.target
+    },
+    { 
+      id: 'gratitude', 
+      title: '感恩練習', 
+      icon: Heart,
+      color: 'pink',
+      bgColor: '#FDF2F8',
+      iconColor: '#EC4899',
+      gradientColors: ['#F9A8D4', '#EC4899'],
+      action: () => handleNotImplemented('感恩練習'),
+      current: goals.gratitude.current,
+      target: goals.gratitude.target
+    },
+  ];
 
-  const weeklyCheckIns = currentPracticeStats.weeklyCheckIns || Array(7).fill(false);
-  const checkInCount = weeklyCheckIns.filter(Boolean).length;
-  const monthlyTotal = currentPracticeStats.monthlyTotal || 0;
+  // ========== 渲染 ==========
 
-  // ========== 子組件 ==========
-
-  /**
-   * 情緒按鈕組件
-   */
-  const MoodButton = React.memo(({ emotion, index, isSelected, onPress }) => {
-    const handlePress = () => {
-      console.log(`👆 點擊按鈕: ${emotion.label} (index: ${index})`);
-      onPress();
-    };
-
-    return (
-      <TouchableOpacity
-        onPress={handlePress}
-        style={styles.moodButtonContainer}
-        activeOpacity={0.8}
-      >
-        <View
-          style={[
-            styles.moodButton,
-            isSelected && {
-              shadowColor: emotion.color,
-              shadowOffset: { width: 0, height: 12 },
-              shadowOpacity: 0.35,
-              shadowRadius: 24,
-              elevation: 10,
-            },
-          ]}
-        >
-          {/* 1. 底層：顏色填充（在 Emoji 下方） */}
-          {isSelected && (
-            <View
-              style={[
-                StyleSheet.absoluteFill,
-                {
-                  backgroundColor: emotion.color,
-                  borderRadius: 32,
-                  opacity: 0.5,
-                },
-              ]}
-            />
-          )}
-
-          {/* 2. 中間層：白色半透明遮罩 */}
-          {isSelected && (
-            <View
-              style={[
-                StyleSheet.absoluteFill,
-                {
-                  backgroundColor: '#FFFFFF',
-                  borderRadius: 32,
-                  opacity: 0.6,
-                },
-              ]}
-            />
-          )}
-
-          {/* 3. 邊框層 */}
-          {isSelected && (
-            <View
-              style={[
-                StyleSheet.absoluteFill,
-                {
-                  borderRadius: 32,
-                  borderWidth: 2,
-                  borderColor: emotion.color,
-                },
-              ]}
-            />
-          )}
-
-          {/* 4. 最上層：Emoji 圖標 */}
-          <Text style={styles.moodIcon}>{emotion.icon}</Text>
-        </View>
-
-        {/* 標籤文字 */}
-        <Text
-          style={[
-            styles.moodText,
-            {
-              color: isSelected ? emotion.color : '#718096',
-              fontWeight: isSelected ? '800' : '600',
-            },
-          ]}
-        >
-          {emotion.label}
-        </Text>
-      </TouchableOpacity>
-    );
-  });
-
-  // ========== 主渲染 ==========
-
-  // ⭐ 如果還在初始化，顯示載入畫面
+  // 載入畫面
   if (isInitializing) {
     return (
       <View style={styles.loadingContainer}>
@@ -514,132 +329,26 @@ const HomeScreen = ({ navigation }) => {
       <AppHeader navigation={navigation} />
 
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {/* Greeting Section */}
-        <View style={styles.greetingSection}>
-          <Text style={styles.greetingText}>早安啊！</Text>
-          <MaskedView
-            maskElement={
-              <Text style={styles.nameTextMask}>
-                {isLoggedIn && user ? user.name : 'Jennifer'}
-              </Text>
-            }
-          >
-            <LinearGradient
-              colors={['#166CB5', '#31C6FE']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.nameGradientMask}
-            >
-              <Text style={[styles.nameTextMask, { opacity: 0 }]}>
-                {isLoggedIn && user ? user.name : 'Jennifer'}
-              </Text>
-            </LinearGradient>
-          </MaskedView>
+        {/* 主標題 */}
+        <View style={styles.titleSection}>
+          <Text style={styles.mainTitle}>
+            {isLoggedIn && user ? user.name : 'Jennifer'} 心理肌力養成計劃
+          </Text>
         </View>
 
-        {/* Consecutive Days Card */}
-        <View style={styles.consecutiveCard}>
-          <View style={styles.consecutiveTextRow}>
-            <Text style={styles.consecutiveText}>已連續簽到</Text>
-            <Text style={styles.consecutiveNumber}>{consecutiveDays}</Text>
-            <Text style={styles.consecutiveText}>天</Text>
-          </View>
-          <LinearGradient
-            colors={['#FF6B35', '#FF8C42']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.flameCircle}
-          >
-            <Flame color="#FFFFFF" size={24} fill="#FFFFFF" />
-          </LinearGradient>
-        </View>
-
-        {/* Total Days Card */}
-        <TouchableOpacity
-          style={styles.totalDaysCard}
-          onPress={navigateToResiliencePlan}
-          activeOpacity={0.9}
-        >
-          <LinearGradient
-            colors={['#31C6FE', '#166CB5', '#1e3a8a']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.totalDaysGradient}
-          >
-            <View style={styles.totalDaysContent}>
-              <View style={styles.totalDaysLeft}>
-                <Text style={styles.totalDaysLabel}>心理肌力訓練</Text>
-                <Text style={styles.totalDaysTitle}>持續堅持</Text>
-              </View>
-
-              <View style={styles.totalDaysRight}>
-                <View style={styles.totalDaysNumberRow}>
-                  <Text style={styles.totalDaysPrefix}>第</Text>
-                  <Text style={styles.totalDaysNumber}>{totalDays}</Text>
-                  <Text style={styles.totalDaysSuffix}>天</Text>
-                </View>
-              </View>
-            </View>
-
-            <View style={styles.progressSection}>
-              <View style={styles.progressLabels}>
-                <Text style={styles.progressLabel}>Current Level</Text>
-                <Text style={styles.progressLabel}>Next Goal: 30天</Text>
-              </View>
-              <View style={styles.progressBarBg}>
-                <View
-                  style={[
-                    styles.progressBarFill,
-                    {
-                      width: `${Math.min(
-                        100,
-                        (totalDays / 30) * 100 || 0
-                      )}%`,
-                    },
-                  ]}
-                />
-              </View>
-            </View>
-          </LinearGradient>
-        </TouchableOpacity>
-
-        {/* Mood Question */}
-        <Text style={styles.moodQuestion}>今天的心情如何呢？</Text>
-
-        {/* Emotion Cards */}
-        <View style={styles.emotionCardsRow}>
-          {emotionCards.map((emotion, index) => (
-            <MoodButton
-              key={`${emotion.id}-${index}`}
-              emotion={emotion}
-              index={index}
-              isSelected={selectedMood === index}
-              onPress={() => handleMoodSelect(emotion, index)}
-            />
-          ))}
-        </View>
-
-        {/* Section Title */}
-        <View style={styles.sectionTitleContainer}>
-          <Text style={styles.sectionTitle}>屬於你的練心書</Text>
-          <Text style={styles.sectionSubtitle}>今天想選擇什麼練習呢？</Text>
-        </View>
-
-        {/* Category Filters */}
-        <View style={styles.categoryFilters}>
+        {/* 分類標籤 */}
+        <View style={styles.categorySection}>
           <TouchableOpacity
             onPress={() => setSelectedCategory('all')}
             style={[
-              styles.categoryButtonInactive,
-              selectedCategory === 'all' &&
-                styles.categoryButtonInactiveSelected,
+              styles.categoryButton,
+              selectedCategory === 'all' && styles.categoryButtonActive,
             ]}
           >
             <Text
               style={[
-                styles.categoryTextInactive,
-                selectedCategory === 'all' &&
-                  styles.categoryTextInactiveSelected,
+                styles.categoryText,
+                selectedCategory === 'all' && styles.categoryTextActive,
               ]}
             >
               全部
@@ -647,306 +356,220 @@ const HomeScreen = ({ navigation }) => {
           </TouchableOpacity>
 
           <TouchableOpacity
-            onPress={() => setSelectedCategory('employee')}
+            onPress={() => {
+              console.log('📋 [首頁] 點擊計劃標籤');
+              if (selectedCategory === 'plan') {
+                setShowPlanDetails(true);
+              } else {
+                setSelectedCategory('plan');
+              }
+            }}
             activeOpacity={0.8}
           >
-            {selectedCategory === 'employee' ? (
+            {selectedCategory === 'plan' ? (
               <LinearGradient
                 colors={['#166CB5', '#31C6FE']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
-                style={styles.categoryButtonActive}
+                style={styles.categoryButtonGradient}
               >
-                <Text style={styles.categoryTextActive}>情緒抗壓力計劃</Text>
+                <Text style={styles.categoryTextGradient}>情緒抗壓力計劃</Text>
               </LinearGradient>
             ) : (
-              <View style={styles.categoryButtonInactive}>
-                <Text style={styles.categoryTextInactive}>情緒抗壓力計劃</Text>
+              <View style={styles.categoryButton}>
+                <Text style={styles.categoryText}>情緒抗壓力計劃</Text>
               </View>
             )}
           </TouchableOpacity>
         </View>
 
-        {/* Practice Module Title */}
-        {selectedCategory === 'employee' && (
-          <View style={styles.practiceModuleTitleContainer}>
-            <Text style={styles.practiceModuleTitle}>情緒抗壓力計劃</Text>
-            <Text style={styles.practiceModuleSubtitle}>
-              今天也是心理韌性訓練的好日子！
-            </Text>
+        {/* 計劃標題 & 進度 */}
+        <View style={styles.planHeader}>
+          <TouchableOpacity
+            style={styles.planInfo}
+            onPress={() => {
+              console.log('📋 [首頁] 點擊查看詳情');
+              setShowPlanDetails(true);
+            }}
+            activeOpacity={0.8}
+          >
+            <View style={styles.planTitleRow}>
+              <Text style={styles.planTitle}>情緒抗壓力計劃</Text>
+              <View style={styles.infoButton}>
+                <Info color="#166CB5" size={12} />
+                <Text style={styles.infoText}>點我看詳情</Text>
+              </View>
+            </View>
+            <Text style={styles.planSubtitle}>今天也是心理韌性訓練的好日子！</Text>
+          </TouchableOpacity>
+
+          <View style={styles.progressInfo}>
+            <Text style={styles.progressNumber}>{progressPercentage}%</Text>
+            <Text style={styles.progressLabel}>完成度</Text>
           </View>
-        )}
-
-        {/* Practice Cards */}
-        <View style={styles.practiceCardsGrid}>
-          <TouchableOpacity
-            onPress={() => setSelectedPractice('breathing')}
-            style={styles.practiceCardContainer}
-            activeOpacity={0.8}
-          >
-            {selectedPractice === 'breathing' ? (
-              <LinearGradient
-                colors={['#31C6FE', '#166CB5']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.practiceCardSelected}
-              >
-                <View style={styles.practiceIconCircleSelected}>
-                  <Wind color="#FFFFFF" size={16} />
-                </View>
-                <Text style={styles.practiceNameSelected}>呼吸練習</Text>
-                <Text style={styles.practiceSubtitleSelected}>3 分鐘平靜</Text>
-              </LinearGradient>
-            ) : (
-              <View style={styles.practiceCard}>
-                <View style={styles.practiceIconCircle}>
-                  <Wind color="#166CB5" size={16} />
-                </View>
-                <Text style={styles.practiceName}>呼吸練習</Text>
-                <Text style={styles.practiceSubtitle}>3 分鐘平靜</Text>
-              </View>
-            )}
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            onPress={() => setSelectedPractice('goodthings')}
-            style={styles.practiceCardContainer}
-            activeOpacity={0.8}
-          >
-            {selectedPractice === 'goodthings' ? (
-              <LinearGradient
-                colors={['#FFBC42', '#FF8C42']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.practiceCardSelected}
-              >
-                <View style={styles.practiceIconCircleSelected}>
-                  <PenLine color="#FFFFFF" size={16} />
-                </View>
-                <Text style={styles.practiceNameSelected}>好事書寫</Text>
-                <Text style={styles.practiceSubtitleSelected}>紀錄小確幸</Text>
-              </LinearGradient>
-            ) : (
-              <View style={styles.practiceCard}>
-                <View
-                  style={[
-                    styles.practiceIconCircle,
-                    { backgroundColor: '#FFF7ED' },
-                  ]}
-                >
-                  <PenLine color="#FF8C42" size={16} />
-                </View>
-                <Text style={styles.practiceName}>好事書寫</Text>
-                <Text style={styles.practiceSubtitle}>紀錄小確幸</Text>
-              </View>
-            )}
-          </TouchableOpacity>
         </View>
 
-        {/* Dynamic Practice Detail Card */}
-        {selectedPractice === 'breathing' && (
-          <View style={styles.practiceDetailCard}>
-            <View style={styles.practiceDetailHeader}>
-              <View>
-                <Text style={styles.practiceDetailTitle}>呼吸練習</Text>
-                <View style={styles.practiceDetailMeta}>
-                  <Clock color="#6B7280" size={14} strokeWidth={2} />
-                  <Text style={styles.practiceDetailMetaText}> 5 分鐘</Text>
-                </View>
-              </View>
-              <LinearGradient
-                colors={['#166CB5', '#31C6FE']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.monthlyBadge}
-              >
-                <Text style={styles.monthlyNumber}>{monthlyTotal}</Text>
-                <Text style={styles.monthlyText}>天</Text>
-                <Text style={styles.monthlyLabel}>月累計</Text>
-              </LinearGradient>
-            </View>
-
-            <TouchableOpacity
-              onPress={navigateToBreathing}
-              style={styles.startButtonContainer}
-              activeOpacity={0.9}
-            >
-              <LinearGradient
-                colors={['#166CB5', '#31C6FE']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.startButton}
-              >
-                <Sparkles color="#FFFFFF" size={20} />
-                <Text style={styles.startButtonText}>開始今日練習</Text>
-              </LinearGradient>
-            </TouchableOpacity>
-
-            <Text style={styles.practiceDescription}>
-              透過呼吸覺察練習,培養內心的平靜與專注力。每天只需 5
-              分鐘,讓身心回到當下。
-            </Text>
-
-            <View style={styles.weeklyProgressContainer}>
-              <View style={styles.weeklyProgressHeader}>
-                <Text style={styles.weeklyProgressTitle}>本週進度</Text>
-                <Text style={styles.weeklyProgressCount}>
-                  {checkInCount}/7 次
-                </Text>
-              </View>
-
-              <View style={styles.weeklyDaysRow}>
-                {['日', '一', '二', '三', '四', '五', '六'].map(
-                  (day, index) => (
-                    <View key={index} style={styles.dayColumn}>
-                      <View
-                        style={[
-                          styles.dayCircle,
-                          weeklyCheckIns[index] && styles.dayCircleCompleted,
-                        ]}
-                      >
-                        {weeklyCheckIns[index] ? (
-                          <Check
-                            color="#FFFFFF"
-                            size={18}
-                            strokeWidth={3}
-                          />
-                        ) : (
-                          <View style={styles.dayCircleDot} />
-                        )}
-                      </View>
-                      <Text
-                        style={[
-                          styles.dayText,
-                          weeklyCheckIns[index] &&
-                            styles.dayTextCompleted,
-                        ]}
-                      >
-                        {day}
-                      </Text>
-                    </View>
-                  )
-                )}
-              </View>
-            </View>
-
-            <View style={styles.motivationCard}>
-              <Text style={styles.motivationText}>
-                🌟 持續練習,讓心靈更強韌！每週至少完成一次練習。
-              </Text>
-            </View>
-          </View>
-        )}
-
-        {selectedPractice === 'goodthings' && (
-          <View style={styles.practiceDetailCard}>
-            <View style={styles.practiceDetailHeader}>
-              <View>
-                <Text style={styles.practiceDetailTitle}>好事書寫</Text>
-                <View style={styles.practiceDetailMeta}>
-                  <Clock color="#6B7280" size={14} strokeWidth={2} />
-                  <Text style={styles.practiceDetailMetaText}> 10 分鐘</Text>
-                </View>
-              </View>
-              <LinearGradient
-                colors={['#FFBC42', '#FF8C42']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.monthlyBadge}
-              >
-                <Text style={styles.monthlyNumber}>{monthlyTotal}</Text>
-                <Text style={styles.monthlyText}>天</Text>
-                <Text style={styles.monthlyLabel}>月累計</Text>
-              </LinearGradient>
-            </View>
-
-            <TouchableOpacity
-              onPress={navigateToGoodThings}
-              style={styles.startButtonContainer}
-              activeOpacity={0.9}
-            >
-              <LinearGradient
-                colors={['#FFBC42', '#FF8C42']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.startButton}
-              >
-                <Sparkles color="#FFFFFF" size={20} />
-                <Text style={styles.startButtonText}>開始今日練習</Text>
-              </LinearGradient>
-            </TouchableOpacity>
-
-            <Text style={styles.practiceDescription}>
-              記住做不好的事情是大腦的原廠設定,用好事書寫改變負向對話的神經迴路。
-            </Text>
-
-            <View style={styles.weeklyProgressContainer}>
-              <View style={styles.weeklyProgressHeader}>
-                <Text style={styles.weeklyProgressTitle}>本週進度</Text>
-                <Text style={styles.weeklyProgressCount}>
-                  {checkInCount}/7 次
-                </Text>
-              </View>
-
-              <View style={styles.weeklyDaysRow}>
-                {['日', '一', '二', '三', '四', '五', '六'].map(
-                  (day, index) => (
-                    <View key={index} style={styles.dayColumn}>
-                      <LinearGradient
-                        colors={
-                          weeklyCheckIns[index]
-                            ? ['#FFBC42', '#FF8C42']
-                            : ['#F3F4F6', '#F3F4F6']
-                        }
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 1 }}
-                        style={styles.dayCircle}
-                      >
-                        {weeklyCheckIns[index] ? (
-                          <Check
-                            color="#FFFFFF"
-                            size={18}
-                            strokeWidth={3}
-                          />
-                        ) : (
-                          <View style={styles.dayCircleDot} />
-                        )}
-                      </LinearGradient>
-                      <Text
-                        style={[
-                          styles.dayText,
-                          weeklyCheckIns[index] && {
-                            color: '#FF8C42',
-                            fontWeight: '600',
-                          },
-                        ]}
-                      >
-                        {day}
-                      </Text>
-                    </View>
-                  )
-                )}
-              </View>
-            </View>
-
+        {/* 進度條 */}
+        <View style={styles.progressBarContainer}>
+          <View style={styles.progressBarBg}>
             <LinearGradient
-              colors={['#FFF7ED', '#FFEDD5']}
+              colors={['#166CB5', '#31C6FE']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
-              style={styles.motivationCard}
-            >
-              <Text style={styles.motivationText}>
-                ✨ 每天記錄好事,累積正向心理資本！
-              </Text>
-            </LinearGradient>
+              style={[styles.progressBarFill, { width: `${progressPercentage}%` }]}
+            />
           </View>
-        )}
+        </View>
 
+        {/* 練習網格 */}
+        <View style={styles.practiceGrid}>
+          {practiceModules.map((module, index) => {
+            const Icon = module.icon;
+            const isBlue = module.color === 'blue';
+            const isCompleted = module.current >= module.target;
+
+            return (
+              <TouchableOpacity
+                key={module.id}
+                onPress={module.action}
+                activeOpacity={0.8}
+                style={styles.practiceCardContainer}
+              >
+                {isBlue ? (
+                  <LinearGradient
+                    colors={module.gradientColors}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.practiceCard}
+                  >
+                    {/* 頂部 */}
+                    <View style={styles.practiceCardTop}>
+                      <View style={styles.practiceIconBlue}>
+                        <Icon color="#FFFFFF" size={20} />
+                      </View>
+                      <View style={styles.practiceProgressBlue}>
+                        <Text style={styles.practiceProgressTextBlue}>
+                          {module.current}/{module.target}
+                        </Text>
+                      </View>
+                    </View>
+
+                    {/* 底部 */}
+                    <View style={styles.practiceCardBottom}>
+                      <Text style={styles.practiceTitleBlue}>{module.title}</Text>
+                      <Text style={styles.practiceSubtitleBlue}>
+                        {isCompleted ? '已完成目標' : '點擊開始練習'}
+                      </Text>
+                    </View>
+                  </LinearGradient>
+                ) : (
+                  <View style={styles.practiceCardWhite}>
+                    {/* 頂部 */}
+                    <View style={styles.practiceCardTop}>
+                      <View
+                        style={[
+                          styles.practiceIcon,
+                          { backgroundColor: module.bgColor },
+                        ]}
+                      >
+                        <Icon color={module.iconColor} size={20} />
+                      </View>
+                      <View style={styles.practiceProgress}>
+                        <Text style={styles.practiceProgressText}>
+                          {module.current}/{module.target}
+                        </Text>
+                      </View>
+                    </View>
+
+                    {/* 底部 */}
+                    <View style={styles.practiceCardBottom}>
+                      <Text style={styles.practiceTitle}>{module.title}</Text>
+                      <Text style={styles.practiceSubtitle}>
+                        {isCompleted ? '已完成目標' : '點擊開始練習'}
+                      </Text>
+                    </View>
+                  </View>
+                )}
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        {/* ⭐ 心情溫度計卡片 - 完整版 */}
+        <Pressable
+          onPress={() => handleNotImplemented('心情溫度計')}
+          style={({ pressed }) => [
+            styles.thermometerCard,
+            pressed && styles.thermometerCardPressed,
+          ]}
+        >
+          {({ pressed }) => (
+            <>
+              {/* ⭐ 右側漸層光暈 */}
+              <LinearGradient
+                colors={['rgba(254, 243, 199, 0)', 'rgba(254, 243, 199, 0.8)']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.thermometerGlow}
+                pointerEvents="none"
+              />
+
+              {/* 圖標容器 */}
+              <View style={styles.thermometerIconContainer}>
+                <View style={styles.thermometerIcon}>
+                  <ThermometerSun color="#F59E0B" size={24} />
+                </View>
+              </View>
+
+              {/* 文字信息 */}
+              <View style={styles.thermometerInfo}>
+                <Text style={styles.thermometerTitle}>心情溫度計</Text>
+                <Text style={styles.thermometerProgress}>
+                  {goals.thermometer.current}/{goals.thermometer.target}
+                </Text>
+              </View>
+
+              {/* ⭐ 箭頭容器（動態變色） */}
+              <View
+                style={[
+                  styles.thermometerArrowContainer,
+                  pressed && styles.thermometerArrowContainerPressed,
+                ]}
+              >
+                <ChevronRight 
+                  color={pressed ? '#FFFFFF' : '#9CA3AF'} 
+                  size={20} 
+                />
+              </View>
+            </>
+          )}
+        </Pressable>
+
+        {/* 底部間距 */}
         <View style={styles.bottomPadding} />
       </ScrollView>
 
       <BottomNavigation navigation={navigation} currentRoute="Home" />
-      {/* ⭐ 新增：鎖定遮罩 */}
+
+      {/* 🔧 計劃詳情彈窗 */}
+      {showPlanDetails && (
+        <PlanDetailsModal
+          isOpen={showPlanDetails}
+          onClose={() => {
+            console.log('📋 [首頁] 關閉 Modal');
+            setShowPlanDetails(false);
+          }}
+          onStartPlan={() => {
+            console.log('📋 [首頁] Modal 內點擊開始計劃');
+            setShowPlanDetails(false);
+            setTimeout(() => {
+              navigateToBreathing();
+            }, 100);
+          }}
+        />
+      )}
+
+      {/* LOCK 覆蓋層 */}
       {!isLoggedIn && (
         <LockedOverlay 
           navigation={navigation} 
@@ -978,7 +601,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
-  // ⭐ 新增：載入畫面樣式
+  // 載入畫面
   loadingContainer: {
     flex: 1,
     backgroundColor: '#FFFFFF',
@@ -995,512 +618,330 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
 
-  greetingSection: {
+  // 主標題
+  titleSection: {
     paddingHorizontal: 20,
     paddingTop: 24,
     marginBottom: 24,
-    flexDirection: 'row',
-    alignItems: 'center',
   },
-  greetingText: {
-    fontSize: 30,
-    color: '#111827',
-    marginRight: 8,
-  },
-  nameTextMask: {
-    fontSize: 30,
+  mainTitle: {
+    fontSize: 24,
     fontWeight: '700',
-    backgroundColor: 'transparent',
-  },
-  nameGradientMask: {
-    height: 40,
+    color: '#111827',
   },
 
-  consecutiveCard: {
-    marginHorizontal: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
-    borderRadius: 24,
+  // 分類標籤
+  categorySection: {
+    flexDirection: 'row',
     paddingHorizontal: 20,
-    paddingVertical: 16,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.4)',
+    marginBottom: 24,
+    gap: 12,
+  },
+  categoryButton: {
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    backgroundColor: '#F0F4F8',
+    borderRadius: 100,
+  },
+  categoryButtonActive: {
+    backgroundColor: '#FFFFFF',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 5,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  consecutiveTextRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  categoryButtonGradient: {
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    borderRadius: 100,
+    shadowColor: '#166CB5',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  consecutiveText: {
-    fontSize: 16,
+  categoryText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#6B7280',
+  },
+  categoryTextActive: {
     color: '#111827',
-  },
-  consecutiveNumber: {
-    fontSize: 16,
-    color: '#111827',
-    marginHorizontal: 4,
     fontWeight: '600',
   },
-  flameCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: 'rgba(255, 138, 76, 0.4)',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 1,
-    shadowRadius: 10,
-    elevation: 8,
+  categoryTextGradient: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#FFFFFF',
   },
 
-  totalDaysCard: {
-    marginHorizontal: 20,
-    borderRadius: 24,
-    marginBottom: 24,
-    shadowColor: '#166CB5',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-    elevation: 10,
-    overflow: 'hidden',
-  },
-  totalDaysGradient: {
-    paddingHorizontal: 24,
-    paddingVertical: 14,
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-  },
-  totalDaysContent: {
+  // 計劃標題 & 進度
+  planHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
+    alignItems: 'flex-end',
+    paddingHorizontal: 20,
+    marginBottom: 8,
   },
-  totalDaysLeft: {
+  planInfo: {
     flex: 1,
+    marginRight: 16,
   },
-  totalDaysLabel: {
-    fontSize: 12,
-    color: 'rgba(207, 232, 250, 0.9)',
-    marginBottom: 6,
-    fontWeight: '500',
-    letterSpacing: 0.5,
+  planTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+    gap: 8,
   },
-  totalDaysTitle: {
-    fontSize: 22,
-    color: '#FFFFFF',
+  planTitle: {
+    fontSize: 18,
     fontWeight: '700',
+    color: '#333333',
   },
-  totalDaysRight: {
+  infoButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 100,
+    gap: 4,
+  },
+  infoText: {
+    fontSize: 10,
+    fontWeight: '500',
+    color: '#166CB5',
+  },
+  planSubtitle: {
+    fontSize: 12,
+    color: '#6B7280',
+  },
+  progressInfo: {
     alignItems: 'flex-end',
   },
-  totalDaysNumberRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-  },
-  totalDaysPrefix: {
-    fontSize: 19,
-    color: 'rgba(207, 232, 250, 1)',
-    fontWeight: '500',
-    marginRight: 4,
-  },
-  totalDaysNumber: {
-    fontSize: 67,
-    color: '#FFFFFF',
-    fontWeight: '900',
-    lineHeight: 74,
-  },
-  totalDaysSuffix: {
-    fontSize: 22,
-    color: '#FFFFFF',
+  progressNumber: {
+    fontSize: 24,
     fontWeight: '700',
-    marginLeft: 4,
-  },
-  progressSection: {
-    marginTop: 1,
-  },
-  progressLabels: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 6,
-    paddingHorizontal: 4,
+    color: '#2CB3F0',
   },
   progressLabel: {
     fontSize: 12,
-    color: 'rgba(207, 232, 250, 1)',
+    color: '#9CA3AF',
+  },
+
+  // 進度條
+  progressBarContainer: {
+    paddingHorizontal: 20,
+    marginBottom: 24,
   },
   progressBarBg: {
     height: 8,
-    backgroundColor: 'rgba(0, 0, 0, 0.2)',
+    backgroundColor: '#F3F4F6',
     borderRadius: 4,
     overflow: 'hidden',
   },
   progressBarFill: {
     height: '100%',
-    backgroundColor: '#FFFFFF',
     borderRadius: 4,
-    shadowColor: '#FFFFFF',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.7,
-    shadowRadius: 10,
   },
 
-  moodQuestion: {
-    fontSize: 16,
-    color: '#6B7280',
-    paddingHorizontal: 20,
-    marginBottom: 16,
-  },
-
-  emotionCardsRow: {
+  // 練習網格
+  practiceGrid: {
     flexDirection: 'row',
-    paddingHorizontal: 20,
-    justifyContent: 'space-between',
-    marginBottom: 32,
-  },
-  moodButtonContainer: {
-    flex: 1,
-    alignItems: 'center',
-    marginHorizontal: 6,
-  },
-  moodButton: {
-    width: '100%',
-    aspectRatio: 1 / 1.25,
-    borderRadius: 32,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 12,
-    overflow: 'hidden',
-    backgroundColor: '#F7FAFC',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  moodIcon: {
-    fontSize: 28,
-    zIndex: 10,
-  },
-  moodText: {
-    fontSize: 12,
-    fontWeight: '700',
-    textAlign: 'center',
-  },
-
-  sectionTitleContainer: {
-    paddingHorizontal: 20,
+    flexWrap: 'wrap',
+    paddingHorizontal: 14,
     marginBottom: 16,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    color: '#111827',
-    marginBottom: 4,
-  },
-  sectionSubtitle: {
-    fontSize: 14,
-    color: '#6B7280',
-  },
-
-  categoryFilters: {
-    flexDirection: 'row',
-    paddingHorizontal: 20,
-    marginBottom: 24,
-  },
-  categoryButtonInactive: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    backgroundColor: '#E9F4FB',
-    borderRadius: 100,
-    marginRight: 8,
-  },
-  categoryButtonInactiveSelected: {
-    backgroundColor: '#FFFFFF',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  categoryTextInactive: {
-    fontSize: 14,
-    color: '#6B7280',
-    fontWeight: '500',
-  },
-  categoryTextInactiveSelected: {
-    color: '#111827',
-    fontWeight: '600',
-  },
-  categoryButtonActive: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 100,
-    shadowColor: '#166CB5',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  categoryTextActive: {
-    fontSize: 14,
-    color: '#FFFFFF',
-    fontWeight: '500',
-  },
-
-  practiceModuleTitleContainer: {
-    paddingHorizontal: 20,
-    marginBottom: 16,
-  },
-  practiceModuleTitle: {
-    fontSize: 18,
-    color: '#111827',
-    marginBottom: 4,
-  },
-  practiceModuleSubtitle: {
-    fontSize: 14,
-    color: '#6B7280',
-  },
-
-  practiceCardsGrid: {
-    flexDirection: 'row',
-    paddingHorizontal: 20,
-    marginBottom: 24,
-    justifyContent: 'flex-start',
   },
   practiceCardContainer: {
-    width: 110,
-    marginHorizontal: 4,
+    width: '50%',
+    padding: 6,
   },
   practiceCard: {
+    aspectRatio: 1.4 / 1,
+    borderRadius: 24,
+    padding: 16,
+    justifyContent: 'space-between',
+    shadowColor: '#166CB5',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  practiceCardWhite: {
+    aspectRatio: 1.4 / 1,
+    borderRadius: 24,
+    padding: 16,
+    justifyContent: 'space-between',
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 8,
-    height: 140,
-    justifyContent: 'center',
-    alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#E0F2FE',
+    borderColor: '#F3F4F6',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  practiceCardSelected: {
-    borderRadius: 12,
-    padding: 8,
-    height: 140,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#166CB5',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
-    elevation: 8,
-  },
-  practiceIconCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 9,
-    backgroundColor: '#EFF6FF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 6,
-  },
-  practiceIconCircleSelected: {
-    width: 36,
-    height: 36,
-    borderRadius: 9,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 6,
-  },
-  practiceName: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#111827',
-    textAlign: 'center',
-    marginBottom: 3,
-  },
-  practiceNameSelected: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    textAlign: 'center',
-    marginBottom: 3,
-  },
-  practiceSubtitle: {
-    fontSize: 9,
-    color: '#6B7280',
-    textAlign: 'center',
-  },
-  practiceSubtitleSelected: {
-    fontSize: 9,
-    color: 'rgba(255, 255, 255, 0.8)',
-    textAlign: 'center',
-  },
-
-  practiceDetailCard: {
-    marginHorizontal: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
-    borderRadius: 24,
-    padding: 24,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.4)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 5,
-    marginBottom: 24,
-  },
-  practiceDetailHeader: {
+  practiceCardTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 16,
   },
-  practiceDetailTitle: {
-    fontSize: 20,
-    color: '#111827',
-    marginBottom: 4,
-  },
-  practiceDetailMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  practiceDetailMetaText: {
-    fontSize: 14,
-    color: '#6B7280',
-  },
-  monthlyBadge: {
-    borderRadius: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  monthlyNumber: {
-    fontSize: 24,
-    color: '#FFFFFF',
-    fontWeight: '700',
-  },
-  monthlyText: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.9)',
-  },
-  monthlyLabel: {
-    fontSize: 10,
-    color: 'rgba(255, 255, 255, 0.8)',
-    marginTop: 2,
-  },
-  startButtonContainer: {
-    marginBottom: 16,
-    borderRadius: 100,
-    overflow: 'hidden',
-  },
-  startButton: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 14,
-    borderRadius: 100,
-  },
-  startButtonText: {
-    fontSize: 16,
-    color: '#FFFFFF',
-    fontWeight: '600',
-    marginLeft: 8,
-  },
-  practiceDescription: {
-    fontSize: 14,
-    color: '#6B7280',
-    lineHeight: 22,
-    marginBottom: 20,
+  practiceCardBottom: {
+    justifyContent: 'flex-end',
   },
 
-  weeklyProgressContainer: {
-    marginBottom: 20,
-  },
-  weeklyProgressHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  weeklyProgressTitle: {
-    fontSize: 16,
-    color: '#111827',
-  },
-  weeklyProgressCount: {
-    fontSize: 14,
-    color: '#6B7280',
-  },
-  weeklyDaysRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  dayColumn: {
-    alignItems: 'center',
-  },
-  dayCircle: {
-    width: 36,
-    height: 36,
+  // 練習卡片 - 藍色版本
+  practiceIconBlue: {
+    width: 40,
+    height: 40,
     borderRadius: 12,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 6,
   },
-  dayCircleCompleted: {
-    backgroundColor: '#166CB5',
-    shadowColor: '#166CB5',
+  practiceProgressBlue: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 100,
+  },
+  practiceProgressTextBlue: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#FFFFFF',
+  },
+  practiceTitleBlue: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    marginBottom: 2,
+  },
+  practiceSubtitleBlue: {
+    fontSize: 10,
+    color: 'rgba(191, 219, 254, 0.9)',
+  },
+
+  // 練習卡片 - 白色版本
+  practiceIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  practiceProgress: {
+    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 100,
+  },
+  practiceProgressText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#6B7280',
+  },
+  practiceTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 2,
+  },
+  practiceSubtitle: {
+    fontSize: 10,
+    color: '#9CA3AF',
+  },
+
+  // ==========================================
+  // ⭐ 心情溫度計卡片樣式
+  // ==========================================
+  thermometerCard: {
+    marginHorizontal: 20,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#FEF3C7',
+    borderRadius: 24,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#F59E0B',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.1,
     shadowRadius: 4,
-    elevation: 3,
+    elevation: 2,
+    position: 'relative',
+    overflow: 'hidden',
   },
-  dayCircleDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    borderWidth: 2,
-    borderColor: '#9CA3AF',
+
+  // ⭐ 卡片按壓效果
+  thermometerCardPressed: {
+    transform: [{ scale: 0.98 }],
+    shadowOpacity: 0.15,
   },
-  dayText: {
+
+  // ⭐ 右側漸層光暈
+  thermometerGlow: {
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    bottom: 0,
+    width: 80,
+    height: '200%',
+  },
+
+  // 圖標容器
+  thermometerIconContainer: {
+    marginRight: 16,
+    zIndex: 1,
+  },
+
+  // 圖標背景
+  thermometerIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    backgroundColor: '#FEF3C7',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  // 文字信息
+  thermometerInfo: {
+    flex: 1,
+    zIndex: 1,
+  },
+
+  // 標題
+  thermometerTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#333333',
+    marginBottom: 2,
+  },
+
+  // 進度文字
+  thermometerProgress: {
     fontSize: 12,
     color: '#9CA3AF',
   },
-  dayTextCompleted: {
-    color: '#166CB5',
-    fontWeight: '600',
+
+  // ⭐ 箭頭容器（未按壓：灰色）
+  thermometerArrowContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#F9FAFB',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1,
   },
 
-  motivationCard: {
-    backgroundColor: '#E8F4F9',
-    borderRadius: 12,
-    padding: 12,
-  },
-  motivationText: {
-    fontSize: 14,
-    color: '#374151',
-    textAlign: 'center',
-    lineHeight: 20,
+  // ⭐ 箭頭容器（按壓時：黃色）
+  thermometerArrowContainerPressed: {
+    backgroundColor: '#FBBF24',
   },
 
+  // 底部間距
   bottomPadding: {
     height: 100,
   },

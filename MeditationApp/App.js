@@ -1,7 +1,7 @@
 // ==========================================
 // 檔案名稱: App.js 
-// 應用主入口 - 只負責導航配置
-// 版本: V2.0 - 新增刪除帳號頁面
+// 應用主入口 - 移除所有動畫配置
+// 版本: V2.2 - 簡化導航，移除動畫干擾
 // ==========================================
 
 import React from 'react';
@@ -49,12 +49,12 @@ import TermsOfServiceScreen from './src/screens/account/settings/utils/TermsOfSe
 import HelpCenter from './src/screens/account/settings/utils/HelpCenter';
 import PrivacyPolicy from './src/screens/account/settings/utils/PrivacyPolicy';
 import AboutUs from './src/screens/account/settings/utils/AboutUs';
-import DeleteAccountScreen from './src/screens/account/settings/utils/DeleteAccountScreen'; // 🆕 刪除帳號頁面
+import DeleteAccountScreen from './src/screens/account/settings/utils/DeleteAccountScreen';
 
 const Stack = createNativeStackNavigator();
 
 // ==========================================
-// 主導航配置
+// 主導航配置 - 移除所有動畫
 // ==========================================
 const App = () => {
   return (
@@ -62,6 +62,8 @@ const App = () => {
       <Stack.Navigator
         screenOptions={{
           headerShown: false,
+          animation: 'none', // ⭐ 移除所有動畫
+          gestureEnabled: false, // ⭐ 停用手勢（避免衝突）
         }}
       >
         {/* 主頁面 */}
@@ -69,7 +71,6 @@ const App = () => {
         <Stack.Screen 
           name="EmotionalResiliencePlan" 
           component={EmotionalResiliencePlanScreen} 
-          options={{ headerShown: false }}
         />
         
         {/* 認證相關頁面 */}
@@ -98,65 +99,27 @@ const App = () => {
         {/* 訓練計畫相關頁面 */}
         <Stack.Screen name="TrainingPlanDetail" component={TrainingPlanDetailScreen} />
         <Stack.Screen name="TrainingPlanProgress" component={TrainingPlanProgressScreen} />
-        <Stack.Screen name="PracticeNavigator" component={PracticeNavigator} />
+        <Stack.Screen 
+          name="PracticeNavigator" 
+          component={PracticeNavigator}
+        />
 
         {/* 設定相關頁面 */}
         <Stack.Screen name="Settings" component={Settings} />
         <Stack.Screen name="Feedback" component={Feedback} />
         <Stack.Screen name="Favorites" component={Favorites} />
-        <Stack.Screen 
-          name="EnterpriseCode" 
-          component={EnterpriseCode}  
-          options={{ headerShown: false }}
-        />
-        <Stack.Screen 
-          name="EnterpriseCodeManagement" 
-          component={EnterpriseCodeManagement}  
-          options={{ headerShown: false }}
-        />
-        <Stack.Screen      
-          name="SelectGoals"      
-          component={SelectGoals}  
-          options={{ headerShown: false }}
-        />
+        <Stack.Screen name="EnterpriseCode" component={EnterpriseCode} />
+        <Stack.Screen name="EnterpriseCodeManagement" component={EnterpriseCodeManagement} />
+        <Stack.Screen name="SelectGoals" component={SelectGoals} />
 
         {/* 設定工具頁面 */}
-        <Stack.Screen 
-          name="ProfileEdit" 
-          component={ProfileEditScreen}
-          options={{ headerShown: false }}
-        />
-        <Stack.Screen 
-          name="PrivacySettings" 
-          component={PrivacySettingsScreen}
-          options={{ headerShown: false }}
-        />
-        <Stack.Screen 
-          name="TermsOfService" 
-          component={TermsOfServiceScreen}
-          options={{ headerShown: false }}
-        />
-        <Stack.Screen 
-          name="HelpCenter" 
-          component={HelpCenter}
-          options={{ headerShown: false }}
-        />
-        <Stack.Screen 
-          name="PrivacyPolicy" 
-          component={PrivacyPolicy}
-          options={{ headerShown: false }}
-        />
-        <Stack.Screen 
-          name="AboutUs" 
-          component={AboutUs}
-          options={{ headerShown: false }}
-        />
-        {/* 🆕 刪除帳號頁面 */}
-        <Stack.Screen 
-          name="DeleteAccount" 
-          component={DeleteAccountScreen}
-          options={{ headerShown: false }}
-        />
+        <Stack.Screen name="ProfileEdit" component={ProfileEditScreen} />
+        <Stack.Screen name="PrivacySettings" component={PrivacySettingsScreen} />
+        <Stack.Screen name="TermsOfService" component={TermsOfServiceScreen} />
+        <Stack.Screen name="HelpCenter" component={HelpCenter} />
+        <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicy} />
+        <Stack.Screen name="AboutUs" component={AboutUs} />
+        <Stack.Screen name="DeleteAccount" component={DeleteAccountScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

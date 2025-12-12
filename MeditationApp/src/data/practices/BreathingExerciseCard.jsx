@@ -36,7 +36,7 @@ import SatisfiedIcon from './components/SatisfiedIcon';
 // ⭐ 統一練習類型名稱
 const PRACTICE_TYPE = '呼吸穩定力練習';
 
-export default function BreathingExerciseCard({ onBack, navigation, route }) {
+export default function BreathingExerciseCard({ onBack, navigation, route, onHome }) {
   // 頁面狀態
   const [currentPage, setCurrentPage] = useState('welcome');
   
@@ -797,12 +797,33 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
   };
 
   // 處理查看日記
-  const handleViewJournal = () => {
+  const handleViewJournal = async () => {
+    console.log('📖 [呼吸練習] 準備查看日記並導航...');
+    
+    // ⭐ 立即導航，不等待 API
     if (navigation) {
+      console.log('✅ [呼吸練習] 使用 navigation.navigate');
       navigation.navigate('Daily');
+    } else if (onBack) {
+      console.log('✅ [呼吸練習] 使用 onBack');
+      onBack();
     } else {
-      handleHome();
+      console.error('❌ [呼吸練習] 無法導航');
+      return;
     }
+    
+    // 在背景完成 API 調用
+    setTimeout(async () => {
+      try {
+        if (practiceId) {
+          console.log('💾 [呼吸練習] 背景完成練習...');
+          await completePractice();
+          console.log('✅ [呼吸練習] 背景完成成功');
+        }
+      } catch (e) {
+        console.log('⚠️ [呼吸練習] 背景完成失敗:', e);
+      }
+    }, 0);
   };
 
   // 處理結束練習（從第五頁）
@@ -855,14 +876,29 @@ export default function BreathingExerciseCard({ onBack, navigation, route }) {
   };
 
   // 處理 Home
-  const handleHome = () => {
-    if (currentPage === 'practice') {
-      stopPractice();
+  const handleHome = async () => {
+    console.log('🏠 [呼吸練習] 準備返回首頁...');
+    
+    if (currentPage === 'practice' && sound.current) {
+      try {
+        await stopPractice();
+      } catch (e) {
+        console.log('停止音檔失敗:', e);
+      }
     }
-    setCurrentPage('welcome');
-    setSelectedExercise(null);
-    setSelectedState(null);
-    if (navigation) {
+    
+    try {
+      if (practiceId) {
+        await saveProgress();
+      }
+    } catch (e) {
+      console.log('回首頁前儲存進度失敗:', e);
+    }
+
+    // ✅ 使用 onHome
+    if (onHome) {
+      onHome();
+    } else if (navigation) {
       navigation.navigate('Home');
     }
   };

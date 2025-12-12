@@ -113,7 +113,7 @@ const ArrowIcon = ({ direction = 'right', color = '#31C6FE', size = 24 }) => {
   );
 };
 
-export default function GoodThingsJournalNew({ onBack, navigation, route }) {
+export default function GoodThingsJournalNew({ onBack, navigation, route, onHome }) {
   const [currentPage, setCurrentPage] = useState('welcome');
 
   // 表單數據
@@ -296,38 +296,44 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
 
   // 完成好事書寫練習，送到後端 completePractice
   const handleCompleteJournal = async () => {
-    try {
-      let totalSeconds = elapsedTime;
-
-      // 如果 elapsedTime 還是 0，用 startTime 算一次
-      if (!totalSeconds && startTime) {
-        totalSeconds = Math.floor((Date.now() - startTime) / 1000);
-      }
-      if (!totalSeconds) totalSeconds = 60; // 至少算一分鐘練習
-
-      if (practiceId) {
-        await ApiService.completePractice(practiceId, {
-          practice_type: '好事書寫練習',
-          duration: Math.max(1, Math.ceil(totalSeconds / 60)),
-          duration_seconds: totalSeconds,
-          formData, // 這裡整包丟給後端存 JSON
-        });
-
-        // 可以順便存最後一筆 progress
-        await saveProgress();
-      } else {
-        console.log('⚠️ 沒有 practiceId，僅在前端完成好事書寫:', formData);
-      }
-    } catch (err) {
-      console.log('完成好事書寫練習失敗:', err);
-    } finally {
-      // 完成後導回日記頁或 Home
-      if (navigation) {
-        navigation.navigate('Daily');
-      } else if (onBack) {
-        onBack();
-      }
+    console.log('📖 [好事書寫] 準備查看日記並導航...');
+    
+    // ⭐ 立即導航，不等待 API
+    if (navigation) {
+      console.log('✅ [好事書寫] 使用 navigation.navigate');
+      navigation.navigate('Daily');
+    } else if (onBack) {
+      console.log('✅ [好事書寫] 使用 onBack');
+      onBack();
+    } else {
+      console.error('❌ [好事書寫] 無法導航');
+      return;
     }
+    
+    // 在背景完成 API 調用
+    setTimeout(async () => {
+      try {
+        let totalSeconds = elapsedTime;
+        if (!totalSeconds && startTime) {
+          totalSeconds = Math.floor((Date.now() - startTime) / 1000);
+        }
+        if (!totalSeconds) totalSeconds = 60;
+
+        if (practiceId) {
+          console.log('💾 [好事書寫] 背景完成練習...');
+          await ApiService.completePractice(practiceId, {
+            practice_type: '好事書寫練習',
+            duration: Math.max(1, Math.ceil(totalSeconds / 60)),
+            duration_seconds: totalSeconds,
+            formData,
+          });
+          console.log('✅ [好事書寫] 背景完成成功');
+          await saveProgress();
+        }
+      } catch (err) {
+        console.log('⚠️ [好事書寫] 背景完成失敗:', err);
+      }
+    }, 0);
   };
 
   // 初始化練習（component mount）
@@ -480,6 +486,8 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
 
   // 處理 Home 按鈕（順便存一次進度）
   const handleHome = async () => {
+    console.log('🏠 [好事書寫] 準備返回首頁...');
+    
     try {
       if (practiceId) {
         await saveProgress();
@@ -488,8 +496,10 @@ export default function GoodThingsJournalNew({ onBack, navigation, route }) {
       console.log('回首頁前儲存好事書寫進度失敗:', e);
     }
 
-    setCurrentPage('welcome');
-    if (navigation) {
+    // ✅ 使用 onHome
+    if (onHome) {
+      onHome();
+    } else if (navigation) {
       navigation.navigate('Home');
     }
   };
