@@ -1,5 +1,5 @@
 // ==========================================
-// DailyScreen.js - 完全修正版本
+// DailyScreen.js - 完全按照要求設計
 // ==========================================
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -25,12 +25,15 @@ import {
   List,
   Grid3X3,
   Calendar as CalendarIcon,
-  BookOpen,
   X,
   Heart,
   Lightbulb,
   RefreshCw,
   Target,
+  Clock,
+  FileText,
+  Brain,
+  MessageCircle,
 } from 'lucide-react-native';
 import ApiService from '../../../api';
 import BottomNavigation from '../../navigation/BottomNavigation';
@@ -54,59 +57,50 @@ const moodColors = {
   溫暖: '#FFBC42',
 };
 
+const PLAN_CATEGORIES = {
+  all: '全部',
+  emotional: '情緒抗壓力',
+};
+
+const EMOTIONAL_PLAN_TYPES = ['呼吸', '好事', '思維', '感恩', '心情溫度計', '4-6', '屏息'];
+
 const DailyScreen = ({ navigation }) => {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [allPracticeData, setAllPracticeData] = useState([]);
   const [displayData, setDisplayData] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({
-    totalPractices: 0,
-    mentalMuscle: 0,
-  });
+  const [stats, setStats] = useState({ totalPractices: 0, totalDuration: 0 });
   const [viewMode, setViewMode] = useState('list');
-  const [showInfoCard, setShowInfoCard] = useState(null);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [hasEnterpriseCode, setHasEnterpriseCode] = useState(false);
-  const [emotionDiaryStats, setEmotionDiaryStats] = useState([]);
   const [detailModalVisible, setDetailModalVisible] = useState(false);
   const [selectedPractice, setSelectedPractice] = useState(null);
+  const [selectedPlan, setSelectedPlan] = useState('all');
   const hasLoadedData = useRef(false);
 
   useFocusEffect(
     React.useCallback(() => {
-      console.log('📱 [DailyScreen] 頁面獲得焦點');
       checkAccess();
-      if (!hasLoadedData.current) {
-        fetchAllData();
-      }
-      return () => {
-        console.log('📱 [DailyScreen] 頁面失去焦點');
-      };
+      if (!hasLoadedData.current) fetchAllData();
+      return () => {};
     }, [])
   );
 
   useEffect(() => {
     filterDataForCurrentMonth(allPracticeData);
-    fetchEmotionDiaryStats();
-  }, [currentMonth]);
+  }, [currentMonth, selectedPlan]);
 
   const checkAccess = async () => {
     try {
-      console.log('🔍 [DailyScreen] 開始檢查權限...');
       const loggedIn = await ApiService.isLoggedIn();
-      console.log('📋 [DailyScreen] 登入狀態:', loggedIn);
       setIsLoggedIn(loggedIn);
-
       if (loggedIn) {
         const profile = await ApiService.getUserProfile();
-        const hasCode = !!profile.user.enterprise_code;
-        console.log('📋 [DailyScreen] 企業引薦碼:', hasCode);
-        setHasEnterpriseCode(hasCode);
+        setHasEnterpriseCode(!!profile.user.enterprise_code);
       } else {
         setHasEnterpriseCode(false);
       }
     } catch (error) {
-      console.error('❌ [DailyScreen] 檢查權限失敗:', error);
       setIsLoggedIn(false);
       setHasEnterpriseCode(false);
     } finally {
@@ -123,69 +117,31 @@ const DailyScreen = ({ navigation }) => {
         hasLoadedData.current = true;
         filterDataForCurrentMonth(practiceResponse.practices);
       }
-      await fetchEmotionDiaryStats();
     } catch (error) {
-      console.error('❌ 獲取數據失敗:', error);
+      console.error('獲取數據失敗:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchEmotionDiaryStats = async () => {
-    try {
-      const year = currentMonth.getFullYear();
-      const month = currentMonth.getMonth() + 1;
-
-      if (typeof ApiService.getEmotionDiaryMonthly !== 'function') {
-        setEmotionDiaryStats([]);
-        return;
-      }
-
-      const response = await ApiService.getEmotionDiaryMonthly(year, month);
-
-      if (!response || response.error) {
-        setEmotionDiaryStats([]);
-        return;
-      }
-
-      if (response.success && response.diaries && response.diaries.length > 0) {
-        const emotionCount = {};
-        response.diaries.forEach((diary) => {
-          const emotion = diary.emotion || diary.mood;
-          if (emotion) {
-            emotionCount[emotion] = (emotionCount[emotion] || 0) + 1;
-          }
-        });
-
-        const topEmotions = Object.entries(emotionCount)
-          .sort((a, b) => b[1] - a[1])
-          .slice(0, 3)
-          .map(([emotion, count]) => ({ emotion, count }));
-
-        setEmotionDiaryStats(topEmotions);
-      } else {
-        setEmotionDiaryStats([]);
-      }
-    } catch (error) {
-      setEmotionDiaryStats([]);
-    }
+  const isEmotionalPlanPractice = (practiceType) => {
+    if (!practiceType) return false;
+    return EMOTIONAL_PLAN_TYPES.some(type => practiceType.includes(type));
   };
 
   const filterDataForCurrentMonth = (practices) => {
     const year = currentMonth.getFullYear();
     const month = currentMonth.getMonth();
 
-    const filtered = practices.filter((practice) => {
+    let filtered = practices.filter((practice) => {
       const practiceDate = new Date(practice.completed_at);
-      const isCompleted =
-        String(practice.completed) === '1' || practice.completed === 1;
-
-      return (
-        isCompleted &&
-        practiceDate.getFullYear() === year &&
-        practiceDate.getMonth() === month
-      );
+      const isCompleted = String(practice.completed) === '1' || practice.completed === 1;
+      return isCompleted && practiceDate.getFullYear() === year && practiceDate.getMonth() === month;
     });
+
+    if (selectedPlan === 'emotional') {
+      filtered = filtered.filter(p => isEmotionalPlanPractice(p.practice_type));
+    }
 
     setDisplayData(filtered);
     calculateStats(filtered);
@@ -193,26 +149,11 @@ const DailyScreen = ({ navigation }) => {
 
   const calculateStats = (practices) => {
     const totalPractices = practices.length;
-    let totalRelaxScore = 0;
-    let relaxCount = 0;
-
+    let totalDuration = 0;
     practices.forEach((p) => {
-      if (p.relax_level !== null && p.relax_level !== undefined) {
-        totalRelaxScore += parseFloat(p.relax_level);
-        relaxCount++;
-      } else if (p.positive_level !== null && p.positive_level !== undefined) {
-        totalRelaxScore += parseFloat(p.positive_level);
-        relaxCount++;
-      }
+      if (p.duration_seconds) totalDuration += parseInt(p.duration_seconds) || 0;
     });
-
-    const mentalMuscle =
-      relaxCount > 0 ? Math.round(totalRelaxScore / relaxCount) : 0;
-
-    setStats({
-      totalPractices,
-      mentalMuscle,
-    });
+    setStats({ totalPractices, totalDuration });
   };
 
   const formatDate = (dateStr) => {
@@ -225,35 +166,28 @@ const DailyScreen = ({ navigation }) => {
   const formatDuration = (seconds) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
-
-    if (mins > 0 && secs > 0) {
-      return `${mins}分${secs}秒`;
-    } else if (mins > 0) {
-      return `${mins}分鐘`;
-    } else {
-      return `${secs}秒`;
-    }
+    if (mins > 0 && secs > 0) return `${mins}分${secs}秒`;
+    if (mins > 0) return `${mins}分鐘`;
+    return `${secs}秒`;
   };
 
-  const getMoodColor = (mood) => {
-    if (!mood) return '#9CA3AF';
-    return moodColors[mood] || '#9CA3AF';
+  const formatStatsDuration = (seconds) => {
+    const hours = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    if (hours > 0) return `${hours}時${mins}分`;
+    if (mins > 0) return `${mins}分${secs}秒`;
+    return `${secs}秒`;
   };
+
+  const getMoodColor = (mood) => moodColors[mood] || '#9CA3AF';
 
   const handlePrevMonth = () => {
-    const newMonth = new Date(
-      currentMonth.getFullYear(),
-      currentMonth.getMonth() - 1
-    );
-    setCurrentMonth(newMonth);
+    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1));
   };
 
   const handleNextMonth = () => {
-    const newMonth = new Date(
-      currentMonth.getFullYear(),
-      currentMonth.getMonth() + 1
-    );
-    setCurrentMonth(newMonth);
+    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1));
   };
 
   const generateCalendarDays = () => {
@@ -263,29 +197,20 @@ const DailyScreen = ({ navigation }) => {
     const lastDay = new Date(year, month + 1, 0);
     const daysInMonth = lastDay.getDate();
     const startingDayOfWeek = firstDay.getDay();
-
     const days = [];
-    for (let i = 0; i < startingDayOfWeek; i++) {
-      days.push(null);
-    }
-    for (let i = 1; i <= daysInMonth; i++) {
-      days.push(i);
-    }
+    for (let i = 0; i < startingDayOfWeek; i++) days.push(null);
+    for (let i = 1; i <= daysInMonth; i++) days.push(i);
     return days;
   };
 
   const days = generateCalendarDays();
 
   const getRecordForDate = (day) => {
-    const dateStr = `${currentMonth.getFullYear()}-${String(
-      currentMonth.getMonth() + 1
-    ).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    const dateStr = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     return displayData.find((r) => r.completed_at?.startsWith(dateStr));
   };
 
-  const hasRecordOnDate = (day) => {
-    return !!getRecordForDate(day);
-  };
+  const hasRecordOnDate = (day) => !!getRecordForDate(day);
 
   const handleDayClick = (day) => {
     const record = getRecordForDate(day);
@@ -305,450 +230,245 @@ const DailyScreen = ({ navigation }) => {
     setSelectedPractice(null);
   };
 
-  const getPracticeType = (practiceTypeName) => {
-    if (practiceTypeName?.includes('好事') || practiceTypeName?.includes('感恩')) {
-      return 'good-things';
-    }
-    if (practiceTypeName?.includes('呼吸') || practiceTypeName?.includes('4-6') || practiceTypeName?.includes('屏息')) {
-      return 'breathing';
-    }
-    return 'breathing';
+  const getPracticeType = (name) => {
+    if (!name) return 'other';
+    if (name.includes('好事') || name.includes('感恩書寫')) return 'good-things';
+    if (name.includes('呼吸') || name.includes('4-6') || name.includes('屏息')) return 'breathing';
+    if (name.includes('思維') || name.includes('調節')) return 'cognitive';
+    if (name.includes('感恩')) return 'gratitude';
+    return 'other';
   };
 
-  // 資料提取函數
-  const extractBreathingData = (practice) => {
-    let data = {
-      preMood: practice.pre_mood || practice.mood || null,
-      preMoodNote: practice.pre_mood_note || null,
-      relaxLevel: practice.relax_level || practice.positive_level || null,
-      postFeelings: practice.post_feelings || practice.feelings || null,
-      postMood: practice.post_mood || practice.mood || null,
-      journalEntry: null, // 預設為 null
-    };
+  const getPlanName = (type) => isEmotionalPlanPractice(type) ? '情緒抗壓力' : '其他';
 
+  const extractBreathingData = (practice) => {
+    let data = { relaxLevel: practice.relax_level || practice.positive_level || null, postFeelings: practice.post_feelings || practice.feelings || null };
     if (practice.form_data) {
       try {
-        const formData = typeof practice.form_data === 'string' 
-          ? JSON.parse(practice.form_data)
-          : practice.form_data;
-        
-        if (formData && typeof formData === 'object') {
-          data = {
-            preMood: data.preMood || formData.pre_mood || formData.preMood || formData.mood || null,
-            preMoodNote: data.preMoodNote || formData.pre_mood_note || formData.preMoodNote || null,
-            relaxLevel: data.relaxLevel || formData.relax_level || formData.relaxLevel || formData.positive_level || formData.positiveLevel || null,
-            postFeelings: data.postFeelings || formData.post_feelings || formData.postFeelings || formData.feelings || null,
-            postMood: data.postMood || formData.post_mood || formData.postMood || null,
-            // 只有當 other_emotion 有值時才顯示
-            journalEntry: formData.other_emotion || formData.otherEmotion || null,
-          };
+        const fd = typeof practice.form_data === 'string' ? JSON.parse(practice.form_data) : practice.form_data;
+        if (fd) {
+          data.relaxLevel = data.relaxLevel || fd.relax_level || fd.relaxLevel || null;
+          data.postFeelings = data.postFeelings || fd.post_feelings || fd.postFeelings || null;
         }
-      } catch (e) {
-        console.log('解析 form_data 失敗:', e);
-      }
+      } catch (e) {}
     }
-
     return data;
   };
 
   const extractGoodThingData = (practice) => {
-    let data = {
-      goodThing: null,
-      whoWith: null,
-      feelings: null,
-      emotions: null,
-      otherEmotion: null,
-      reason: null,
-      howToRepeat: null,
-      futureAction: null,
-      positiveLevel: null,
-      moodAfterWriting: null,
-      moodNotes: null,
-    };
-
+    let data = { goodThing: null, reason: null, futureAction: null, newDiscovery: null };
     if (practice.form_data) {
       try {
-        const formData = typeof practice.form_data === 'string' 
-          ? JSON.parse(practice.form_data)
-          : practice.form_data;
-        
-        if (formData && typeof formData === 'object') {
-          data = {
-            goodThing: formData.goodThing || formData.good_thing || null,
-            whoWith: formData.whoWith || formData.who_with || null,
-            feelings: formData.feelings || null,
-            emotions: formData.emotions || null,
-            otherEmotion: formData.otherEmotion || formData.other_emotion || null,
-            reason: formData.reason || null,
-            howToRepeat: formData.howToRepeat || formData.how_to_repeat || null,
-            futureAction: formData.futureAction || formData.future_action || null,
-            positiveLevel: formData.positiveScore || formData.positive_score || formData.positiveLevel || formData.positive_level || null,
-            moodAfterWriting: formData.moodEmotions || formData.mood_emotions || formData.moodAfterWriting || formData.mood_after_writing || null,
-            moodNotes: formData.moodNotes || formData.mood_notes || null,
-          };
-          
-          console.log('📊 好事書寫資料:', {
-            goodThing: data.goodThing,
-            positiveLevel: data.positiveLevel,
-            moodAfterWriting: data.moodAfterWriting,
-          });
-        }
-      } catch (e) {
-        console.log('解析好事練習 form_data 失敗:', e);
-      }
+        const fd = typeof practice.form_data === 'string' ? JSON.parse(practice.form_data) : practice.form_data;
+        if (fd) data = { goodThing: fd.goodThing || fd.good_thing, reason: fd.reason, futureAction: fd.futureAction || fd.future_action, newDiscovery: fd.newDiscovery || fd.new_discovery };
+      } catch (e) {}
     }
+    return data;
+  };
 
-    return {
-      goodThing: data.goodThing || practice.good_thing || null,
-      whoWith: data.whoWith || practice.who_with || null,
-      feelings: data.feelings || practice.feelings || null,
-      emotions: data.emotions || practice.emotions || null,
-      otherEmotion: data.otherEmotion || practice.other_emotion || null,
-      reason: data.reason || practice.reason || null,
-      howToRepeat: data.howToRepeat || practice.how_to_repeat || null,
-      futureAction: data.futureAction || practice.future_action || null,
-      positiveLevel: data.positiveLevel || practice.positive_level || practice.positive_score || null,
-      moodAfterWriting: data.moodAfterWriting || practice.mood_after_writing || practice.mood_emotions || null,
-      moodNotes: data.moodNotes || practice.mood_notes || null,
-    };
+  const extractCognitiveData = (practice) => {
+    let data = { event: null, originalThought: null, reaction: null, newThought: null };
+    if (practice.form_data) {
+      try {
+        const fd = typeof practice.form_data === 'string' ? JSON.parse(practice.form_data) : practice.form_data;
+        if (fd) data = { event: fd.event || fd.situation, originalThought: fd.originalThought || fd.original_thought, reaction: fd.reaction || fd.emotion, newThought: fd.newThought || fd.new_thought };
+      } catch (e) {}
+    }
+    return data;
+  };
+
+  const extractGratitudeData = (practice) => {
+    let data = { gratitudeContent: null, happinessLevel: null, relatedEmotions: null };
+    if (practice.form_data) {
+      try {
+        const fd = typeof practice.form_data === 'string' ? JSON.parse(practice.form_data) : practice.form_data;
+        if (fd) data = { gratitudeContent: fd.gratitudeContent || fd.content, happinessLevel: fd.happinessLevel || fd.positiveLevel, relatedEmotions: fd.relatedEmotions || fd.emotions };
+      } catch (e) {}
+    }
+    return data;
   };
 
   const renderDetailModal = () => {
     if (!selectedPractice) return null;
-
     const totalSeconds = parseInt(selectedPractice.duration_seconds) || 0;
-    const mood = selectedPractice.post_mood || selectedPractice.mood || '平靜';
     const practiceType = getPracticeType(selectedPractice.practice_type);
-    const isGoodThingsPractice = practiceType === 'good-things' || 
-                                  selectedPractice.practice_type?.includes('好事') ||
-                                  selectedPractice.practice_type?.includes('感恩');
+    const planName = getPlanName(selectedPractice.practice_type);
+    const isBreathing = practiceType === 'breathing';
+    const isGoodThings = practiceType === 'good-things';
+    const isCognitive = practiceType === 'cognitive';
+    const isGratitude = practiceType === 'gratitude';
+    const isMoodThermometer = selectedPractice.practice_type?.includes('心情溫度計');
+    const breathingData = isBreathing ? extractBreathingData(selectedPractice) : null;
+    const goodThingData = isGoodThings ? extractGoodThingData(selectedPractice) : null;
+    const cognitiveData = isCognitive ? extractCognitiveData(selectedPractice) : null;
+    const gratitudeData = isGratitude ? extractGratitudeData(selectedPractice) : null;
 
-    const breathingData = !isGoodThingsPractice ? extractBreathingData(selectedPractice) : null;
-    const goodThingData = isGoodThingsPractice ? extractGoodThingData(selectedPractice) : null;
+    // 格式化日期
+    const formatModalDate = (dateStr) => {
+      const date = new Date(dateStr);
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const weekdays = ['週日', '週一', '週二', '週三', '週四', '週五', '週六'];
+      const weekday = weekdays[date.getDay()];
+      return `${year}/${month}/${day} (${weekday})`;
+    };
+
+    // 格式化時長
+    const formatModalDuration = (seconds) => {
+      const mins = Math.floor(seconds / 60);
+      return `${mins} 分鐘`;
+    };
 
     return (
-      <Modal
-        visible={detailModalVisible}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={closeDetailModal}
-      >
+      <Modal visible={detailModalVisible} transparent animationType="fade" onRequestClose={closeDetailModal}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
-            {/* Header */}
-            <View style={styles.modalHeader}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.modalTitle}>
-                  {selectedPractice.practice_type}
-                </Text>
-                <Text style={styles.modalDate}>
-                  {selectedPractice.completed_at}
-                </Text>
-              </View>
-              <TouchableOpacity
-                onPress={closeDetailModal}
-                style={styles.modalCloseButton}
-              >
-                <View style={styles.closeIconCircle}>
-                  <X color="#9CA3AF" size={20} strokeWidth={2} />
+            {/* 關閉按鈕 */}
+            <TouchableOpacity style={styles.modalCloseBtn} onPress={closeDetailModal}>
+              <X color="#9CA3AF" size={20} strokeWidth={2} />
+            </TouchableOpacity>
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {/* 標題區塊 */}
+              <Text style={styles.modalTitle}>{selectedPractice.practice_type}</Text>
+              <Text style={styles.modalDate}>{formatModalDate(selectedPractice.completed_at)}</Text>
+              
+              <View style={styles.modalInfoRow}>
+                <View style={styles.modalInfoItem}>
+                  <Clock color="#9CA3AF" size={14} strokeWidth={1.5} />
+                  <Text style={styles.modalInfoText}>{formatModalDuration(totalSeconds)}</Text>
                 </View>
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView
-              style={styles.modalContent}
-              showsVerticalScrollIndicator={false}
-            >
-              {/* 練習後情緒卡片 */}
-              <LinearGradient
-                colors={['#EFF6FF', '#DBEAFE']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.moodCard}
-              >
-                <Text style={styles.moodCardLabel}>練習後情緒</Text>
-                <View style={styles.moodBadgeContainer}>
-                  <View
-                    style={[
-                      styles.moodBadge,
-                      { backgroundColor: getMoodColor(mood) },
-                    ]}
-                  >
-                    <Text style={styles.moodBadgeText}>{mood}</Text>
-                  </View>
-                </View>
-              </LinearGradient>
-
-              {/* 完成日期 + 投入時間 */}
-              <View style={styles.infoSection}>
-                <View style={styles.infoRow}>
-                  <View style={styles.iconCircle}>
-                    <CalendarIcon color="#6B7280" size={20} strokeWidth={2} />
-                  </View>
-                  <View style={styles.infoTextBlock}>
-                    <Text style={styles.infoLabel}>完成日期</Text>
-                    <Text style={styles.infoValue}>
-                      {selectedPractice.completed_at}
-                    </Text>
-                  </View>
-                </View>
-
-                <View style={styles.infoDivider} />
-
-                <View style={styles.infoRow}>
-                  <View style={styles.iconCircle}>
-                    <TrendingUp color="#6B7280" size={20} strokeWidth={2} />
-                  </View>
-                  <View style={styles.infoTextBlock}>
-                    <Text style={styles.infoLabel}>投入時間</Text>
-                    <Text style={styles.infoValue}>
-                      {formatDuration(totalSeconds)}
-                    </Text>
-                  </View>
+                <View style={styles.modalInfoItem}>
+                  <FileText color="#9CA3AF" size={14} strokeWidth={1.5} />
+                  <Text style={styles.modalInfoText}>{planName}</Text>
                 </View>
               </View>
 
-              {/* 呼吸練習內容 */}
-              {!isGoodThingsPractice && breathingData && (
-                <View style={styles.practiceContent}>
-                  {/* 練習前狀態 */}
-                  {breathingData.preMood && (
-                    <View style={styles.section}>
-                      <View style={styles.sectionHeader}>
-                        <Heart color="#F59E0B" size={16} strokeWidth={2} />
-                        <Text style={styles.sectionTitle}>練習前的狀態</Text>
-                      </View>
-                      <View style={styles.lightBox}>
-                        <Text style={breathingData.preMood ? styles.contentText : styles.emptyContentText}>
-                          {breathingData.preMood || '暫無紀錄'}
-                        </Text>
-                      </View>
+              {/* 呼吸練習成效 */}
+              {isBreathing && breathingData && (breathingData.relaxLevel !== null || breathingData.postFeelings) && (
+                <View style={styles.modalSection}>
+                  <View style={styles.modalSectionHeader}>
+                    <Sparkles color="#166CB5" size={14} />
+                    <Text style={styles.modalSectionTitle}>練習成效</Text>
+                  </View>
+                  {breathingData.relaxLevel !== null && (
+                    <View style={styles.relaxLevelRow}>
+                      <Text style={styles.relaxLevelLabel}>放鬆程度</Text>
+                      <Text style={styles.relaxLevelValue}>{breathingData.relaxLevel}</Text>
+                      <Text style={styles.relaxLevelMax}>/10</Text>
                     </View>
                   )}
-
-                  {/* 放鬆程度 */}
-                  {breathingData.relaxLevel !== null && breathingData.relaxLevel !== undefined && (
-                    <View style={styles.section}>
-                      <View style={styles.sectionHeader}>
-                        <Sparkles color="#31C6FE" size={16} strokeWidth={2} />
-                        <Text style={styles.sectionTitle}>放鬆程度</Text>
-                      </View>
-                      <View style={styles.progressBarContainer}>
-                        <View style={styles.blueGradientProgressBarWrapper}>
-                          <LinearGradient
-                            colors={['#166CB5', '#31C6FE']}
-                            start={{ x: 0, y: 0 }}
-                            end={{ x: 1, y: 0 }}
-                            style={styles.blueGradientProgressBar}
-                          />
-                          <View 
-                            style={[
-                              styles.blueGradientProgressMask, 
-                              { width: `${100 - (breathingData.relaxLevel / 10) * 100}%` }
-                            ]} 
-                          />
-                        </View>
-                        <Text style={styles.blueProgressText}>{breathingData.relaxLevel}/10</Text>
-                      </View>
-                    </View>
-                  )}
-
-                  {/* 練習後感受 */}
                   {breathingData.postFeelings && (
-                    <View style={styles.section}>
-                      <View style={styles.sectionHeader}>
-                        <Smile color="#10B981" size={16} strokeWidth={2} />
-                        <Text style={styles.sectionTitle}>練習後的感受</Text>
-                      </View>
-                      <View style={styles.tagContainer}>
-                        {(Array.isArray(breathingData.postFeelings) 
-                          ? breathingData.postFeelings 
-                          : breathingData.postFeelings.split(',')
-                        ).map((feeling, idx) => (
-                          <View key={idx} style={styles.greenTag}>
-                            <Text style={styles.greenTagText}>{feeling.trim()}</Text>
-                          </View>
-                        ))}
-                      </View>
-                    </View>
-                  )}
-
-                  {/* 練習筆記 - 只有 other_emotion 有值時才顯示 */}
-                  {breathingData.journalEntry && (
-                    <View style={styles.section}>
-                      <View style={styles.sectionHeader}>
-                        <BookOpen color="#6B7280" size={16} strokeWidth={2} />
-                        <Text style={styles.sectionTitle}>練習筆記</Text>
-                      </View>
-                      <Text style={styles.noteText}>{breathingData.journalEntry}</Text>
+                    <View style={styles.feelingsRow}>
+                      {(Array.isArray(breathingData.postFeelings) ? breathingData.postFeelings : breathingData.postFeelings.split(',')).map((f, i) => (
+                        <View key={i} style={styles.feelingTag}><Text style={styles.feelingTagText}>{f.trim()}</Text></View>
+                      ))}
                     </View>
                   )}
                 </View>
               )}
 
-              {/* 好事書寫內容 */}
-              {isGoodThingsPractice && goodThingData && (
-                <View style={styles.practiceContent}>
-                  {/* 今天的好事 */}
-                  {(goodThingData.goodThing || goodThingData.whoWith || goodThingData.feelings) && (
-                    <View style={styles.section}>
-                      <View style={styles.sectionHeader}>
-                        <Sparkles color="#31C6FE" size={16} strokeWidth={2} />
-                        <Text style={styles.sectionTitle}>今天的好事</Text>
+              {/* 好事書寫 */}
+              {isGoodThings && goodThingData && (
+                <>
+                  {goodThingData.goodThing && (
+                    <View style={styles.modalSectionBlue}>
+                      <View style={styles.modalSectionHeader}>
+                        <Sparkles color="#166CB5" size={14} />
+                        <Text style={styles.modalSectionTitleBlue}>好事紀錄</Text>
                       </View>
-                      <View style={styles.lightBlueBox}>
-                        <Text style={styles.goodThingSubTitle}>發生了什麼</Text>
-                        <Text style={goodThingData.goodThing ? styles.goodThingContent : styles.emptyContentText}>
-                          {goodThingData.goodThing || '暫無紀錄'}
-                        </Text>
-                        
-                        <Text style={[styles.goodThingSubTitle, { marginTop: 16 }]}>當時和誰在一起</Text>
-                        <Text style={goodThingData.whoWith ? styles.goodThingContent : styles.emptyContentText}>
-                          {goodThingData.whoWith || '暫無紀錄'}
-                        </Text>
-                        
-                        <Text style={[styles.goodThingSubTitle, { marginTop: 16 }]}>當下的想法</Text>
-                        <Text style={goodThingData.feelings ? styles.goodThingContent : styles.emptyContentText}>
-                          {goodThingData.feelings || '暫無紀錄'}
-                        </Text>
-                      </View>
+                      <Text style={styles.modalSectionContent}>{goodThingData.goodThing}</Text>
                     </View>
                   )}
-
-                  {/* 這件事讓我感覺 */}
-                  {goodThingData.emotions && (
-                    <View style={styles.section}>
-                      <View style={styles.sectionHeader}>
-                        <Heart color="#EC4899" size={16} strokeWidth={2} />
-                        <Text style={styles.sectionTitle}>這件事讓我感覺</Text>
-                      </View>
-                      {goodThingData.emotions ? (
-                        <View style={styles.tagContainer}>
-                          {(Array.isArray(goodThingData.emotions) 
-                            ? goodThingData.emotions 
-                            : goodThingData.emotions.split(',')
-                          ).map((emotion, idx) => (
-                            <View key={idx} style={styles.pinkTag}>
-                              <Text style={styles.pinkTagText}>{emotion.trim()}</Text>
-                            </View>
-                          ))}
-                        </View>
-                      ) : (
-                        <Text style={styles.emptyContentText}>暫無紀錄</Text>
-                      )}
-                    </View>
-                  )}
-
-                  {/* 為什麼是好事 */}
                   {goodThingData.reason && (
-                    <View style={styles.section}>
-                      <View style={styles.sectionHeader}>
-                        <Lightbulb color="#9333EA" size={16} strokeWidth={2} />
-                        <Text style={styles.sectionTitle}>為什麼是好事</Text>
-                      </View>
-                      <View style={styles.lightPurpleBox}>
-                        <Text style={goodThingData.reason ? styles.contentText : styles.emptyContentText}>
-                          {goodThingData.reason || '暫無紀錄'}
-                        </Text>
-                      </View>
+                    <View style={styles.modalSectionGray}>
+                      <Text style={styles.modalSectionLabelGray}>發生原因</Text>
+                      <Text style={styles.modalSectionContent}>{goodThingData.reason}</Text>
                     </View>
                   )}
-
-                  {/* 如何讓好事更常出現 */}
-                  {goodThingData.howToRepeat && (
-                    <View style={styles.section}>
-                      <View style={styles.sectionHeader}>
-                        <RefreshCw color="#10B981" size={16} strokeWidth={2} />
-                        <Text style={styles.sectionTitle}>如何讓好事更常出現</Text>
-                      </View>
-                      <View style={styles.lightGreenBox}>
-                        <Text style={goodThingData.howToRepeat ? styles.contentText : styles.emptyContentText}>
-                          {goodThingData.howToRepeat || '暫無紀錄'}
-                        </Text>
-                      </View>
-                    </View>
-                  )}
-
-                  {/* 好事複製小行動 */}
                   {goodThingData.futureAction && (
-                    <View style={styles.section}>
-                      <View style={styles.sectionHeader}>
-                        <Target color="#F97316" size={16} strokeWidth={2} />
-                        <Text style={styles.sectionTitle}>好事複製小行動</Text>
-                      </View>
-                      <View style={styles.lightOrangeBox}>
-                        <Text style={goodThingData.futureAction ? styles.contentText : styles.emptyContentText}>
-                          {goodThingData.futureAction || '暫無紀錄'}
-                        </Text>
-                      </View>
+                    <View style={styles.modalSectionGray}>
+                      <Text style={styles.modalSectionLabelGray}>下一步行動</Text>
+                      <Text style={styles.modalSectionContent}>{goodThingData.futureAction}</Text>
                     </View>
                   )}
-
-                  {/* 正向感受程度 */}
-                  {goodThingData.positiveLevel !== null && goodThingData.positiveLevel !== undefined && (
-                    <View style={styles.section}>
-                      <View style={styles.sectionHeader}>
-                        <Sparkles color="#fac915ff" size={16} strokeWidth={2} />
-                        <Text style={styles.sectionTitle}>正向感受程度</Text>
-                      </View>
-                      <View style={styles.progressBarContainer}>
-                        <View style={styles.gradientProgressBarWrapper}>
-                          <LinearGradient
-                            colors={['#EC4899', '#F97316', '#FBBF24']}
-                            start={{ x: 0, y: 0 }}
-                            end={{ x: 1, y: 0 }}
-                            style={styles.gradientProgressBar}
-                          />
-                          <View 
-                            style={[
-                              styles.gradientProgressMask, 
-                              { width: `${100 - (goodThingData.positiveLevel / 10) * 100}%` }
-                            ]} 
-                          />
-                        </View>
-                        <Text style={styles.gradientProgressText}>{goodThingData.positiveLevel}/10</Text>
-                      </View>
+                  {goodThingData.newDiscovery && (
+                    <View style={styles.modalSectionGray}>
+                      <Text style={styles.modalSectionLabelGray}>新發現</Text>
+                      <Text style={styles.modalSectionContent}>{goodThingData.newDiscovery}</Text>
                     </View>
                   )}
+                </>
+              )}
 
-                  {/* 書寫後的心情 */}
-                  {goodThingData.moodAfterWriting && (
-                    <View style={styles.section}>
-                      <View style={styles.sectionHeader}>
-                        <Smile color="#3B82F6" size={16} strokeWidth={2} />
-                        <Text style={styles.sectionTitle}>書寫後的心情</Text>
-                      </View>
-                      {goodThingData.moodAfterWriting ? (
-                        <View style={styles.tagContainer}>
-                          {(Array.isArray(goodThingData.moodAfterWriting) 
-                            ? goodThingData.moodAfterWriting 
-                            : goodThingData.moodAfterWriting.split(',')
-                          ).map((mood, idx) => (
-                            <View key={idx} style={styles.lightBlueTag}>
-                              <Text style={styles.lightBlueTagText}>{mood.trim()}</Text>
-                            </View>
-                          ))}
+              {/* 思維調節 */}
+              {isCognitive && cognitiveData && (
+                <>
+                  {cognitiveData.event && (
+                    <View style={styles.modalSectionGray}>
+                      <Text style={styles.modalSectionLabelGray}>事件 (A)</Text>
+                      <Text style={styles.modalSectionContent}>{cognitiveData.event}</Text>
+                    </View>
+                  )}
+                  {cognitiveData.originalThought && (
+                    <View style={styles.modalSectionRed}>
+                      <Text style={styles.modalSectionLabelRed}>原本的想法 (B)</Text>
+                      <Text style={styles.modalSectionContent}>{cognitiveData.originalThought}</Text>
+                      {cognitiveData.reaction && (
+                        <View style={styles.emotionTags}>
+                          <View style={styles.emotionTagRed}><Text style={styles.emotionTagRedText}>失落</Text></View>
+                          <View style={styles.emotionTagRed}><Text style={styles.emotionTagRedText}>羞愧</Text></View>
                         </View>
-                      ) : (
-                        <Text style={styles.emptyContentText}>暫無紀錄</Text>
                       )}
                     </View>
                   )}
-
-                  {/* 練習筆記 */}
-                  {goodThingData.moodNotes && (
-                    <View style={styles.section}>
-                      <View style={styles.sectionHeader}>
-                        <BookOpen color="#6B7280" size={16} strokeWidth={2} />
-                        <Text style={styles.sectionTitle}>練習筆記</Text>
-                      </View>
-                      <Text style={styles.noteText}>{goodThingData.moodNotes}</Text>
+                  {cognitiveData.newThought && (
+                    <View style={styles.modalSectionGreen}>
+                      <Text style={styles.modalSectionLabelGreen}>轉念後 (D)</Text>
+                      <Text style={styles.modalSectionContent}>{cognitiveData.newThought}</Text>
                     </View>
                   )}
-                </View>
+                </>
               )}
 
-              <View style={styles.bottomPadding} />
+              {/* 感恩練習 */}
+              {isGratitude && gratitudeData && (
+                <>
+                  {gratitudeData.gratitudeContent && (
+                    <View style={styles.modalSectionPink}>
+                      <View style={styles.modalSectionHeader}>
+                        <Heart color="#EC4899" size={14} />
+                        <Text style={styles.modalSectionTitlePink}>感恩日記內容</Text>
+                      </View>
+                      <Text style={styles.modalSectionContent}>{gratitudeData.gratitudeContent}</Text>
+                    </View>
+                  )}
+                  <View style={styles.gratitudeRow}>
+                    {gratitudeData.happinessLevel !== null && (
+                      <View style={styles.gratitudeBox}>
+                        <Text style={styles.gratitudeLabel}>幸福感指數</Text>
+                        <View style={styles.gratitudeValueRow}>
+                          <Text style={styles.gratitudeValue}>{gratitudeData.happinessLevel}</Text>
+                          <Text style={styles.gratitudeMax}>/10</Text>
+                        </View>
+                      </View>
+                    )}
+                    {gratitudeData.relatedEmotions && (
+                      <View style={styles.gratitudeBox}>
+                        <Text style={styles.gratitudeLabel}>相關情緒</Text>
+                        <View style={styles.emotionTagsSmall}>
+                          {(Array.isArray(gratitudeData.relatedEmotions) ? gratitudeData.relatedEmotions : gratitudeData.relatedEmotions.split(',')).slice(0, 2).map((e, i) => (
+                            <View key={i} style={styles.emotionTagBlue}><Text style={styles.emotionTagBlueText}>{e.trim()}</Text></View>
+                          ))}
+                        </View>
+                      </View>
+                    )}
+                  </View>
+                </>
+              )}
+
+              <View style={{ height: 20 }} />
             </ScrollView>
           </View>
         </View>
@@ -758,12 +478,7 @@ const DailyScreen = ({ navigation }) => {
 
   if (loading) {
     return (
-      <View
-        style={[
-          styles.container,
-          { justifyContent: 'center', alignItems: 'center' },
-        ]}
-      >
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
         <ActivityIndicator size="large" color="#166CB5" />
         <Text style={{ marginTop: 16, color: '#6B7280' }}>載入中...</Text>
       </View>
@@ -776,1065 +491,657 @@ const DailyScreen = ({ navigation }) => {
       <AppHeader navigation={navigation} />
 
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+        
+        {/* ===== 上半部：兩個統計框 ===== */}
         <View style={styles.statsCard}>
-          <View style={styles.monthSelector}>
-            <TouchableOpacity onPress={handlePrevMonth}>
-              <LinearGradient
-                colors={['#166CB5', '#31C6FE']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.monthButton}
-              >
-                <ChevronLeft color="#FFFFFF" size={20} strokeWidth={2.5} />
-              </LinearGradient>
-            </TouchableOpacity>
-
-            <Text style={styles.monthText}>
-              {currentMonth.getFullYear()} 年 {currentMonth.getMonth() + 1} 月
-            </Text>
-
-            <TouchableOpacity onPress={handleNextMonth}>
-              <LinearGradient
-                colors={['#166CB5', '#31C6FE']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.monthButton}
-              >
-                <ChevronRight color="#FFFFFF" size={20} strokeWidth={2.5} />
-              </LinearGradient>
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.statsGrid}>
-            <TouchableOpacity
-              style={{ flex: 1 }}
-              onPress={() =>
-                setShowInfoCard(showInfoCard === 'practice' ? null : 'practice')
-              }
-              activeOpacity={0.7}
-            >
-              <LinearGradient
-                colors={['#EFF6FF', '#DBEAFE']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.statBox}
-              >
-                <View style={styles.infoButtonTop}>
-                  <Info color="#166CB5" size={12} strokeWidth={2} />
-                </View>
-                <View style={styles.statContent}>
-                  <TrendingUp color="#166CB5" size={16} strokeWidth={2} />
-                  <Text style={styles.statValue}>{stats.totalPractices}</Text>
-                  <Text style={styles.statLabel}>月累計練習</Text>
-                </View>
-              </LinearGradient>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={{ flex: 1 }}
-              onPress={() =>
-                setShowInfoCard(showInfoCard === 'mental' ? null : 'mental')
-              }
-              activeOpacity={0.7}
-            >
-              <LinearGradient
-                colors={['#FAF5FF', '#F3E8FF']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={[styles.statBox, styles.statBoxMental]}
-              >
-                <View style={styles.infoButtonTop}>
-                  <Info color="#9333EA" size={12} strokeWidth={2} />
-                </View>
-                <View style={styles.statContent}>
-                  <Sparkles color="#9333EA" size={16} strokeWidth={2} />
-                  <Text style={[styles.statValue, { color: '#9333EA' }]}>
-                    {stats.mentalMuscle}
-                  </Text>
-                  <Text style={styles.statLabel}>心理肌力分數</Text>
-                </View>
-              </LinearGradient>
-            </TouchableOpacity>
-          </View>
-
-          {(showInfoCard === 'practice' || showInfoCard === 'mental') && (
-            <View style={styles.infoCardContainer}>
-              {showInfoCard === 'practice' && (
-                <View style={[styles.infoCard, { borderColor: '#DBEAFE' }]}>
-                  <View style={styles.infoCardHeader}>
-                    <TrendingUp color="#166CB5" size={14} strokeWidth={2} />
-                    <Text style={styles.infoCardTitle}>月累計練習</Text>
-                  </View>
-                  <Text style={styles.infoCardText}>
-                    統計本月完成的所有練習模組次數,包含呼吸練習、好事書寫等。
-                  </Text>
-                </View>
-              )}
-
-              {showInfoCard === 'mental' && (
-                <View style={[styles.infoCard, { borderColor: '#F3E8FF' }]}>
-                  <View style={styles.infoCardHeader}>
-                    <Sparkles color="#9333EA" size={14} strokeWidth={2} />
-                    <Text style={styles.infoCardTitle}>心理肌力分數</Text>
-                  </View>
-                  <Text style={styles.infoCardText}>
-                    根據練習後的紀錄評分做平均計算,1-10分,分數越高心理肌力越強大。
-                  </Text>
-                </View>
-              )}
+          <View style={styles.statsRow}>
+            {/* 本月練習次數 - 淺藍背景 #E8F4FD */}
+            <View style={styles.statBoxBlue}>
+              <View style={styles.statInfoIcon}>
+                <Info color="#2563EB" size={14} strokeWidth={2} />
+              </View>
+              <TrendingUp color="#2563EB" size={24} strokeWidth={2} />
+              <Text style={styles.statValueBlue}>{stats.totalPractices}</Text>
+              <Text style={styles.statLabel}>本月練習次數</Text>
             </View>
-          )}
 
-          {emotionDiaryStats.length > 0 && (
-            <>
-              <TouchableOpacity
-                onPress={() =>
-                  setShowInfoCard(showInfoCard === 'mood' ? null : 'mood')
-                }
-                activeOpacity={0.7}
-              >
-                <LinearGradient
-                  colors={['#FFF7ED', '#FFEDD5']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.moodSnapshot}
-                >
-                  <View style={styles.infoButtonTop}>
-                    <Info color="#F59E0B" size={12} strokeWidth={2} />
-                  </View>
-                  <View style={styles.moodSnapshotHeader}>
-                    <Smile color="#F59E0B" size={16} strokeWidth={2} />
-                    <Text style={styles.moodSnapshotTitle}>本月心情快照</Text>
-                  </View>
-                  <View style={styles.moodTags}>
-                    {emotionDiaryStats.map(({ emotion, count }) => (
-                      <View
-                        key={emotion}
-                        style={[
-                          styles.moodTag,
-                          { backgroundColor: getMoodColor(emotion) },
-                        ]}
-                      >
-                        <Text style={styles.moodTagText}>{emotion}</Text>
-                        <View style={styles.moodCountBadge}>
-                          <Text style={styles.moodCountText}>{count}</Text>
-                        </View>
-                      </View>
-                    ))}
-                  </View>
-                </LinearGradient>
-              </TouchableOpacity>
-
-              {showInfoCard === 'mood' && (
-                <View style={styles.infoCardContainer}>
-                  <View style={[styles.infoCard, { borderColor: '#FFEDD5' }]}>
-                    <View style={styles.infoCardHeader}>
-                      <Smile color="#F59E0B" size={14} strokeWidth={2} />
-                      <Text style={styles.infoCardTitle}>本月心情快照</Text>
-                    </View>
-                    <Text style={styles.infoCardText}>
-                      統計本月心情記錄中最常出現的情緒狀態(Top 3),數字代表記錄次數。
-                    </Text>
-                  </View>
-                </View>
-              )}
-            </>
-          )}
+            {/* 本月練習時間 - 淺紫背景 #F3E8FF */}
+            <View style={styles.statBoxPurple}>
+              <View style={styles.statInfoIcon}>
+                <Info color="#9333EA" size={14} strokeWidth={2} />
+              </View>
+              <Clock color="#9333EA" size={24} strokeWidth={2} />
+              <Text style={styles.statValuePurple}>{formatStatsDuration(stats.totalDuration)}</Text>
+              <Text style={styles.statLabel}>本月練習時間</Text>
+            </View>
+          </View>
         </View>
 
-        <View style={styles.viewModeToggle}>
-          <TouchableOpacity
-            onPress={() => setViewMode('list')}
-            style={styles.viewModeButtonContainer}
-          >
-            {viewMode === 'list' ? (
-              <LinearGradient
-                colors={['#166CB5', '#31C6FE']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.viewModeButtonActive}
-              >
-                <List color="#FFFFFF" size={16} strokeWidth={2} />
-                <Text style={styles.viewModeTextActive}>列表</Text>
-              </LinearGradient>
-            ) : (
-              <View style={styles.viewModeButtonInactive}>
-                <List color="#6B7280" size={16} strokeWidth={2} />
-                <Text style={styles.viewModeTextInactive}>列表</Text>
-              </View>
-            )}
+        {/* ===== 下半部：100% Figma 設計 ===== */}
+
+        {/* 月份選擇器 + 列表/日曆切換（同一行） */}
+        <View style={styles.monthAndToggleRow}>
+          {/* 月份選擇器 - 白色圓角卡片 */}
+          <View style={styles.monthSelector}>
+            <TouchableOpacity onPress={handlePrevMonth} style={styles.monthArrow}>
+              <ChevronLeft color="#C4C4C4" size={24} strokeWidth={2} />
+            </TouchableOpacity>
+            <Text style={styles.monthText}>{currentMonth.getFullYear()}年{currentMonth.getMonth() + 1}月</Text>
+            <TouchableOpacity onPress={handleNextMonth} style={styles.monthArrow}>
+              <ChevronRight color="#C4C4C4" size={24} strokeWidth={2} />
+            </TouchableOpacity>
+          </View>
+
+          {/* 列表/日曆切換 - 白色圓角 */}
+          <View style={styles.viewToggle}>
+            <TouchableOpacity
+              onPress={() => setViewMode('list')}
+              style={[styles.viewToggleBtn, viewMode === 'list' && styles.viewToggleBtnActive]}
+            >
+              <List color={viewMode === 'list' ? '#166CB5' : '#C4C4C4'} size={20} strokeWidth={2} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setViewMode('calendar')}
+              style={[styles.viewToggleBtn, viewMode === 'calendar' && styles.viewToggleBtnActive]}
+            >
+              <Grid3X3 color={viewMode === 'calendar' ? '#166CB5' : '#C4C4C4'} size={20} strokeWidth={2} />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* 篩選按鈕（獨立膠囊形狀） */}
+        <View style={styles.filterRow}>
+          <TouchableOpacity onPress={() => setSelectedPlan('all')} activeOpacity={0.8}>
+            <View style={selectedPlan === 'all' ? styles.filterPillActive : styles.filterPillInactive}>
+              <Text style={selectedPlan === 'all' ? styles.filterPillActiveText : styles.filterPillInactiveText}>全部</Text>
+            </View>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            onPress={() => setViewMode('calendar')}
-            style={styles.viewModeButtonContainer}
-          >
-            {viewMode === 'calendar' ? (
-              <LinearGradient
-                colors={['#166CB5', '#31C6FE']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.viewModeButtonActive}
-              >
-                <Grid3X3 color="#FFFFFF" size={16} strokeWidth={2} />
-                <Text style={styles.viewModeTextActive}>日曆</Text>
-              </LinearGradient>
-            ) : (
-              <View style={styles.viewModeButtonInactive}>
-                <Grid3X3 color="#6B7280" size={16} strokeWidth={2} />
-                <Text style={styles.viewModeTextInactive}>日曆</Text>
-              </View>
-            )}
+          <TouchableOpacity onPress={() => setSelectedPlan('emotional')} activeOpacity={0.8}>
+            <View style={selectedPlan === 'emotional' ? styles.filterPillActive : styles.filterPillInactive}>
+              <Text style={selectedPlan === 'emotional' ? styles.filterPillActiveText : styles.filterPillInactiveText}>情緒抗壓力</Text>
+            </View>
           </TouchableOpacity>
         </View>
 
+        {/* 日曆視圖 */}
         {viewMode === 'calendar' && (
-          <View style={styles.calendarView}>
+          <View style={styles.contentCard}>
             <View style={styles.calendarGrid}>
-              {['日', '一', '二', '三', '四', '五', '六'].map((day) => (
-                <View key={day} style={styles.calendarWeekday}>
-                  <Text style={styles.calendarWeekdayText}>{day}</Text>
-                </View>
+              {['日', '一', '二', '三', '四', '五', '六'].map((d) => (
+                <View key={d} style={styles.calendarWeekday}><Text style={styles.calendarWeekdayText}>{d}</Text></View>
               ))}
-
-              {days.map((day, index) => {
-                if (!day) {
-                  return <View key={`empty-${index}`} style={styles.calendarDay} />;
-                }
-
+              {days.map((day, idx) => {
+                if (!day) return <View key={`e-${idx}`} style={styles.calendarDay} />;
                 const hasRecord = hasRecordOnDate(day);
-                const record = getRecordForDate(day);
-
                 return (
-                  <TouchableOpacity
-                    key={day}
-                    onPress={() => handleDayClick(day)}
-                    disabled={!hasRecord}
-                    style={[
-                      styles.calendarDay,
-                      hasRecord && {
-                        backgroundColor: getMoodColor(
-                          record?.post_mood || record?.mood || '平靜'
-                        ),
-                        shadowColor: '#000',
-                        shadowOffset: { width: 0, height: 2 },
-                        shadowOpacity: 0.15,
-                        shadowRadius: 4,
-                        elevation: 3,
-                      },
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.calendarDayText,
-                        hasRecord && styles.calendarDayTextActive,
-                      ]}
-                    >
-                      {day}
-                    </Text>
+                  <TouchableOpacity key={day} onPress={() => handleDayClick(day)} disabled={!hasRecord} style={styles.calendarDay}>
+                    <Text style={[styles.calendarDayText, hasRecord && styles.calendarDayTextActive]}>{day}</Text>
+                    {hasRecord && <View style={styles.calendarDot} />}
                   </TouchableOpacity>
                 );
               })}
             </View>
-
-            <View style={styles.calendarLegend}>
-              <View style={styles.legendItem}>
-                <LinearGradient
-                  colors={['#FF9A6C', '#31C6FE']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.legendColor}
-                />
-                <Text style={styles.legendText}>有練習記錄</Text>
-              </View>
-            </View>
           </View>
         )}
 
+        {/* 列表視圖 / 空狀態 */}
         {viewMode === 'list' && (
-          <View style={styles.listView}>
+          <>
             {displayData.length > 0 ? (
-              displayData.map((record, index) => {
-                const { day, weekday } = formatDate(record.completed_at);
-                const totalSeconds = parseInt(record.duration_seconds) || 0;
-                const mood = record.post_mood || record.mood || '平靜';
+              <View style={styles.listContainer}>
+                {displayData.map((record, index) => {
+                  const totalSeconds = parseInt(record.duration_seconds) || 0;
+                  const planName = getPlanName(record.practice_type);
+                  const practiceType = getPracticeType(record.practice_type);
+                  
 
-                return (
-                  <TouchableOpacity
-                    key={index}
-                    style={styles.recordCard}
-                    onPress={() => openDetailModal(record)}
-                    activeOpacity={0.7}
-                  >
-                    <View
-                      style={[
-                        styles.recordDateCircle,
-                        { backgroundColor: getMoodColor(mood) },
-                      ]}
-                    >
-                      <Text style={styles.recordDay}>{day}</Text>
-                      <Text style={styles.recordWeekday}>週{weekday}</Text>
-                    </View>
+                  
+                  // 格式化日期為 2025/11/08 (週六) 格式
+                  const formatRecordDate = (dateStr) => {
+                    const date = new Date(dateStr);
+                    const year = date.getFullYear();
+                    const month = String(date.getMonth() + 1).padStart(2, '0');
+                    const day = String(date.getDate()).padStart(2, '0');
+                    const weekdays = ['週日', '週一', '週二', '週三', '週四', '週五', '週六'];
+                    const weekday = weekdays[date.getDay()];
+                    return `${year}/${month}/${day} (${weekday})`;
+                  };
 
-                    <View style={styles.recordContent}>
-                      <Text style={styles.recordTitle} numberOfLines={1}>
-                        {record.practice_type}
-                      </Text>
-                      <View style={styles.recordMeta}>
-                        <View
-                          style={[
-                            styles.moodDot,
-                            { backgroundColor: getMoodColor(mood) },
-                          ]}
-                        />
-                        <Text style={styles.recordMood}>{mood}</Text>
-                      </View>
+                  // 格式化時長
+                  const formatRecordDuration = (seconds) => {
+                    const mins = Math.floor(seconds / 60);
+                    const secs = seconds % 60;
+                    if (secs === 0) return `${String(mins).padStart(2, '0')}:00 分鐘`;
+                    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')} 分鐘`;
+                  };
 
+                  return (
+                    <TouchableOpacity key={index} style={styles.recordCard} onPress={() => openDetailModal(record)} activeOpacity={0.7}>
+    
+    
+                      <Text style={styles.recordTitle}>{record.practice_type}</Text>
                       <View style={styles.recordFooter}>
-                        <TrendingUp
-                          color="#31C6FE"
-                          size={14}
-                          strokeWidth={2}
-                        />
-                        <Text style={styles.recordDuration}>
-                          {formatDuration(totalSeconds)}
-                        </Text>
-                        {record.journal_entry && (
-                          <>
-                            <BookOpen
-                              color="#9CA3AF"
-                              size={12}
-                              strokeWidth={2}
-                            />
-                            <Text style={styles.recordHasNote}>有筆記</Text>
-                          </>
-                        )}
+                        <View style={styles.recordFooterItem}>
+                          <Clock color="#9CA3AF" size={14} strokeWidth={1.5} />
+                          <Text style={styles.recordFooterText}>{formatRecordDuration(totalSeconds)}</Text>
+                        </View>
+                        <View style={styles.recordFooterItem}>
+                          <FileText color="#9CA3AF" size={14} strokeWidth={1.5} />
+                          <Text style={styles.recordFooterText}>所屬計畫：{planName}</Text>
+                        </View>
                       </View>
-                    </View>
-                  </TouchableOpacity>
-                );
-              })
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
             ) : (
-              <View style={styles.emptyState}>
-                <CalendarIcon color="#D1D5DB" size={48} strokeWidth={1.5} />
-                <Text style={styles.emptyText}>本月尚無練習記錄</Text>
-                <Text style={styles.emptySubtext}>開始你的第一次練習吧!</Text>
+              <View style={styles.contentCard}>
+                <View style={styles.emptyContent}>
+                  <CalendarIcon color="#D1D5DB" size={56} strokeWidth={1.2} />
+                  <Text style={styles.emptyTitle}>本月尚無符合篩選的紀錄</Text>
+                  <Text style={styles.emptySubtitle}>開始您的第一次練習吧！</Text>
+                </View>
               </View>
             )}
-          </View>
+          </>
         )}
 
-        <View style={styles.bottomPadding} />
+        <View style={{ height: 100 }} />
       </ScrollView>
 
       {renderDetailModal()}
       <BottomNavigation navigation={navigation} currentRoute="Daily" />
-
-      {!isLoggedIn && (
-        <LockedOverlay 
-          navigation={navigation} 
-          reason="login"
-          message="登入後查看你的練習日記"
-        />
-      )}
-      
-      {isLoggedIn && !hasEnterpriseCode && (
-        <LockedOverlay 
-          navigation={navigation} 
-          reason="enterprise-code"
-          message="輸入企業引薦碼以解鎖日記功能"
-        />
-      )}
+      {!isLoggedIn && <LockedOverlay navigation={navigation} reason="login" message="登入後查看你的練習日記" />}
+      {isLoggedIn && !hasEnterpriseCode && <LockedOverlay navigation={navigation} reason="enterprise-code" message="輸入企業引薦碼以解鎖日記功能" />}
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-  },
-  scrollView: {
-    flex: 1,
-  },
+  container: { flex: 1, backgroundColor: '#F3F4F6' },
+  scrollView: { flex: 1 },
+
+  // ===== 上半部統計區塊 =====
   statsCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    padding: 20,
-    margin: 16,
-    marginTop: 20,
+    borderRadius: 20,
+    marginHorizontal: 16,
+    marginTop: 16,
+    padding: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.06,
     shadowRadius: 8,
-    elevation: 4,
+    elevation: 3,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  // 本月練習次數 - 淺藍背景 #E8F4FD
+  statBoxBlue: {
+    flex: 1,
+    backgroundColor: '#E8F4FD',
+    borderRadius: 16,
+    paddingVertical: 20,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    position: 'relative',
+  },
+  // 本月練習時間 - 淺紫背景 #F3E8FF
+  statBoxPurple: {
+    flex: 1,
+    backgroundColor: '#F3E8FF',
+    borderRadius: 16,
+    paddingVertical: 20,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    position: 'relative',
+  },
+  statInfoIcon: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+  },
+  statValueBlue: {
+    fontSize: 40,
+    fontWeight: '700',
+    color: '#2563EB',
+    marginTop: 8,
+  },
+  statValuePurple: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#9333EA',
+    marginTop: 8,
+  },
+  statLabel: {
+    fontSize: 13,
+    color: '#6B7280',
+    marginTop: 4,
+  },
+
+  // ===== 下半部 Figma 設計 =====
+
+  // 月份選擇器 + 切換（同一行）
+  monthAndToggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginHorizontal: 16,
+    marginTop: 16,
   },
   monthSelector: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 20,
-  },
-  monthButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 25,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
     shadowRadius: 4,
-    elevation: 3,
+    elevation: 2,
+  },
+  monthArrow: {
+    padding: 4,
   },
   monthText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#111827',
+    color: '#1F2937',
+    marginHorizontal: 16,
   },
-  statsGrid: {
+  viewToggle: {
     flexDirection: 'row',
-    gap: 12,
-    marginBottom: 16,
-  },
-  statBox: {
-    borderRadius: 16,
-    padding: 16,
-    position: 'relative',
-    borderWidth: 1,
-    borderColor: '#E0F2FE',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    elevation: 2,
-  },
-  statBoxMental: {
-    borderColor: '#e9d5ff6a',
-  },
-  infoButtonTop: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 10,
-  },
-  statContent: {
-    alignItems: 'center',
-    gap: 8,
-  },
-  statValue: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#166CB5',
-  },
-  statLabel: {
-    fontSize: 12,
-    color: '#6B7280',
-    textAlign: 'center',
-  },
-  infoCardContainer: {
-    marginTop: 8,
-  },
-  infoCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 5,
-  },
-  infoCardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 8,
-  },
-  infoCardTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#111827',
-  },
-  infoCardText: {
-    fontSize: 13,
-    color: '#6B7280',
-    lineHeight: 20,
-  },
-  moodSnapshot: {
-    borderRadius: 16,
-    padding: 16,
-    position: 'relative',
-    borderWidth: 1,
-    borderColor: '#FFECD9',
-    marginTop: 0,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    elevation: 2,
-  },
-  moodSnapshotHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 12,
-  },
-  moodSnapshotTitle: {
-    fontSize: 12,
-    color: '#6B7280',
-  },
-  moodTags: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  moodTag: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    gap: 6,
+    borderRadius: 12,
+    padding: 4,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
     elevation: 2,
   },
-  moodTagText: {
-    fontSize: 12,
-    color: '#FFFFFF',
-    fontWeight: '500',
+  viewToggleBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  moodCountBadge: {
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 8,
+  viewToggleBtnActive: {
+    backgroundColor: '#D6EEFF',
   },
-  moodCountText: {
-    fontSize: 10,
-    color: '#FFFFFF',
-    fontWeight: '600',
-  },
-  viewModeToggle: {
+
+  // 篩選按鈕（獨立膠囊形狀）
+  filterRow: {
     flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 6,
     marginHorizontal: 16,
-    marginBottom: 16,
+    marginTop: 12,
+    gap: 10,
+  },
+  filterPillActive: {
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 25,
+    backgroundColor: '#166CB5',
+  },
+  filterPillInactive: {
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 25,
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: '#E5E7EB',
-    gap: 6,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 2,
   },
-  viewModeButtonContainer: {
-    flex: 1,
-  },
-  viewModeButtonActive: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 10,
-    borderRadius: 12,
-  },
-  viewModeButtonInactive: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 10,
-    borderRadius: 12,
-  },
-  viewModeTextActive: {
+  filterPillActiveText: {
     fontSize: 14,
-    color: '#FFFFFF',
     fontWeight: '600',
-  },
-  viewModeTextInactive: {
-    fontSize: 14,
-    color: '#6B7280',
-    fontWeight: '500',
-  },
-  calendarView: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    padding: 20,
-    marginHorizontal: 16,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  calendarGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-  },
-  calendarWeekday: {
-    width: `${100 / 7}%`,
-    paddingVertical: 8,
-    alignItems: 'center',
-  },
-  calendarWeekdayText: {
-    fontSize: 12,
-    color: '#6B7280',
-    fontWeight: '500',
-  },
-  calendarDay: {
-    width: `${100 / 7}%`,
-    aspectRatio: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 12,
-    marginBottom: 4,
-  },
-  calendarDayText: {
-    fontSize: 14,
-    color: '#D1D5DB',
-  },
-  calendarDayTextActive: {
     color: '#FFFFFF',
-    fontWeight: '600',
   },
-  calendarLegend: {
-    marginTop: 16,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
-    flexDirection: 'row',
-    justifyContent: 'center',
-  },
-  legendItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  legendColor: {
-    width: 16,
-    height: 16,
-    borderRadius: 4,
-  },
-  legendText: {
-    fontSize: 12,
+  filterPillInactiveText: {
+    fontSize: 14,
+    fontWeight: '500',
     color: '#6B7280',
   },
-  emptyContentText: {
-    fontSize: 15,
-    color: '#D1D5DB',  // 淺灰色
-    lineHeight: 24,
-    fontStyle: 'italic',  // 斜體（可選）
-  },
-  listView: {
-    paddingHorizontal: 16,
-  },
-  recordCard: {
-    flexDirection: 'row',
+
+  // 內容卡片
+  contentCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 20,
-    padding: 16,
+    marginHorizontal: 16,
+    marginTop: 16,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  emptyContent: {
+    alignItems: 'center',
+    paddingVertical: 50,
+  },
+  emptyTitle: {
+    fontSize: 16,
+    color: '#9CA3AF',
+    marginTop: 20,
+    fontWeight: '500',
+  },
+  emptySubtitle: {
+    fontSize: 14,
+    color: '#D1D5DB',
+    marginTop: 6,
+  },
+
+  // 日曆
+  calendarGrid: { flexDirection: 'row', flexWrap: 'wrap' },
+  calendarWeekday: { width: `${100 / 7}%`, paddingVertical: 8, alignItems: 'center' },
+  calendarWeekdayText: { fontSize: 13, color: '#9CA3AF', fontWeight: '600' },
+  calendarDay: { 
+    width: `${100 / 7}%`, 
+    aspectRatio: 1, 
+    alignItems: 'center', 
+    justifyContent: 'center',
+  },
+  calendarDayText: { fontSize: 15, color: '#6B7280', fontWeight: '500' },
+  calendarDayTextActive: { color: '#1F2937', fontWeight: '600' },
+  calendarDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: '#166CB5',
+    marginTop: 2,
+  },
+
+  // 列表
+  listContainer: { paddingHorizontal: 16, marginTop: 16 },
+  recordCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 20,
     marginBottom: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.06,
     shadowRadius: 8,
     elevation: 3,
-    borderWidth: 1,
-    borderColor: '#F3F4F6',
   },
-  recordDateCircle: {
-    width: 64,
-    height: 64,
-    borderRadius: 16,
+  recordHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.12,
-    shadowRadius: 4,
-    elevation: 3,
+    marginBottom: 8,
   },
-  recordDay: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#FFFFFF',
+  recordDate: {
+    fontSize: 13,
+    color: '#9CA3AF',
   },
-  recordWeekday: {
-    fontSize: 11,
-    color: 'rgba(255, 255, 255, 0.9)',
-  },
-  recordContent: {
-    flex: 1,
+  recordRelaxLevel: {
+    fontSize: 12,
+    color: '#9CA3AF',
   },
   recordTitle: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '600',
-    color: '#111827',
-    marginBottom: 8,
-  },
-  recordMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 8,
-  },
-  moodDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-  },
-  recordMood: {
-    fontSize: 12,
-    color: '#6B7280',
+    color: '#1F2937',
+    marginBottom: 12,
   },
   recordFooter: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 16,
   },
-  recordDuration: {
-    fontSize: 13,
-    color: '#31C6FE',
-    fontWeight: '600',
+  recordFooterItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
-  recordHasNote: {
+  recordFooterText: {
     fontSize: 12,
     color: '#9CA3AF',
   },
-  emptyState: {
+
+  // Modal - 居中彈出
+  modalOverlay: { 
+    flex: 1, 
+    backgroundColor: 'rgba(0,0,0,0.4)', 
+    justifyContent: 'center', 
     alignItems: 'center',
-    paddingVertical: 60,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
+    padding: 24,
   },
-  emptyText: {
-    fontSize: 16,
-    color: '#9CA3AF',
-    marginTop: 16,
-    marginBottom: 4,
+  modalContainer: { 
+    backgroundColor: '#FFFFFF', 
+    borderRadius: 16, 
+    width: '100%',
+    maxHeight: '80%', 
+    padding: 24,
+    position: 'relative',
   },
-  emptySubtext: {
-    fontSize: 14,
-    color: '#D1D5DB',
-  },
-  bottomPadding: {
-    height: 100,
-  },
-  // ===== Modal Styles =====
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalContainer: {
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    maxHeight: '85%',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    paddingHorizontal: 24,
-    paddingTop: 24,
-    paddingBottom: 16,
+  modalCloseBtn: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    zIndex: 10,
   },
   modalTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#111827',
-    marginBottom: 4,
+    color: '#1F2937',
+    textAlign: 'center',
+    marginBottom: 8,
+    marginTop: 8,
   },
   modalDate: {
     fontSize: 14,
     color: '#9CA3AF',
-  },
-  modalCloseButton: {
-    marginLeft: 16,
-  },
-  closeIconCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#F3F4F6',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  modalContent: {
-    paddingHorizontal: 24,
-    paddingBottom: 24,
-  },
-  // 練習後情緒卡片
-  moodCard: {
-    borderRadius: 20,
-    padding: 20,
-    marginBottom: 20,
-    alignItems: 'center',
-  },
-  moodCardLabel: {
-    fontSize: 13,
-    color: '#6B7280',
+    textAlign: 'center',
     marginBottom: 16,
   },
-  moodBadgeContainer: {
+  modalInfoRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
     alignItems: 'center',
-  },
-  moodBadge: {
-    paddingHorizontal: 24,
-    paddingVertical: 10,
-    borderRadius: 20,
-    minWidth: 100,
-    alignItems: 'center',
-  },
-  moodBadgeText: {
-    fontSize: 16,
-    color: '#FFFFFF',
-    fontWeight: '600',
-  },
-  // 完成日期 + 投入時間
-  infoSection: {
+    gap: 20,
     marginBottom: 20,
   },
-  infoRow: {
+  modalInfoItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
-    gap: 12,
+    gap: 4,
   },
-  iconCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#F3F4F6',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  infoDivider: {
-    height: 1,
-    backgroundColor: '#E5E7EB',
-    marginVertical: 4,
-  },
-  infoTextBlock: {
-    flex: 1,
-  },
-  infoLabel: {
+  modalInfoText: {
     fontSize: 13,
     color: '#9CA3AF',
-    marginBottom: 4,
   },
-  infoValue: {
-    fontSize: 16,
-    color: '#111827',
-    fontWeight: '600',
+
+  // Modal 區塊樣式
+  modalSection: {
+    backgroundColor: '#EBF5FF',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
   },
-  // 練習內容區
-  practiceContent: {
-    marginBottom: 20,
-  },
-  section: {
-    marginBottom: 24,
-  },
-  sectionHeader: {
+  modalSectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
     marginBottom: 12,
   },
-  sectionTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#707680ff',
-  },
-  // 彩色背景框
-  lightBox: {
-    backgroundColor: '#fdf7eaff',
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#faebc9ff',
-  },
-  lightBlueBox: {
-    backgroundColor: '#F0F9FF',
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#dbeafcff',
-  },
-  lightPurpleBox: {
-    backgroundColor: '#FAF5FF',
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#f1e7fcff',
-  },
-  lightGreenBox: {
-    backgroundColor: '#ECFDF5',
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#def8ecff',
-  },
-  lightOrangeBox: {
-    backgroundColor: '#FFF7ED',
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#fdebd7ff',
-  },
-  goodThingSubTitle: {
+  modalSectionTitle: {
     fontSize: 13,
-    fontWeight: '700',
-    color: '#111827',
-    marginBottom: 14,
+    fontWeight: '600',
+    color: '#166CB5',
   },
-  goodThingContent: {
-    fontSize: 15,
-    color: '#424852ff',
-    lineHeight: 22,
-  },
-  contentText: {
-    fontSize: 15,
-    color: '#111827',
-    lineHeight: 24,
-  },
-  noteText: {
-    fontSize: 15,
-    color: '#374151',
-    lineHeight: 24,
-  },
-  // 進度條樣式
-  progressBarContainer: {
+  relaxLevelRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
+    alignItems: 'baseline',
+    marginBottom: 12,
   },
-  // 藍色漸層進度條 (呼吸練習)
-  blueGradientProgressBarWrapper: {
-    flex: 1,
-    height: 8,
-    borderRadius: 4,
-    overflow: 'hidden',
-    position: 'relative',
-  },
-  blueGradientProgressBar: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: 0,
-    bottom: 0,
-    height: 8,
-    borderRadius: 4,
-  },
-  blueGradientProgressMask: {
-    position: 'absolute',
-    right: 0,
-    top: 0,
-    bottom: 0,
-    backgroundColor: '#E5E7EB',
-    height: 8,
-  },
-  blueProgressText: {
+  relaxLevelLabel: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#3B82F6',
+    color: '#6B7280',
+    marginRight: 8,
   },
-  // 彩色漸層進度條 (好事書寫)
-  gradientProgressBarWrapper: {
-    flex: 1,
-    height: 8,
-    borderRadius: 4,
-    overflow: 'hidden',
-    position: 'relative',
+  relaxLevelValue: {
+    fontSize: 32,
+    fontWeight: '700',
+    color: '#166CB5',
   },
-  gradientProgressBar: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: 0,
-    bottom: 0,
-    height: 8,
-    borderRadius: 4,
+  relaxLevelMax: {
+    fontSize: 16,
+    color: '#9CA3AF',
   },
-  gradientProgressMask: {
-    position: 'absolute',
-    right: 0,
-    top: 0,
-    bottom: 0,
-    backgroundColor: '#E5E7EB',
-    height: 8,
-  },
-  gradientProgressText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#EC4899',
-  },
-  // 標籤樣式
-  tagContainer: {
+  feelingsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
   },
-  greenTag: {
-    backgroundColor: '#D1FAE5',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#bbfde2ff',
+  feelingTag: {
+    backgroundColor: '#166CB5',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 14,
   },
-  greenTagText: {
-    fontSize: 14,
-    color: '#047857',
+  feelingTagText: {
+    fontSize: 12,
+    color: '#FFFFFF',
     fontWeight: '500',
   },
-  pinkTag: {
-    backgroundColor: '#FCE7F3',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#facde6ff',
+
+  // 好事書寫區塊
+  modalSectionBlue: {
+    backgroundColor: '#EBF5FF',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
   },
-  pinkTagText: {
+  modalSectionTitleBlue: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#166CB5',
+  },
+  modalSectionGray: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+  },
+  modalSectionLabelGray: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    marginBottom: 8,
+  },
+  modalSectionContent: {
     fontSize: 14,
-    color: '#BE185D',
-    fontWeight: '500',
+    color: '#1F2937',
+    lineHeight: 22,
   },
-  lightBlueTag: {
-    backgroundColor: '#e8f5faff',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
+
+  // 思維調節區塊
+  modalSectionRed: {
+    backgroundColor: '#FEF2F2',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+  },
+  modalSectionLabelRed: {
+    fontSize: 12,
+    color: '#DC2626',
+    marginBottom: 8,
+  },
+  emotionTags: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 12,
+  },
+  emotionTagRed: {
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#d3eef9ff',
+    borderColor: '#FCA5A5',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
   },
-  lightBlueTagText: {
+  emotionTagRedText: {
+    fontSize: 12,
+    color: '#DC2626',
+  },
+  modalSectionGreen: {
+    backgroundColor: '#ECFDF5',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+  },
+  modalSectionLabelGreen: {
+    fontSize: 12,
+    color: '#059669',
+    marginBottom: 8,
+  },
+
+  // 感恩練習區塊
+  modalSectionPink: {
+    backgroundColor: '#FDF2F8',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+  },
+  modalSectionTitlePink: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#EC4899',
+  },
+  gratitudeRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  gratitudeBox: {
+    flex: 1,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    padding: 12,
+  },
+  gratitudeLabel: {
+    fontSize: 11,
+    color: '#9CA3AF',
+    marginBottom: 8,
+  },
+  gratitudeValueRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+  },
+  gratitudeValue: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#EC4899',
+  },
+  gratitudeMax: {
     fontSize: 14,
-    color: '#188abbff',
-    fontWeight: '500',
+    color: '#9CA3AF',
   },
+  emotionTagsSmall: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  emotionTagBlue: {
+    backgroundColor: '#DBEAFE',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 10,
+  },
+  emotionTagBlueText: {
+    fontSize: 11,
+    color: '#2563EB',
+  },
+  
+  // 練習內容區塊
+  section: { marginBottom: 20 },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 },
+  sectionTitle: { fontSize: 14, fontWeight: '600', color: '#6B7280' },
 });
 
 export default DailyScreen;
