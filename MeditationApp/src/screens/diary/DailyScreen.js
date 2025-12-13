@@ -1,5 +1,5 @@
 // ==========================================
-// DailyScreen.js - 完全按照要求設計
+// DailyScreen.js
 // ==========================================
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -843,9 +843,10 @@ const styles = StyleSheet.create({
   calendarWeekdayText: { fontSize: 13, color: '#9CA3AF', fontWeight: '600' },
   calendarDay: { 
     width: `${100 / 7}%`, 
-    aspectRatio: 1, 
+    height: 48,
     alignItems: 'center', 
     justifyContent: 'center',
+    paddingBottom: 8,
   },
   calendarDayText: { fontSize: 15, color: '#6B7280', fontWeight: '500' },
   calendarDayTextActive: { color: '#1F2937', fontWeight: '600' },
@@ -854,7 +855,7 @@ const styles = StyleSheet.create({
     height: 5,
     borderRadius: 2.5,
     backgroundColor: '#166CB5',
-    marginTop: 2,
+    marginTop: 4,
   },
 
   // 列表
