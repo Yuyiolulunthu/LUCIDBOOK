@@ -248,7 +248,7 @@ const HomeScreen = ({ navigation }) => {
 
   // ========== 計算完成度 ==========
   const totalTasks = Object.values(goals).reduce((acc, curr) => acc + curr.target, 0);
-  const completedTasks = Object.values(goals).reduce((acc, curr) => acc + curr.current, 0);
+  const completedTasks = Object.values(goals).reduce((acc, curr) => acc + Math.min(curr.current, curr.target), 0);
   const progressPercentage = Math.round((completedTasks / totalTasks) * 100);
 
   // ========== 練習模組配置 ==========
