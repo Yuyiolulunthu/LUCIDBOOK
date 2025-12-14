@@ -2,14 +2,16 @@
 // 檔案名稱: BottomNavigation.js
 // 共用底部導航列組件
 // 🎨 白色透明背景(85%) + 藍色漸層選中狀態 + 頂部指示線
+// ✨ 支援滑動切換動畫
 // ==========================================
 
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import {
   View,
   TouchableOpacity,
   Text,
   StyleSheet,
+  Animated,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Path, Rect, Circle } from 'react-native-svg';
@@ -38,32 +40,9 @@ const HomeIcon = ({ color, size = 24 }) => (
   </Svg>
 );
 
-// 練習 (打開的書本) 圖標
-const PracticeIcon = ({ color, size = 24 }) => (
-  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-    {/* 左邊書頁 */}
-    <Path
-      d="M2 3H8C9.06087 3 10.0783 3.42143 10.8284 4.17157C11.5786 4.92172 12 5.93913 12 7V21C12 20.2044 11.6839 19.4413 11.1213 18.8787C10.5587 18.3161 9.79565 18 9 18H2V3Z"
-      stroke={color}
-      strokeWidth={2.2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-    {/* 右邊書頁 */}
-    <Path
-      d="M22 3H16C14.9391 3 13.9217 3.42143 13.1716 4.17157C12.4214 4.92172 12 5.93913 12 7V21C12 20.2044 12.3161 19.4413 12.8787 18.8787C13.4413 18.3161 14.2044 18 15 18H22V3Z"
-      stroke={color}
-      strokeWidth={2.2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-  </Svg>
-);
-
 // 日記 (Journal/Calendar) 圖標
 const JournalIcon = ({ color, size = 24 }) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-    {/* 外框 */}
     <Rect
       x="3"
       y="4"
@@ -75,7 +54,6 @@ const JournalIcon = ({ color, size = 24 }) => (
       strokeLinecap="round"
       strokeLinejoin="round"
     />
-    {/* 上方掛勾 */}
     <Path
       d="M8 2V6"
       stroke={color}
@@ -88,7 +66,6 @@ const JournalIcon = ({ color, size = 24 }) => (
       strokeWidth={2.2}
       strokeLinecap="round"
     />
-    {/* 橫線 */}
     <Path
       d="M3 10H21"
       stroke={color}
@@ -101,7 +78,6 @@ const JournalIcon = ({ color, size = 24 }) => (
 // 我的 (Profile/Person) 圖標
 const ProfileIcon = ({ color, size = 24 }) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-    {/* 頭部 */}
     <Circle
       cx="12"
       cy="8"
@@ -111,7 +87,6 @@ const ProfileIcon = ({ color, size = 24 }) => (
       strokeLinecap="round"
       strokeLinejoin="round"
     />
-    {/* 身體 */}
     <Path
       d="M4 21V19C4 17.9391 4.42143 16.9217 5.17157 16.1716C5.92172 15.4214 6.93913 15 8 15H16C17.0609 15 18.0783 15.4214 18.8284 16.1716C19.5786 16.9217 20 17.9391 20 19V21"
       stroke={color}
@@ -123,42 +98,82 @@ const ProfileIcon = ({ color, size = 24 }) => (
 );
 
 // ==========================================
-// 導航按鈕元件
+// 動畫化的 LinearGradient 包裝器
+// ==========================================
+const AnimatedLinearGradient = Animated.createAnimatedComponent(LinearGradient);
+
+// ==========================================
+// 導航按鈕元件 (含動畫)
 // ==========================================
 const NavButton = ({ icon: Icon, label, isActive, onPress }) => {
   const activeColor = '#166CB5';
   const inactiveColor = '#9CA3AF';
+  
+  // 動畫值
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const opacityAnim = useRef(new Animated.Value(isActive ? 1 : 0)).current;
+
+  useEffect(() => {
+    Animated.timing(opacityAnim, {
+      toValue: isActive ? 1 : 0,
+      duration: 200,
+      useNativeDriver: true,
+    }).start();
+  }, [isActive]);
+
+  // 按下效果
+  const handlePressIn = () => {
+    Animated.spring(scaleAnim, {
+      toValue: 0.9,
+      friction: 5,
+      tension: 300,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const handlePressOut = () => {
+    Animated.spring(scaleAnim, {
+      toValue: 1,
+      friction: 3,
+      tension: 200,
+      useNativeDriver: true,
+    }).start();
+  };
 
   return (
     <TouchableOpacity
       style={styles.navButton}
       onPress={onPress}
-      activeOpacity={0.7}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
+      activeOpacity={1}
     >
-      {/* 選中狀態的頂部指示線 */}
-      {isActive ? (
-        <LinearGradient
-          colors={['#166CB5', '#31C6FE']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={styles.activeIndicator}
-        />
-      ) : (
-        <View style={styles.inactiveIndicator} />
-      )}
+      <Animated.View style={{ transform: [{ scale: scaleAnim }], alignItems: 'center' }}>
+        {/* 選中狀態的頂部指示線 (帶動畫) */}
+        <View style={styles.indicatorContainer}>
+          <Animated.View style={[styles.indicatorWrapper, { opacity: opacityAnim }]}>
+            <LinearGradient
+              colors={['#166CB5', '#31C6FE']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.activeIndicator}
+            />
+          </Animated.View>
+        </View>
 
-      {/* 圖標 */}
-      <View style={styles.iconContainer}>
-        <Icon color={isActive ? activeColor : inactiveColor} size={24} />
-      </View>
+        {/* 圖標 */}
+        <View style={styles.iconContainer}>
+          <Icon color={isActive ? activeColor : inactiveColor} size={24} />
+        </View>
 
-      {/* 文字標籤 */}
-      <Text style={[
-        styles.navLabel,
-        isActive && styles.navLabelActive
-      ]}>
-        {label}
-      </Text>
+        {/* 文字標籤 */}
+        <Text style={[
+          styles.navLabel,
+          isActive && styles.navLabelActive
+        ]}>
+          {label}
+        </Text>
+      </Animated.View>
     </TouchableOpacity>
   );
 };
@@ -167,16 +182,20 @@ const NavButton = ({ icon: Icon, label, isActive, onPress }) => {
 // 主元件
 // ==========================================
 const BottomNavigation = ({ navigation, activeTab, currentRoute }) => {
+  // 頁面順序映射 (用於判斷滑動方向)
+  const routeOrder = {
+    'Home': 0,
+    'Daily': 1,
+    'Profile': 2,
+  };
+
   // 支援 activeTab 或 currentRoute 兩種傳入方式
   const getActiveKey = () => {
     if (activeTab) return activeTab;
     
-    // 根據 currentRoute 轉換
     switch (currentRoute) {
       case 'Home':
         return 'home';
-      case 'PracticeSelection':
-        return 'explore';
       case 'Daily':
         return 'record';
       case 'Profile':
@@ -188,18 +207,13 @@ const BottomNavigation = ({ navigation, activeTab, currentRoute }) => {
 
   const currentActiveTab = getActiveKey();
 
+  // 導航項目 (已移除練習)
   const navItems = [
     {
       key: 'home',
       icon: HomeIcon,
       label: '首頁',
       route: 'Home',
-    },
-    {
-      key: 'explore',
-      icon: PracticeIcon,
-      label: '練習',
-      route: 'PracticeSelection',
     },
     {
       key: 'record',
@@ -215,9 +229,22 @@ const BottomNavigation = ({ navigation, activeTab, currentRoute }) => {
     },
   ];
 
+  // 處理導航 (帶滑動方向)
+  const handleNavigation = (targetRoute) => {
+    const currentOrder = routeOrder[currentRoute] ?? 0;
+    const targetOrder = routeOrder[targetRoute] ?? 0;
+    
+    // 根據目標頁面位置決定動畫方向
+    const direction = targetOrder > currentOrder ? 'slide_from_right' : 'slide_from_left';
+    
+    navigation.navigate(targetRoute, {
+      animation: direction,
+    });
+  };
+
   return (
     <View style={styles.bottomNavContainer}>
-      {/* 白色透明背景 85% */}
+      {/* 白色透明背景 */}
       <View style={styles.menuBackground} />
 
       {/* 導航按鈕列 */}
@@ -228,7 +255,7 @@ const BottomNavigation = ({ navigation, activeTab, currentRoute }) => {
             icon={item.icon}
             label={item.label}
             isActive={currentActiveTab === item.key}
-            onPress={() => navigation.navigate(item.route)}
+            onPress={() => handleNavigation(item.route)}
           />
         ))}
       </View>
@@ -253,7 +280,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 90,
-    backgroundColor: 'rgba(255, 255, 255, 0.97)', // 85% 透明度
+    backgroundColor: 'rgba(255, 255, 255, 0.97)',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.08,
@@ -279,18 +306,20 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-start',
   },
 
-  // 頂部指示線 (加粗)
+  // 指示線容器
+  indicatorContainer: {
+    width: 36,
+    height: 4,
+    marginBottom: 4,
+  },
+  indicatorWrapper: {
+    width: '100%',
+    height: '100%',
+  },
   activeIndicator: {
     width: 36,
     height: 4,
     borderRadius: 2,
-    marginBottom: 4,
-  },
-  inactiveIndicator: {
-    width: 36,
-    height: 4,
-    marginBottom: 4,
-    backgroundColor: 'transparent',
   },
 
   // 圖標容器
@@ -302,7 +331,7 @@ const styles = StyleSheet.create({
     marginBottom: 1,
   },
 
-  // 文字標籤 (置中)
+  // 文字標籤
   navLabel: {
     fontSize: 11,
     color: '#9CA3AF',
