@@ -1,7 +1,7 @@
 // ==========================================
 // 檔案名稱: App.js 
-// 應用主入口 - 移除所有動畫配置
-// 版本: V2.2 - 簡化導航，移除動畫干擾
+// 應用主入口 - 順滑滑動切換效果
+// 版本: V2.3 - 啟用滑動動畫
 // ==========================================
 
 import React from 'react';
@@ -54,7 +54,7 @@ import DeleteAccountScreen from './src/screens/account/settings/utils/DeleteAcco
 const Stack = createNativeStackNavigator();
 
 // ==========================================
-// 主導航配置 - 移除所有動畫
+// 主導航配置 - 順滑滑動動畫
 // ==========================================
 const App = () => {
   return (
@@ -62,49 +62,96 @@ const App = () => {
       <Stack.Navigator
         screenOptions={{
           headerShown: false,
-          animation: 'none', // ⭐ 移除所有動畫
-          gestureEnabled: false, // ⭐ 停用手勢（避免衝突）
+          // ✨ 預設滑動動畫
+          animation: 'slide_from_right',
+          // ✨ 啟用手勢滑動返回
+          gestureEnabled: true,
+          gestureDirection: 'horizontal',
+          // ✨ 動畫時長 (毫秒) - 越小越快，250 是很順的甜蜜點
+          animationDuration: 250,
         }}
       >
-        {/* 主頁面 */}
-        <Stack.Screen name="Home" component={HomeScreen} />
+        {/* ========== 主頁面 (底部導航) ========== */}
+        {/* 這三個頁面會根據 BottomNavigation 傳來的方向做動態動畫 */}
+        <Stack.Screen 
+          name="Home" 
+          component={HomeScreen}
+          options={({ route }) => ({
+            animation: route.params?.animation || 'slide_from_right',
+          })}
+        />
+        <Stack.Screen 
+          name="Daily" 
+          component={DailyScreen}
+          options={({ route }) => ({
+            animation: route.params?.animation || 'slide_from_right',
+          })}
+        />
+        <Stack.Screen 
+          name="Profile" 
+          component={AccountScreen}
+          options={({ route }) => ({
+            animation: route.params?.animation || 'slide_from_right',
+          })}
+        />
+        
+        {/* ========== 首頁子頁面 ========== */}
         <Stack.Screen 
           name="EmotionalResiliencePlan" 
           component={EmotionalResiliencePlanScreen} 
         />
         
-        {/* 認證相關頁面 */}
-        <Stack.Screen name="Login" component={LoginScreen} />
+        {/* ========== 認證相關頁面 ========== */}
+        {/* 登入頁面用淡入效果比較合適 */}
+        <Stack.Screen 
+          name="Login" 
+          component={LoginScreen}
+          options={{ animation: 'fade' }}
+        />
         <Stack.Screen name="Register" component={RegisterScreen} />
         <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
         <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
         
-        {/* 其他主要頁面 */}
-        <Stack.Screen name="Daily" component={DailyScreen} />
-        <Stack.Screen name="Profile" component={AccountScreen} />
-        
-        {/* 練習統計頁面 */}
+        {/* ========== 練習統計頁面 ========== */}
         <Stack.Screen name="PracticeStats" component={PracticeStatsScreen} />
         
-        {/* Explore 頁面 - 包含單個練習和訓練計畫 */}
+        {/* ========== Explore 頁面 ========== */}
         <Stack.Screen name="PracticeSelection" component={PracticeSelectionScreen} />
         
-        {/* 單個練習頁面 */}
-        <Stack.Screen name="BreathingPractice" component={BreathingExerciseCard} />
-        <Stack.Screen name="EmotionPractice" component={EmotionPractice} />
-        <Stack.Screen name="MindfulnessPractice" component={MindfulnessPractice} />
-        <Stack.Screen name="SelfAwarenessPractice" component={SelfAwarenessPractice} />
-        <Stack.Screen name="GoodThingsJournal" component={GoodThingsJournal} />
+        {/* ========== 單個練習頁面 ========== */}
+        {/* 練習頁面從底部滑入更有沉浸感 */}
+        <Stack.Screen 
+          name="BreathingPractice" 
+          component={BreathingExerciseCard}
+          options={{ animation: 'slide_from_bottom' }}
+        />
+        <Stack.Screen 
+          name="EmotionPractice" 
+          component={EmotionPractice}
+          options={{ animation: 'slide_from_bottom' }}
+        />
+        <Stack.Screen 
+          name="MindfulnessPractice" 
+          component={MindfulnessPractice}
+          options={{ animation: 'slide_from_bottom' }}
+        />
+        <Stack.Screen 
+          name="SelfAwarenessPractice" 
+          component={SelfAwarenessPractice}
+          options={{ animation: 'slide_from_bottom' }}
+        />
+        <Stack.Screen 
+          name="GoodThingsJournal" 
+          component={GoodThingsJournal}
+          options={{ animation: 'slide_from_bottom' }}
+        />
         
-        {/* 訓練計畫相關頁面 */}
+        {/* ========== 訓練計畫相關頁面 ========== */}
         <Stack.Screen name="TrainingPlanDetail" component={TrainingPlanDetailScreen} />
         <Stack.Screen name="TrainingPlanProgress" component={TrainingPlanProgressScreen} />
-        <Stack.Screen 
-          name="PracticeNavigator" 
-          component={PracticeNavigator}
-        />
+        <Stack.Screen name="PracticeNavigator" component={PracticeNavigator} />
 
-        {/* 設定相關頁面 */}
+        {/* ========== 設定相關頁面 ========== */}
         <Stack.Screen name="Settings" component={Settings} />
         <Stack.Screen name="Feedback" component={Feedback} />
         <Stack.Screen name="Favorites" component={Favorites} />
@@ -112,7 +159,7 @@ const App = () => {
         <Stack.Screen name="EnterpriseCodeManagement" component={EnterpriseCodeManagement} />
         <Stack.Screen name="SelectGoals" component={SelectGoals} />
 
-        {/* 設定工具頁面 */}
+        {/* ========== 設定工具頁面 ========== */}
         <Stack.Screen name="ProfileEdit" component={ProfileEditScreen} />
         <Stack.Screen name="PrivacySettings" component={PrivacySettingsScreen} />
         <Stack.Screen name="TermsOfService" component={TermsOfServiceScreen} />
