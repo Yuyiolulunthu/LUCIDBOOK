@@ -1,12 +1,16 @@
 // ==========================================
 // 檔案名稱: App.js 
-// 應用主入口 - 順滑滑動切換效果
-// 版本: V2.3 - 啟用滑動動畫
+// 應用主入口 - 改用Tab Navigator
+// 版本: V3.0 - 重構導航架構
 // ==========================================
 
 import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+
+// 導入自訂底部導航
+import BottomNavigation from './src/navigation/BottomNavigation';
 
 // 導入所有頁面
 import HomeScreen from './src/screens/home/HomeScreen';
@@ -52,9 +56,32 @@ import AboutUs from './src/screens/account/settings/utils/AboutUs';
 import DeleteAccountScreen from './src/screens/account/settings/utils/DeleteAccountScreen';
 
 const Stack = createNativeStackNavigator();
+const Tab = createBottomTabNavigator();
 
 // ==========================================
-// 主導航配置 - 順滑滑動動畫
+// 主頁面 Tab Navigator（超順滑！）
+// ==========================================
+const MainTabs = () => {
+  return (
+    <Tab.Navigator
+      tabBar={(props) => <BottomNavigation {...props} />}
+      screenOptions={{
+        headerShown: false,
+        // ⚡ 懶加載關閉，預先載入所有頁面
+        lazy: false,
+        // ⚡ 凍結非活躍頁面，提升效能
+        freezeOnBlur: true,
+      }}
+    >
+      <Tab.Screen name="Home" component={HomeScreen} />
+      <Tab.Screen name="Daily" component={DailyScreen} />
+      <Tab.Screen name="Profile" component={AccountScreen} />
+    </Tab.Navigator>
+  );
+};
+
+// ==========================================
+// 主導航配置
 // ==========================================
 const App = () => {
   return (
@@ -62,47 +89,25 @@ const App = () => {
       <Stack.Navigator
         screenOptions={{
           headerShown: false,
-          // ✨ 預設滑動動畫
           animation: 'slide_from_right',
-          // ✨ 啟用手勢滑動返回
+          animationDuration: 200,
           gestureEnabled: true,
-          gestureDirection: 'horizontal',
-          // ✨ 動畫時長 (毫秒) - 越小越快，250 是很順的甜蜜點
-          animationDuration: 250,
         }}
       >
-        {/* ========== 主頁面 (底部導航) ========== */}
-        {/* 這三個頁面會根據 BottomNavigation 傳來的方向做動態動畫 */}
+        {/* ⭐ 主頁面用 Tab Navigator */}
         <Stack.Screen 
-          name="Home" 
-          component={HomeScreen}
-          options={({ route }) => ({
-            animation: route.params?.animation || 'slide_from_right',
-          })}
-        />
-        <Stack.Screen 
-          name="Daily" 
-          component={DailyScreen}
-          options={({ route }) => ({
-            animation: route.params?.animation || 'slide_from_right',
-          })}
-        />
-        <Stack.Screen 
-          name="Profile" 
-          component={AccountScreen}
-          options={({ route }) => ({
-            animation: route.params?.animation || 'slide_from_right',
-          })}
+          name="MainTabs" 
+          component={MainTabs}
+          options={{ animation: 'none' }}
         />
         
         {/* ========== 首頁子頁面 ========== */}
         <Stack.Screen 
           name="EmotionalResiliencePlan" 
-          component={EmotionalResiliencePlanScreen} 
+          component={EmotionalResiliencePlanScreen}
         />
         
         {/* ========== 認證相關頁面 ========== */}
-        {/* 登入頁面用淡入效果比較合適 */}
         <Stack.Screen 
           name="Login" 
           component={LoginScreen}
@@ -119,7 +124,6 @@ const App = () => {
         <Stack.Screen name="PracticeSelection" component={PracticeSelectionScreen} />
         
         {/* ========== 單個練習頁面 ========== */}
-        {/* 練習頁面從底部滑入更有沉浸感 */}
         <Stack.Screen 
           name="BreathingPractice" 
           component={BreathingExerciseCard}

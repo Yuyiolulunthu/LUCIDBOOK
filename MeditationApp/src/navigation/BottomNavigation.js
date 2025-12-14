@@ -1,8 +1,8 @@
 // ==========================================
 // 檔案名稱: BottomNavigation.js
-// 共用底部導航列組件
+// 共用底部導航列組件 - Tab Navigator 版本
 // 🎨 白色透明背景 + 藍色漸層滑動指示線
-// ✨ 指示線會左右滑動！
+// ✨ 超順滑！配合 Tab Navigator 使用
 // ==========================================
 
 import React, { useRef, useEffect } from 'react';
@@ -82,6 +82,20 @@ const ProfileIcon = ({ color, size = 24 }) => (
   </Svg>
 );
 
+// 圖標映射
+const iconMap = {
+  Home: HomeIcon,
+  Daily: JournalIcon,
+  Profile: ProfileIcon,
+};
+
+// 標籤映射
+const labelMap = {
+  Home: '首頁',
+  Daily: '日記',
+  Profile: '我的',
+};
+
 // ==========================================
 // 導航按鈕元件
 // ==========================================
@@ -93,8 +107,8 @@ const NavButton = ({ icon: Icon, label, isActive, onPress }) => {
 
   const handlePressIn = () => {
     Animated.spring(scaleAnim, {
-      toValue: 0.9,
-      friction: 5,
+      toValue: 0.92,
+      friction: 8,
       tension: 300,
       useNativeDriver: true,
     }).start();
@@ -103,7 +117,7 @@ const NavButton = ({ icon: Icon, label, isActive, onPress }) => {
   const handlePressOut = () => {
     Animated.spring(scaleAnim, {
       toValue: 1,
-      friction: 3,
+      friction: 5,
       tension: 200,
       useNativeDriver: true,
     }).start();
@@ -135,16 +149,14 @@ const NavButton = ({ icon: Icon, label, isActive, onPress }) => {
 const SlidingIndicator = ({ activeIndex, tabCount }) => {
   const translateX = useRef(new Animated.Value(0)).current;
   
-  // 計算每個 tab 的寬度和指示線位置
-  const TAB_WIDTH = (SCREEN_WIDTH - 20) / tabCount; // 扣掉 paddingHorizontal
+  const TAB_WIDTH = (SCREEN_WIDTH - 20) / tabCount;
   const INDICATOR_WIDTH = 36;
-  const INDICATOR_OFFSET = (TAB_WIDTH - INDICATOR_WIDTH) / 2 + 10; // 10 是 paddingHorizontal
+  const INDICATOR_OFFSET = (TAB_WIDTH - INDICATOR_WIDTH) / 2 + 10;
 
   useEffect(() => {
-    Animated.spring(translateX, {
+    Animated.timing(translateX, {
       toValue: activeIndex * TAB_WIDTH + INDICATOR_OFFSET,
-      friction: 6,      // 較低 = 更彈
-      tension: 80,      // 較高 = 更快
+      duration: 180,
       useNativeDriver: true,
     }).start();
   }, [activeIndex]);
@@ -167,73 +179,58 @@ const SlidingIndicator = ({ activeIndex, tabCount }) => {
 };
 
 // ==========================================
-// 主元件
+// 主元件 - 配合 Tab Navigator
 // ==========================================
-const BottomNavigation = ({ navigation, activeTab, currentRoute }) => {
-  // 頁面順序映射
-  const routeOrder = {
-    'Home': 0,
-    'Daily': 1,
-    'Profile': 2,
-  };
-
-  // 導航項目（已移除練習）
-  const navItems = [
-    { key: 'home', icon: HomeIcon, label: '首頁', route: 'Home' },
-    { key: 'record', icon: JournalIcon, label: '日記', route: 'Daily' },
-    { key: 'profile', icon: ProfileIcon, label: '我的', route: 'Profile' },
-  ];
-
-  // 取得當前活躍的 key
-  const getActiveKey = () => {
-    if (activeTab) return activeTab;
-    switch (currentRoute) {
-      case 'Home': return 'home';
-      case 'Daily': return 'record';
-      case 'Profile': return 'profile';
-      default: return 'home';
-    }
-  };
-
-  const currentActiveTab = getActiveKey();
+const BottomNavigation = (props) => {
+  // 從 Tab Navigator 的 props 取得 state 和 navigation
+  const { state, navigation } = props;
   
-  // 取得當前活躍的 index
-  const getActiveIndex = () => {
-    const index = navItems.findIndex(item => item.key === currentActiveTab);
-    return index >= 0 ? index : 0;
-  };
+  // 安全檢查：確保 state 存在
+  if (!state || !state.routes) {
+    console.warn('BottomNavigation: state is undefined');
+    return null;
+  }
 
-  // 處理導航（帶滑動方向）
-  const handleNavigation = (targetRoute) => {
-    const currentOrder = routeOrder[currentRoute] ?? 0;
-    const targetOrder = routeOrder[targetRoute] ?? 0;
-    const direction = targetOrder > currentOrder ? 'slide_from_right' : 'slide_from_left';
-    
-    navigation.navigate(targetRoute, { animation: direction });
-  };
+  const activeIndex = state.index;
+  const routes = state.routes;
 
   return (
     <View style={styles.bottomNavContainer}>
-      {/* 白色透明背景 */}
       <View style={styles.menuBackground} />
 
-      {/* ✨ 滑動指示線 */}
       <SlidingIndicator 
-        activeIndex={getActiveIndex()} 
-        tabCount={navItems.length}
+        activeIndex={activeIndex} 
+        tabCount={routes.length}
       />
 
-      {/* 導航按鈕列 */}
       <View style={styles.bottomNav}>
-        {navItems.map((item) => (
-          <NavButton
-            key={item.key}
-            icon={item.icon}
-            label={item.label}
-            isActive={currentActiveTab === item.key}
-            onPress={() => handleNavigation(item.route)}
-          />
-        ))}
+        {routes.map((route, index) => {
+          const isFocused = activeIndex === index;
+          const Icon = iconMap[route.name] || HomeIcon;
+          const label = labelMap[route.name] || route.name;
+
+          const onPress = () => {
+            const event = navigation.emit({
+              type: 'tabPress',
+              target: route.key,
+              canPreventDefault: true,
+            });
+
+            if (!isFocused && !event.defaultPrevented) {
+              navigation.navigate(route.name);
+            }
+          };
+
+          return (
+            <NavButton
+              key={route.key}
+              icon={Icon}
+              label={label}
+              isActive={isFocused}
+              onPress={onPress}
+            />
+          );
+        })}
       </View>
     </View>
   );
@@ -266,7 +263,6 @@ const styles = StyleSheet.create({
     borderTopColor: 'rgba(0, 0, 0, 0.05)',
   },
   
-  // 滑動指示線
   slidingIndicatorContainer: {
     position: 'absolute',
     top: 2,
@@ -279,7 +275,6 @@ const styles = StyleSheet.create({
     borderRadius: 2,
   },
 
-  // 導航按鈕列
   bottomNav: {
     position: 'absolute',
     top: 0,
@@ -288,7 +283,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'flex-start',
-    paddingTop: 8, // 給指示線留空間
+    paddingTop: 8,
     paddingHorizontal: 10,
   },
   navButton: {
