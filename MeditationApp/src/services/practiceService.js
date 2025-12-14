@@ -34,6 +34,7 @@ class PracticeService {
         thoughtImpact: data.thoughtImpact || null,
         responseMethod: data.responseMethod || null,
         newResponse: data.newResponse || null,
+        form_data: data.form_data || null,
       }),
     });
   }

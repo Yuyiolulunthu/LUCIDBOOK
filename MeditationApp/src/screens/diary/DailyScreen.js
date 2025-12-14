@@ -64,7 +64,7 @@ const PLAN_CATEGORIES = {
 
 const EMOTIONAL_PLAN_TYPES = ['呼吸', '好事', '思維', '感恩', '心情溫度計', '4-6', '屏息'];
 
-const DailyScreen = ({ navigation }) => {
+const DailyScreen = ({ navigation, route }) => {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [allPracticeData, setAllPracticeData] = useState([]);
   const [displayData, setDisplayData] = useState([]);
@@ -76,6 +76,7 @@ const DailyScreen = ({ navigation }) => {
   const [detailModalVisible, setDetailModalVisible] = useState(false);
   const [selectedPractice, setSelectedPractice] = useState(null);
   const [selectedPlan, setSelectedPlan] = useState('all');
+  const highlightPracticeId = route?.params?.highlightPracticeId;
   const hasLoadedData = useRef(false);
 
   useFocusEffect(
@@ -85,6 +86,23 @@ const DailyScreen = ({ navigation }) => {
       return () => {};
     }, [])
   );
+
+  // 在 fetchAllData 成功後，檢查是否有要高亮的練習
+  useEffect(() => {
+    if (highlightPracticeId && displayData.length > 0) {
+      // 找到對應的練習記錄
+      const practice = displayData.find(p => p.id === highlightPracticeId);
+      
+      if (practice) {
+        // 自動打開詳細 Modal
+        setSelectedPractice(practice);
+        setDetailModalVisible(true);
+        
+        // 清除參數，避免重複觸發
+        navigation.setParams({ highlightPracticeId: undefined });
+      }
+    }
+  }, [highlightPracticeId, displayData]);
 
   useEffect(() => {
     filterDataForCurrentMonth(allPracticeData);
@@ -256,15 +274,34 @@ const DailyScreen = ({ navigation }) => {
   };
 
   const extractGoodThingData = (practice) => {
-    let data = { goodThing: null, reason: null, futureAction: null, newDiscovery: null };
+    let data = {
+      goodThing: null,      // 好事紀錄（第二頁第一題）
+      emotions: [],         // 當時感受（第三頁按鈕）
+      reason: null,         // 好事再發生（第四頁）
+      postScore: null,      // 心情愉悅程度
+    };
+
     if (practice.form_data) {
       try {
-        const fd = typeof practice.form_data === 'string' ? JSON.parse(practice.form_data) : practice.form_data;
-        if (fd) data = { goodThing: fd.goodThing || fd.good_thing, reason: fd.reason, futureAction: fd.futureAction || fd.future_action, newDiscovery: fd.newDiscovery || fd.new_discovery };
-      } catch (e) {}
+        const fd =
+          typeof practice.form_data === 'string'
+            ? JSON.parse(practice.form_data)
+            : practice.form_data;
+
+        if (fd) {
+          data.goodThing = fd.goodThing || null;
+          data.emotions = fd.emotions || [];
+          data.reason = fd.reason || null;
+          data.postScore = fd.postScore ?? null;
+        }
+      } catch (e) {
+        console.warn('parse goodThing form_data failed', e);
+      }
     }
+
     return data;
   };
+
 
   const extractCognitiveData = (practice) => {
     let data = { event: null, originalThought: null, reaction: null, newThought: null };
@@ -381,22 +418,41 @@ const DailyScreen = ({ navigation }) => {
                       <Text style={styles.modalSectionContent}>{goodThingData.goodThing}</Text>
                     </View>
                   )}
+                  {goodThingData.emotions?.length > 0 && (
+                    <View style={styles.modalSectionGray}>
+                      <Text style={styles.modalSectionLabelGray}>當時感受</Text>
+
+                      <View style={styles.feelingsRow}>
+                        {goodThingData.emotions.map((e, i) => (
+                          <View key={i} style={styles.feelingTagGray}>
+                            <Text style={styles.feelingTagGrayText}>{e}</Text>
+                          </View>
+                        ))}
+                      </View>
+                    </View>
+                  )}
                   {goodThingData.reason && (
                     <View style={styles.modalSectionGray}>
-                      <Text style={styles.modalSectionLabelGray}>發生原因</Text>
-                      <Text style={styles.modalSectionContent}>{goodThingData.reason}</Text>
+                      <Text style={styles.modalSectionLabelGray}>好事再發生</Text>
+                      <Text style={styles.modalSectionContent}>
+                        {goodThingData.reason}
+                      </Text>
                     </View>
                   )}
-                  {goodThingData.futureAction && (
+                  {goodThingData.postScore !== null && (
                     <View style={styles.modalSectionGray}>
-                      <Text style={styles.modalSectionLabelGray}>下一步行動</Text>
-                      <Text style={styles.modalSectionContent}>{goodThingData.futureAction}</Text>
-                    </View>
-                  )}
-                  {goodThingData.newDiscovery && (
-                    <View style={styles.modalSectionGray}>
-                      <Text style={styles.modalSectionLabelGray}>新發現</Text>
-                      <Text style={styles.modalSectionContent}>{goodThingData.newDiscovery}</Text>
+                      <View style={styles.modalSectionHeader}>
+                        <Smile color="#166CB5" size={14} />
+                        <Text style={styles.modalSectionTitle}>練習成效</Text>
+                      </View>
+
+                      <View style={styles.relaxLevelRow}>
+                        <Text style={styles.relaxLevelLabel}>心情愉悅程度</Text>
+                        <Text style={styles.relaxLevelValue}>
+                          {goodThingData.postScore}
+                        </Text>
+                        <Text style={styles.relaxLevelMax}>/10</Text>
+                      </View>
                     </View>
                   )}
                 </>
@@ -703,6 +759,17 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 12,
     right: 12,
+  },
+  feelingTagGray: {
+    backgroundColor: '#E5E7EB',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 14,
+  },
+  feelingTagGrayText: {
+    fontSize: 12,
+    color: '#374151',
+    fontWeight: '500',
   },
   statValueBlue: {
     fontSize: 40,
