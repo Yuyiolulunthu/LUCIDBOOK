@@ -88,7 +88,7 @@ const PrivacyPolicyScreen = ({ navigation, route }) => {
             <View style={styles.iconContainer}>
               <Ionicons name="shield-checkmark" size={32} color="#166CB5" />
             </View>
-            <Text style={styles.title}>LucidBook 隱私權政策</Text>
+            <Text style={styles.title}>LUCIDBOOK 隱私權政策</Text>
             <Text style={styles.lastUpdated}>最後更新日期：2024 年 1 月</Text>
           </View>
 

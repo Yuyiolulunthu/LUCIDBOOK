@@ -127,7 +127,7 @@ const AboutUs = ({ navigation }) => {
           <View style={styles.heroTextContainer}>
             <Text style={styles.heroTitle}>讓心慢下來的地方</Text>
             <Text style={styles.heroSubtitle}>
-              路晰書 LucidBook 陪你一點一點，{'\n'}練出心理肌力。
+              路晰書 LUCIDBOOK 陪你一點一點，{'\n'}練出心理肌力。
             </Text>
           </View>
         </View>
@@ -287,15 +287,15 @@ const AboutUs = ({ navigation }) => {
             </LinearGradient>
           </View>
 
-          <Text style={styles.closingTitle}>路晰書 LucidBook</Text>
+          <Text style={styles.closingTitle}>路晰書 LUCIDBOOK</Text>
           <Text style={styles.closingSubtitle}>
             陪你一起練習，{'\n'}一起變得更舒適、更踏實。
           </Text>
 
           {/* Version Info */}
           <View style={styles.versionContainer}>
-            <Text style={styles.versionText}>路晰書 LucidBook v1.0.0</Text>
-            <Text style={styles.versionText}>© 2025 LucidBook. All rights reserved.</Text>
+            <Text style={styles.versionText}>路晰書 LUCIDBOOK v1.0.0</Text>
+            <Text style={styles.versionText}>© 2025 LUCIDBOOK. All rights reserved.</Text>
           </View>
         </View>
 

@@ -224,7 +224,7 @@ const RegisterScreen = ({ navigation, route }) => {
 
               {/* 表單卡片 */}
               <View style={styles.formCard}>
-                <Text style={styles.formTitle}>加入 LucidBook</Text>
+                <Text style={styles.formTitle}>加入 LUCIDBOOK</Text>
                 <Text style={styles.formSubtitle}>填寫資訊以建立您的帳戶</Text>
                 
                 {/* 姓名輸入 */}

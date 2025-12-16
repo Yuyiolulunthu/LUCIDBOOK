@@ -43,7 +43,7 @@ const ONBOARDING_PAGES = [
   {
     id: '1',
     icon: 'heart-outline',
-    title: '歡迎加入 LucidBook',
+    title: '歡迎加入 LUCIDBOOK',
     description: '這是一個專為您打造的心靈練習空間，\n幫助您找到內心的平靜與專注。',
     highlight: '每天只需幾分鐘，讓自己更好',
   },

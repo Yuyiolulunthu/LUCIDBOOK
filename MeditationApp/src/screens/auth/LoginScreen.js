@@ -244,7 +244,7 @@ const LoginScreen = ({ navigation, route }) => {
                     <Ionicons name="leaf" size={40} color="#FFFFFF" />
                   </LinearGradient>
                 </View>
-                <Text style={styles.logoText}>LucidBook</Text>
+                <Text style={styles.logoText}>LUCIDBOOK</Text>
                 <Text style={styles.logoSubtext}>找到內心的平靜</Text>
               </View>
 
