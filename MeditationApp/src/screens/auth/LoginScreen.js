@@ -6,6 +6,7 @@
 // ✅ 記住我 / 保持登入狀態
 // ✅ 登入成功後強制輸入企業引薦碼（若無）
 // ✅ 忘記密碼
+// 🔧 修復：導航錯誤 'Home' -> 'MainTabs'
 // ==========================================
 
 import React, { useState, useEffect } from 'react';
@@ -147,10 +148,11 @@ const LoginScreen = ({ navigation, route }) => {
           parentOnLoginSuccess(userData);
         }
         
+        // 🔧 修復：從 'Home' 改為 'MainTabs'
         navigation.dispatch(
           CommonActions.reset({
             index: 0,
-            routes: [{ name: 'Home' }],
+            routes: [{ name: 'MainTabs' }],
           })
         );
       } else {
@@ -192,10 +194,11 @@ const LoginScreen = ({ navigation, route }) => {
       if (navigation.canGoBack()) {
         navigation.goBack();
       } else {
+        // 🔧 修復：從 'Home' 改為 'MainTabs'
         navigation.dispatch(
           CommonActions.reset({
             index: 0,
-            routes: [{ name: 'Home' }],
+            routes: [{ name: 'MainTabs' }],
           })
         );
       }
@@ -304,37 +307,37 @@ const LoginScreen = ({ navigation, route }) => {
                 {/* 🆕 記住我 & 保持登入狀態 */}
                 <View style={styles.checkboxGroup}>
                   {/* 記住我 */}
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     style={styles.checkboxContainer}
                     onPress={() => handleRememberMeChange(!rememberMe)}
                     activeOpacity={0.7}
                   >
                     <View style={[styles.checkbox, rememberMe && styles.checkboxChecked]}>
-                      {rememberMe && (
-                        <Ionicons name="checkmark" size={14} color="#FFFFFF" />
-                      )}
+                      {rememberMe && <Ionicons name="checkmark" size={14} color="#FFFFFF" />}
                     </View>
                     <Text style={styles.checkboxLabel}>記住我</Text>
                   </TouchableOpacity>
 
                   {/* 保持登入狀態 */}
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     style={styles.checkboxContainer}
                     onPress={() => handleStayLoggedInChange(!stayLoggedIn)}
                     activeOpacity={0.7}
                   >
                     <View style={[styles.checkbox, stayLoggedIn && styles.checkboxChecked]}>
-                      {stayLoggedIn && (
-                        <Ionicons name="checkmark" size={14} color="#FFFFFF" />
-                      )}
+                      {stayLoggedIn && <Ionicons name="checkmark" size={14} color="#FFFFFF" />}
                     </View>
-                    <Text style={styles.checkboxLabel}>保持登入狀態</Text>
+                    <Text style={styles.checkboxLabel}>保持登入</Text>
                   </TouchableOpacity>
                 </View>
 
-                {/* 🆕 提示說明 */}
+                {/* 提示訊息 */}
                 <View style={styles.checkboxHintContainer}>
-                  <Ionicons name="information-circle-outline" size={14} color="#9CA3AF" />
+                  <Ionicons 
+                    name="information-circle-outline" 
+                    size={14} 
+                    color="#9CA3AF" 
+                  />
                   <Text style={styles.checkboxHint}>
                     {stayLoggedIn 
                       ? '下次開啟 App 將自動登入' 
