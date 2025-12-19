@@ -1,7 +1,7 @@
 // ==========================================
 // 檔案名稱: src/screens/home/HomeScreen.js
-// 首頁畫面 - 完整修復版
-// 版本: V3.4 - 修復心情溫度計樣式 + Modal 導航
+// 首頁畫面 - 完整修復版 + 完成度計算 + 恭喜視窗
+// 版本: V4.0 - 永久累計完成度 + 達標慶祝動畫
 // ==========================================
 
 import React, { useState, useEffect } from 'react';
@@ -32,10 +32,7 @@ import BottomNavigation from '../../navigation/BottomNavigation';
 import AppHeader from '../../navigation/AppHeader';
 import LockedOverlay from '../../navigation/LockedOverlay';
 import PlanDetailsModal from './components/PlanDetailsModal';
-import {
-  computeWeeklyCheckIns,
-  computeMonthlyTotal,
-} from './utils/practiceTypeMapping';
+import PlanCompletionModal from './components/PlanCompletionModal';
 
 const { width } = Dimensions.get('window');
 
@@ -47,15 +44,19 @@ const HomeScreen = ({ navigation }) => {
   const [selectedCategory, setSelectedCategory] = useState('plan');
   const [hasEnterpriseCode, setHasEnterpriseCode] = useState(false);
   const [showPlanDetails, setShowPlanDetails] = useState(false);
+  const [showCompletionModal, setShowCompletionModal] = useState(false);
 
-  // 進度數據
+  // 進度數據 - 使用「永久累計」邏輯
   const [goals, setGoals] = useState({
     breathing: { current: 0, target: 3, label: '呼吸練習' },
     goodthings: { current: 0, target: 3, label: '好事書寫' },
-    abcd: { current: 0, target: 3, label: '思維調節' },
-    gratitude: { current: 0, target: 3, label: '感恩練習' },
+    abcd: { current: 3, target: 3, label: '思維調節' }, // 固定值
+    gratitude: { current: 3, target: 3, label: '感恩練習' }, // 固定值
     thermometer: { current: 0, target: 1, label: '心情溫度計' },
   });
+
+  // 記錄上一次的完成度（用於判斷是否剛達標）
+  const [previousProgress, setPreviousProgress] = useState(0);
 
   // ========== 生命週期 ==========
 
@@ -124,7 +125,7 @@ const HomeScreen = ({ navigation }) => {
   };
 
   /**
-   * 載入首頁進度數據
+   * 載入首頁進度數據 - 永久累計邏輯
    */
   const loadHomeProgress = async () => {
     try {
@@ -141,25 +142,38 @@ const HomeScreen = ({ navigation }) => {
 
       console.log('✅ [首頁] 統計數據載入成功');
 
-      const weeklyPractices = stats.weeklyPractices || stats.weekly_practices || [];
-
-      // 計算各練習的完成次數（本週）
-      const breathingCount = weeklyPractices.filter(
-        p => p.practice_type === 'breathing' || 
-             p.practice_type === '呼吸練習' ||
-             p.practice_type === '呼吸穩定力練習'
-      ).length;
+      // ⭐ 使用 categoryStats 來獲取總次數（永久累計）
+      const categoryStats = stats.categoryStats || [];
       
-      const goodthingsCount = weeklyPractices.filter(
-        p => p.practice_type === 'good-things' || 
-             p.practice_type === 'goodthings' ||
-             p.practice_type === '好事書寫' ||
-             p.practice_type === '好事書寫練習'
-      ).length;
+      // 呼吸練習總次數
+      const breathingStat = categoryStats.find(
+        c => c.type === '呼吸穩定力練習' || c.type === 'breathing'
+      );
+      const breathingCount = breathingStat?.sessions || 0;
+      
+      // 好事書寫總次數
+      const goodthingsStat = categoryStats.find(
+        c => c.type === '好事書寫練習' || c.type === '好事書寫' || c.type === 'goodthings'
+      );
+      const goodthingsCount = goodthingsStat?.sessions || 0;
 
-      console.log('📋 [首頁] 本週練習統計:', {
+      // 心情溫度計總次數
+      const thermometerStat = categoryStats.find(
+        c => c.type === '心情溫度計' || c.type === 'thermometer'
+      );
+      const thermometerCount = thermometerStat?.sessions || 0;
+
+      console.log('📋 [首頁] 總練習統計（永久累計）:', {
         breathing: breathingCount,
         goodthings: goodthingsCount,
+        thermometer: thermometerCount,
+      });
+
+      // 計算當前完成度（更新前）
+      const currentProgress = calculateProgress({
+        breathing: breathingCount,
+        goodthings: goodthingsCount,
+        thermometer: thermometerCount,
       });
 
       // 更新進度
@@ -167,12 +181,45 @@ const HomeScreen = ({ navigation }) => {
         ...prev,
         breathing: { ...prev.breathing, current: breathingCount },
         goodthings: { ...prev.goodthings, current: goodthingsCount },
+        thermometer: { ...prev.thermometer, current: thermometerCount },
+        // abcd 和 gratitude 保持固定值 3
       }));
+
+      // 🎉 檢查是否達標（>= 100%）且剛完成練習
+      if (currentProgress >= 100 && previousProgress < 100) {
+        console.log('🎉 [首頁] 首次達標，顯示恭喜視窗！');
+        setTimeout(() => {
+          setShowCompletionModal(true);
+        }, 500);
+      } else if (currentProgress >= 100 && previousProgress >= 100) {
+        console.log('🎊 [首頁] 已達標，每次練習完成都顯示恭喜視窗！');
+        setTimeout(() => {
+          setShowCompletionModal(true);
+        }, 500);
+      }
+
+      // 更新上一次的完成度
+      setPreviousProgress(currentProgress);
 
       console.log('📊 [首頁] 進度數據更新完成');
     } catch (error) {
       console.error('❌ [首頁] 載入進度失敗:', error);
     }
+  };
+
+  /**
+   * 計算完成度百分比
+   */
+  const calculateProgress = (counts) => {
+    const totalTasks = 3 + 3 + 3 + 3 + 1; // 13
+    const completedTasks = Math.min(counts.breathing || 0, 3) + 
+                          Math.min(counts.goodthings || 0, 3) + 
+                          3 + // 思維調節固定
+                          3 + // 感恩練習固定
+                          Math.min(counts.thermometer || 0, 1);
+    
+    const percentage = Math.round((completedTasks / totalTasks) * 100);
+    return Math.min(percentage, 100); // 上限 100%
   };
 
   /**
@@ -237,13 +284,31 @@ const HomeScreen = ({ navigation }) => {
     }, 100);
   };
 
+  const navigateToEmotionThermometer = () => {
+    if (showLoginPrompt()) return;
+    
+    console.log('🌡️ [首頁] 準備導航到心情溫度計');
+    setShowPlanDetails(false);
+    
+    setTimeout(() => {
+      console.log('🌡️ [首頁] 導航到心情溫度計');
+      navigation.navigate('PracticeNavigator', {
+        practiceType: '心情溫度計',
+        onPracticeComplete: async () => {
+          console.log('✅ [首頁] 心情溫度計完成，重新載入進度');
+          await loadHomeProgress();
+        },
+      });
+    }, 100);
+  };
+
   const navigateToResiliencePlan = () => {
     navigation.navigate('EmotionalResiliencePlan');
   };
 
   // 暫不實作的功能
   const handleNotImplemented = (featureName) => {
-    Alert.alert('功能開發中', `${featureName}功能即將推出，敬請期待！`);
+    Alert.alert('功能開發中', `${featureName}功能即將推出,敬請期待！`);
   };
 
   // ========== 計算完成度 ==========
@@ -497,7 +562,7 @@ const HomeScreen = ({ navigation }) => {
 
         {/* ⭐ 心情溫度計卡片 - 完整版 */}
         <Pressable
-          onPress={() => handleNotImplemented('心情溫度計')}
+          onPress={navigateToEmotionThermometer}
           style={({ pressed }) => [
             styles.thermometerCard,
             pressed && styles.thermometerCardPressed,
@@ -569,6 +634,17 @@ const HomeScreen = ({ navigation }) => {
         />
       )}
 
+      {/* 🎉 計劃完成恭喜彈窗 */}
+      {showCompletionModal && (
+        <PlanCompletionModal
+          isOpen={showCompletionModal}
+          onClose={() => {
+            console.log('🎊 [首頁] 關閉恭喜視窗');
+            setShowCompletionModal(false);
+          }}
+        />
+      )}
+
       {/* LOCK 覆蓋層 */}
       {!isLoggedIn && (
         <LockedOverlay 
@@ -590,7 +666,7 @@ const HomeScreen = ({ navigation }) => {
 };
 
 // ==========================================
-// 樣式定義
+// 樣式定義（保持不變）
 // ==========================================
 const styles = StyleSheet.create({
   container: {
