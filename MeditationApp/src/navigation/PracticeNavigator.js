@@ -11,6 +11,7 @@ import EmotionPractice from '../data/practices/EmotionPractice';
 import MindfulnessPractice from '../data/practices/MindfulnessPractice';
 import SelfAwarenessPractice from '../data/practices/SelfAwarenessPractice';
 import GoodThingsJournal from '../data/practices/Goodthingsjournal';
+import EmotionThermometer from '../data/practices/EmotionThermometer';
 
 const PracticeNavigator = ({ route, navigation }) => {
   const { practiceType, onPracticeComplete } = route.params || {};
@@ -117,6 +118,18 @@ const PracticeNavigator = ({ route, navigation }) => {
           route={route}
           onComplete={onPracticeComplete}
           onBack={handleBack}
+        />
+      );
+    
+    case '心情溫度計':
+    case 'emotion-thermometer':
+      return (
+        <EmotionThermometer
+          navigation={navigation}
+          route={route}
+          onComplete={onPracticeComplete}
+          onBack={handleBack}
+          onHome={handleHomeNavigation}
         />
       );
 

@@ -29,6 +29,7 @@ import EmotionPractice from './src/data/practices/EmotionPractice';
 import MindfulnessPractice from './src/data/practices/MindfulnessPractice';
 import SelfAwarenessPractice from './src/data/practices/SelfAwarenessPractice';
 import GoodThingsJournal from './src/data/practices/Goodthingsjournal';
+import EmotionThermometer from './src/data/practices/EmotionThermometer';
 
 // 訓練計畫相關頁面
 import TrainingPlanDetailScreen from './src/screens/practice/training/TrainingPlanDetailScreen';
@@ -147,6 +148,11 @@ const App = () => {
         <Stack.Screen 
           name="GoodThingsJournal" 
           component={GoodThingsJournal}
+          options={{ animation: 'slide_from_bottom' }}
+        />
+        <Stack.Screen 
+          name="EmotionThermometer" 
+          component={EmotionThermometer}
           options={{ animation: 'slide_from_bottom' }}
         />
         

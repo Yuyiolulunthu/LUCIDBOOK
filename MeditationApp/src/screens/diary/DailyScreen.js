@@ -325,6 +325,32 @@ const DailyScreen = ({ navigation, route }) => {
     return data;
   };
 
+  const extractEmotionThermometerData = (practice) => {
+    let data = { 
+      scores: null,
+      totalScore: null,  // 前5題總分
+      riskScore: null,   // 第6題分數
+    };
+    
+    if (practice.form_data) {
+      try {
+        const fd = typeof practice.form_data === 'string' 
+          ? JSON.parse(practice.form_data) 
+          : practice.form_data;
+        
+        if (fd) {
+          data.scores = fd.scores || null;
+          data.totalScore = fd.totalScore || fd.total_score || null;
+          data.riskScore = fd.riskScore || fd.risk_score || null;
+        }
+      } catch (e) {
+        console.warn('parse emotionThermometer form_data failed', e);
+      }
+    }
+    
+    return data;
+  };
+
   const renderDetailModal = () => {
     if (!selectedPractice) return null;
     const totalSeconds = parseInt(selectedPractice.duration_seconds) || 0;
@@ -339,6 +365,7 @@ const DailyScreen = ({ navigation, route }) => {
     const goodThingData = isGoodThings ? extractGoodThingData(selectedPractice) : null;
     const cognitiveData = isCognitive ? extractCognitiveData(selectedPractice) : null;
     const gratitudeData = isGratitude ? extractGratitudeData(selectedPractice) : null;
+    const emotionThermometerData = isMoodThermometer ? extractEmotionThermometerData(selectedPractice) : null;
 
     // 格式化日期
     const formatModalDate = (dateStr) => {
@@ -522,6 +549,42 @@ const DailyScreen = ({ navigation, route }) => {
                     )}
                   </View>
                 </>
+              )}
+
+              {/* 心情溫度計 */}
+              {isMoodThermometer && emotionThermometerData && (
+                <View style={styles.modalSectionThermometer}>
+                  <View style={styles.modalSectionHeader}>
+                    <TrendingUp color="#166CB5" size={14} />
+                    <Text style={styles.modalSectionTitleThermometer}>情緒溫度總分</Text>
+                  </View>
+                  
+                  <View style={styles.thermometerScoreRow}>
+                    <Text style={styles.thermometerScoreValue}>
+                      {emotionThermometerData.totalScore ?? 0}
+                    </Text>
+                    <Text style={styles.thermometerScoreMax}>/20</Text>
+                  </View>
+                  
+                  {/* 漸層進度條 */}
+                  <View style={styles.thermometerBarContainer}>
+                    <View style={styles.thermometerBarBg}>
+                      <LinearGradient
+                        colors={['#60a5fa', '#818cf8', '#a78bfa']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                        style={[
+                          styles.thermometerBarFill,
+                          { width: `${Math.min(((emotionThermometerData.totalScore ?? 0) / 20) * 100, 100)}%` }
+                        ]}
+                      />
+                    </View>
+                    <View style={styles.thermometerBarLabels}>
+                      <Text style={styles.thermometerBarLabel}>低強度</Text>
+                      <Text style={styles.thermometerBarLabel}>高強度</Text>
+                    </View>
+                  </View>
+                </View>
               )}
 
               <View style={{ height: 20 }} />
@@ -1204,6 +1267,62 @@ const styles = StyleSheet.create({
   emotionTagBlueText: {
     fontSize: 11,
     color: '#2563EB',
+  },
+
+  // 心情溫度計區塊
+  modalSectionThermometer: {
+    backgroundColor: '#EBF5FF',
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 12,
+    alignItems: 'center',
+  },
+  modalSectionTitleThermometer: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#166CB5',
+  },
+  thermometerScoreRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'center',
+    marginTop: 16,
+    marginBottom: 20,
+  },
+  thermometerScoreValue: {
+    fontSize: 56,
+    fontWeight: '700',
+    color: '#166CB5',
+    lineHeight: 64,
+  },
+  thermometerScoreMax: {
+    fontSize: 20,
+    color: '#9CA3AF',
+    marginLeft: 4,
+  },
+  thermometerBarContainer: {
+    width: '100%',
+    paddingHorizontal: 8,
+  },
+  thermometerBarBg: {
+    height: 12,
+    backgroundColor: '#fcfdffff',
+    borderRadius: 6,
+    overflow: 'hidden',
+    marginBottom: 8,
+  },
+  thermometerBarFill: {
+    height: '100%',
+    borderRadius: 6,
+  },
+  thermometerBarLabels: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  thermometerBarLabel: {
+    fontSize: 11,
+    color: '#9CA3AF',
+    fontWeight: '500',
   },
   
   // 練習內容區塊
