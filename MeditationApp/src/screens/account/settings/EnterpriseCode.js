@@ -10,6 +10,7 @@
 // 🎨 白色圓角卡片設計
 // 🆕 必填模式（從註冊/登入進入時不能跳過）
 // 🆕 Onboarding Modal
+// 🔧 修復：導航錯誤 'Home' -> 'MainTabs'
 // ==========================================
 
 import React, { useState, useRef, useEffect } from 'react';
@@ -315,10 +316,10 @@ const EnterpriseCode = ({ navigation, route }) => {
   const handleOnboardingComplete = () => {
     setShowOnboarding(false);
     
-    // 直接進入首頁
+    // 🔧 修復：直接進入首頁（MainTabs）
     navigation.reset({
       index: 0,
-      routes: [{ name: 'Home' }],
+      routes: [{ name: 'MainTabs' }],
     });
   };
 
@@ -326,10 +327,10 @@ const EnterpriseCode = ({ navigation, route }) => {
     console.log('🎯 handleNavigationAfterSuccess called');
     
     if (isFromLogin || isFromRegister) {
-      console.log('✅ From login/register → navigating to Home');
+      console.log('✅ From login/register → navigating to MainTabs');
       navigation.reset({
         index: 0,
-        routes: [{ name: 'Home' }],
+        routes: [{ name: 'MainTabs' }],
       });
       
     } else if (isFromManagement) {
@@ -341,13 +342,13 @@ const EnterpriseCode = ({ navigation, route }) => {
       navigation.goBack();
       
     } else {
-      console.log('✅ Default → attempting to navigate home');
+      console.log('✅ Default → attempting to navigate to MainTabs');
       if (navigation.canGoBack()) {
         navigation.goBack();
       } else {
         navigation.reset({
           index: 0,
-          routes: [{ name: 'Home' }],
+          routes: [{ name: 'MainTabs' }],
         });
       }
     }
@@ -414,13 +415,13 @@ const EnterpriseCode = ({ navigation, route }) => {
       navigation.goBack();
       
     } else {
-      console.log('✅ Default skip → attempting to navigate home');
+      console.log('✅ Default skip → attempting to navigate to MainTabs');
       if (navigation.canGoBack()) {
         navigation.goBack();
       } else {
         navigation.reset({
           index: 0,
-          routes: [{ name: 'Home' }],
+          routes: [{ name: 'MainTabs' }],
         });
       }
     }
