@@ -19,7 +19,9 @@
       "bundleIdentifier": "com.lucidbook",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
-        "UIBackgroundModes": ["remote-notification"]
+        "UIBackgroundModes": [
+          "remote-notification"
+        ]
       }
     },
     "android": {
@@ -43,7 +45,7 @@
     ],
     "extra": {
       "eas": {
-        "projectId": "e13cf8b6-91d7-4821-ae3c-a3866c2f14d4"
+        "projectId": "84ee6734-2720-452a-ae4a-47e575690763"
       }
     }
   }
