@@ -1,7 +1,7 @@
 // ==========================================
 // 檔案名稱: src/screens/home/HomeScreen.js
 // 首頁畫面 - 完整修復版 + 完成度計算 + 恭喜視窗
-// 版本: V4.2 - 新增思維調節 + 感恩練習導航
+// 版本: V4.3 - 修正完成度計算邏輯
 // ==========================================
 
 import React, { useState, useEffect } from 'react';
@@ -51,7 +51,7 @@ const HomeScreen = ({ navigation }) => {
     breathing: { current: 0, target: 3, label: '呼吸練習' },
     goodthings: { current: 0, target: 3, label: '好事書寫' },
     abcd: { current: 0, target: 3, label: '思維調節' },
-    gratitude: { current: 0, target: 3, label: '感恩練習' }, // ⭐ 改為動態
+    gratitude: { current: 0, target: 3, label: '感恩練習' },
     thermometer: { current: 0, target: 1, label: '心情溫度計' },
   });
 
@@ -122,6 +122,32 @@ const HomeScreen = ({ navigation }) => {
       setIsInitializing(false);
       console.log('🏁 [HomeScreen] 初始化完成');
     }
+  };
+
+  /**
+   * ⭐ 統一的完成度計算函數
+   * 每種練習分開計算，貢獻值不超過目標值，總完成度上限 100%
+   */
+  const calculateProgress = (counts) => {
+    const targets = {
+      breathing: 3,
+      goodthings: 3,
+      abcd: 3,
+      gratitude: 3,
+      thermometer: 1,
+    };
+    
+    const totalTarget = targets.breathing + targets.goodthings + targets.abcd + targets.gratitude + targets.thermometer; // 13
+    
+    // 每種練習的貢獻不超過其目標值
+    const completed = Math.min(counts.breathing || 0, targets.breathing) +
+                     Math.min(counts.goodthings || 0, targets.goodthings) +
+                     Math.min(counts.abcd || 0, targets.abcd) +
+                     Math.min(counts.gratitude || 0, targets.gratitude) +
+                     Math.min(counts.thermometer || 0, targets.thermometer);
+    
+    const percentage = Math.round((completed / totalTarget) * 100);
+    return Math.min(percentage, 100); // 上限 100%
   };
 
   /**
@@ -218,25 +244,10 @@ const HomeScreen = ({ navigation }) => {
       // 更新上一次的完成度
       setPreviousProgress(currentProgress);
 
-      console.log('📊 [首頁] 進度數據更新完成');
+      console.log('📊 [首頁] 進度數據更新完成，完成度:', currentProgress + '%');
     } catch (error) {
       console.error('❌ [首頁] 載入進度失敗:', error);
     }
-  };
-
-  /**
-   * 計算完成度百分比
-   */
-  const calculateProgress = (counts) => {
-    const totalTasks = 3 + 3 + 3 + 3 + 1; // 13
-    const completedTasks = Math.min(counts.breathing || 0, 3) + 
-                          Math.min(counts.goodthings || 0, 3) + 
-                          Math.min(counts.abcd || 0, 3) +
-                          Math.min(counts.gratitude || 0, 3) +
-                          Math.min(counts.thermometer || 0, 1);
-    
-    const percentage = Math.round((completedTasks / totalTasks) * 100);
-    return Math.min(percentage, 100); // 上限 100%
   };
 
   /**
@@ -370,10 +381,14 @@ const HomeScreen = ({ navigation }) => {
     Alert.alert('功能開發中', `${featureName}功能即將推出,敬請期待！`);
   };
 
-  // ========== 計算完成度 ==========
-  const totalTasks = Object.values(goals).reduce((acc, curr) => acc + curr.target, 0);
-  const completedTasks = Object.values(goals).reduce((acc, curr) => acc + Math.min(curr.current, curr.target), 0);
-  const progressPercentage = Math.round((completedTasks / totalTasks) * 100);
+  // ========== ⭐ 計算完成度（使用統一函數）==========
+  const progressPercentage = calculateProgress({
+    breathing: goals.breathing.current,
+    goodthings: goals.goodthings.current,
+    abcd: goals.abcd.current,
+    gratitude: goals.gratitude.current,
+    thermometer: goals.thermometer.current,
+  });
 
   // ========== 練習模組配置 ==========
   const practiceModules = [
@@ -421,7 +436,7 @@ const HomeScreen = ({ navigation }) => {
       bgColor: '#FDF2F8',
       iconColor: '#EC4899',
       gradientColors: ['#F9A8D4', '#EC4899'],
-      action: navigateToGratitude, // ⭐ 改為實際導航
+      action: navigateToGratitude,
       current: goals.gratitude.current,
       target: goals.gratitude.target
     },
@@ -573,7 +588,7 @@ const HomeScreen = ({ navigation }) => {
                       </View>
                       <View style={styles.practiceProgressBlue}>
                         <Text style={styles.practiceProgressTextBlue}>
-                          {module.current}/{module.target}
+                          {Math.min(module.current, module.target)}/{module.target}
                         </Text>
                       </View>
                     </View>
@@ -582,7 +597,7 @@ const HomeScreen = ({ navigation }) => {
                     <View style={styles.practiceCardBottom}>
                       <Text style={styles.practiceTitleBlue}>{module.title}</Text>
                       <Text style={styles.practiceSubtitleBlue}>
-                        {isCompleted ? '已完成目標' : '點擊開始練習'}
+                        {isCompleted ? '已完成目標 ✓' : '點擊開始練習'}
                       </Text>
                     </View>
                   </LinearGradient>
@@ -600,7 +615,7 @@ const HomeScreen = ({ navigation }) => {
                       </View>
                       <View style={styles.practiceProgress}>
                         <Text style={styles.practiceProgressText}>
-                          {module.current}/{module.target}
+                          {Math.min(module.current, module.target)}/{module.target}
                         </Text>
                       </View>
                     </View>
@@ -609,7 +624,7 @@ const HomeScreen = ({ navigation }) => {
                     <View style={styles.practiceCardBottom}>
                       <Text style={styles.practiceTitle}>{module.title}</Text>
                       <Text style={styles.practiceSubtitle}>
-                        {isCompleted ? '已完成目標' : '點擊開始練習'}
+                        {isCompleted ? '已完成目標 ✓' : '點擊開始練習'}
                       </Text>
                     </View>
                   </View>
@@ -649,7 +664,8 @@ const HomeScreen = ({ navigation }) => {
               <View style={styles.thermometerInfo}>
                 <Text style={styles.thermometerTitle}>心情溫度計</Text>
                 <Text style={styles.thermometerProgress}>
-                  {goals.thermometer.current}/{goals.thermometer.target}
+                  {Math.min(goals.thermometer.current, goals.thermometer.target)}/{goals.thermometer.target}
+                  {goals.thermometer.current >= goals.thermometer.target && ' ✓'}
                 </Text>
               </View>
 
@@ -725,7 +741,7 @@ const HomeScreen = ({ navigation }) => {
 };
 
 // ==========================================
-// 樣式定義（保持不變）
+// 樣式定義
 // ==========================================
 const styles = StyleSheet.create({
   container: {
