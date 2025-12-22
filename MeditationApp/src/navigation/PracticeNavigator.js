@@ -1,7 +1,7 @@
 // ==========================================
 // 檔案名稱: src/navigation/PracticeNavigator.js
 // 練習導航器 - 統一管理所有練習頁面的導航
-// 版本: V2.0 - 修復 Home 按鈕導航問題
+// 版本: V2.2 - 新增思維調節 + 感恩練習
 // ==========================================
 
 import React from 'react';
@@ -12,6 +12,8 @@ import MindfulnessPractice from '../data/practices/MindfulnessPractice';
 import SelfAwarenessPractice from '../data/practices/SelfAwarenessPractice';
 import GoodThingsJournal from '../data/practices/Goodthingsjournal';
 import EmotionThermometer from '../data/practices/EmotionThermometer';
+import CognitiveReframingPractice from '../data/practices/CognitiveReframingPractice';
+import GratitudePractice from '../data/practices/GratitudePractice'; // ⭐ 新增
 
 const PracticeNavigator = ({ route, navigation }) => {
   const { practiceType, onPracticeComplete } = route.params || {};
@@ -123,11 +125,43 @@ const PracticeNavigator = ({ route, navigation }) => {
     
     case '心情溫度計':
     case 'emotion-thermometer':
+      console.log('🌡️ [PracticeNavigator] 渲染心情溫度計');
       return (
         <EmotionThermometer
           navigation={navigation}
           route={route}
           onComplete={onPracticeComplete}
+          onBack={handleBack}
+          onHome={handleHomeNavigation}
+        />
+      );
+
+    // ⭐ 思維調節練習
+    case '思維調節練習':
+    case '思維調節':
+    case 'cognitive-reframing':
+    case 'abcd':
+      console.log('🧠 [PracticeNavigator] 渲染思維調節練習');
+      return (
+        <CognitiveReframingPractice
+          navigation={navigation}
+          route={route}
+          onBack={handleBack}
+          onHome={handleHomeNavigation}
+        />
+      );
+
+    // ⭐⭐⭐ 新增：感恩練習 ⭐⭐⭐
+    case '感恩練習':
+    case '感恩日記':
+    case '迷你感謝信':
+    case '如果練習':
+    case 'gratitude':
+      console.log('💝 [PracticeNavigator] 渲染感恩練習');
+      return (
+        <GratitudePractice
+          navigation={navigation}
+          route={route}
           onBack={handleBack}
           onHome={handleHomeNavigation}
         />

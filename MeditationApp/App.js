@@ -1,7 +1,7 @@
 // ==========================================
 // 檔案名稱: App.js 
 // 應用主入口 - 改用Tab Navigator
-// 版本: V3.0 - 重構導航架構
+// 版本: V3.2 - 新增思維調節 + 感恩練習路由
 // ==========================================
 
 import React from 'react';
@@ -30,6 +30,8 @@ import MindfulnessPractice from './src/data/practices/MindfulnessPractice';
 import SelfAwarenessPractice from './src/data/practices/SelfAwarenessPractice';
 import GoodThingsJournal from './src/data/practices/Goodthingsjournal';
 import EmotionThermometer from './src/data/practices/EmotionThermometer';
+import CognitiveReframingPractice from './src/data/practices/CognitiveReframingPractice';
+import GratitudePractice from './src/data/practices/GratitudePractice'; // ⭐ 新增
 
 // 訓練計畫相關頁面
 import TrainingPlanDetailScreen from './src/screens/practice/training/TrainingPlanDetailScreen';
@@ -153,6 +155,18 @@ const App = () => {
         <Stack.Screen 
           name="EmotionThermometer" 
           component={EmotionThermometer}
+          options={{ animation: 'slide_from_bottom' }}
+        />
+        {/* 思維調節練習 */}
+        <Stack.Screen 
+          name="CognitiveReframingPractice" 
+          component={CognitiveReframingPractice}
+          options={{ animation: 'slide_from_bottom' }}
+        />
+        {/* ⭐ 新增：感恩練習 */}
+        <Stack.Screen 
+          name="GratitudePractice" 
+          component={GratitudePractice}
           options={{ animation: 'slide_from_bottom' }}
         />
         

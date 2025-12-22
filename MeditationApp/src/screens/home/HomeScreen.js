@@ -1,7 +1,7 @@
 // ==========================================
 // 檔案名稱: src/screens/home/HomeScreen.js
 // 首頁畫面 - 完整修復版 + 完成度計算 + 恭喜視窗
-// 版本: V4.0 - 永久累計完成度 + 達標慶祝動畫
+// 版本: V4.2 - 新增思維調節 + 感恩練習導航
 // ==========================================
 
 import React, { useState, useEffect } from 'react';
@@ -50,8 +50,8 @@ const HomeScreen = ({ navigation }) => {
   const [goals, setGoals] = useState({
     breathing: { current: 0, target: 3, label: '呼吸練習' },
     goodthings: { current: 0, target: 3, label: '好事書寫' },
-    abcd: { current: 3, target: 3, label: '思維調節' }, // 固定值
-    gratitude: { current: 3, target: 3, label: '感恩練習' }, // 固定值
+    abcd: { current: 0, target: 3, label: '思維調節' },
+    gratitude: { current: 0, target: 3, label: '感恩練習' }, // ⭐ 改為動態
     thermometer: { current: 0, target: 1, label: '心情溫度計' },
   });
 
@@ -163,10 +163,24 @@ const HomeScreen = ({ navigation }) => {
       );
       const thermometerCount = thermometerStat?.sessions || 0;
 
+      // 思維調節總次數
+      const abcdStat = categoryStats.find(
+        c => c.type === '思維調節練習' || c.type === '思維調節' || c.type === 'abcd'
+      );
+      const abcdCount = abcdStat?.sessions || 0;
+
+      // ⭐ 感恩練習總次數（包含三種子練習）
+      const gratitudeStat = categoryStats.find(
+        c => c.type === '感恩練習' || c.type === '感恩日記' || c.type === '迷你感謝信' || c.type === '如果練習' || c.type === 'gratitude'
+      );
+      const gratitudeCount = gratitudeStat?.sessions || 0;
+
       console.log('📋 [首頁] 總練習統計（永久累計）:', {
         breathing: breathingCount,
         goodthings: goodthingsCount,
         thermometer: thermometerCount,
+        abcd: abcdCount,
+        gratitude: gratitudeCount,
       });
 
       // 計算當前完成度（更新前）
@@ -174,6 +188,8 @@ const HomeScreen = ({ navigation }) => {
         breathing: breathingCount,
         goodthings: goodthingsCount,
         thermometer: thermometerCount,
+        abcd: abcdCount,
+        gratitude: gratitudeCount,
       });
 
       // 更新進度
@@ -182,7 +198,8 @@ const HomeScreen = ({ navigation }) => {
         breathing: { ...prev.breathing, current: breathingCount },
         goodthings: { ...prev.goodthings, current: goodthingsCount },
         thermometer: { ...prev.thermometer, current: thermometerCount },
-        // abcd 和 gratitude 保持固定值 3
+        abcd: { ...prev.abcd, current: abcdCount },
+        gratitude: { ...prev.gratitude, current: gratitudeCount },
       }));
 
       // 🎉 檢查是否達標（>= 100%）且剛完成練習
@@ -214,8 +231,8 @@ const HomeScreen = ({ navigation }) => {
     const totalTasks = 3 + 3 + 3 + 3 + 1; // 13
     const completedTasks = Math.min(counts.breathing || 0, 3) + 
                           Math.min(counts.goodthings || 0, 3) + 
-                          3 + // 思維調節固定
-                          3 + // 感恩練習固定
+                          Math.min(counts.abcd || 0, 3) +
+                          Math.min(counts.gratitude || 0, 3) +
                           Math.min(counts.thermometer || 0, 1);
     
     const percentage = Math.round((completedTasks / totalTasks) * 100);
@@ -302,6 +319,48 @@ const HomeScreen = ({ navigation }) => {
     }, 100);
   };
 
+  /**
+   * 🧠 導航到思維調節練習
+   */
+  const navigateToCognitiveReframing = () => {
+    if (showLoginPrompt()) return;
+    
+    console.log('🧠 [首頁] 準備導航到思維調節練習');
+    setShowPlanDetails(false);
+    
+    setTimeout(() => {
+      console.log('🧠 [首頁] 導航到思維調節練習');
+      navigation.navigate('PracticeNavigator', {
+        practiceType: '思維調節練習',
+        onPracticeComplete: async () => {
+          console.log('✅ [首頁] 思維調節練習完成，重新載入進度');
+          await loadHomeProgress();
+        },
+      });
+    }, 100);
+  };
+
+  /**
+   * 💝 導航到感恩練習
+   */
+  const navigateToGratitude = () => {
+    if (showLoginPrompt()) return;
+    
+    console.log('💝 [首頁] 準備導航到感恩練習');
+    setShowPlanDetails(false);
+    
+    setTimeout(() => {
+      console.log('💝 [首頁] 導航到感恩練習');
+      navigation.navigate('PracticeNavigator', {
+        practiceType: '感恩練習',
+        onPracticeComplete: async () => {
+          console.log('✅ [首頁] 感恩練習完成，重新載入進度');
+          await loadHomeProgress();
+        },
+      });
+    }, 100);
+  };
+
   const navigateToResiliencePlan = () => {
     navigation.navigate('EmotionalResiliencePlan');
   };
@@ -350,7 +409,7 @@ const HomeScreen = ({ navigation }) => {
       bgColor: '#F5F3FF',
       iconColor: '#A855F7',
       gradientColors: ['#C084FC', '#A855F7'],
-      action: () => handleNotImplemented('思維調節'),
+      action: navigateToCognitiveReframing,
       current: goals.abcd.current,
       target: goals.abcd.target
     },
@@ -362,7 +421,7 @@ const HomeScreen = ({ navigation }) => {
       bgColor: '#FDF2F8',
       iconColor: '#EC4899',
       gradientColors: ['#F9A8D4', '#EC4899'],
-      action: () => handleNotImplemented('感恩練習'),
+      action: navigateToGratitude, // ⭐ 改為實際導航
       current: goals.gratitude.current,
       target: goals.gratitude.target
     },
