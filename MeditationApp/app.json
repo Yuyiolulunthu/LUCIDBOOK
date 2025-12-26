@@ -2,7 +2,7 @@
   "expo": {
     "name": "LUCIDBOOK",
     "slug": "lucidbook",
-    "version": "2.3.3",
+    "version": "2.3.4",
     "orientation": "portrait",
     "icon": "./assets/images/lucidbook.png",
     "userInterfaceStyle": "light",
@@ -15,13 +15,16 @@
       "**/*"
     ],
     "ios": {
+      "buildNumber": "4",
       "supportsTablet": true,
       "bundleIdentifier": "com.lucidbook",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "UIBackgroundModes": [
           "remote-notification"
-        ]
+        ],
+        "NSCameraUsageDescription": "LUCIDBOOK 需要使用相機以完成您的大頭貼設定",
+        "NSPhotoLibraryUsageDescription": "LUCIDBOOK 需要存取您的相簿以選擇大頭貼照片"
       }
     },
     "android": {
@@ -30,7 +33,13 @@
         "backgroundColor": "#ffffff"
       },
       "package": "com.lucidbook",
-      "versionCode": 3
+      "versionCode": 4,
+      "permissions": [
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "READ_MEDIA_IMAGES"
+      ]
     },
     "web": {
       "favicon": "./assets/images/lucidbook.png"
@@ -45,7 +54,7 @@
     ],
     "extra": {
       "eas": {
-        "projectId": "84ee6734-2720-452a-ae4a-47e575690763"
+        "projectId": "e13cf8b6-91d7-4821-ae3c-a3866c2f14d4"
       }
     }
   }
