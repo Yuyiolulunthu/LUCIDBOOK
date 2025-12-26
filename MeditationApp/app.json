@@ -33,7 +33,7 @@
         "backgroundColor": "#ffffff"
       },
       "package": "com.lucidbook",
-      "versionCode": 4,
+      "versionCode": 26,
       "permissions": [
         "CAMERA",
         "READ_EXTERNAL_STORAGE",
