@@ -1,5 +1,5 @@
 // GoodThingsJournalNew.js - 完美修正版
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -130,6 +130,38 @@ const InfoModal = ({ visible, onClose }) => {
   );
 };
 
+// ==================== 常數資料 ====================
+const EVENT_WRITING_TIPS = [
+  "當時的情況是什麼？",
+  "你當時的想法、念頭是什麼？"
+];
+
+const EVENT_EXAMPLES = [
+  "吃到好吃的早餐",
+  "天氣很好，看到了藍天",
+  "完成了一件拖延很久的工作",
+  "朋友傳來關心的訊息",
+  "睡了一個好覺",
+  "在路上看到可愛的貓咪",
+  "準時下班",
+  "讀到一本好書"
+];
+
+const REASON_WRITING_TIPS = [
+  "是否可能因為你打開了好事覺察的視角？",
+  "是否可能因為你願意注意他人的友善？",
+  "是否可能因為你用不同的心情面對這一天？"
+];
+
+const REASON_EXAMPLES = [
+  "試著嘗試新鮮事",
+  "對待他人友善",
+  "更注意周遭的人事物",
+  "享受當下",
+  "決定好好照顧自己",
+  "努力讓自己心情好起來"
+];
+
 // ==================== 主組件 ====================
 export default function GoodThingsJournalNew({ onBack, navigation, onHome }) {
   const [currentPage, setCurrentPage] = useState('intro');
@@ -183,6 +215,30 @@ export default function GoodThingsJournalNew({ onBack, navigation, onHome }) {
   };
 
   const totalSteps = 4;
+
+  // ==================== 優化的回調函數 ====================
+  const handleExampleClick = useCallback((example, isEvent) => {
+    setFormData(prev => {
+      const field = isEvent ? 'goodThing' : 'reason';
+      const currentValue = prev[field];
+      return {
+        ...prev,
+        [field]: currentValue ? `${currentValue}\n${example}` : example
+      };
+    });
+  }, []);
+
+  const handleTextChange = useCallback((field, text) => {
+    setFormData(prev => ({ ...prev, [field]: text }));
+  }, []);
+
+  const toggleShowTips = useCallback(() => {
+    setShowTips(prev => !prev);
+  }, []);
+
+  const toggleShowExamples = useCallback(() => {
+    setShowExamples(prev => !prev);
+  }, []);
 
   // ==================== Practice 管理 ====================
   const initializePractice = async () => {
@@ -313,7 +369,10 @@ export default function GoodThingsJournalNew({ onBack, navigation, onHome }) {
       emotion: () => setCurrentPage('event'),
       reason: () => setCurrentPage('emotion'),
       assessment: () => setCurrentPage('reason'),
-      completion: () => setCurrentPage('assessment'),
+      completion: () => {
+        // 從完成頁面返回就直接回首頁
+        onBack?.() || navigation?.goBack();
+      },
     };
     backMap[currentPage]?.();
   };
@@ -423,21 +482,6 @@ export default function GoodThingsJournalNew({ onBack, navigation, onHome }) {
 
   // 2. 好事發生頁
   const renderEventPage = () => {
-    const writingTips = [
-      "當時的情況是什麼？",
-      "你當時的想法、念頭是什麼？"
-    ];
-    
-    const examples = [
-      "吃到好吃的早餐",
-      "天氣很好，看到了藍天",
-      "完成了一件拖延很久的工作",
-      "朋友傳來關心的訊息",
-      "睡了一個好覺",
-      "在路上看到可愛的貓咪",
-      "準時下班",
-      "讀到一本好書"
-    ];
 
     return (
       <KeyboardAvoidingView
@@ -483,6 +527,10 @@ export default function GoodThingsJournalNew({ onBack, navigation, onHome }) {
                   { paddingBottom: isKeyboardVisible ? 200 : 120 }
                 ]}
                 keyboardShouldPersistTaps="handled"
+                removeClippedSubviews={true} 
+                maxToRenderPerBatch={10} 
+                updateCellsBatchingPeriod={50}
+                windowSize={7}
               >
                 <View style={styles.inputCard}>
                   <TextInput
@@ -491,16 +539,16 @@ export default function GoodThingsJournalNew({ onBack, navigation, onHome }) {
                     placeholder="今天因為坐過站而走了不同的路去公司，因此買了不同的早餐店，沒想到卻超級好吃，吃得當下想說：好險有做過站，不然永遠不知道這家店啊！"
                     placeholderTextColor="#cbd5e1"
                     value={formData.goodThing}
-                    onChangeText={text => setFormData(prev => ({ ...prev, goodThing: text }))}
+                    onChangeText={(text) => handleTextChange('goodThing', text)}
                     textAlignVertical="top"
                   />
                 </View>
 
                 {/* 書寫提示 */}
-                {writingTips.length > 0 && (
+                {EVENT_WRITING_TIPS.length > 0 && (
                   <View style={styles.tipsSection}>
                     <TouchableOpacity
-                      onPress={() => setShowTips(!showTips)}
+                      onPress={toggleShowTips} 
                       style={styles.tipsToggle}
                     >
                       {showTips ? <ChevronUp size={16} color="#0ea5e9" /> : <ChevronDown size={16} color="#0ea5e9" />}
@@ -509,7 +557,7 @@ export default function GoodThingsJournalNew({ onBack, navigation, onHome }) {
 
                     {showTips && (
                       <View style={styles.tipsContent}>
-                        {writingTips.map((tip, i) => (
+                        {EVENT_WRITING_TIPS.map((tip, i) => (
                           <View key={i} style={styles.tipItem}>
                             <View style={styles.tipBullet} />
                             <Text style={styles.tipText}>{tip}</Text>
@@ -521,10 +569,10 @@ export default function GoodThingsJournalNew({ onBack, navigation, onHome }) {
                 )}
 
                 {/* 參考範例 */}
-                {examples.length > 0 && (
+                {EVENT_EXAMPLES.length > 0 && (
                   <View style={styles.examplesSection}>
                     <TouchableOpacity
-                      onPress={() => setShowExamples(!showExamples)}
+                      onPress={toggleShowExamples} 
                       style={styles.examplesToggle}
                     >
                       <Lightbulb size={16} color="#0ea5e9" />
@@ -535,14 +583,11 @@ export default function GoodThingsJournalNew({ onBack, navigation, onHome }) {
 
                     {showExamples && (
                       <View style={styles.examplesContent}>
-                        {examples.map((ex, i) => (
+                        {EVENT_EXAMPLES.map((ex, i) => (
                           <TouchableOpacity
                             key={i}
                             style={styles.exampleChip}
-                            onPress={() => setFormData(prev => ({ 
-                              ...prev, 
-                              goodThing: prev.goodThing ? `${prev.goodThing}\n${ex}` : ex 
-                            }))}
+                            onPress={() => handleExampleClick(ex, true)}
                           >
                             <Text style={styles.exampleText}>{ex}</Text>
                             <Plus size={14} color="#0ea5e9" />
@@ -718,20 +763,6 @@ export default function GoodThingsJournalNew({ onBack, navigation, onHome }) {
 
   // 4. 好事再發生頁
   const renderReasonPage = () => {
-    const writingTips = [
-      "是否可能因為你打開了好事覺察的視角？",
-      "是否可能因為你願意注意他人的友善？",
-      "是否可能因為你用不同的心情面對這一天？"
-    ];
-    
-    const examples = [
-      "試著嘗試新鮮事",
-      "對待他人友善",
-      "更注意周遭的人事物",
-      "享受當下",
-      "決定好好照顧自己",
-      "努力讓自己心情好起來"
-    ];
 
     return (
       <KeyboardAvoidingView
@@ -774,6 +805,10 @@ export default function GoodThingsJournalNew({ onBack, navigation, onHome }) {
                   { paddingBottom: isKeyboardVisible ? 200 : 120 }
                 ]}
                 keyboardShouldPersistTaps="handled"
+                removeClippedSubviews={true} 
+                maxToRenderPerBatch={10}   
+                updateCellsBatchingPeriod={50} 
+                windowSize={7}
               >
                 <View style={styles.inputCard}>
                   <TextInput
@@ -782,16 +817,16 @@ export default function GoodThingsJournalNew({ onBack, navigation, onHome }) {
                     placeholder="1. 不要拖到最後一刻才出門，才有充裕的時間悠閒買早餐。2. 跨出舒適圈，勇於嘗試新的事物。"
                     placeholderTextColor="#cbd5e1"
                     value={formData.reason}
-                    onChangeText={text => setFormData(prev => ({ ...prev, reason: text }))}
+                    onChangeText={(text) => handleTextChange('reason', text)} 
                     textAlignVertical="top"
                   />
                 </View>
 
                 {/* 書寫提示 */}
-                {writingTips.length > 0 && (
+                {REASON_WRITING_TIPS.length > 0 && (
                   <View style={styles.tipsSection}>
                     <TouchableOpacity
-                      onPress={() => setShowTips(!showTips)}
+                      onPress={toggleShowTips} 
                       style={styles.tipsToggle}
                     >
                       {showTips ? <ChevronUp size={16} color="#0ea5e9" /> : <ChevronDown size={16} color="#0ea5e9" />}
@@ -800,7 +835,7 @@ export default function GoodThingsJournalNew({ onBack, navigation, onHome }) {
 
                     {showTips && (
                       <View style={styles.tipsContent}>
-                        {writingTips.map((tip, i) => (
+                        {REASON_WRITING_TIPS.map((tip, i) => (
                           <View key={i} style={styles.tipItem}>
                             <View style={styles.tipBullet} />
                             <Text style={styles.tipText}>{tip}</Text>
@@ -812,10 +847,10 @@ export default function GoodThingsJournalNew({ onBack, navigation, onHome }) {
                 )}
 
                 {/* 參考範例 */}
-                {examples.length > 0 && (
+                {REASON_EXAMPLES.length > 0 && (
                   <View style={styles.examplesSection}>
                     <TouchableOpacity
-                      onPress={() => setShowExamples(!showExamples)}
+                      onPress={toggleShowExamples} 
                       style={styles.examplesToggle}
                     >
                       <Lightbulb size={16} color="#0ea5e9" />
@@ -826,14 +861,11 @@ export default function GoodThingsJournalNew({ onBack, navigation, onHome }) {
 
                     {showExamples && (
                       <View style={styles.examplesContent}>
-                        {examples.map((ex, i) => (
+                        {REASON_EXAMPLES.map((ex, i) => (
                           <TouchableOpacity
                             key={i}
                             style={styles.exampleChip}
-                            onPress={() => setFormData(prev => ({ 
-                              ...prev, 
-                              reason: prev.reason ? `${prev.reason}\n${ex}` : ex 
-                            }))}
+                            onPress={() => handleExampleClick(ex, false)}
                           >
                             <Text style={styles.exampleText}>{ex}</Text>
                             <Plus size={14} color="#0ea5e9" />

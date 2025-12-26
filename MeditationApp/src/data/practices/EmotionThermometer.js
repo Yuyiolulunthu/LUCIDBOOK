@@ -147,17 +147,22 @@ const EmotionThermometer = ({ navigation, route }) => {
     const currentQuestion = QUESTIONS[currentQuestionIndex];
     console.log(`📝 [問卷] 第 ${currentQuestionIndex + 1} 題 (ID: ${currentQuestion.id}) 選擇答案: ${score}`);
     
-    // 建立包含新答案的完整 answers 物件
     const updatedAnswers = { ...answers, [currentQuestion.id]: score };
     console.log('📝 [問卷] 更新後的 answers:', updatedAnswers);
     
     setAnswers(updatedAnswers);
     
+    // ⭐ 第六題（風險題）不自動跳轉，需要手動點擊「下一步」
+    if (currentQuestion.isRisk) {
+      console.log('⚠️  第六題已選擇，等待使用者手動確認');
+      return;
+    }
+    
+    // 其他題目（第 1-5 題）保持自動跳轉
     setTimeout(() => {
       if (currentQuestionIndex < QUESTIONS.length - 1) {
         setCurrentQuestionIndex(prev => prev + 1);
       } else {
-        // 🔥 關鍵修正：直接使用 updatedAnswers 而不是依賴 answers 狀態
         handleQuestionnaireComplete(updatedAnswers);
       }
     }, 400);
