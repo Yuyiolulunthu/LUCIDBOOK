@@ -1,13 +1,17 @@
 // ==========================================
 // 檔案名稱: App.js 
 // 應用主入口 - 改用Tab Navigator
-// 版本: V3.2 - 新增思維調節 + 感恩練習路由
+// 版本: V3.3 - 新增自動登入檢查（30天Token機制）
 // ==========================================
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+
+// ⭐ 引入自動登入工具
+import { checkAutoLogin } from './src/screens/auth/AuthUtils';
 
 // 導入自訂底部導航
 import BottomNavigation from './src/navigation/BottomNavigation';
@@ -31,7 +35,7 @@ import SelfAwarenessPractice from './src/data/practices/SelfAwarenessPractice';
 import GoodThingsJournal from './src/data/practices/GoodthingsJournal';
 import EmotionThermometer from './src/data/practices/EmotionThermometer';
 import CognitiveReframingPractice from './src/data/practices/CognitiveReframingPractice';
-import GratitudePractice from './src/data/practices/GratitudePractice'; // ⭐ 新增
+import GratitudePractice from './src/data/practices/GratitudePractice';
 
 // 訓練計畫相關頁面
 import TrainingPlanDetailScreen from './src/screens/practice/training/TrainingPlanDetailScreen';
@@ -62,7 +66,7 @@ const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
 // ==========================================
-// 主頁面 Tab Navigator（超順滑！）
+// 主頁面 Tab Navigator
 // ==========================================
 const MainTabs = () => {
   return (
@@ -70,9 +74,7 @@ const MainTabs = () => {
       tabBar={(props) => <BottomNavigation {...props} />}
       screenOptions={{
         headerShown: false,
-        // ⚡ 懶加載關閉，預先載入所有頁面
         lazy: false,
-        // ⚡ 凍結非活躍頁面，提升效能
         freezeOnBlur: true,
       }}
     >
@@ -84,12 +86,66 @@ const MainTabs = () => {
 };
 
 // ==========================================
+// 啟動畫面（Loading Screen）
+// ==========================================
+const SplashScreen = () => {
+  return (
+    <View style={styles.splashContainer}>
+      <ActivityIndicator size="large" color="#166CB5" />
+    </View>
+  );
+};
+
+// ==========================================
 // 主導航配置
 // ==========================================
 const App = () => {
+  const [isLoading, setIsLoading] = useState(true);
+  const [initialRoute, setInitialRoute] = useState('Login');
+
+  // ⭐ App 啟動時檢查自動登入
+  useEffect(() => {
+    const initializeApp = async () => {
+      try {
+        console.log('🚀 [App] 應用啟動，開始檢查登入狀態...');
+        
+        const { shouldAutoLogin, userData, isExpired } = await checkAutoLogin();
+        
+        if (shouldAutoLogin && userData) {
+          console.log('✅ [App] Token 有效，自動登入成功');
+          console.log('👤 [App] 用戶資料:', userData.name, userData.email);
+          setInitialRoute('MainTabs');
+        } else {
+          if (isExpired) {
+            console.log('⏰ [App] Token 已過期，導航到登入頁面');
+          } else {
+            console.log('📝 [App] 無登入資料，導航到登入頁面');
+          }
+          setInitialRoute('Login');
+        }
+      } catch (error) {
+        console.error('❌ [App] 初始化失敗:', error);
+        setInitialRoute('Login');
+      } finally {
+        // ⭐ 延遲 500ms 讓啟動畫面更自然
+        setTimeout(() => {
+          setIsLoading(false);
+        }, 500);
+      }
+    };
+
+    initializeApp();
+  }, []);
+
+  // ⭐ 顯示啟動畫面
+  if (isLoading) {
+    return <SplashScreen />;
+  }
+
   return (
     <NavigationContainer>
       <Stack.Navigator
+        initialRouteName={initialRoute}
         screenOptions={{
           headerShown: false,
           animation: 'slide_from_right',
@@ -157,13 +213,11 @@ const App = () => {
           component={EmotionThermometer}
           options={{ animation: 'slide_from_bottom' }}
         />
-        {/* 思維調節練習 */}
         <Stack.Screen 
           name="CognitiveReframingPractice" 
           component={CognitiveReframingPractice}
           options={{ animation: 'slide_from_bottom' }}
         />
-        {/* ⭐ 新增：感恩練習 */}
         <Stack.Screen 
           name="GratitudePractice" 
           component={GratitudePractice}
@@ -195,5 +249,17 @@ const App = () => {
     </NavigationContainer>
   );
 };
+
+// ==========================================
+// 樣式
+// ==========================================
+const styles = StyleSheet.create({
+  splashContainer: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+});
 
 export default App;
