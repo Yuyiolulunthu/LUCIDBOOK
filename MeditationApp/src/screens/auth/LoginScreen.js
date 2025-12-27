@@ -293,7 +293,7 @@ const LoginScreen = ({ navigation, route }) => {
                     color="#9CA3AF" 
                   />
                   <Text style={styles.autoLoginHintText}>
-                    登入後將自動保持 30 天，除非手動登出
+                    登入後將自動保持 30 天，可至設定登出
                   </Text>
                 </View>
 
