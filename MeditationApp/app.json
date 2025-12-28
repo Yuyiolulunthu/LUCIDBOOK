@@ -32,8 +32,8 @@
         "foregroundImage": "./assets/images/lucidbook.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.lucidbook.v2",
-      "versionCode": 1,
+      "package": "com.lucidbook",
+      "versionCode": 27,
       "permissions": [
         "CAMERA",
         "READ_EXTERNAL_STORAGE",
@@ -54,7 +54,7 @@
     ],
     "extra": {
       "eas": {
-        "projectId": "84ee6734-2720-452a-ae4a-47e575690763"
+        "projectId": "e13cf8b6-91d7-4821-ae3c-a3866c2f14d4"
       }
     }
   }
