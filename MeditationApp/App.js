@@ -32,7 +32,7 @@ import BreathingExerciseCard from './src/data/practices/BreathingExerciseCard';
 import EmotionPractice from './src/data/practices/EmotionPractice';
 import MindfulnessPractice from './src/data/practices/MindfulnessPractice';
 import SelfAwarenessPractice from './src/data/practices/SelfAwarenessPractice';
-import GoodThingsJournal from './src/data/practices/GoodthingsJournal';
+import GoodThingsJournal from './src/data/practices/GoodThingsJournal';
 import EmotionThermometer from './src/data/practices/EmotionThermometer';
 import CognitiveReframingPractice from './src/data/practices/CognitiveReframingPractice';
 import GratitudePractice from './src/data/practices/GratitudePractice';
