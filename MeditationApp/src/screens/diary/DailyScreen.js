@@ -247,14 +247,9 @@ const DailyScreen = ({ navigation, route }) => {
     return 'other';
   };
 
-  // ⭐ 所屬計畫判斷（更新版 - 支援感恩三子練習）
+  // ⭐ 所屬計畫判斷（統一版 - 全部顯示為「情緒抗壓力」）
   const getPlanName = (type) => {
-    if (!type) return '其他';
-    if (type.includes('思維') || type.includes('調節') || type.includes('認知')) return '認知行為';
-    if (type.includes('感恩') || type.includes('感謝信') || type.includes('如果練習')) return '幸福感提升';
-    if (type.includes('好事')) return '正向心理';
-    if (isEmotionalPlanPractice(type)) return '情緒抗壓力';
-    return '其他';
+    return '情緒抗壓力';
   };
 
   // ⭐ 呼吸練習資料解析
@@ -852,16 +847,49 @@ const DailyScreen = ({ navigation, route }) => {
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         <View style={styles.statsCard}>
           <View style={styles.statsRow}>
+            {/* 本月練習次數 */}
             <View style={styles.statBoxBlue}>
-              <View style={styles.statInfoIcon}><Info color="#2563EB" size={14} strokeWidth={2} /></View>
+              <TouchableOpacity style={styles.statInfoIcon}>
+                <Info color="#2563EB" size={14} strokeWidth={2} />
+              </TouchableOpacity>
+              
               <TrendingUp color="#2563EB" size={24} strokeWidth={2} />
-              <Text style={styles.statValueBlue}>{stats.totalPractices}</Text>
+              
+              {/* ⭐ 數值容器（固定高度） */}
+              <View style={styles.statValueContainer}>
+                <Text 
+                  style={styles.statValueBlue}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.5}
+                >
+                  {stats.totalPractices}
+                </Text>
+              </View>
+              
               <Text style={styles.statLabel}>本月練習次數</Text>
             </View>
+
+            {/* 本月練習時間 */}
             <View style={styles.statBoxPurple}>
-              <View style={styles.statInfoIcon}><Info color="#9333EA" size={14} strokeWidth={2} /></View>
+              <TouchableOpacity style={styles.statInfoIcon}>
+                <Info color="#9333EA" size={14} strokeWidth={2} />
+              </TouchableOpacity>
+              
               <Clock color="#9333EA" size={24} strokeWidth={2} />
-              <Text style={styles.statValuePurple}>{formatStatsDuration(stats.totalDuration)}</Text>
+              
+              {/* ⭐ 數值容器（固定高度） */}
+              <View style={styles.statValueContainer}>
+                <Text 
+                  style={styles.statValuePurple}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.4}
+                >
+                  {formatStatsDuration(stats.totalDuration)}
+                </Text>
+              </View>
+              
               <Text style={styles.statLabel}>本月練習時間</Text>
             </View>
           </View>
@@ -988,14 +1016,86 @@ const DailyScreen = ({ navigation, route }) => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F3F4F6' },
   scrollView: { flex: 1 },
-  statsCard: { backgroundColor: '#FFFFFF', borderRadius: 20, marginHorizontal: 16, marginTop: 16, padding: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 3 },
+  // ==================== 統計卡片樣式 ====================
+  statsCard: { 
+    backgroundColor: '#FFFFFF', 
+    borderRadius: 20, 
+    marginHorizontal: 16, 
+    marginTop: 16, 
+    padding: 16, 
+    shadowColor: '#000', 
+    shadowOffset: { width: 0, height: 2 }, 
+    shadowOpacity: 0.06, 
+    shadowRadius: 8, 
+    elevation: 3 
+  },
   statsRow: { flexDirection: 'row', gap: 12 },
-  statBoxBlue: { flex: 1, backgroundColor: '#E8F4FD', borderRadius: 16, paddingVertical: 20, paddingHorizontal: 16, alignItems: 'center', position: 'relative' },
-  statBoxPurple: { flex: 1, backgroundColor: '#F3E8FF', borderRadius: 16, paddingVertical: 20, paddingHorizontal: 16, alignItems: 'center', position: 'relative' },
-  statInfoIcon: { position: 'absolute', top: 12, right: 12 },
-  statValueBlue: { fontSize: 40, fontWeight: '700', color: '#2563EB', marginTop: 8 },
-  statValuePurple: { fontSize: 28, fontWeight: '700', color: '#9333EA', marginTop: 8 },
-  statLabel: { fontSize: 13, color: '#6B7280', marginTop: 4 },
+
+  // 藍色卡片（本月練習次數）
+  statBoxBlue: { 
+    flex: 1, 
+    backgroundColor: '#E8F4FD', 
+    borderRadius: 16, 
+    paddingVertical: 20, 
+    paddingHorizontal: 16, 
+    alignItems: 'center', 
+    position: 'relative' 
+  },
+
+  // 紫色卡片（本月練習時間）
+  statBoxPurple: { 
+    flex: 1, 
+    backgroundColor: '#F3E8FF', 
+    borderRadius: 16, 
+    paddingVertical: 20, 
+    paddingHorizontal: 16, 
+    alignItems: 'center', 
+    position: 'relative' 
+  },
+
+  // 右上角資訊圖標
+  statInfoIcon: { 
+    position: 'absolute', 
+    top: 12, 
+    right: 12 
+  },
+
+  // ⭐ 數值容器（固定高度，關鍵！）
+  statValueContainer: {
+    height: 56,              // 固定高度
+    justifyContent: 'center', // 垂直居中
+    alignItems: 'center',     // 水平居中
+    marginTop: 12,           // 與上方 ICON 的間距
+    marginBottom: 8,         // 與下方標籤的間距
+    width: '100%',           // 佔滿寬度
+  },
+
+  // 藍色數值文字
+  statValueBlue: { 
+    fontSize: 40,           // 預設字體大小
+    fontWeight: '700', 
+    color: '#2563EB',
+    textAlign: 'center',
+    width: '100%',
+  },
+
+  // 紫色數值文字
+  statValuePurple: { 
+    fontSize: 28,           // 預設字體大小（稍小以容納長文字）
+    fontWeight: '700', 
+    color: '#9333EA',
+    textAlign: 'center',
+    width: '100%',
+    paddingHorizontal: 4,   // 左右留一點空間
+  },
+
+  // 標籤文字
+  statLabel: { 
+    fontSize: 13, 
+    color: '#6B7280', 
+    marginTop: 4,
+    textAlign: 'center',
+  },
   monthAndToggleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginHorizontal: 16, marginTop: 16 },
   monthSelector: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF', borderRadius: 25, paddingVertical: 12, paddingHorizontal: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 4, elevation: 2 },
   monthArrow: { padding: 4 },

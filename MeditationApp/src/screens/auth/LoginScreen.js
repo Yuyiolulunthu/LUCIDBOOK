@@ -3,10 +3,10 @@
 // 功能: 登入頁面
 // 🎨 統一設計風格
 // ✅ 電子郵件登入
-// ✅ 記住我 / 保持登入狀態
+// ✅ 記住我（記住帳號）
+// ⭐ 自動保持登入 30 天
 // ✅ 登入成功後強制輸入企業引薦碼（若無）
 // ✅ 忘記密碼
-// 🔧 修復：導航錯誤 'Home' -> 'MainTabs'
 // ==========================================
 
 import React, { useState, useEffect } from 'react';
@@ -28,15 +28,8 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { CommonActions } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import ApiService from '../../../api';
-
-// AsyncStorage Keys
-const STORAGE_KEYS = {
-  REMEMBERED_EMAIL: 'remembered_email',
-  STAY_LOGGED_IN: 'stay_logged_in',
-  USER_DATA: 'userData',
-};
+import { setLoginState, getRememberedEmail } from './AuthUtils'; // ⭐ 引入新的 AuthUtils
 
 const LoginScreen = ({ navigation, route }) => {
   const { onLoginSuccess: parentOnLoginSuccess, canGoBack = false } = route.params || {};
@@ -45,41 +38,22 @@ const LoginScreen = ({ navigation, route }) => {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  
-  // 🆕 記住我 & 保持登入狀態
-  const [rememberMe, setRememberMe] = useState(false);
-  const [stayLoggedIn, setStayLoggedIn] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false); // ⭐ 只保留「記住我」
 
-  // 🆕 載入時檢查是否有記住的帳號
+  // 載入記住的帳號
   useEffect(() => {
     loadRememberedEmail();
   }, []);
 
   const loadRememberedEmail = async () => {
     try {
-      const rememberedEmail = await AsyncStorage.getItem(STORAGE_KEYS.REMEMBERED_EMAIL);
+      const rememberedEmail = await getRememberedEmail();
       if (rememberedEmail) {
         setEmail(rememberedEmail);
         setRememberMe(true);
       }
     } catch (error) {
       console.error('載入記住的帳號失敗:', error);
-    }
-  };
-
-  // 🆕 處理「保持登入狀態」勾選 - 連動「記住我」
-  const handleStayLoggedInChange = (value) => {
-    setStayLoggedIn(value);
-    if (value) {
-      setRememberMe(true);
-    }
-  };
-
-  // 🆕 處理「記住我」勾選
-  const handleRememberMeChange = (value) => {
-    setRememberMe(value);
-    if (!value) {
-      setStayLoggedIn(false);
     }
   };
 
@@ -97,7 +71,7 @@ const LoginScreen = ({ navigation, route }) => {
 
     setIsLoading(true);
     try {
-      // ⭐ 登入
+      // 登入
       const response = await ApiService.login(email, password);
       
       const userData = {
@@ -107,22 +81,13 @@ const LoginScreen = ({ navigation, route }) => {
         isGuest: false
       };
 
-      // 🆕 根據勾選狀態儲存資料
-      if (rememberMe) {
-        await AsyncStorage.setItem(STORAGE_KEYS.REMEMBERED_EMAIL, email);
-      } else {
-        await AsyncStorage.removeItem(STORAGE_KEYS.REMEMBERED_EMAIL);
-      }
-
-      if (stayLoggedIn) {
-        await AsyncStorage.setItem(STORAGE_KEYS.STAY_LOGGED_IN, 'true');
-      } else {
-        await AsyncStorage.setItem(STORAGE_KEYS.STAY_LOGGED_IN, 'false');
-      }
+      // ⭐ 使用新的 setLoginState（自動保持 30 天）
+      await setLoginState({
+        userData,
+        rememberMe, // 只傳遞 rememberMe（用於記住帳號）
+      });
       
-      await AsyncStorage.setItem(STORAGE_KEYS.USER_DATA, JSON.stringify(userData));
-      
-      // ⭐ 獲取完整用戶資料（包含企業引薦碼）
+      // 檢查企業引薦碼
       console.log('🔍 [LoginScreen] 檢查企業引薦碼狀態...');
       
       let hasEnterpriseCode = false;
@@ -139,16 +104,14 @@ const LoginScreen = ({ navigation, route }) => {
         hasEnterpriseCode = false;
       }
       
-      // ⭐ 根據是否有企業引薦碼決定流程
+      // 根據是否有企業引薦碼決定流程
       if (hasEnterpriseCode) {
-        // 已有企業引薦碼，直接進入首頁
         console.log('✅ [LoginScreen] 用戶已有企業引薦碼，直接登入');
         
         if (parentOnLoginSuccess) {
           parentOnLoginSuccess(userData);
         }
         
-        // 🔧 修復：從 'Home' 改為 'MainTabs'
         navigation.dispatch(
           CommonActions.reset({
             index: 0,
@@ -156,14 +119,12 @@ const LoginScreen = ({ navigation, route }) => {
           })
         );
       } else {
-        // 🆕 沒有企業引薦碼，強制導航到企業引薦碼頁面
         console.log('📝 [LoginScreen] 用戶尚未設定企業引薦碼，導航到引薦碼頁面');
         
         if (parentOnLoginSuccess) {
           parentOnLoginSuccess(userData);
         }
         
-        // 導航到企業引薦碼頁面（必填模式）
         navigation.navigate('EnterpriseCode', { 
           fromLogin: true,
           isRequired: true,
@@ -194,7 +155,6 @@ const LoginScreen = ({ navigation, route }) => {
       if (navigation.canGoBack()) {
         navigation.goBack();
       } else {
-        // 🔧 修復：從 'Home' 改為 'MainTabs'
         navigation.dispatch(
           CommonActions.reset({
             index: 0,
@@ -209,7 +169,6 @@ const LoginScreen = ({ navigation, route }) => {
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#166CB5" />
       
-      {/* ⭐ Header - 漸層藍色設計 */}
       <LinearGradient
         colors={['#166CB5', '#31C6FE']}
         start={{ x: 0, y: 0 }}
@@ -304,12 +263,11 @@ const LoginScreen = ({ navigation, route }) => {
                   </View>
                 </View>
 
-                {/* 🆕 記住我 & 保持登入狀態 */}
-                <View style={styles.checkboxGroup}>
-                  {/* 記住我 */}
+                {/* ⭐ 只保留「記住我」選項 */}
+                <View style={styles.rememberMeRow}>
                   <TouchableOpacity
                     style={styles.checkboxContainer}
-                    onPress={() => handleRememberMeChange(!rememberMe)}
+                    onPress={() => setRememberMe(!rememberMe)}
                     activeOpacity={0.7}
                   >
                     <View style={[styles.checkbox, rememberMe && styles.checkboxChecked]}>
@@ -318,43 +276,26 @@ const LoginScreen = ({ navigation, route }) => {
                     <Text style={styles.checkboxLabel}>記住我</Text>
                   </TouchableOpacity>
 
-                  {/* 保持登入狀態 */}
-                  <TouchableOpacity
-                    style={styles.checkboxContainer}
-                    onPress={() => handleStayLoggedInChange(!stayLoggedIn)}
+                  {/* 忘記密碼 */}
+                  <TouchableOpacity 
+                    onPress={handleForgotPassword}
                     activeOpacity={0.7}
                   >
-                    <View style={[styles.checkbox, stayLoggedIn && styles.checkboxChecked]}>
-                      {stayLoggedIn && <Ionicons name="checkmark" size={14} color="#FFFFFF" />}
-                    </View>
-                    <Text style={styles.checkboxLabel}>保持登入</Text>
+                    <Text style={styles.forgotPasswordText}>忘記密碼？</Text>
                   </TouchableOpacity>
                 </View>
 
-                {/* 提示訊息 */}
-                <View style={styles.checkboxHintContainer}>
+                {/* ⭐ 提示訊息（說明自動保持登入） */}
+                <View style={styles.autoLoginHint}>
                   <Ionicons 
                     name="information-circle-outline" 
                     size={14} 
                     color="#9CA3AF" 
                   />
-                  <Text style={styles.checkboxHint}>
-                    {stayLoggedIn 
-                      ? '下次開啟 App 將自動登入' 
-                      : rememberMe 
-                        ? '下次登入將自動填入帳號' 
-                        : '登出後需重新輸入帳號密碼'}
+                  <Text style={styles.autoLoginHintText}>
+                    登入後將自動保持 30 天，可至設定登出
                   </Text>
                 </View>
-
-                {/* 忘記密碼 */}
-                <TouchableOpacity 
-                  style={styles.forgotPassword} 
-                  onPress={handleForgotPassword}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.forgotPasswordText}>忘記密碼？</Text>
-                </TouchableOpacity>
 
                 {/* 登入按鈕 */}
                 <TouchableOpacity 
@@ -402,7 +343,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#F5F7FA',
   },
 
-  // Header
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -446,7 +386,6 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
 
-  // Logo 區域
   logoContainer: {
     alignItems: 'center',
     marginBottom: 32,
@@ -481,7 +420,6 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
 
-  // 表單卡片
   formCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 20,
@@ -506,7 +444,6 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
 
-  // 輸入框
   inputContainer: {
     marginBottom: 16,
   },
@@ -538,11 +475,11 @@ const styles = StyleSheet.create({
     padding: 8,
   },
 
-  // 🆕 記住我 & 保持登入狀態
-  checkboxGroup: {
+  // ⭐ 記住我 & 忘記密碼（單行排列）
+  rememberMeRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 8,
+    alignItems: 'center',
     marginBottom: 8,
   },
   checkboxContainer: {
@@ -569,30 +506,30 @@ const styles = StyleSheet.create({
     color: '#374151',
     fontWeight: '500',
   },
-  checkboxHintContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-    paddingHorizontal: 4,
-  },
-  checkboxHint: {
-    fontSize: 12,
-    color: '#9CA3AF',
-    marginLeft: 6,
-  },
-
-  // 忘記密碼
-  forgotPassword: {
-    alignSelf: 'flex-end',
-    marginBottom: 24,
-  },
   forgotPasswordText: {
     fontSize: 14,
     color: '#166CB5',
     fontWeight: '600',
   },
 
-  // 登入按鈕
+  // ⭐ 自動登入提示
+  autoLoginHint: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F0F9FF',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginTop: 13,
+    marginBottom: 20,
+  },
+  autoLoginHintText: {
+    fontSize: 12,
+    color: '#0369A1',
+    marginLeft: 12,
+    flex: 1,
+  },
+
   loginButtonContainer: {
     borderRadius: 12,
     overflow: 'hidden',
@@ -616,7 +553,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
 
-  // 註冊連結
   signupContainer: {
     flexDirection: 'row',
     justifyContent: 'center',

@@ -403,7 +403,10 @@ export default function CognitiveReframingPractice({ onBack, navigation, onHome 
       action: () => setCurrentPage('reframe'),
       assessment: () => setCurrentPage('action'),
       review: () => setCurrentPage('assessment'),
-      completion: () => setCurrentPage('review'),
+      completion: () => { 
+        // 從完成頁面返回就直接回首頁，不再回到 review
+        onBack?.() || navigation?.goBack();
+      },
     };
     backMap[currentPage]?.();
   };

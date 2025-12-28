@@ -170,13 +170,13 @@ const HomeScreen = ({ navigation }) => {
 
       // ⭐ 使用 categoryStats 來獲取總次數（永久累計）
       const categoryStats = stats.categoryStats || [];
-      
+
       // 呼吸練習總次數
       const breathingStat = categoryStats.find(
         c => c.type === '呼吸穩定力練習' || c.type === 'breathing'
       );
       const breathingCount = breathingStat?.sessions || 0;
-      
+
       // 好事書寫總次數
       const goodthingsStat = categoryStats.find(
         c => c.type === '好事書寫練習' || c.type === '好事書寫' || c.type === 'goodthings'
@@ -195,11 +195,15 @@ const HomeScreen = ({ navigation }) => {
       );
       const abcdCount = abcdStat?.sessions || 0;
 
-      // ⭐ 感恩練習總次數（包含三種子練習）
-      const gratitudeStat = categoryStats.find(
-        c => c.type === '感恩練習' || c.type === '感恩日記' || c.type === '迷你感謝信' || c.type === '如果練習' || c.type === 'gratitude'
+      // ⭐ 感恩練習總次數（包含三種子練習）- 修正版
+      const gratitudeStats = categoryStats.filter(
+        c => c.type === '感恩練習' || 
+            c.type === '感恩日記' || 
+            c.type === '迷你感謝信' || 
+            c.type === '如果練習' || 
+            c.type === 'gratitude'
       );
-      const gratitudeCount = gratitudeStat?.sessions || 0;
+      const gratitudeCount = gratitudeStats.reduce((sum, stat) => sum + (stat.sessions || 0), 0);
 
       console.log('📋 [首頁] 總練習統計（永久累計）:', {
         breathing: breathingCount,
@@ -207,6 +211,7 @@ const HomeScreen = ({ navigation }) => {
         thermometer: thermometerCount,
         abcd: abcdCount,
         gratitude: gratitudeCount,
+        gratitudeBreakdown: gratitudeStats.map(s => `${s.type}: ${s.sessions}`), // 👈 加這行，方便 debug
       });
 
       // 計算當前完成度（更新前）
@@ -588,7 +593,7 @@ const HomeScreen = ({ navigation }) => {
                       </View>
                       <View style={styles.practiceProgressBlue}>
                         <Text style={styles.practiceProgressTextBlue}>
-                          {Math.min(module.current, module.target)}/{module.target}
+                          {module.current}/{module.target} 
                         </Text>
                       </View>
                     </View>
@@ -615,7 +620,7 @@ const HomeScreen = ({ navigation }) => {
                       </View>
                       <View style={styles.practiceProgress}>
                         <Text style={styles.practiceProgressText}>
-                          {Math.min(module.current, module.target)}/{module.target}
+                          {module.current}/{module.target} 
                         </Text>
                       </View>
                     </View>
@@ -664,7 +669,7 @@ const HomeScreen = ({ navigation }) => {
               <View style={styles.thermometerInfo}>
                 <Text style={styles.thermometerTitle}>心情溫度計</Text>
                 <Text style={styles.thermometerProgress}>
-                  {Math.min(goals.thermometer.current, goals.thermometer.target)}/{goals.thermometer.target}
+                  {goals.thermometer.current}/{goals.thermometer.target}
                   {goals.thermometer.current >= goals.thermometer.target && ' ✓'}
                 </Text>
               </View>

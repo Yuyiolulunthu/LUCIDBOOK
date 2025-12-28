@@ -420,7 +420,10 @@ export default function GratitudePractice({ onBack, navigation, onHome }) {
         else if (formData.practiceType === PRACTICE_TYPES.LETTER) setCurrentPage('letter-message');
         else if (formData.practiceType === PRACTICE_TYPES.IF) setCurrentPage('if-appreciate');
       },
-      'completion': () => setCurrentPage('assessment'),
+      'completion': () => {  
+        // 從完成頁面返回直接回首頁
+        onBack?.() || navigation?.goBack();
+      },
     };
     backMap[currentPage]?.();
   };

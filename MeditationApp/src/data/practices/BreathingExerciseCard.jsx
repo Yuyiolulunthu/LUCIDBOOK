@@ -115,7 +115,7 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
       title: '減壓放鬆',
       subtitle: '4-6 呼吸法',
       tags: ['焦慮', '會議前', '助眠'],
-      description: '透過延長吐氣時間來啟動副交感神經，幫助您快速緩解緊張或焦慮，身心逐漸放鬆。',
+      description: '4秒吸氣，6秒吐氣。透過延長吐氣時間來啟動副交感神經，幫助您快速緩解緊張或焦慮，身心逐漸放鬆。',
       audioFile: { uri: 'https://curiouscreate.com/api/asserts/4-6.mp3' },
       breathPattern: { inhale: 4, exhale: 6 }, // 4秒吸氣，6秒吐氣
     },
@@ -124,7 +124,7 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
       title: '專注穩定',
       subtitle: '4-7-8 呼吸法',
       tags: ['專注', '穩壓', '清晰'],
-      description: '透過屏息呼吸來提升專注力與穩定性，幫助您集中注意力，保持清晰的思維。',
+      description: '4秒吸氣，7秒屏息，8秒吐氣。透過屏息呼吸來提升專注力與穩定性，幫助您集中注意力，保持清晰的思維。',
       audioFile: { uri: 'https://curiouscreate.com/api/asserts/breath-holding.mp3' },
       breathPattern: { inhale: 4, hold: 7, exhale: 8 },
     },
@@ -756,6 +756,12 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
               </View>
             </TouchableOpacity>
           </View>
+
+          <View style={styles.firstTimeTipContainer}>
+            <Text style={styles.firstTimeTipText}>
+              初次練習建議選擇語音引導
+            </Text>
+          </View>
         </View>
       </ScrollView>
     </View>
@@ -1200,6 +1206,19 @@ const styles = StyleSheet.create({
   guideModeActionText: {
     fontSize: 12,
     color: '#666',
+  },
+  firstTimeTipContainer: {
+    marginTop: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: '#E8F4F8',  // 淡藍色背景
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  firstTimeTipText: {
+    fontSize: 13,
+    color: '#1E88A8',  // 深藍色文字
+    lineHeight: 18,
   },
 
   // ============================================
