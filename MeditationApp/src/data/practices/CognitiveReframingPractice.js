@@ -344,22 +344,22 @@ export default function CognitiveReframingPractice({ onBack, navigation, onHome 
         Animated.sequence([
           Animated.timing(breathingScale, {
             toValue: 1.3,
-            duration: 4000,
+            duration: 5000,
             useNativeDriver: true,
           }),
           Animated.timing(breathingScale, {
             toValue: 1,
-            duration: 4000,
+            duration: 5000,
             useNativeDriver: true,
           }),
         ])
       );
       breatheAnimation.start();
 
-      // 5秒後自動跳轉
+      // 10秒後自動跳轉（完整呼吸一次）
       const timer = setTimeout(() => {
         setCurrentPage('event');
-      }, 8000);
+      }, 10000);
 
       return () => {
         breatheAnimation.stop();
@@ -574,9 +574,9 @@ export default function CognitiveReframingPractice({ onBack, navigation, onHome 
             </View>
           </Animated.View>
 
-          <Text style={styles.breathingTitle}>進行3至5次腹式呼吸</Text>
-          <Text style={styles.breathingSubtitle}>讓理性腦重新主導思考</Text>
-          <Text style={styles.breathingSubtitle}>後面的練習更順利</Text>
+          <Text style={styles.breathingTitle}>跟著畫面深呼吸</Text>
+          <Text style={styles.breathingSubtitle}>圈圈變大時吸氣</Text>
+          <Text style={styles.breathingSubtitle}>圈圈變小時吐氣</Text>
 
           <TouchableOpacity
             style={styles.skipButton}
@@ -622,12 +622,12 @@ export default function CognitiveReframingPractice({ onBack, navigation, onHome 
               <View style={styles.titleSection}>
                 <Text style={styles.pageTitle}>發生了什麼事？</Text>
                 <Text style={styles.pageSubtitle}>
-                  只描述「發生什麼事」，不加入感受與想法。
+                  記錄一件「讓你感到擔心、生氣、委屈、焦慮或心中有點卡卡悶悶」的事件
                 </Text>
                 <View style={styles.noteContainer}>
                   <Star size={16} color="#fbbf24" fill="#fbbf24" />
                   <Text style={styles.noteText}>
-                    例如：主管問了我三個問題
+                    只描述「發生什麼事」，不加入感受與想法
                   </Text>
                 </View>
               </View>
@@ -1396,6 +1396,55 @@ export default function CognitiveReframingPractice({ onBack, navigation, onHome 
               </View>
               <Text style={styles.reviewText}>{formData.thought}</Text>
             </View>
+
+            {/* 情緒反應 */}
+            {(formData.emotions.length > 0 || formData.bodyReactions.length > 0 || formData.behaviors.length > 0) && (
+              <View style={styles.reviewSection}>
+                <View style={styles.reviewLabelRow}>
+                  <View style={[styles.reviewDot, { backgroundColor: '#f59e0b' }]} />
+                  <Text style={styles.reviewLabel}>情緒反應</Text>
+                </View>
+                
+                {formData.emotions.length > 0 && (
+                  <View style={styles.reviewReactionGroup}>
+                    <Text style={styles.reviewReactionLabel}>情緒：</Text>
+                    <View style={styles.reviewTagsContainer}>
+                      {formData.emotions.map((emotion, index) => (
+                        <View key={index} style={styles.reviewTag}>
+                          <Text style={styles.reviewTagText}>{emotion}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                )}
+
+                {formData.bodyReactions.length > 0 && (
+                  <View style={styles.reviewReactionGroup}>
+                    <Text style={styles.reviewReactionLabel}>身體：</Text>
+                    <View style={styles.reviewTagsContainer}>
+                      {formData.bodyReactions.map((reaction, index) => (
+                        <View key={index} style={styles.reviewTag}>
+                          <Text style={styles.reviewTagText}>{reaction}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                )}
+
+                {formData.behaviors.length > 0 && (
+                  <View style={styles.reviewReactionGroup}>
+                    <Text style={styles.reviewReactionLabel}>行為：</Text>
+                    <View style={styles.reviewTagsContainer}>
+                      {formData.behaviors.map((behavior, index) => (
+                        <View key={index} style={styles.reviewTag}>
+                          <Text style={styles.reviewTagText}>{behavior}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                )}
+              </View>
+            )}
 
             {/* 箭頭 */}
             <View style={styles.reviewArrow}>
@@ -2498,6 +2547,33 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#334155',
     lineHeight: 24,
+  },
+  reviewReactionGroup: {
+    marginBottom: 12,
+  },
+  reviewReactionLabel: {
+    fontSize: 14,
+    color: '#64748b',
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  reviewTagsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  reviewTag: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    backgroundColor: '#e0f2fe',
+    borderWidth: 1,
+    borderColor: '#bae6fd',
+  },
+  reviewTagText: {
+    fontSize: 13,
+    color: '#0369a1',
+    fontWeight: '500',
   },
   reviewArrow: {
     alignItems: 'center',
