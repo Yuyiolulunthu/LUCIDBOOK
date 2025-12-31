@@ -9,7 +9,6 @@ import { View, Text, StyleSheet } from 'react-native';
 import BreathingExerciseCard from '../data/practices/BreathingExerciseCard';
 import EmotionPractice from '../data/practices/EmotionPractice';
 import MindfulnessPractice from '../data/practices/MindfulnessPractice';
-import SelfAwarenessPractice from '../data/practices/SelfAwarenessPractice';
 import GoodThingsJournal from '../data/practices/GoodThingsJournal';
 import EmotionThermometer from '../data/practices/EmotionThermometer';
 import CognitiveReframingPractice from '../data/practices/CognitiveReframingPractice';

@@ -17,7 +17,7 @@ import {
   Platform,
   Modal,
 } from 'react-native';
-import ApiService from '../../../api';
+import ApiService from '../../../../api';
 
 export default function SelfAwarenessPractice({ onBack, navigation }) {
   const [practiceId, setPracticeId] = useState(null);

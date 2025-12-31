@@ -31,7 +31,6 @@ import PracticeSelectionScreen from './src/screens/practice/PracticeSelectionScr
 import BreathingExerciseCard from './src/data/practices/BreathingExerciseCard';
 import EmotionPractice from './src/data/practices/EmotionPractice';
 import MindfulnessPractice from './src/data/practices/MindfulnessPractice';
-import SelfAwarenessPractice from './src/data/practices/SelfAwarenessPractice';
 import GoodThingsJournal from './src/data/practices/GoodThingsJournal';
 import EmotionThermometer from './src/data/practices/EmotionThermometer';
 import CognitiveReframingPractice from './src/data/practices/CognitiveReframingPractice';
@@ -198,11 +197,7 @@ const App = () => {
           component={MindfulnessPractice}
           options={{ animation: 'slide_from_bottom' }}
         />
-        <Stack.Screen 
-          name="SelfAwarenessPractice" 
-          component={SelfAwarenessPractice}
-          options={{ animation: 'slide_from_bottom' }}
-        />
+
         <Stack.Screen 
           name="GoodThingsJournal" 
           component={GoodThingsJournal}
