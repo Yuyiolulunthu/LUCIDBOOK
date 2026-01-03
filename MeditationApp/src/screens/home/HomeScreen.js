@@ -484,19 +484,22 @@ const HomeScreen = ({ navigation }) => {
         <View style={styles.categorySection}>
           <TouchableOpacity
             onPress={() => setSelectedCategory('all')}
-            style={[
-              styles.categoryButton,
-              selectedCategory === 'all' && styles.categoryButtonActive,
-            ]}
+            activeOpacity={0.8}
           >
-            <Text
-              style={[
-                styles.categoryText,
-                selectedCategory === 'all' && styles.categoryTextActive,
-              ]}
-            >
-              全部
-            </Text>
+            {selectedCategory === 'all' ? (
+              <LinearGradient
+                colors={['#166CB5', '#31C6FE']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.categoryButtonGradient}
+              >
+                <Text style={styles.categoryTextGradient}>全部</Text>
+              </LinearGradient>
+            ) : (
+              <View style={styles.categoryButton}>
+                <Text style={styles.categoryText}>全部</Text>
+              </View>
+            )}
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -798,14 +801,6 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     backgroundColor: '#F0F4F8',
     borderRadius: 100,
-  },
-  categoryButtonActive: {
-    backgroundColor: '#FFFFFF',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
   },
   categoryButtonGradient: {
     paddingHorizontal: 20,

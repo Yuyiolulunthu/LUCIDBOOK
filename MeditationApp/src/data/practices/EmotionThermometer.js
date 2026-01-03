@@ -516,7 +516,7 @@ const EmotionThermometer = ({ navigation, route }) => {
                     bgColor="#fffbeb"
                     onPress={() => {
                       navigation.navigate('PracticeNavigator', {
-                        practiceType: '自我覺察力練習',
+                        practiceType: '思維調節練習',
                       });
                     }}
                   />

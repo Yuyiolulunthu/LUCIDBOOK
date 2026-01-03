@@ -84,6 +84,8 @@ const DailyScreen = ({ navigation, route }) => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [hasEnterpriseCode, setHasEnterpriseCode] = useState(false);
   const [detailModalVisible, setDetailModalVisible] = useState(false);
+  const [currentDayRecords, setCurrentDayRecords] = useState([]); // 當天所有記錄
+  const [currentRecordIndex, setCurrentRecordIndex] = useState(0); // 當前顯示索引
   const [selectedPractice, setSelectedPractice] = useState(null);
   const [selectedPlan, setSelectedPlan] = useState('all');
   const highlightPracticeId = route?.params?.highlightPracticeId;
@@ -210,18 +212,40 @@ const DailyScreen = ({ navigation, route }) => {
 
   const days = generateCalendarDays();
 
-  const getRecordForDate = (day) => {
+  const getRecordsForDate = (day) => {
     const dateStr = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-    return displayData.find((r) => r.completed_at?.startsWith(dateStr));
+    return displayData.filter((r) => r.completed_at?.startsWith(dateStr));
   };
 
-  const hasRecordOnDate = (day) => !!getRecordForDate(day);
+  const hasRecordOnDate = (day) => {
+    return getRecordsForDate(day).length > 0;
+  };
 
   const handleDayClick = (day) => {
-    const record = getRecordForDate(day);
-    if (record) {
-      setSelectedPractice(record);
+    const records = getRecordsForDate(day);
+    if (records.length > 0) {
+      setCurrentDayRecords(records);  // ⭐ 保存當天所有記錄
+      setCurrentRecordIndex(0);       // ⭐ 重置為第一筆
+      setSelectedPractice(records[0]); // ⭐ 顯示第一筆
       setDetailModalVisible(true);
+    }
+  };
+
+  // ⭐ 新增：上一筆記錄
+  const handlePrevRecord = () => {
+    if (currentRecordIndex > 0) {
+      const newIndex = currentRecordIndex - 1;
+      setCurrentRecordIndex(newIndex);
+      setSelectedPractice(currentDayRecords[newIndex]);
+    }
+  };
+
+  // ⭐ 新增：下一筆記錄
+  const handleNextRecord = () => {
+    if (currentRecordIndex < currentDayRecords.length - 1) {
+      const newIndex = currentRecordIndex + 1;
+      setCurrentRecordIndex(newIndex);
+      setSelectedPractice(currentDayRecords[newIndex]);
     }
   };
 
@@ -504,6 +528,39 @@ const DailyScreen = ({ navigation, route }) => {
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.modalScrollContent}>
               {/* 標題區域 */}
               <View style={styles.modalHeaderSection}>
+                {/* ⭐ 新增：翻頁控制（當有多筆記錄時顯示） */}
+                {currentDayRecords.length > 1 && (
+                  <View style={styles.recordNavigator}>
+                    <TouchableOpacity 
+                      onPress={handlePrevRecord} 
+                      disabled={currentRecordIndex === 0}
+                      style={[styles.navButton, currentRecordIndex === 0 && styles.navButtonDisabled]}
+                    >
+                      <ChevronLeft 
+                        color={currentRecordIndex === 0 ? '#CBD5E1' : '#166CB5'} 
+                        size={20} 
+                        strokeWidth={2.5} 
+                      />
+                    </TouchableOpacity>
+                    
+                    <Text style={styles.recordCounter}>
+                      {currentRecordIndex + 1} / {currentDayRecords.length}
+                    </Text>
+                    
+                    <TouchableOpacity 
+                      onPress={handleNextRecord} 
+                      disabled={currentRecordIndex === currentDayRecords.length - 1}
+                      style={[styles.navButton, currentRecordIndex === currentDayRecords.length - 1 && styles.navButtonDisabled]}
+                    >
+                      <ChevronRight 
+                        color={currentRecordIndex === currentDayRecords.length - 1 ? '#CBD5E1' : '#166CB5'} 
+                        size={20} 
+                        strokeWidth={2.5} 
+                      />
+                    </TouchableOpacity>
+                  </View>
+                )}
+                
                 <Text style={styles.modalTitle}>
                   {isCognitive ? '思維調節' : isGratitude ? getGratitudeTitle() : selectedPractice.practice_type}
                 </Text>
@@ -849,9 +906,6 @@ const DailyScreen = ({ navigation, route }) => {
           <View style={styles.statsRow}>
             {/* 本月練習次數 */}
             <View style={styles.statBoxBlue}>
-              <TouchableOpacity style={styles.statInfoIcon}>
-                <Info color="#2563EB" size={14} strokeWidth={2} />
-              </TouchableOpacity>
               
               <TrendingUp color="#2563EB" size={24} strokeWidth={2} />
               
@@ -872,9 +926,6 @@ const DailyScreen = ({ navigation, route }) => {
 
             {/* 本月練習時間 */}
             <View style={styles.statBoxPurple}>
-              <TouchableOpacity style={styles.statInfoIcon}>
-                <Info color="#9333EA" size={14} strokeWidth={2} />
-              </TouchableOpacity>
               
               <Clock color="#9333EA" size={24} strokeWidth={2} />
               
@@ -931,17 +982,24 @@ const DailyScreen = ({ navigation, route }) => {
         </ScrollView>
 
         {viewMode === 'calendar' && (
-          <View style={styles.contentCard}>
+          <View style={styles.calendarCard}>
             <View style={styles.calendarGrid}>
               {['日', '一', '二', '三', '四', '五', '六'].map((d) => (
                 <View key={d} style={styles.calendarWeekday}><Text style={styles.calendarWeekdayText}>{d}</Text></View>
               ))}
               {days.map((day, idx) => {
                 if (!day) return <View key={`e-${idx}`} style={styles.calendarDay} />;
-                const hasRecord = hasRecordOnDate(day);
+                const hasRecord = hasRecordOnDate(day);  // ⭐ 使用新函數
                 return (
-                  <TouchableOpacity key={day} onPress={() => handleDayClick(day)} disabled={!hasRecord} style={styles.calendarDay}>
-                    <Text style={[styles.calendarDayText, hasRecord && styles.calendarDayTextActive]}>{day}</Text>
+                  <TouchableOpacity 
+                    key={day} 
+                    onPress={() => handleDayClick(day)} 
+                    disabled={!hasRecord} 
+                    style={styles.calendarDay}
+                  >
+                    <Text style={[styles.calendarDayText, hasRecord && styles.calendarDayTextActive]}>
+                      {day}
+                    </Text>
                     {hasRecord && <View style={styles.calendarDot} />}
                   </TouchableOpacity>
                 );
@@ -1053,13 +1111,6 @@ const styles = StyleSheet.create({
     position: 'relative' 
   },
 
-  // 右上角資訊圖標
-  statInfoIcon: { 
-    position: 'absolute', 
-    top: 12, 
-    right: 12 
-  },
-
   // ⭐ 數值容器（固定高度，關鍵！）
   statValueContainer: {
     height: 56,              // 固定高度
@@ -1109,14 +1160,47 @@ const styles = StyleSheet.create({
   filterPillInactive: { paddingHorizontal: 24, paddingVertical: 12, borderRadius: 25, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E7EB' },
   filterPillActiveText: { fontSize: 14, fontWeight: '600', color: '#FFFFFF' },
   filterPillInactiveText: { fontSize: 14, fontWeight: '500', color: '#6B7280' },
-  contentCard: { backgroundColor: '#FFFFFF', borderRadius: 20, marginHorizontal: 16, marginTop: 16, padding: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 3 },
+  contentCard: { 
+    backgroundColor: '#FFFFFF', 
+    borderRadius: 20, 
+    marginHorizontal: 16, 
+    marginTop: 16, 
+    padding: 20, 
+    shadowColor: '#000', 
+    shadowOffset: { width: 0, height: 2 }, 
+    shadowOpacity: 0.06, 
+    shadowRadius: 8, 
+    elevation: 3 
+  },
+  
+  // ⭐ 新增：專門給日曆用的卡片樣式
+  calendarCard: { 
+    backgroundColor: '#FFFFFF', 
+    borderRadius: 20, 
+    marginHorizontal: 16,   
+    marginTop: 16, 
+    padding: 20,               
+    shadowColor: '#000', 
+    shadowOffset: { width: 0, height: 2 }, 
+    shadowOpacity: 0.06, 
+    shadowRadius: 8, 
+    elevation: 3 
+  },
   emptyContent: { alignItems: 'center', paddingVertical: 50 },
   emptyTitle: { fontSize: 16, color: '#9CA3AF', marginTop: 20, fontWeight: '500' },
   emptySubtitle: { fontSize: 14, color: '#D1D5DB', marginTop: 6 },
-  calendarGrid: { flexDirection: 'row', flexWrap: 'wrap' },
+  calendarGrid: { flexDirection: 'row', flexWrap: 'wrap' , marginHorizontal: -2 },
   calendarWeekday: { width: `${100 / 7}%`, paddingVertical: 8, alignItems: 'center' },
   calendarWeekdayText: { fontSize: 13, color: '#9CA3AF', fontWeight: '600' },
-  calendarDay: { width: `${100 / 7}%`, height: 48, alignItems: 'center', justifyContent: 'center', paddingBottom: 8 },
+  calendarDay: { 
+    flexBasis: `${100 / 7}%`, 
+    maxWidth: `${100 / 7}%`,  
+    height: 48, 
+    alignItems: 'center', 
+    justifyContent: 'center', 
+    paddingBottom: 8,
+    paddingHorizontal: 0,
+  },
   calendarDayText: { fontSize: 15, color: '#6B7280', fontWeight: '500' },
   calendarDayTextActive: { color: '#1F2937', fontWeight: '600' },
   calendarDot: { width: 5, height: 5, borderRadius: 2.5, backgroundColor: '#166CB5', marginTop: 4 },
@@ -1129,12 +1213,39 @@ const styles = StyleSheet.create({
   recordFooterItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   recordFooterText: { fontSize: 12, color: '#9CA3AF' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.5)', justifyContent: 'center', alignItems: 'center', padding: 20 },
-  modalContainer: { backgroundColor: '#FFFFFF', borderRadius: 24, width: '100%', maxHeight: '85%', position: 'relative', overflow: 'hidden' },
+  modalContainer: { backgroundColor: '#FFFFFF', borderRadius: 24, width: '100%',maxWidth: 360, maxHeight: '85%', position: 'relative', overflow: 'hidden' },
   modalTopAccent: { height: 4, width: '100%' },
   modalScrollContent: { padding: 24, paddingTop: 20 },
   modalCloseBtn: { position: 'absolute', top: 16, right: 16, zIndex: 10 },
   modalCloseBtnCircle: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#F1F5F9', justifyContent: 'center', alignItems: 'center' },
   modalHeaderSection: { alignItems: 'center', marginBottom: 16 },
+  // ⭐ 新增樣式
+  recordNavigator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+    gap: 16,
+  },
+  navButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#F1F5F9',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  navButtonDisabled: {
+    backgroundColor: '#F8FAFC',
+    opacity: 0.5,
+  },
+  recordCounter: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#166CB5',
+    minWidth: 60,
+    textAlign: 'center',
+  },
   modalTitle: { fontSize: 22, fontWeight: '700', color: '#1E293B', textAlign: 'center', marginBottom: 6, letterSpacing: 0.3 },
   modalDate: { fontSize: 14, color: '#94A3B8', textAlign: 'center', fontWeight: '500' },
   modalMetaRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 12, marginBottom: 20 },

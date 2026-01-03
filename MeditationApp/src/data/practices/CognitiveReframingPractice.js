@@ -396,7 +396,7 @@ export default function CognitiveReframingPractice({ onBack, navigation, onHome 
     const backMap = {
       intro: () => onBack?.() || navigation?.goBack(),
       breathing: () => setCurrentPage('intro'),
-      event: () => setCurrentPage('breathing'),
+      event: () => setCurrentPage('intro'),
       thought: () => setCurrentPage('event'),
       reaction: () => setCurrentPage('thought'),
       reframe: () => setCurrentPage('reaction'),
