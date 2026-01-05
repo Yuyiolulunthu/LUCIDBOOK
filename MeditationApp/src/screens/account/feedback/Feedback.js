@@ -71,6 +71,7 @@ const Feedback = ({ navigation }) => {
   const [loading, setLoading] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
 
+  // Android 13+ 使用 Photo Picker，無需權限
   const handlePickImage = async () => {
     if (images.length >= 3) {
       Alert.alert('提示', '最多只能上傳3張圖片');
@@ -78,12 +79,6 @@ const Feedback = ({ navigation }) => {
     }
 
     try {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('需要權限', '請允許訪問相簿以上傳圖片');
-        return;
-      }
-
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,

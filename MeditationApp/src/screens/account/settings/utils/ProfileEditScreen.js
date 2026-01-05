@@ -64,16 +64,10 @@ const ProfileEditScreen = ({ navigation }) => {
 
   useEffect(() => {
     loadUserProfile();
-    requestPermissions();
   }, []);
 
-  // 請求權限
-  const requestPermissions = async () => {
-    if (Platform.OS !== 'web') {
-      await ImagePicker.requestCameraPermissionsAsync();
-      await ImagePicker.requestMediaLibraryPermissionsAsync();
-    }
-  };
+  // 注意：Android 13+ 會自動使用 Photo Picker，不需要權限
+  // 舊版 Android 會在需要時自動請求權限
 
   // 載入用戶資料
   const loadUserProfile = async () => {
@@ -172,6 +166,13 @@ const ProfileEditScreen = ({ navigation }) => {
   // 拍照
   const handleTakePhoto = async () => {
     try {
+      // 請求相機權限
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('需要權限', '請允許使用相機以拍攝大頭貼');
+        return;
+      }
+
       const result = await ImagePicker.launchCameraAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
@@ -191,7 +192,7 @@ const ProfileEditScreen = ({ navigation }) => {
     }
   };
 
-  // 從相簿選擇
+  // 從相簿選擇 (Android 13+ 使用 Photo Picker，無需權限)
   const handlePickImage = async () => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
