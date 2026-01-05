@@ -8,8 +8,9 @@
 // ✅ 完成按鈕驗證
 // ✅ 完全符合設計圖風格
 // 🎨 白色圓角卡片設計
-// 🆕 必填模式（從註冊/登入進入時不能跳過）
+// 🆕 必填模式（從註冊/登入進入時可稍後設定）
 // 🆕 Onboarding Modal
+// 🆕 登出功能（避免用戶被困住）
 // 🔧 修復：導航錯誤 'Home' -> 'MainTabs'
 // ==========================================
 
@@ -213,7 +214,7 @@ const EnterpriseCode = ({ navigation, route }) => {
   const isFromSettings = route?.params?.fromSettings || false;
   const isFromManagement = route?.params?.fromManagement || false;
   
-  // 🆕 必填模式：從註冊或登入進入時，不能跳過
+  // 🆕 必填模式：從註冊或登入進入時的標記
   const isRequired = route?.params?.isRequired || false;
   
   // 🆕 保存的表單資料（從註冊頁面返回時使用）
@@ -316,7 +317,7 @@ const EnterpriseCode = ({ navigation, route }) => {
   const handleOnboardingComplete = () => {
     setShowOnboarding(false);
     
-    // 🔧 修復：直接進入首頁（MainTabs）
+    // 直接進入首頁（MainTabs）
     navigation.reset({
       index: 0,
       routes: [{ name: 'MainTabs' }],
@@ -354,26 +355,69 @@ const EnterpriseCode = ({ navigation, route }) => {
     }
   };
 
-  // 🆕 返回按鈕處理（必填模式需要確認）
+  // 🆕 登出功能
+  const handleLogout = () => {
+    Alert.alert(
+      '確認登出',
+      '您確定要登出嗎？登出後需要重新登入。',
+      [
+        {
+          text: '取消',
+          style: 'cancel',
+        },
+        {
+          text: '登出',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              // 清除所有登入資料
+              await AsyncStorage.multiRemove([
+                'userData',
+                'authToken',
+                'loginExpiry',
+                'enterpriseCode',
+                'enterpriseCodeExpiry',
+                'enterpriseName',
+                'enterpriseId',
+              ]);
+              
+              console.log('✅ 登出成功');
+              
+              // 導航回登入頁面
+              navigation.reset({
+                index: 0,
+                routes: [{ name: 'Login' }],
+              });
+            } catch (error) {
+              console.error('❌ 登出失敗:', error);
+              Alert.alert('錯誤', '登出失敗，請稍後再試');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  // 🆕 返回按鈕處理（優化後的邏輯）
   const handleBack = () => {
     if (isRequired) {
-      // 必填模式：顯示確認對話框
+      // 必填模式：顯示確認對話框，提供登出選項
       Alert.alert(
         '確認離開',
-        '您尚未輸入企業引薦碼，若離開將無法使用完整功能。\n\n確定要離開嗎？',
+        '您可以選擇：\n\n• 稍後在設定中輸入引薦碼\n• 登出並換其他帳號\n• 繼續輸入引薦碼',
         [
-          { text: '繼續輸入', style: 'cancel' },
           { 
-            text: '離開', 
+            text: '繼續輸入', 
+            style: 'cancel' 
+          },
+          { 
+            text: '稍後設定', 
+            onPress: handleSkipForNow
+          },
+          { 
+            text: '登出', 
             style: 'destructive',
-            onPress: () => {
-              if (isFromRegister && savedFormData) {
-                // 返回註冊頁面，保留表單資料
-                navigation.navigate('Register', { savedFormData });
-              } else {
-                navigation.goBack();
-              }
-            }
+            onPress: handleLogout
           }
         ]
       );
@@ -387,19 +431,27 @@ const EnterpriseCode = ({ navigation, route }) => {
     }
   };
 
-  // 🆕 跳過按鈕處理
-  const handleSkip = () => {
-    if (isRequired) {
-      // 必填模式：不能跳過，顯示提示
-      Alert.alert(
-        '需要企業引薦碼',
-        '請輸入企業引薦碼以繼續使用。\n\n如果您沒有引薦碼，請聯繫您的企業管理員。',
-        [{ text: '好的', style: 'default' }]
-      );
-      return;
-    }
+  // 🆕 稍後設定功能（從必填模式跳過）
+  const handleSkipForNow = () => {
+    console.log('✅ 稍後設定 → navigating to MainTabs');
     
-    // 非必填模式：可以跳過
+    Alert.alert(
+      '提醒',
+      '您可以稍後在「設定」→「企業引薦碼」中輸入。',
+      [
+        {
+          text: '知道了',
+          onPress: () => {
+            // 顯示 Onboarding 然後進入主頁面
+            setShowOnboarding(true);
+          },
+        },
+      ]
+    );
+  };
+
+  // 🆕 跳過按鈕處理（非必填模式）
+  const handleSkip = () => {
     console.log('🔄 handleSkip called');
     
     if (isFromLogin) {
@@ -453,18 +505,21 @@ const EnterpriseCode = ({ navigation, route }) => {
           
           <Text style={styles.headerTitle}>企業引薦</Text>
           
-          {/* 🆕 必填模式時隱藏跳過按鈕 */}
-          {!isRequired ? (
+          {/* 🆕 必填模式顯示登出按鈕，非必填模式顯示跳過按鈕 */}
+          {isRequired ? (
+            <TouchableOpacity 
+              style={styles.logoutButton}
+              onPress={handleLogout}
+            >
+              <Ionicons name="log-out-outline" size={20} color="rgba(255,255,255,0.8)" />
+            </TouchableOpacity>
+          ) : (
             <TouchableOpacity 
               style={styles.skipButton}
               onPress={handleSkip}
             >
               <Text style={styles.skipText}>跳過</Text>
             </TouchableOpacity>
-          ) : (
-            <View style={styles.skipButton}>
-              <Text style={[styles.skipText, { opacity: 0 }]}>跳過</Text>
-            </View>
           )}
         </View>
 
@@ -474,10 +529,7 @@ const EnterpriseCode = ({ navigation, route }) => {
             <Text style={styles.title}>企業引薦碼</Text>
             
             <Text style={styles.description}>
-              {isRequired 
-                ? '請輸入6位英數字驗證碼以完成註冊流程'
-                : '輸入6位英數字驗證碼以解鎖企業為您準備的練習模組'
-              }
+              輸入6位英數字驗證碼以解鎖企業為您準備的練習模組
             </Text>
 
             {/* 6個驗證碼輸入框 */}
@@ -528,13 +580,24 @@ const EnterpriseCode = ({ navigation, route }) => {
               )}
             </TouchableOpacity>
 
-            {/* 🆕 提示文字根據模式不同 */}
-            <Text style={styles.hintText}>
-              {isRequired 
-                ? '如果您沒有引薦碼，請聯繫您的企業管理員'
-                : '沒有企業引薦碼？您仍可以使用所有基本練習功能'
-              }
-            </Text>
+            {/* 🆕 提示文字 - 統一友好的訊息 */}
+            <View style={styles.hintContainer}>
+              <Ionicons name="information-circle-outline" size={16} color="#9CA3AF" />
+              <Text style={styles.hintText}>
+                沒有引薦碼？您仍可使用所有基本功能
+              </Text>
+            </View>
+
+            {/* 🆕 如果是必填模式，顯示「稍後設定」按鈕 */}
+            {isRequired && (
+              <TouchableOpacity 
+                style={styles.laterButton}
+                onPress={handleSkipForNow}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.laterButtonText}>稍後在設定中輸入</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       </LinearGradient>
@@ -593,6 +656,15 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: 'rgba(255,255,255,0.8)',
     fontWeight: '400',
+  },
+  // 🆕 登出按鈕樣式
+  logoutButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   cardContainer: {
     flex: 1,
@@ -667,7 +739,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#D1D5DB',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 24,
+    marginBottom: 16,
   },
   submitButtonActive: {
     backgroundColor: '#166CB5',
@@ -685,11 +757,38 @@ const styles = StyleSheet.create({
   submitButtonTextActive: {
     color: '#FFF',
   },
+  // 🆕 提示區域樣式
+  hintContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F0F9FF',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    marginBottom: 16,
+  },
   hintText: {
-    fontSize: 14,
-    color: '#9CA3AF',
-    textAlign: 'center',
-    lineHeight: 20,
+    fontSize: 13,
+    color: '#0369A1',
+    marginLeft: 8,
+    fontWeight: '500',
+  },
+  // 🆕 稍後設定按鈕樣式
+  laterButton: {
+    width: '100%',
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: '#F9FAFB',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  laterButtonText: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: '#6B7280',
   },
 });
 

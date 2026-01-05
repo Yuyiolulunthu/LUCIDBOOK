@@ -1,4 +1,4 @@
-// BreathingExerciseCard.jsx - 根據設計稿重新設計
+// BreathingExerciseCard.jsx - 修复屏幕锁定和计时问题，优化滑杆样式
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View,
@@ -21,6 +21,7 @@ import {
 } from 'react-native';
 import Slider from '@react-native-community/slider';
 import { Audio } from 'expo-av';
+import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { LinearGradient } from 'expo-linear-gradient';
 import MaskedView from '@react-native-masked-view/masked-view';
 import { 
@@ -85,9 +86,10 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
   const sound = useRef(null);
   const timerRef = useRef(null);
   const breathTimerRef = useRef(null);
-  const breathTimeoutRef = useRef(null);  // 用於存儲 setTimeout ID
-  const breathAnimationRef = useRef(null); // 用於存儲當前動畫
+  const breathTimeoutRef = useRef(null);
+  const breathAnimationRef = useRef(null);
   const hasInitialized = useRef(false);
+  const audioStatusInterval = useRef(null);
 
   // ============================================
   // 動畫值
@@ -117,7 +119,7 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
       tags: ['焦慮', '會議前', '助眠'],
       description: '4秒吸氣，6秒吐氣。透過延長吐氣時間來啟動副交感神經，幫助您快速緩解緊張或焦慮，身心逐漸放鬆。',
       audioFile: { uri: 'https://curiouscreate.com/api/asserts/4-6.mp3' },
-      breathPattern: { inhale: 4, exhale: 6 }, // 4秒吸氣，6秒吐氣
+      breathPattern: { inhale: 4, exhale: 6 },
     },
     focus: {
       id: 'focus',
@@ -141,6 +143,26 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
     { id: 'sleepy', label: '想睡' },
     { id: 'energized', label: '更有力' },
   ];
+
+  // ============================================
+  // 音頻配置
+  // ============================================
+
+  const configureAudio = async () => {
+    try {
+      await Audio.setAudioModeAsync({
+        playsInSilentModeIOS: true,
+        staysActiveInBackground: true,
+        shouldDuckAndroid: true,
+        playThroughEarpieceAndroid: false,
+        allowsRecordingIOS: false,
+        interruptionModeIOS: 1,
+        interruptionModeAndroid: 1,
+      });
+    } catch (error) {
+      console.error('配置音頻失敗:', error);
+    }
+  };
 
   // ============================================
   // API 串接函數
@@ -265,17 +287,42 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
     
     setIsAudioLoading(true);
     try {
+      await configureAudio();
+      
       const { sound: audioSound } = await Audio.Sound.createAsync(
-        currentPractice.audioFile
+        currentPractice.audioFile,
+        { shouldPlay: false }
       );
       sound.current = audioSound;
       
+      audioSound.setOnPlaybackStatusUpdate((status) => {
+        if (status.isLoaded) {
+          if (status.isPlaying) {
+            const positionSeconds = Math.floor(status.positionMillis / 1000);
+            const durationSeconds = Math.floor(status.durationMillis / 1000);
+            
+            if (guideMode === 'audio') {
+              setCurrentTime(positionSeconds);
+              if (durationSeconds > 0 && totalDuration !== durationSeconds) {
+                setTotalDuration(durationSeconds);
+              }
+            }
+          }
+          
+          if (status.didJustFinish) {
+            handlePracticeComplete();
+          }
+        }
+      });
+      
       const status = await audioSound.getStatusAsync();
-      if (status.isLoaded) {
-        setTotalDuration(Math.floor(status.durationMillis / 1000));
+      if (status.isLoaded && status.durationMillis) {
+        const duration = Math.floor(status.durationMillis / 1000);
+        setTotalDuration(duration);
       }
     } catch (error) {
       console.error('音檔載入失敗:', error);
+      Alert.alert('錯誤', '音檔載入失敗，請重試');
     } finally {
       setIsAudioLoading(false);
     }
@@ -283,6 +330,12 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
 
   const startPractice = async (mode) => {
     setGuideMode(mode);
+    
+    try {
+      await activateKeepAwakeAsync();
+    } catch (e) {
+      console.log('保持屏幕常亮失敗:', e);
+    }
     
     if (!hasInitialized.current) {
       await initializePractice();
@@ -297,36 +350,37 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
     setIsPaused(false);
     setCurrentTime(0);
     
-    // 開始計時
-    startTimers();
-    
     if (mode === 'audio' && sound.current) {
       await sound.current.playAsync();
-    }
-    
-    if (mode === 'visual') {
+    } else if (mode === 'visual') {
+      startTimers();
       startBreathAnimation();
     }
   };
 
   const startTimers = () => {
-    // 清除舊的計時器
     if (timerRef.current) clearInterval(timerRef.current);
     
-    timerRef.current = setInterval(() => {
-      setCurrentTime(prev => {
-        if (prev >= totalDuration) {
-          handlePracticeComplete();
-          return prev;
-        }
-        return prev + 1;
-      });
-      setElapsedTime(prev => prev + 1);
-    }, 1000);
+    if (guideMode === 'visual') {
+      timerRef.current = setInterval(() => {
+        setCurrentTime(prev => {
+          const newTime = prev + 1;
+          if (newTime >= totalDuration) {
+            handlePracticeComplete();
+            return prev;
+          }
+          return newTime;
+        });
+        setElapsedTime(prev => prev + 1);
+      }, 1000);
+    } else {
+      timerRef.current = setInterval(() => {
+        setElapsedTime(prev => prev + 1);
+      }, 1000);
+    }
   };
 
   const startBreathAnimation = () => {
-    // 先停止之前的動畫
     stopBreathAnimation();
     
     const pattern = currentPractice.breathPattern;
@@ -335,7 +389,6 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
     const holdDuration = (pattern.hold || 0) * 1000;
     
     const runBreathCycle = () => {
-      // 吸氣
       setBreathPhase('吸氣');
       breathAnimationRef.current = Animated.timing(breathCircleScale, {
         toValue: 1.5,
@@ -345,10 +398,8 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
       
       breathAnimationRef.current.start(() => {
         if (holdDuration > 0) {
-          // 屏息
           setBreathPhase('屏息');
           breathTimeoutRef.current = setTimeout(() => {
-            // 吐氣
             setBreathPhase('吐氣');
             breathAnimationRef.current = Animated.timing(breathCircleScale, {
               toValue: 1,
@@ -358,7 +409,6 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
             breathAnimationRef.current.start();
           }, holdDuration);
         } else {
-          // 吐氣
           setBreathPhase('吐氣');
           breathAnimationRef.current = Animated.timing(breathCircleScale, {
             toValue: 1,
@@ -375,7 +425,6 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
     breathTimerRef.current = setInterval(runBreathCycle, cycleTime);
   };
 
-  // 停止呼吸動畫
   const stopBreathAnimation = () => {
     if (breathTimerRef.current) {
       clearInterval(breathTimerRef.current);
@@ -392,7 +441,6 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
       breathAnimationRef.current = null;
     }
     
-    // 重置動畫值
     breathCircleScale.setValue(1);
   };
 
@@ -401,22 +449,18 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
     setIsPaused(true);
     setShowPauseModal(true);
     
-    // 停止計時器
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
     
-    // 停止呼吸動畫
     stopBreathAnimation();
     
-    // 停止音頻波形動畫
     waveAnimations.forEach((anim) => {
       anim.stopAnimation();
       anim.setValue(0.3);
     });
     
-    // 暫停音頻
     if (sound.current) {
       try {
         await sound.current.pauseAsync();
@@ -431,13 +475,10 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
     setIsPlaying(true);
     setIsPaused(false);
     
-    startTimers();
-    
     if (guideMode === 'audio' && sound.current) {
       await sound.current.playAsync();
-    }
-    
-    if (guideMode === 'visual') {
+    } else if (guideMode === 'visual') {
+      startTimers();
       startBreathAnimation();
     }
   };
@@ -446,22 +487,18 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
     setIsPlaying(false);
     setIsPaused(false);
     
-    // 停止計時器
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
     
-    // 停止呼吸動畫
     stopBreathAnimation();
     
-    // 停止音頻波形動畫
     waveAnimations.forEach((anim) => {
       anim.stopAnimation();
       anim.setValue(0.3);
     });
     
-    // 停止並卸載音頻
     if (sound.current) {
       try {
         await sound.current.stopAsync();
@@ -471,13 +508,23 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
       }
       sound.current = null;
     }
+    
+    try {
+      deactivateKeepAwake();
+    } catch (e) {
+      console.log('取消屏幕常亮失敗:', e);
+    }
   };
 
   const switchMode = async () => {
     const newMode = guideMode === 'audio' ? 'visual' : 'audio';
     
-    // 停止當前模式的動畫/音頻
     stopBreathAnimation();
+    
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
     
     if (sound.current) {
       try {
@@ -492,10 +539,16 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
         await loadAudio();
       }
       if (sound.current && isPlaying) {
-        await sound.current.playAsync();
+        try {
+          await sound.current.setPositionAsync(currentTime * 1000);
+          await sound.current.playAsync();
+        } catch (e) {
+          console.error('恢復播放失敗:', e);
+        }
       }
     } else {
       if (isPlaying) {
+        startTimers();
         startBreathAnimation();
       }
     }
@@ -594,7 +647,6 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
   // useEffect
   // ============================================
 
-  // 音頻波形動畫
   useEffect(() => {
     if (isPlaying && guideMode === 'audio') {
       waveAnimations.forEach((anim) => {
@@ -620,10 +672,8 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
     }
   }, [isPlaying, guideMode]);
 
-  // 清理
   useEffect(() => {
     return () => {
-      // 停止所有動畫和計時器
       if (timerRef.current) {
         clearInterval(timerRef.current);
       }
@@ -637,15 +687,17 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
         breathAnimationRef.current.stop();
       }
       
-      // 停止音頻波形動畫
       waveAnimations.forEach((anim) => {
         anim.stopAnimation();
       });
       
-      // 卸載音頻
       if (sound.current) {
         sound.current.unloadAsync();
       }
+      
+      try {
+        deactivateKeepAwake();
+      } catch (e) {}
     };
   }, []);
 
@@ -663,10 +715,8 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
   // 渲染函數
   // ============================================
 
-  // 練習選擇頁面
   const renderSelectionPage = () => (
     <View style={styles.pageContainer}>
-      {/* Header */}
       <View style={styles.selectionHeader}>
         <TouchableOpacity onPress={handleBack} style={styles.backButton}>
           <ChevronLeft size={24} color="#333" />
@@ -675,7 +725,6 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
         <View style={{ width: 40 }} />
       </View>
 
-      {/* Tab 切換 */}
       <View style={styles.tabContainer}>
         <TouchableOpacity
           style={[styles.tab, activeTab === 'stress' && styles.tabActive]}
@@ -696,23 +745,19 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
       </View>
 
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {/* 練習卡片 */}
         <View style={styles.practiceCard}>
-          {/* 圖標區域 */}
           <View style={styles.iconArea}>
             <View style={styles.breathIcon}>
               <Text style={styles.breathIconText}>≋</Text>
             </View>
           </View>
 
-          {/* 標題 */}
           <Text style={styles.practiceTitle}>{currentPractice.title}</Text>
           <View style={styles.subtitleRow}>
             <Text style={styles.practiceSubtitleIcon}>≋</Text>
             <Text style={styles.practiceSubtitle}>{currentPractice.subtitle}</Text>
           </View>
 
-          {/* 標籤 */}
           <View style={styles.tagsRow}>
             {currentPractice.tags.map((tag, idx) => (
               <View key={idx} style={styles.tagChip}>
@@ -721,24 +766,29 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
             ))}
           </View>
 
-          {/* 說明 */}
           <Text style={styles.practiceDescription}>
             {currentPractice.description}
           </Text>
 
-          {/* 引導模式按鈕 */}
           <View style={styles.guideModeButtons}>
             <TouchableOpacity
               style={styles.guideModeButton}
               onPress={() => startPractice('audio')}
+              disabled={isAudioLoading}
             >
               <View style={styles.guideModeIconContainer}>
-                <Headphones size={24} color="#4ECDC4" />
+                {isAudioLoading ? (
+                  <ActivityIndicator size="small" color="#4ECDC4" />
+                ) : (
+                  <Headphones size={24} color="#4ECDC4" />
+                )}
               </View>
               <Text style={styles.guideModeTitle}>語音引導</Text>
               <View style={styles.guideModeAction}>
-                <Text style={styles.guideModeActionText}>開始播放</Text>
-                <Play size={12} color="#666" fill="#666" />
+                <Text style={styles.guideModeActionText}>
+                  {isAudioLoading ? '載入中...' : '開始播放'}
+                </Text>
+                {!isAudioLoading && <Play size={12} color="#666" fill="#666" />}
               </View>
             </TouchableOpacity>
 
@@ -767,12 +817,10 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
     </View>
   );
 
-  // 練習進行頁面
   const renderPracticePage = () => (
     <View style={styles.practicePageContainer}>
       <StatusBar barStyle="light-content" />
       
-      {/* Header */}
       <View style={styles.practiceHeader}>
         <Text style={styles.practiceHeaderTitle}>{currentPractice.title}</Text>
         <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
@@ -780,10 +828,8 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
         </TouchableOpacity>
       </View>
 
-      {/* 主要內容區域 */}
       <View style={styles.practiceContent}>
         {guideMode === 'audio' ? (
-          // 語音引導模式
           <View style={styles.audioGuideContainer}>
             <View style={styles.audioWaveContainer}>
               {waveAnimations.map((anim, i) => (
@@ -803,7 +849,6 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
             </View>
           </View>
         ) : (
-          // 視覺引導模式
           <View style={styles.visualGuideContainer}>
             <Animated.View
               style={[
@@ -818,17 +863,14 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
           </View>
         )}
 
-        {/* 倒計時 */}
         <Text style={styles.timerText}>
-          {formatTime(totalDuration - currentTime)}
+          {formatTime(Math.max(0, totalDuration - currentTime))}
         </Text>
 
-        {/* 暫停按鈕 */}
         <TouchableOpacity onPress={pausePractice} style={styles.pauseButton}>
           <Pause size={28} color="#fff" />
         </TouchableOpacity>
 
-        {/* 切換模式 */}
         <TouchableOpacity onPress={switchMode} style={styles.switchModeButton}>
           <Text style={styles.switchModeText}>
             切換至{guideMode === 'audio' ? '動畫' : '語音'}模式
@@ -836,7 +878,6 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
         </TouchableOpacity>
       </View>
 
-      {/* 暫停彈窗 */}
       <Modal
         visible={showPauseModal}
         transparent
@@ -869,11 +910,9 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
     </View>
   );
 
-  // 放鬆程度頁面
   const renderRelaxationPage = () => (
     <View style={styles.relaxationPageContainer}>
       <View style={styles.relaxationCard}>
-        {/* 返回按鈕 */}
         <TouchableOpacity onPress={handleBack} style={styles.relaxationBackButton}>
           <ChevronLeft size={24} color="#333" />
         </TouchableOpacity>
@@ -889,7 +928,7 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
           練習後，你現在的放鬆程度如何?
         </Text>
 
-        {/* 滑桿 */}
+        {/* 改進版滑桿 */}
         <View style={styles.sliderContainer}>
           <View style={styles.sliderTrack}>
             <View 
@@ -899,6 +938,7 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
               ]} 
             />
           </View>
+          
           <Slider
             style={styles.slider}
             minimumValue={0}
@@ -908,7 +948,7 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
             onValueChange={(value) => setRelaxLevel(Math.round(value))}
             minimumTrackTintColor="transparent"
             maximumTrackTintColor="transparent"
-            thumbTintColor="#fff"
+            thumbTintColor="#2196F3"
           />
         </View>
 
@@ -917,7 +957,6 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
           <Text style={styles.sliderLabel}>10 (放鬆)</Text>
         </View>
 
-        {/* 完成按鈕 */}
         <TouchableOpacity
           style={styles.relaxationCompleteButton}
           onPress={handleRelaxationComplete}
@@ -929,16 +968,13 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
     </View>
   );
 
-  // 完成頁面
   const renderCompletionPage = () => (
     <View style={styles.completionPageContainer}>
       <Text style={styles.completionHeader}>練習完成</Text>
 
-      {/* 專注時間 */}
       <Text style={styles.completionTime}>{formatTime(currentTime)}</Text>
       <Text style={styles.completionTimeLabel}>專注時間</Text>
 
-      {/* 放鬆指數 */}
       <View style={styles.completionRelaxContainer}>
         <Text style={styles.completionRelaxLabel}>放鬆指數</Text>
         <View style={styles.completionRelaxScore}>
@@ -947,7 +983,6 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
         </View>
       </View>
 
-      {/* 此刻感受 */}
       <Text style={styles.feelingsTitle}>此刻感受</Text>
       <View style={styles.feelingsContainer}>
         {feelingOptions.map((feeling) => (
@@ -970,7 +1005,6 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
           </TouchableOpacity>
         ))}
         
-        {/* 自定義按鈕 */}
         <TouchableOpacity
           style={[styles.feelingChip, showCustomInput && styles.feelingChipActive]}
           onPress={() => setShowCustomInput(!showCustomInput)}
@@ -981,7 +1015,6 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
         </TouchableOpacity>
       </View>
 
-      {/* 自定義輸入框 */}
       {showCustomInput && (
         <TextInput
           style={styles.customInput}
@@ -992,7 +1025,6 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
         />
       )}
 
-      {/* 完成按鈕 */}
       <TouchableOpacity
         style={styles.completionButton}
         onPress={handleComplete}
@@ -1057,7 +1089,6 @@ const styles = StyleSheet.create({
     color: '#333',
   },
 
-  // Tab 樣式
   tabContainer: {
     flexDirection: 'row',
     marginHorizontal: 16,
@@ -1094,7 +1125,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
-  // 練習卡片
   practiceCard: {
     marginHorizontal: 16,
     backgroundColor: '#fff',
@@ -1167,7 +1197,6 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
 
-  // 引導模式按鈕
   guideModeButtons: {
     flexDirection: 'row',
     gap: 12,
@@ -1211,13 +1240,13 @@ const styles = StyleSheet.create({
     marginTop: 16,
     paddingVertical: 12,
     paddingHorizontal: 16,
-    backgroundColor: '#E8F4F8',  // 淡藍色背景
+    backgroundColor: '#E8F4F8',
     borderRadius: 12,
     alignItems: 'center',
   },
   firstTimeTipText: {
     fontSize: 13,
-    color: '#1E88A8',  // 深藍色文字
+    color: '#1E88A8',
     lineHeight: 18,
   },
 
@@ -1258,7 +1287,6 @@ const styles = StyleSheet.create({
     paddingBottom: 100,
   },
 
-  // 語音引導
   audioGuideContainer: {
     marginBottom: 60,
   },
@@ -1275,7 +1303,6 @@ const styles = StyleSheet.create({
     borderRadius: 2,
   },
 
-  // 視覺引導
   visualGuideContainer: {
     marginBottom: 60,
   },
@@ -1294,7 +1321,6 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
 
-  // 計時器
   timerText: {
     fontSize: 72,
     fontWeight: '300',
@@ -1302,7 +1328,6 @@ const styles = StyleSheet.create({
     marginBottom: 40,
   },
 
-  // 暫停按鈕
   pauseButton: {
     width: 64,
     height: 64,
@@ -1314,7 +1339,6 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
 
-  // 切換模式
   switchModeButton: {
     paddingVertical: 8,
     paddingHorizontal: 16,
@@ -1378,7 +1402,7 @@ const styles = StyleSheet.create({
   },
 
   // ============================================
-  // 放鬆程度頁面樣式
+  // 放鬆程度頁面樣式 - 改進版
   // ============================================
   
   relaxationPageContainer: {
@@ -1438,33 +1462,37 @@ const styles = StyleSheet.create({
   },
   sliderContainer: {
     position: 'relative',
-    height: 40,
+    height: 50,
     marginBottom: 8,
+    paddingVertical: 10,
   },
   sliderTrack: {
     position: 'absolute',
     left: 0,
     right: 0,
     top: '50%',
-    height: 6,
-    backgroundColor: '#E0E0E0',
-    borderRadius: 3,
-    transform: [{ translateY: -3 }],
+    height: 8,
+    backgroundColor: '#E3F2FD',
+    borderRadius: 4,
+    transform: [{ translateY: -4 }],
     overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#BBDEFB',
   },
   sliderFill: {
     height: '100%',
     backgroundColor: '#2196F3',
-    borderRadius: 3,
+    borderRadius: 4,
   },
   slider: {
     width: '100%',
-    height: 40,
+    height: 50,
   },
   sliderLabels: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: 32,
+    paddingHorizontal: 4,
   },
   sliderLabel: {
     fontSize: 12,

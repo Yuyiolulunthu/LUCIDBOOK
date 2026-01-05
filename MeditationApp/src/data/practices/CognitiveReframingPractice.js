@@ -1,7 +1,7 @@
 // ==========================================
 // 檔案名稱: CognitiveReframingPractice.js
 // 思維調節練習 - ABCD 認知行為療法
-// 版本: V1.0 - 完整版
+// 版本: V1.2 - 優化拉桿視覺 + 加入呼吸練習引導
 // ==========================================
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
@@ -466,6 +466,14 @@ export default function CognitiveReframingPractice({ onBack, navigation, onHome 
 
   const selectAction = (action) => {
     setFormData(prev => ({ ...prev, selectedAction: action }));
+  };
+
+  // 導航到呼吸練習
+  const handleGoToBreathing = () => {
+    console.log('🫁 導航到呼吸練習');
+    navigation.navigate('PracticeNavigator', {
+      practiceType: '呼吸穩定力練習',
+    });
   };
 
   // ==================== 頁面渲染 ====================
@@ -1279,7 +1287,7 @@ export default function CognitiveReframingPractice({ onBack, navigation, onHome 
     );
   };
 
-  // 8. 情緒評估頁
+  // 8. 情緒評估頁 ⭐ 加入呼吸練習建議 + 優化拉桿視覺
   const renderAssessmentPage = () => (
     <View style={styles.fullScreen}>
       <LinearGradient
@@ -1306,12 +1314,16 @@ export default function CognitiveReframingPractice({ onBack, navigation, onHome 
 
             <View style={styles.scoreDisplay}>
               <Text style={styles.scoreNumber}>{formData.postScore}</Text>
+              <Text style={styles.scoreLabel}>分</Text>
             </View>
 
             <View style={styles.sliderContainer}>
+              {/* 背景軌道 */}
               <View style={styles.customSliderTrackBackground} />
+              
+              {/* 填充的漸層軌道 */}
               <LinearGradient
-                colors={['#e0f2fe', '#a5f3fc', '#6ee7b7', '#fde68a', '#fca5a5']}
+                colors={['#fca5a5', '#fde68a', '#6ee7b7', '#a5f3fc', '#60a5fa']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
                 style={[
@@ -1320,6 +1332,14 @@ export default function CognitiveReframingPractice({ onBack, navigation, onHome 
                 ]}
               />
 
+              {/* 刻度標記 */}
+              <View style={styles.sliderMarks}>
+                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(mark => (
+                  <View key={mark} style={styles.sliderMark} />
+                ))}
+              </View>
+
+              {/* 實際的拉桿 */}
               <Slider
                 style={styles.slider}
                 minimumValue={1}
@@ -1329,14 +1349,43 @@ export default function CognitiveReframingPractice({ onBack, navigation, onHome 
                 onValueChange={value => setFormData(prev => ({ ...prev, postScore: value }))}
                 minimumTrackTintColor="transparent"
                 maximumTrackTintColor="transparent"
-                thumbTintColor="#FFFFFF"
+                thumbTintColor="#0288D1"
               />
 
               <View style={styles.sliderLabels}>
-                <Text style={styles.sliderLabel}>沒有減緩 (1)</Text>
-                <Text style={styles.sliderLabel}>完全消失 (10)</Text>
+                <View style={styles.sliderLabelContainer}>
+                  <Text style={styles.sliderLabel}>沒有減緩</Text>
+                  <Text style={styles.sliderLabelNumber}>1</Text>
+                </View>
+                <View style={styles.sliderLabelContainer}>
+                  <Text style={styles.sliderLabel}>完全消失</Text>
+                  <Text style={styles.sliderLabelNumber}>10</Text>
+                </View>
               </View>
             </View>
+
+            {/* ⭐ 當分數為 1 時顯示呼吸練習建議 */}
+            {formData.postScore === 1 && (
+              <View style={styles.breathingSuggestion}>
+                <View style={styles.breathingSuggestionIcon}>
+                  <Wind size={20} color="#0ea5e9" />
+                </View>
+                <View style={styles.breathingSuggestionContent}>
+                  <Text style={styles.breathingSuggestionTitle}>
+                    情緒還是很不舒服嗎？
+                  </Text>
+                  <Text style={styles.breathingSuggestionText}>
+                    試試呼吸練習，幫助身心放鬆
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.breathingSuggestionButton}
+                  onPress={handleGoToBreathing}
+                >
+                  <Text style={styles.breathingSuggestionButtonText}>去練習</Text>
+                </TouchableOpacity>
+              </View>
+            )}
 
             <TouchableOpacity
               style={styles.assessmentButton}
@@ -1595,12 +1644,6 @@ export default function CognitiveReframingPractice({ onBack, navigation, onHome 
       }
     };
 
-    const handleDoBreathing = () => {
-      navigation.navigate('PracticeNavigator', {
-        practiceType: '呼吸穩定力練習',
-      });
-    };
-
     return (
       <View style={styles.fullScreen}>
         <LinearGradient
@@ -1660,7 +1703,7 @@ export default function CognitiveReframingPractice({ onBack, navigation, onHome 
             {/* 做個呼吸練習 */}
             <TouchableOpacity
               style={styles.breathingLinkButton}
-              onPress={handleDoBreathing}
+              onPress={handleGoToBreathing}
             >
               <Text style={styles.breathingLinkText}>做個呼吸練習放鬆一下</Text>
             </TouchableOpacity>
@@ -2367,7 +2410,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
 
-  // ========== 評估頁 ==========
+  // ========== 評估頁 ⭐⭐⭐ 優化後的拉桿樣式 ⭐⭐⭐ ==========
   assessmentContent: {
     flex: 1,
     justifyContent: 'center',
@@ -2426,51 +2469,139 @@ const styles = StyleSheet.create({
   },
   scoreDisplay: {
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 32,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 4,
   },
   scoreNumber: {
-    fontSize: 64,
+    fontSize: 72,
     fontWeight: '700',
     color: '#0288D1',
+    lineHeight: 72,
+  },
+  scoreLabel: {
+    fontSize: 24,
+    fontWeight: '600',
+    color: '#94a3b8',
+    marginTop: 20,
   },
   sliderContainer: {
     marginBottom: 32,
     position: 'relative',
+    paddingHorizontal: 8,
   },
   customSliderTrackBackground: {
     position: 'absolute',
-    top: 18,
-    left: 0,
-    right: 0,
-    height: 12,
-    backgroundColor: '#DFE6E9',
-    borderRadius: 6,
+    top: 20,
+    left: 8,
+    right: 8,
+    height: 16,
+    backgroundColor: '#e2e8f0',
+    borderRadius: 8,
     zIndex: 1,
+    borderWidth: 2,
+    borderColor: '#cbd5e1',
   },
   customSliderTrackFilled: {
     position: 'absolute',
-    top: 18,
-    left: 0,
+    top: 22,
+    left: 10,
     height: 12,
     borderRadius: 6,
     zIndex: 2,
   },
+  sliderMarks: {
+    position: 'absolute',
+    top: 20,
+    left: 8,
+    right: 8,
+    height: 16,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+    zIndex: 3,
+  },
+  sliderMark: {
+    width: 2,
+    height: 8,
+    backgroundColor: '#FFFFFF',
+    opacity: 0.5,
+  },
   slider: {
     width: '100%',
-    height: 44,
+    height: 56,
     position: 'relative',
-    zIndex: 3,
+    zIndex: 4,
   },
   sliderLabels: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 8,
+    marginTop: 12,
+    paddingHorizontal: 8,
+  },
+  sliderLabelContainer: {
+    alignItems: 'center',
   },
   sliderLabel: {
-    fontSize: 12,
-    color: '#636E72',
+    fontSize: 13,
+    color: '#64748b',
     fontWeight: '500',
+    marginBottom: 4,
   },
+  sliderLabelNumber: {
+    fontSize: 16,
+    color: '#0288D1',
+    fontWeight: '700',
+  },
+
+  // ⭐ 呼吸練習建議卡片
+  breathingSuggestion: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f0f9ff',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#bae6fd',
+  },
+  breathingSuggestionIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#e0f2fe',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  breathingSuggestionContent: {
+    flex: 1,
+  },
+  breathingSuggestionTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1e293b',
+    marginBottom: 2,
+  },
+  breathingSuggestionText: {
+    fontSize: 12,
+    color: '#64748b',
+  },
+  breathingSuggestionButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: '#0ea5e9',
+    borderRadius: 12,
+    marginLeft: 8,
+  },
+  breathingSuggestionButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+
   assessmentButton: {
     width: '100%',
     height: 56,
