@@ -2,7 +2,7 @@
   "expo": {
     "name": "LUCIDBOOK",
     "slug": "lucidbook",
-    "version": "2.4.6",
+    "version": "2.4.7",
     "orientation": "default",
     "icon": "./assets/images/lucidbook.png",
     "userInterfaceStyle": "light",
@@ -33,7 +33,7 @@
         "backgroundColor": "#ffffff"
       },
       "package": "com.lucidbook",
-      "versionCode": 29,
+      "versionCode": 30,
       "permissions": [
         "CAMERA",
         "READ_EXTERNAL_STORAGE",
