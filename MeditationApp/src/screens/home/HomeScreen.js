@@ -476,7 +476,7 @@ const HomeScreen = ({ navigation }) => {
         {/* 主標題 */}
         <View style={styles.titleSection}>
           <Text style={styles.mainTitle}>
-            {isLoggedIn && user ? user.name : 'Jennifer'} 心理肌力養成計劃
+            {isLoggedIn && user ? user.name : '我的'} 心理肌力養成計劃
           </Text>
         </View>
 

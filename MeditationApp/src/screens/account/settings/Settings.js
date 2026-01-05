@@ -308,6 +308,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 20,
     paddingHorizontal: 16,
+    backgroundColor: 'transparent',
   },
   menuItemLeft: {
     flexDirection: 'row',
@@ -321,6 +322,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 16,
+    overflow: 'hidden',
   },
   menuItemTextContainer: {
     flex: 1,

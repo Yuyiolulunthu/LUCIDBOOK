@@ -1152,6 +1152,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     borderWidth: 1,
     borderColor: '#e2e8f0',
+    overflow: 'hidden',
   },
   recommendationIcon: {
     width: 40,
@@ -1160,6 +1161,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 16,
+    overflow: 'hidden',
   },
   recommendationTextContainer: {
     flex: 1,
@@ -1181,6 +1183,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#f1f5f9',
     justifyContent: 'center',
     alignItems: 'center',
+    overflow: 'hidden',
   },
 
   completeButton: {
