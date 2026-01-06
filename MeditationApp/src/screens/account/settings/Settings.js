@@ -1,10 +1,11 @@
 // ==========================================
 // 檔案名稱: Settings.js
-// 版本: V2.0 - 新設計風格
+// 版本: V2.1 - 修復 Android 白色方框問題
 // 
 // ✅ 簡化為兩大區塊：帳號管理、支援
 // ✅ 底部顯示：登出、服務條款、隱私權政策、版本
 // ✅ 新增刪除帳號功能
+// ✅ 修復 Android 白色方框問題（統一 iOS/Android 顯示）
 // ==========================================
 
 import React from 'react';
@@ -16,6 +17,7 @@ import {
   StyleSheet,
   StatusBar,
   Alert,
+  Platform,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -23,7 +25,6 @@ import ApiService from '../../../../api';
 
 const Settings = ({ navigation }) => {
 
-  // 導航功能
   const handleNavigateToProfile = () => {
     navigation.navigate('ProfileEdit');
   };
@@ -73,7 +74,6 @@ const Settings = ({ navigation }) => {
     );
   };
 
-  // 渲染導航項目
   const renderMenuItem = (icon, label, subLabel, onPress, isDanger = false) => (
     <TouchableOpacity
       style={styles.menuItem}
@@ -223,16 +223,21 @@ const styles = StyleSheet.create({
     backgroundColor: '#F5F7FA',
   },
 
-  // Header
   header: {
     paddingTop: 50,
     paddingBottom: 16,
     paddingHorizontal: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 8,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 12,
+      },
+      android: {
+        elevation: 8,
+      },
+    }),
   },
   headerContent: {
     flexDirection: 'row',
@@ -256,7 +261,6 @@ const styles = StyleSheet.create({
     width: 40,
   },
 
-  // ScrollView
   scrollView: {
     flex: 1,
   },
@@ -266,7 +270,6 @@ const styles = StyleSheet.create({
     paddingBottom: 100,
   },
 
-  // Section
   section: {
     marginBottom: 32,
   },
@@ -288,20 +291,25 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#6B7280',
   },
+  // ⭐ 修復：Android 白色方框問題
   sectionCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    backgroundColor: '#FFFFFF',  // ⭐ 改為不透明背景
     borderRadius: 16,
-    overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.6)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    borderColor: '#F3F4F6',  // ⭐ 添加邊框增強視覺
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 3,  // ⭐ Android 使用 elevation
+      },
+    }),
   },
 
-  // Menu Item
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -322,7 +330,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 16,
-    overflow: 'hidden',
   },
   menuItemTextContainer: {
     flex: 1,
@@ -338,13 +345,12 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
 
-  // Divider
   divider: {
     height: 1,
     backgroundColor: '#F3F4F6',
+    marginHorizontal: 16,  // ⭐ 添加左右邊距讓分隔線不碰到邊緣
   },
 
-  // Footer
   footer: {
     position: 'absolute',
     bottom: 0,
