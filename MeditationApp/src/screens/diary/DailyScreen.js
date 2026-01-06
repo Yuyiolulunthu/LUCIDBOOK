@@ -100,6 +100,15 @@ const DailyScreen = ({ navigation, route }) => {
   );
 
   useEffect(() => {
+  if (route?.params?.forceRefresh) {
+    console.log('🔄 [日記] 收到強制刷新信號');
+    fetchAllData();
+    // 清除參數避免重複觸發
+    navigation.setParams({ forceRefresh: false });
+  }
+}, [route?.params?.forceRefresh]);
+
+  useEffect(() => {
     if (highlightPracticeId && displayData.length > 0) {
       const practice = displayData.find(p => p.id === highlightPracticeId);
       if (practice) {
@@ -276,18 +285,49 @@ const DailyScreen = ({ navigation, route }) => {
     return '情緒抗壓力';
   };
 
-  // ⭐ 呼吸練習資料解析
+  // ⭐ 呼吸練習資料解析（增強版）
   const extractBreathingData = (practice) => {
-    let data = { relaxLevel: practice.relax_level || practice.positive_level || null, postFeelings: practice.post_feelings || practice.feelings || null };
+    let data = { 
+      relaxLevel: null, 
+      postFeelings: null,
+      postMood: null,  // ⭐ 新增：主要心情
+    };
+    
+    // 優先從 practice 直接取值
+    data.relaxLevel = practice.relax_level || practice.relaxLevel || practice.positive_level || null;
+    data.postFeelings = practice.post_feelings || practice.postFeelings || practice.feelings || null;
+    data.postMood = practice.post_mood || practice.postMood || null;
+    
+    // 從 form_data 補充
     if (practice.form_data) {
       try {
         const fd = typeof practice.form_data === 'string' ? JSON.parse(practice.form_data) : practice.form_data;
         if (fd) {
+          // 放鬆程度
           data.relaxLevel = data.relaxLevel || fd.relax_level || fd.relaxLevel || null;
+          
+          // 練習後感受（字串格式）
           data.postFeelings = data.postFeelings || fd.post_feelings || fd.postFeelings || null;
+          
+          // 練習後感受（陣列格式）- 轉成字串
+          if (!data.postFeelings && fd.feelings && Array.isArray(fd.feelings)) {
+            data.postFeelings = fd.feelings.join('、');
+          }
+          
+          // 主要心情
+          data.postMood = data.postMood || fd.post_mood || fd.postMood || null;
+          
+          // 如果沒有 postMood，從 feelings 陣列取第一個
+          if (!data.postMood && fd.feelings && Array.isArray(fd.feelings) && fd.feelings.length > 0) {
+            data.postMood = fd.feelings[0];
+          }
         }
-      } catch (e) {}
+      } catch (e) {
+        console.warn('[DailyScreen] 解析呼吸練習 form_data 失敗:', e);
+      }
     }
+    
+    console.log('[DailyScreen] 呼吸練習數據:', data);
     return data;
   };
 
@@ -316,51 +356,89 @@ const DailyScreen = ({ navigation, route }) => {
     return data;
   };
 
-  // ⭐⭐⭐ 思維調節練習資料解析（完整版 - 修正欄位名稱）⭐⭐⭐
+  // ⭐⭐⭐ 思維調節練習資料解析（完整版）⭐⭐⭐
   const extractCognitiveData = (practice) => {
     let data = {
-      event: null,           // 事件 (A)
-      originalThought: null, // 原本的想法 (B)
-      emotions: [],          // 情緒標籤
-      emotionIntensity: null,// 情緒強度
-      newThought: null,      // 轉念後 (D)
-      postScore: null,       // 練習後正向程度
+      event: null,           
+      originalThought: null, 
+      emotions: [],          
+      bodyReactions: [],     
+      behaviors: [],         
+      emotionIntensity: null,
+      newThought: null,      
+      postScore: null,
+      postMood: null,
+      hasCustomOptions: false,
     };
 
     if (practice.form_data) {
       try {
         const fd = typeof practice.form_data === 'string' ? JSON.parse(practice.form_data) : practice.form_data;
         if (fd) {
-          // 事件 (A) - 支援多種欄位名
+          // 基本欄位
           data.event = fd.event || fd.situation || fd.activatingEvent || fd.trigger || null;
+          data.originalThought = fd.thought || fd.originalThought || fd.original_thought || null;
+          data.emotionIntensity = fd.emotionIntensity || fd.emotion_intensity || null;
+          data.newThought = fd.newPerspective || fd.newThought || fd.new_thought || null;
+          data.postScore = fd.postScore ?? fd.post_score ?? null;
+          data.postMood = fd.postMood || fd.post_mood || null;
           
-          // ⭐ 原本的想法 (B) - 加入 thought 欄位（CognitiveReframingPractice 實際使用的欄位名）
-          data.originalThought = fd.thought || fd.originalThought || fd.original_thought || fd.belief || fd.negativeThought || fd.automaticThought || null;
+          // ⭐⭐⭐ 關鍵修正：反應資料解析 ⭐⭐⭐
           
-          // 情緒標籤 - 支援多種格式
-          if (fd.emotions && Array.isArray(fd.emotions)) {
-            data.emotions = fd.emotions;
-          } else if (fd.emotion) {
-            data.emotions = Array.isArray(fd.emotion) ? fd.emotion : [fd.emotion];
-          } else if (fd.selectedEmotions) {
-            data.emotions = Array.isArray(fd.selectedEmotions) ? fd.selectedEmotions : [fd.selectedEmotions];
-          } else if (fd.emotionTags) {
-            data.emotions = Array.isArray(fd.emotionTags) ? fd.emotionTags : fd.emotionTags.split(',').map(e => e.trim());
+          // 方法 1: 從 fullReactions 讀取（最新格式）
+          if (fd.fullReactions) {
+            console.log('📊 [DailyScreen] 從 fullReactions 讀取');
+            data.emotions = Array.isArray(fd.fullReactions.emotions) ? fd.fullReactions.emotions : [];
+            data.bodyReactions = Array.isArray(fd.fullReactions.bodyReactions) ? fd.fullReactions.bodyReactions : [];
+            data.behaviors = Array.isArray(fd.fullReactions.behaviors) ? fd.fullReactions.behaviors : [];
+            
+            data.hasCustomOptions = (fd.customEmotions?.length > 0) || 
+                                  (fd.customBodyReactions?.length > 0) || 
+                                  (fd.customBehaviors?.length > 0);
+          }
+          // 方法 2: 直接從根層級讀取（向後兼容）
+          else {
+            console.log('📊 [DailyScreen] 從根層級讀取');
+            
+            // 情緒
+            if (fd.emotions && Array.isArray(fd.emotions)) {
+              data.emotions = fd.emotions;
+            } else if (fd.emotion) {
+              data.emotions = Array.isArray(fd.emotion) ? fd.emotion : [fd.emotion];
+            }
+            
+            // 身體反應
+            if (fd.bodyReactions && Array.isArray(fd.bodyReactions)) {
+              data.bodyReactions = fd.bodyReactions;
+            }
+            
+            // 行為反應
+            if (fd.behaviors && Array.isArray(fd.behaviors)) {
+              data.behaviors = fd.behaviors;
+            }
+            
+            data.hasCustomOptions = (fd.customEmotions?.length > 0) || 
+                                  (fd.customBodyReactions?.length > 0) || 
+                                  (fd.customBehaviors?.length > 0);
           }
           
-          // 情緒強度
-          data.emotionIntensity = fd.emotionIntensity || fd.emotion_intensity || fd.intensity || null;
+          // 補充主要心情
+          if (!data.postMood && data.emotions.length > 0) {
+            data.postMood = data.emotions[0];
+          }
           
-          // ⭐ 轉念後的想法 (D) - 加入 newPerspective 欄位（CognitiveReframingPractice 實際使用的欄位名）
-          data.newThought = fd.newPerspective || fd.newThought || fd.new_thought || fd.dispute || fd.reframedThought || fd.alternativeThought || fd.balancedThought || null;
-          
-          // 練習後評分
-          data.postScore = fd.postScore ?? fd.post_score ?? fd.positiveLevel ?? fd.positive_level ?? null;
+          console.log('📋 [DailyScreen] 解析結果:', {
+            emotions: data.emotions.length,
+            bodyReactions: data.bodyReactions.length,
+            behaviors: data.behaviors.length,
+            hasCustomOptions: data.hasCustomOptions,
+          });
         }
       } catch (e) {
-        console.warn('parse cognitive form_data failed', e);
+        console.warn('[DailyScreen] 解析失敗:', e);
       }
     }
+    
     return data;
   };
 
@@ -653,13 +731,51 @@ const DailyScreen = ({ navigation, route }) => {
                         <Text style={[styles.abcdLabel, { color: '#DC2626' }]}>原本的想法</Text>
                       </View>
                       <Text style={styles.abcdContent}>{cognitiveData.originalThought}</Text>
-                      {cognitiveData.emotions && cognitiveData.emotions.length > 0 && (
-                        <View style={[styles.tagsRow, { marginTop: 12 }]}>
-                          {cognitiveData.emotions.map((emotion, i) => (
-                            <View key={i} style={styles.emotionTagNegative}>
-                              <Text style={styles.emotionTagNegativeText}>{emotion}</Text>
+                      
+                      {/* ⭐ 完整的反应信息 */}
+                      {(cognitiveData.emotions.length > 0 || cognitiveData.bodyReactions.length > 0 || cognitiveData.behaviors.length > 0) && (
+                        <View style={{ marginTop: 16 }}>
+                          {/* 情绪 */}
+                          {cognitiveData.emotions.length > 0 && (
+                            <View style={{ marginBottom: 12 }}>
+                              <Text style={styles.reactionSubLabel}>情绪：</Text>
+                              <View style={styles.tagsRow}>
+                                {cognitiveData.emotions.map((emotion, i) => (
+                                  <View key={i} style={styles.emotionTagNegative}>
+                                    <Text style={styles.emotionTagNegativeText}>{emotion}</Text>
+                                  </View>
+                                ))}
+                              </View>
                             </View>
-                          ))}
+                          )}
+                          
+                          {/* 身体反应 */}
+                          {cognitiveData.bodyReactions.length > 0 && (
+                            <View style={{ marginBottom: 12 }}>
+                              <Text style={styles.reactionSubLabel}>身体：</Text>
+                              <View style={styles.tagsRow}>
+                                {cognitiveData.bodyReactions.map((reaction, i) => (
+                                  <View key={i} style={styles.emotionTagNegative}>
+                                    <Text style={styles.emotionTagNegativeText}>{reaction}</Text>
+                                  </View>
+                                ))}
+                              </View>
+                            </View>
+                          )}
+                          
+                          {/* 行为反应 */}
+                          {cognitiveData.behaviors.length > 0 && (
+                            <View style={{ marginBottom: 0 }}>
+                              <Text style={styles.reactionSubLabel}>行为：</Text>
+                              <View style={styles.tagsRow}>
+                                {cognitiveData.behaviors.map((behavior, i) => (
+                                  <View key={i} style={styles.emotionTagNegative}>
+                                    <Text style={styles.emotionTagNegativeText}>{behavior}</Text>
+                                  </View>
+                                ))}
+                              </View>
+                            </View>
+                          )}
                         </View>
                       )}
                     </View>
@@ -1238,6 +1354,12 @@ const styles = StyleSheet.create({
     paddingTop: 24,
     borderTopWidth: 1,
     borderTopColor: '#E2E8F0',
+  },
+  reactionSubLabel: { 
+    fontSize: 12, 
+    color: '#DC2626', 
+    fontWeight: '600', 
+    marginBottom: 8 
   },
   navButtonBottom: {
     flexDirection: 'row',

@@ -29,7 +29,10 @@ import {
   ChevronLeft, 
   ChevronRight, 
   X, 
-  Headphones, 
+  Headphones,
+  Wind,
+  BookOpen,
+  Star, 
   Eye,
   Play,
   Pause,
@@ -41,6 +44,86 @@ const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 // 統一練習類型名稱
 const PRACTICE_TYPE = '呼吸穩定力練習';
+
+// 星星動畫
+const StarConfetti = ({ index }) => {
+  const animatedValue = useRef(new Animated.Value(0)).current;
+  
+  const [meteorConfig] = useState(() => {
+    const side = index % 4;
+    let startX, startY, angle;
+    
+    if (side === 0) {
+      startX = Math.random() * SCREEN_WIDTH;
+      startY = -50;
+      angle = 45 + (Math.random() - 0.5) * 60;
+    } else if (side === 1) {
+      startX = SCREEN_WIDTH + 50;
+      startY = Math.random() * SCREEN_HEIGHT;
+      angle = 135 + (Math.random() - 0.5) * 60;
+    } else if (side === 2) {
+      startX = Math.random() * SCREEN_WIDTH;
+      startY = SCREEN_HEIGHT + 50;
+      angle = 225 + (Math.random() - 0.5) * 60;
+    } else {
+      startX = -50;
+      startY = Math.random() * SCREEN_HEIGHT;
+      angle = 315 + (Math.random() - 0.5) * 60;
+    }
+    
+    const angleInRadians = (angle * Math.PI) / 180;
+    const distance = 800 + Math.random() * 400;
+    
+    return {
+      startX,
+      startY,
+      endX: startX + Math.cos(angleInRadians) * distance,
+      endY: startY + Math.sin(angleInRadians) * distance,
+      starSize: 24 + Math.random() * 16,
+      delay: Math.random() * 1000,
+    };
+  });
+  
+  useEffect(() => {
+    setTimeout(() => {
+      Animated.timing(animatedValue, {
+        toValue: 1,
+        duration: 2000 + Math.random() * 1000,
+        useNativeDriver: true,
+      }).start();
+    }, meteorConfig.delay);
+  }, []);
+  
+  const translateX = animatedValue.interpolate({
+    inputRange: [0, 1],
+    outputRange: [meteorConfig.startX, meteorConfig.endX],
+  });
+  
+  const translateY = animatedValue.interpolate({
+    inputRange: [0, 1],
+    outputRange: [meteorConfig.startY, meteorConfig.endY],
+  });
+  
+  const opacity = animatedValue.interpolate({
+    inputRange: [0, 0.1, 0.7, 1],
+    outputRange: [0, 1, 0.8, 0],
+  });
+
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={{
+        position: 'absolute',
+        left: 0,
+        top: 0,
+        transform: [{ translateX }, { translateY }],
+        opacity,
+      }}
+    >
+      <Star size={meteorConfig.starSize} color="#60a5fa" fill="#bae6fd" />
+    </Animated.View>
+  );
+};
 
 export default function BreathingExerciseCard({ onBack, navigation, route, onHome }) {
   // ============================================
@@ -91,13 +174,18 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
   const hasInitialized = useRef(false);
   const audioStatusInterval = useRef(null);
 
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false); 
+
   // ============================================
   // 動畫值
   // ============================================
   
   const breathCircleScale = useRef(new Animated.Value(1)).current;
   const breathCircleOpacity = useRef(new Animated.Value(0.5)).current;
-  
+  const iconScale = useRef(new Animated.Value(0)).current;
+  const starBadgeScale = useRef(new Animated.Value(0)).current;
+  const breathingScale = useRef(new Animated.Value(1)).current;
+
   const waveHeights = [12, 20, 16, 28, 24, 32, 28, 20, 16, 24, 28, 32, 28, 24, 20];
   const waveAnimations = useRef(
     waveHeights.map(() => new Animated.Value(0.3))
@@ -207,50 +295,58 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
 
   const completePractice = async () => {
     if (!practiceId) {
-      console.error('❌ [呼吸練習] practiceId 為空，無法完成練習');
+      console.error('❌ [呼吸練習] practiceId 為空');
       return;
     }
     
     try {
-      console.log('📝 [呼吸練習] 開始完成練習，practiceId:', practiceId);
-      
       let totalSeconds = elapsedTime || Math.floor((Date.now() - startTime) / 1000) || 60;
       const totalMinutes = Math.max(1, Math.ceil(totalSeconds / 60));
       
-      console.log('⏱️ [呼吸練習] 練習時長:', totalSeconds, '秒 (', totalMinutes, '分鐘)');
-      
       await saveProgress();
       
+      // ⭐ 整理心情選項（包含自訂）
       const feelingsArray = selectedFeelings.map(id => 
         feelingOptions.find(f => f.id === id)?.label
       ).filter(Boolean);
       
-      if (customFeeling) feelingsArray.push(customFeeling);
+      // ⭐ 確保自訂感受被加入
+      if (customFeeling && customFeeling.trim()) {
+        feelingsArray.push(customFeeling.trim());
+      }
+      
+      // ⭐ 增強的 form_data
+      const enhancedFormData = {
+        practiceType: activeTab,
+        practiceTitle: currentPractice.title,
+        guideMode,
+        relaxLevel: relaxLevel,
+        relax_level: relaxLevel,
+        feelings: feelingsArray,
+        post_feelings: feelingsArray.join('、'),
+        postFeelings: feelingsArray.join('、'),
+        post_mood: feelingsArray.length > 0 ? feelingsArray[0] : '平靜',
+        postMood: feelingsArray.length > 0 ? feelingsArray[0] : '平靜',
+        customFeeling: customFeeling || '',  // ⭐ 保留原始自訂輸入
+        hasCustomFeeling: !!customFeeling,   // ⭐ 標記是否有自訂
+      };
       
       const completePayload = {
         practice_type: PRACTICE_TYPE,
         duration: totalMinutes,
         duration_seconds: totalSeconds,
-        feeling: `練習類型：${currentPractice.title}，放鬆程度：${relaxLevel}/10`,
+        feeling: `練習類型：${currentPractice.title}，放鬆程度：${relaxLevel}/10，心情：${feelingsArray.join('、') || '未記錄'}`,
         noticed: feelingsArray.join('、') || '未記錄',
         reflection: customFeeling || '',
-        formData: {
-          practiceType: activeTab,
-          practiceTitle: currentPractice.title,
-          guideMode,
-          relaxLevel,
-          feelings: feelingsArray,
-        },
+        form_data: enhancedFormData,  // ⭐ 使用增強版
       };
       
-      console.log('📤 [呼吸練習] 發送完成請求:', completePayload);
+      console.log('📤 [呼吸練習] 完整 payload:', completePayload);
       
-      const response = await ApiService.completePractice(practiceId, completePayload);
-      
-      console.log('✅ [呼吸練習] 完成練習成功:', response);
+      await ApiService.completePractice(practiceId, completePayload);
+      console.log('✅ [呼吸練習] 完成練習成功');
     } catch (error) {
       console.error('❌ [呼吸練習] 完成練習失敗:', error);
-      console.error('❌ [呼吸練習] 錯誤詳情:', error.message, error.stack);
     }
   };
 
@@ -289,28 +385,46 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
   // ============================================
 
   const loadAudio = async () => {
+    // ⭐ 檢查是否已載入
     if (sound.current) {
+      try {
+        const status = await sound.current.getStatusAsync();
+        if (status.isLoaded) {
+          console.log('✅ 音檔已載入，跳過重複載入');
+          return;
+        }
+      } catch (e) {
+        console.log('檢查音檔狀態失敗，重新載入');
+      }
+      
       await sound.current.unloadAsync();
       sound.current = null;
     }
     
     setIsAudioLoading(true);
-    try {
-      await configureAudio();
-      
-      const { sound: audioSound } = await Audio.Sound.createAsync(
-        currentPractice.audioFile,
-        { shouldPlay: false }
-      );
-      sound.current = audioSound;
-      
-      audioSound.setOnPlaybackStatusUpdate((status) => {
-        if (status.isLoaded) {
-          if (status.isPlaying) {
+    let retryCount = 0;
+    const maxRetries = 2;
+    
+    while (retryCount <= maxRetries) {
+      try {
+        await configureAudio();
+        
+        console.log(`🎵 [呼吸練習] 嘗試載入音檔 (${retryCount + 1}/${maxRetries + 1})`);
+        
+        // ⭐ 使用 createAsync 而不是 createAsync + setOnPlaybackStatusUpdate
+        const { sound: audioSound } = await Audio.Sound.createAsync(
+          currentPractice.audioFile,
+          { shouldPlay: false }
+        );
+        
+        sound.current = audioSound;
+        
+        // ⭐ 分開設置狀態更新回調
+        audioSound.setOnPlaybackStatusUpdate((status) => {
+          if (status.isLoaded && status.isPlaying) {
             const positionSeconds = Math.floor(status.positionMillis / 1000);
             const durationSeconds = Math.floor(status.durationMillis / 1000);
             
-            // ✅ 修復：無論哪種模式都更新 currentTime
             setCurrentTime(positionSeconds);
             
             if (durationSeconds > 0 && totalDuration !== durationSeconds) {
@@ -321,19 +435,32 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
           if (status.didJustFinish) {
             handlePracticeComplete();
           }
+        });
+        
+        // ⭐ 獲取時長
+        const status = await audioSound.getStatusAsync();
+        if (status.isLoaded && status.durationMillis) {
+          const duration = Math.floor(status.durationMillis / 1000);
+          setTotalDuration(duration);
+          console.log('✅ 音檔載入成功，時長:', duration, '秒');
         }
-      });
-      
-      const status = await audioSound.getStatusAsync();
-      if (status.isLoaded && status.durationMillis) {
-        const duration = Math.floor(status.durationMillis / 1000);
-        setTotalDuration(duration);
+        
+        setIsAudioLoading(false);
+        return;  // ⭐ 成功後直接返回
+        
+      } catch (error) {
+        retryCount++;
+        console.error(`❌ 音檔載入失敗 (${retryCount}/${maxRetries + 1}):`, error);
+        
+        if (retryCount > maxRetries) {
+          setIsAudioLoading(false);
+          Alert.alert('錯誤', '音檔載入失敗，請檢查網絡連接後重試');
+          return;
+        }
+        
+        // ⭐ 等待 1 秒後重試
+        await new Promise(resolve => setTimeout(resolve, 1000));
       }
-    } catch (error) {
-      console.error('音檔載入失敗:', error);
-      Alert.alert('錯誤', '音檔載入失敗，請重試');
-    } finally {
-      setIsAudioLoading(false);
     }
   };
 
@@ -346,11 +473,14 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
       console.log('保持屏幕常亮失敗:', e);
     }
     
+    // ⭐ 修正：確保初始化完成
     if (!hasInitialized.current) {
       await initializePractice();
+      // ⭐ 等待初始化完成
+      await new Promise(resolve => setTimeout(resolve, 300));
     }
     
-    // ✅ 修復：統一載入音頻以獲取正確時長
+    // ⭐ 修正：統一載入音頻
     if (!sound.current) {
       await loadAudio();
     }
@@ -360,8 +490,18 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
     setIsPaused(false);
     setCurrentTime(0);
     
-    if (mode === 'audio' && sound.current) {
-      await sound.current.playAsync();
+    // ⭐ 修正：確保音頻已載入後才播放
+    if (mode === 'audio') {
+      if (sound.current) {
+        try {
+          await sound.current.playAsync();
+        } catch (error) {
+          console.error('❌ 播放音頻失敗:', error);
+          Alert.alert('錯誤', '音頻播放失敗，請重試');
+        }
+      } else {
+        console.error('❌ 音頻未載入');
+      }
     } else if (mode === 'visual') {
       startTimers();
       startBreathAnimation();
@@ -597,8 +737,18 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
     }
   };
 
-  const handleRelaxationComplete = () => {
-    setCurrentPage('completion');
+  const handleRelaxationComplete = async () => {
+    try {
+      setIsLoadingStats(true);
+      // ⭐ 只做進度儲存，不完成練習
+      await saveProgress();
+      setCurrentPage('completion');  // ⭐ 跳到心情記錄頁
+    } catch (error) {
+      console.error('❌ [呼吸練習] 儲存失敗:', error);
+      setCurrentPage('completion');  // ⭐ 即使失敗也跳轉
+    } finally {
+      setIsLoadingStats(false);
+    }
   };
 
   const handleComplete = async () => {
@@ -720,6 +870,70 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
       } catch (e) {}
     };
   }, []);
+
+  // 1. 清理函數 - 防止 Modal 誤觸發
+  useEffect(() => {
+    return () => {
+      console.log('🧹 [呼吸練習] 組件卸載，清理狀態');
+      // 清理所有狀態
+      if (timerRef.current) clearInterval(timerRef.current);
+      if (breathTimerRef.current) clearInterval(breathTimerRef.current);
+      if (breathTimeoutRef.current) clearTimeout(breathTimeoutRef.current);
+      if (sound.current) {
+        sound.current.unloadAsync().catch(() => {});
+      }
+    };
+  }, []);
+
+  // 2. 預載音檔 - 提升載入速度
+  useEffect(() => {
+    if (currentPage === 'selection' && !sound.current && !isAudioLoading) {
+      console.log('🎵 [呼吸練習] 預載音檔');
+      loadAudio();
+    }
+  }, [currentPage, activeTab]);
+
+  // ⭐ 新增：成功頁面動畫觸發
+  useEffect(() => {
+    if (currentPage === 'success') {
+      Animated.sequence([
+        Animated.spring(iconScale, {
+          toValue: 1,
+          tension: 100,
+          friction: 15,
+          delay: 200,
+          useNativeDriver: true,
+        }),
+        Animated.spring(starBadgeScale, {
+          toValue: 1,
+          delay: 400,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else {
+      // 重置動畫值
+      iconScale.setValue(0);
+      starBadgeScale.setValue(0);
+    }
+  }, [currentPage]);
+
+  // ⭐ 新增：鍵盤監聽
+useEffect(() => {
+  const keyboardWillShow = Keyboard.addListener(
+    Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+    () => setIsKeyboardVisible(true)
+  );
+  
+  const keyboardWillHide = Keyboard.addListener(
+    Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+    () => setIsKeyboardVisible(false)
+  );
+
+  return () => {
+    keyboardWillShow.remove();
+    keyboardWillHide.remove();
+  };
+}, []);
 
   // ============================================
   // 工具函數
@@ -933,6 +1147,7 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
   const renderRelaxationPage = () => (
     <View style={styles.relaxationPageContainer}>
       <View style={styles.relaxationCard}>
+        {/* ✅ 保留藍色裝飾條 */}
         <LinearGradient
           colors={['#29B6F6', '#0288D1']}
           style={styles.relaxationAccentBar}
@@ -970,7 +1185,7 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
             onValueChange={(value) => setRelaxLevel(Math.round(value))}
             minimumTrackTintColor="transparent"
             maximumTrackTintColor="transparent"
-            thumbTintColor={Platform.OS === 'android' ? '#164b88ff' : '#FFFFFF'}  // ⭐ Android 使用深色 thumb
+            thumbTintColor={Platform.OS === 'android' ? '#164b88ff' : '#FFFFFF'}
           />
           
           <View style={styles.sliderLabels}>
@@ -979,82 +1194,224 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
           </View>
         </View>
 
+        {/* ✅ 修復完成按鈕 - 使用正確的樣式結構 */}
         <TouchableOpacity
-          style={styles.relaxationCompleteButton}
+          style={[
+            styles.relaxationCompleteButton,
+            isLoadingStats && { opacity: 0.6 }
+          ]}
           onPress={handleRelaxationComplete}
+          disabled={isLoadingStats}
+          activeOpacity={0.8}
         >
-          <Text style={styles.relaxationCompleteButtonText}>完成</Text>
-          <ChevronRight size={20} color="#fff" />
+          {isLoadingStats ? (
+            <ActivityIndicator size="small" color="#FFFFFF" />
+          ) : (
+            <>
+              <Text style={styles.relaxationCompleteButtonText}>完成</Text>
+              <ChevronRight size={20} color="#fff" />
+            </>
+          )}
         </TouchableOpacity>
       </View>
     </View>
   );
 
   const renderCompletionPage = () => (
-    <View style={styles.completionPageContainer}>
-      <Text style={styles.completionHeader}>練習完成</Text>
-
-      <Text style={styles.completionTime}>{formatTime(currentTime)}</Text>
-      <Text style={styles.completionTimeLabel}>專注時間</Text>
-
-      <View style={styles.completionRelaxContainer}>
-        <Text style={styles.completionRelaxLabel}>放鬆指數</Text>
-        <View style={styles.completionRelaxScore}>
-          <Text style={styles.completionRelaxNumber}>{relaxLevel}</Text>
-          <Text style={styles.completionRelaxMax}>/10</Text>
-        </View>
-      </View>
-
-      <Text style={styles.feelingsTitle}>此刻感受</Text>
-      <View style={styles.feelingsContainer}>
-        {feelingOptions.map((feeling) => (
-          <TouchableOpacity
-            key={feeling.id}
-            style={[
-              styles.feelingChip,
-              selectedFeelings.includes(feeling.id) && styles.feelingChipActive,
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      style={{ flex: 1 }}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+    >
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <View style={styles.completionPageContainer}>
+          <ScrollView
+            contentContainerStyle={[
+              styles.completionScrollContent,
+              { paddingBottom: isKeyboardVisible ? 200 : 100 }
             ]}
-            onPress={() => toggleFeeling(feeling.id)}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
           >
-            <Text
+            <Text style={styles.completionHeader}>練習完成</Text>
+
+            <Text style={styles.completionTime}>{formatTime(currentTime)}</Text>
+            <Text style={styles.completionTimeLabel}>專注時間</Text>
+
+            <View style={styles.completionRelaxContainer}>
+              <Text style={styles.completionRelaxLabel}>放鬆指數</Text>
+              <View style={styles.completionRelaxScore}>
+                <Text style={styles.completionRelaxNumber}>{relaxLevel}</Text>
+                <Text style={styles.completionRelaxMax}>/10</Text>
+              </View>
+            </View>
+
+            <Text style={styles.feelingsTitle}>此刻感受</Text>
+            <View style={styles.feelingsContainer}>
+              {feelingOptions.map((feeling) => (
+                <TouchableOpacity
+                  key={feeling.id}
+                  style={[
+                    styles.feelingChip,
+                    selectedFeelings.includes(feeling.id) && styles.feelingChipActive,
+                  ]}
+                  onPress={() => toggleFeeling(feeling.id)}
+                >
+                  <Text
+                    style={[
+                      styles.feelingChipText,
+                      selectedFeelings.includes(feeling.id) && styles.feelingChipTextActive,
+                    ]}
+                  >
+                    {feeling.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+              
+              <TouchableOpacity
+                style={[styles.feelingChip, showCustomInput && styles.feelingChipActive]}
+                onPress={() => setShowCustomInput(!showCustomInput)}
+              >
+                <Text style={[styles.feelingChipText, showCustomInput && styles.feelingChipTextActive]}>
+                  + 自定義
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {showCustomInput && (
+              <TextInput
+                style={styles.customInput}  // ⭐ 移除 inline style
+                placeholder="輸入你的感受..."
+                placeholderTextColor="#999"
+                value={customFeeling}
+                onChangeText={setCustomFeeling}
+                multiline
+                maxLength={100}  // ⭐ 限制最大字數
+                textAlignVertical="top"
+              />
+            )}
+          </ScrollView>
+
+          {!isKeyboardVisible && (
+            <View style={styles.completionButtonContainer}>
+              <TouchableOpacity
+                style={styles.completionButton}
+                onPress={async () => {
+                  Keyboard.dismiss();
+                  setIsLoadingStats(true);
+                  await completeAndLoadStats();  // ⭐ 完成練習並載入統計
+                  setIsLoadingStats(false);
+                  setTimeout(() => setCurrentPage('success'), 100);
+                }}
+                disabled={isLoadingStats}
+              >
+                {isLoadingStats ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.completionButtonText}>完成</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+      </TouchableWithoutFeedback>
+    </KeyboardAvoidingView>
+  );
+
+  // ⭐ 新增：成功頁面（帶動畫）
+  const renderSuccessPage = () => {
+    const safeCompletionData = completionData || {
+      consecutiveDays: 1,
+      totalDays: 1,
+      duration: currentTime,
+      relaxLevel,
+    };
+
+    const handleViewJournal = async () => {
+      try {
+        navigation.navigate('MainTabs', {
+          screen: 'Daily',
+          params: { highlightPracticeId: practiceId }
+        });
+      } catch (error) {
+        console.error('導航失敗:', error);
+        navigation.navigate('MainTabs', { screen: 'Daily' });
+      }
+    };
+
+    return (
+      <View style={styles.successPageContainer}>
+        <LinearGradient 
+          colors={['#f0f9ff', '#e0f2fe']} 
+          style={styles.gradientBg}
+        >
+          {/* ⭐ 移除 SafeAreaView，改用 View */}
+          <View style={styles.successContent}>
+            {/* 星星動畫 */}
+            <View 
+              style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+              pointerEvents="none"
+            >
+              {[...Array(20)].map((_, i) => (
+                <StarConfetti key={i} index={i} />
+              ))}
+            </View>
+
+            {/* 中心圖標 */}
+            <Animated.View 
               style={[
-                styles.feelingChipText,
-                selectedFeelings.includes(feeling.id) && styles.feelingChipTextActive,
+                styles.successIconContainer,
+                { transform: [{ scale: iconScale }] }
               ]}
             >
-              {feeling.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-        
-        <TouchableOpacity
-          style={[styles.feelingChip, showCustomInput && styles.feelingChipActive]}
-          onPress={() => setShowCustomInput(!showCustomInput)}
-        >
-          <Text style={[styles.feelingChipText, showCustomInput && styles.feelingChipTextActive]}>
-            + 自定義
-          </Text>
-        </TouchableOpacity>
+              <LinearGradient
+                colors={['#60a5fa', '#38bdf8']}
+                style={styles.successIconGradient}
+              >
+                <Wind size={64} color="rgba(255,255,255,0.9)" />
+              </LinearGradient>
+              
+              <Animated.View 
+                style={[
+                  styles.starBadge,
+                  { transform: [{ scale: starBadgeScale }] }
+                ]}
+              >
+                <Star size={24} color="#FFFFFF" fill="#FFFFFF" />
+              </Animated.View>
+            </Animated.View>
+
+            <Text style={styles.successTitle}>太棒了！</Text>
+            <Text style={styles.successSubtitle}>你完成了今天的呼吸練習</Text>
+
+            {/* 統計卡片 */}
+            <View style={styles.statsCard}>
+              <View style={styles.statsRow}>
+                <View style={styles.statItem}>
+                  <Text style={styles.statValue}>{formatTime(currentTime)}</Text>
+                  <Text style={styles.statLabel}>練習時間</Text>
+                </View>
+                <View style={styles.statDivider} />
+                <View style={styles.statItem}>
+                  <Text style={styles.statValue}>{relaxLevel}/10</Text>
+                  <Text style={styles.statLabel}>放鬆指數</Text>
+                </View>
+              </View>
+            </View>
+
+            {/* 查看日記按鈕 */}
+            <TouchableOpacity 
+              style={styles.viewJournalButton} 
+              onPress={handleViewJournal}
+            >
+              <BookOpen size={16} color="#0ea5e9" />
+              <Text style={styles.viewJournalText}>查看日記</Text>
+            </TouchableOpacity>
+          </View>
+        </LinearGradient>
       </View>
-
-      {showCustomInput && (
-        <TextInput
-          style={styles.customInput}
-          placeholder="輸入你的感受..."
-          placeholderTextColor="#999"
-          value={customFeeling}
-          onChangeText={setCustomFeeling}
-        />
-      )}
-
-      <TouchableOpacity
-        style={styles.completionButton}
-        onPress={handleComplete}
-      >
-        <Text style={styles.completionButtonText}>完成</Text>
-      </TouchableOpacity>
-    </View>
-  );
+    );
+  };
 
   // ============================================
   // 主渲染
@@ -1064,17 +1421,20 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
     return renderPracticePage();
   }
 
+  if (currentPage === 'success') {
+    return renderSuccessPage();
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" />
       
       {currentPage === 'selection' && renderSelectionPage()}
       {currentPage === 'relaxation' && renderRelaxationPage()}
-      {currentPage === 'completion' && renderCompletionPage()}
+      {currentPage === 'completion' && renderCompletionPage()}  {/* ⭐ 心情記錄頁 */}
     </SafeAreaView>
   );
 }
-
 // ============================================
 // 樣式
 // ============================================
@@ -1546,6 +1906,7 @@ const styles = StyleSheet.create({
   },
   completionPageContainer: {
     flex: 1,
+    backgroundColor: '#F5F8FA',
     paddingHorizontal: 24,
     paddingTop: 40,
   },
@@ -1630,6 +1991,8 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#333',
     marginBottom: 24,
+    height: 50,  // ⭐ 固定高度，不會過大
+    maxHeight: 80,
   },
   completionButton: {
     backgroundColor: '#2196F3',
@@ -1644,4 +2007,156 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#fff',
   },
-});
+  completionScrollContent: {
+    flexGrow: 1,
+    paddingHorizontal: 24,
+    paddingTop: 40,
+    paddingBottom: 100,  // ⭐ 基礎底部間距
+  },
+  completionButtonContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 24,
+    paddingBottom: Platform.OS === 'ios' ? 40 : 20,  // ⭐ iOS 額外底部空間
+    backgroundColor: '#F5F8FA',
+    borderTopWidth: 1,  // ⭐ 新增頂部邊框
+    borderTopColor: '#E0E0E0',  // ⭐ 邊框顏色
+  },
+  successPageContainer: {
+    flex: 1,
+  },
+  gradientBg: {
+    flex: 1,
+  },
+  successContent: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingTop: Platform.OS === 'ios' ? 60 : 40,  // ⭐ 新增頂部內距
+    paddingBottom: Platform.OS === 'ios' ? 60 : 40,  // ⭐ 新增底部內距
+  },
+  successIconContainer: {
+    position: 'relative',
+    width: 128,
+    height: 128,
+    marginBottom: 32,
+  },
+  successIconGradient: {
+    width: 128,
+    height: 128,
+    borderRadius: 64,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#bae6fd',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  starBadge: {
+    position: 'absolute',
+    top: -8,
+    right: -8,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#fbbf24',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 4,
+    borderColor: '#FFFFFF',
+  },
+  successTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#1f2937',
+    marginBottom: 8,
+  },
+  successSubtitle: {
+    fontSize: 16,
+    color: '#6b7280',
+    marginBottom: 32,
+    textAlign: 'center',
+  },
+  statsCard: {
+    width: '100%',
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  statItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  statValue: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#2196F3',
+    marginBottom: 4,
+  },
+  statLabel: {
+    fontSize: 12,
+    color: '#666',
+  },
+  statDivider: {
+    width: 1,
+    height: 40,
+    backgroundColor: '#E0E0E0',
+  },
+  streakCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#FFF7ED',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginBottom: 24,
+  },
+  streakText: {
+    fontSize: 14,
+    color: '#F59E0B',
+    fontWeight: '600',
+  },
+  streakNumber: {
+    fontSize: 36,
+    fontWeight: '700',
+    color: '#0ea5e9',
+  },
+  streakUnit: {
+    fontSize: 18,
+    color: '#9ca3af',
+    marginBottom: 4,
+  },
+  viewJournalButton: {
+    width: '100%',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 16,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 28,
+    borderWidth: 1,
+    borderColor: 'rgba(14, 165, 233, 0.2)',
+    marginTop: 62,
+  },
+  viewJournalText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#0ea5e9',
+  },
+})

@@ -157,7 +157,8 @@ const HomeScreen = ({ navigation }) => {
     try {
       console.log('📊 [首頁] 開始載入練習統計...');
       
-      const res = await ApiService.getPracticeStats();
+      // ⭐ 添加時間戳避免緩存
+      const res = await ApiService.getPracticeStats(`?_t=${Date.now()}`);
       const success = res?.success !== undefined ? res.success : true;
       const stats = res?.stats || res?.data?.stats || res?.data || (success ? res : null);
 
@@ -168,34 +169,30 @@ const HomeScreen = ({ navigation }) => {
 
       console.log('✅ [首頁] 統計數據載入成功');
 
-      // ⭐ 使用 categoryStats 來獲取總次數（永久累計）
       const categoryStats = stats.categoryStats || [];
 
-      // 呼吸練習總次數
+      // ⭐ 使用與 DailyScreen 一致的過濾邏輯
       const breathingStat = categoryStats.find(
         c => c.type === '呼吸穩定力練習' || c.type === 'breathing'
       );
       const breathingCount = breathingStat?.sessions || 0;
 
-      // 好事書寫總次數
       const goodthingsStat = categoryStats.find(
         c => c.type === '好事書寫練習' || c.type === '好事書寫' || c.type === 'goodthings'
       );
       const goodthingsCount = goodthingsStat?.sessions || 0;
 
-      // 心情溫度計總次數
       const thermometerStat = categoryStats.find(
         c => c.type === '心情溫度計' || c.type === 'thermometer'
       );
       const thermometerCount = thermometerStat?.sessions || 0;
 
-      // 思維調節總次數
       const abcdStat = categoryStats.find(
         c => c.type === '思維調節練習' || c.type === '思維調節' || c.type === 'abcd'
       );
       const abcdCount = abcdStat?.sessions || 0;
 
-      // ⭐ 感恩練習總次數（包含三種子練習）- 修正版
+      // ⭐ 感恩練習：包含三種子類型
       const gratitudeStats = categoryStats.filter(
         c => c.type === '感恩練習' || 
             c.type === '感恩日記' || 
@@ -205,16 +202,15 @@ const HomeScreen = ({ navigation }) => {
       );
       const gratitudeCount = gratitudeStats.reduce((sum, stat) => sum + (stat.sessions || 0), 0);
 
-      console.log('📋 [首頁] 總練習統計（永久累計）:', {
+      console.log('📋 [首頁] 總練習統計:', {
         breathing: breathingCount,
         goodthings: goodthingsCount,
         thermometer: thermometerCount,
         abcd: abcdCount,
         gratitude: gratitudeCount,
-        gratitudeBreakdown: gratitudeStats.map(s => `${s.type}: ${s.sessions}`), // 👈 加這行，方便 debug
       });
 
-      // 計算當前完成度（更新前）
+      // 計算當前完成度
       const currentProgress = calculateProgress({
         breathing: breathingCount,
         goodthings: goodthingsCount,
@@ -233,22 +229,12 @@ const HomeScreen = ({ navigation }) => {
         gratitude: { ...prev.gratitude, current: gratitudeCount },
       }));
 
-      // 🎉 檢查是否達標（>= 100%）且剛完成練習
+      // 檢查是否達標
       if (currentProgress >= 100 && previousProgress < 100) {
-        console.log('🎉 [首頁] 首次達標，顯示恭喜視窗！');
-        setTimeout(() => {
-          setShowCompletionModal(true);
-        }, 500);
-      } else if (currentProgress >= 100 && previousProgress >= 100) {
-        console.log('🎊 [首頁] 已達標，每次練習完成都顯示恭喜視窗！');
-        setTimeout(() => {
-          setShowCompletionModal(true);
-        }, 500);
+        setTimeout(() => setShowCompletionModal(true), 500);
       }
 
-      // 更新上一次的完成度
       setPreviousProgress(currentProgress);
-
       console.log('📊 [首頁] 進度數據更新完成，完成度:', currentProgress + '%');
     } catch (error) {
       console.error('❌ [首頁] 載入進度失敗:', error);
@@ -288,12 +274,22 @@ const HomeScreen = ({ navigation }) => {
     setShowPlanDetails(false);
     
     setTimeout(() => {
-      console.log('🎯 [首頁] 導航到呼吸練習');
       navigation.navigate('PracticeNavigator', {
         practiceType: '呼吸穩定力練習',
         onPracticeComplete: async () => {
-          console.log('✅ [首頁] 呼吸練習完成，重新載入進度');
+          console.log('✅ [首頁] 呼吸練習完成');
+          // ⭐ 等待一下讓後端處理完成
+          await new Promise(resolve => setTimeout(resolve, 800));
+          // ⭐ 強制刷新首頁數據
           await loadHomeProgress();
+          // ⭐ 導航到日記頁並傳入刷新參數
+          navigation.navigate('MainTabs', {
+            screen: 'Daily',
+            params: { 
+              highlightPracticeId: practiceId,
+              forceRefresh: true,  // ⭐ 強制刷新標記
+            }
+          });
         },
       });
     }, 100);
