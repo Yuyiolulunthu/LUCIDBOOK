@@ -196,6 +196,86 @@ const InfoModal = ({ visible, onClose }) => {
   );
 };
 
+// ⭐星星動畫
+const StarConfetti = ({ index }) => {
+  const animatedValue = useRef(new Animated.Value(0)).current;
+  
+  const [meteorConfig] = useState(() => {
+    const side = index % 4;
+    let startX, startY, angle;
+    
+    if (side === 0) {
+      startX = Math.random() * SCREEN_WIDTH;
+      startY = -50;
+      angle = 45 + (Math.random() - 0.5) * 60;
+    } else if (side === 1) {
+      startX = SCREEN_WIDTH + 50;
+      startY = Math.random() * SCREEN_HEIGHT;
+      angle = 135 + (Math.random() - 0.5) * 60;
+    } else if (side === 2) {
+      startX = Math.random() * SCREEN_WIDTH;
+      startY = SCREEN_HEIGHT + 50;
+      angle = 225 + (Math.random() - 0.5) * 60;
+    } else {
+      startX = -50;
+      startY = Math.random() * SCREEN_HEIGHT;
+      angle = 315 + (Math.random() - 0.5) * 60;
+    }
+    
+    const angleInRadians = (angle * Math.PI) / 180;
+    const distance = 800 + Math.random() * 400;
+    
+    return {
+      startX,
+      startY,
+      endX: startX + Math.cos(angleInRadians) * distance,
+      endY: startY + Math.sin(angleInRadians) * distance,
+      starSize: 24 + Math.random() * 16,
+      delay: Math.random() * 1000,
+    };
+  });
+  
+  useEffect(() => {
+    setTimeout(() => {
+      Animated.timing(animatedValue, {
+        toValue: 1,
+        duration: 2000 + Math.random() * 1000,
+        useNativeDriver: true,
+      }).start();
+    }, meteorConfig.delay);
+  }, []);
+  
+  const translateX = animatedValue.interpolate({
+    inputRange: [0, 1],
+    outputRange: [meteorConfig.startX, meteorConfig.endX],
+  });
+  
+  const translateY = animatedValue.interpolate({
+    inputRange: [0, 1],
+    outputRange: [meteorConfig.startY, meteorConfig.endY],
+  });
+  
+  const opacity = animatedValue.interpolate({
+    inputRange: [0, 0.1, 0.7, 1],
+    outputRange: [0, 1, 0.8, 0],
+  });
+
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={{
+        position: 'absolute',
+        left: 0,
+        top: 0,
+        transform: [{ translateX }, { translateY }],
+        opacity,
+      }}
+    >
+      <Star size={meteorConfig.starSize} color="#60a5fa" fill="#bae6fd" />
+    </Animated.View>
+  );
+};
+
 // ==================== 主組件 ====================
 export default function CognitiveReframingPractice({ onBack, navigation, onHome }) {
   const [currentPage, setCurrentPage] = useState('intro');
@@ -215,7 +295,9 @@ export default function CognitiveReframingPractice({ onBack, navigation, onHome 
   const [isAddingCustomEmotion, setIsAddingCustomEmotion] = useState(false);
   const [isAddingCustomBody, setIsAddingCustomBody] = useState(false);
   const [isAddingCustomBehavior, setIsAddingCustomBehavior] = useState(false);
-  const [customInput, setCustomInput] = useState('');
+  const [customEmotionInput, setCustomEmotionInput] = useState('');
+  const [customBodyInput, setCustomBodyInput] = useState('');
+  const [customBehaviorInput, setCustomBehaviorInput] = useState('');
 
   // 書寫提示展開狀態
   const [showEventTips, setShowEventTips] = useState(false);
@@ -228,6 +310,8 @@ export default function CognitiveReframingPractice({ onBack, navigation, onHome 
   const iconScale = useRef(new Animated.Value(0)).current;
   const starBadgeScale = useRef(new Animated.Value(0)).current;
   const breathingScale = useRef(new Animated.Value(1)).current;
+
+  const [hasCompleted, setHasCompleted] = useState(false);
 
   // 靈感小卡滾動
   const cardScrollRef = useRef(null);
@@ -282,33 +366,104 @@ export default function CognitiveReframingPractice({ onBack, navigation, onHome 
   const saveProgress = async () => {
     if (!practiceId) return;
     try {
+      // ⭐⭐⭐ 关键修改：即时合并自定义选项 ⭐⭐⭐
+      const currentAllEmotions = [...new Set([...formData.emotions, ...customEmotions])];
+      const currentAllBodyReactions = [...new Set([...formData.bodyReactions, ...customBodyReactions])];
+      const currentAllBehaviors = [...new Set([...formData.behaviors, ...customBehaviors])];
+      
+      const progressFormData = {
+        ...formData,
+        emotions: currentAllEmotions,
+        bodyReactions: currentAllBodyReactions,
+        behaviors: currentAllBehaviors,
+        customEmotions: customEmotions,
+        customBodyReactions: customBodyReactions,
+        customBehaviors: customBehaviors,
+        // ⭐ 也保存 fullReactions
+        fullReactions: {
+          emotions: currentAllEmotions,
+          bodyReactions: currentAllBodyReactions,
+          behaviors: currentAllBehaviors,
+        },
+      };
+      
+      console.log('💾 [思维调节] 保存进度，包含自定义选项');
+      
       await ApiService.updatePracticeProgress(
         practiceId,
         getCurrentStep(),
         totalSteps,
-        formData,
+        progressFormData,  // ⭐ 使用合并后的数据
         elapsedTime
       );
     } catch (err) {
-      console.log('儲存進度失敗:', err);
+      console.log('❌ 保存进度失败:', err);
     }
   };
 
-  const handleComplete = async () => {
+  const completeOnce = async () => {
+    if (hasCompleted) {
+      console.log('⚠️ [思維調節] 已完成過，略過重複 complete');
+      return;
+    }
+
+    setHasCompleted(true);
+
     let totalSeconds = elapsedTime || 60;
+
+    // ⭐⭐⭐ 合併所有選項（包含自訂）⭐⭐⭐
+    const allEmotions = [...new Set([...formData.emotions, ...customEmotions])];
+    const allBodyReactions = [...new Set([...formData.bodyReactions, ...customBodyReactions])];
+    const allBehaviors = [...new Set([...formData.behaviors, ...customBehaviors])];
+
+    // ⭐ 詳細 log（方便除錯）
+    console.log('📤 [思維調節] 準備完成練習（一次性）');
+    console.log('  - 合併後情緒:', allEmotions);
+    console.log('  - 合併後身體反應:', allBodyReactions);
+    console.log('  - 合併後行為:', allBehaviors);
 
     const payloadFormData = {
       ...formData,
+      emotions: allEmotions,
+      bodyReactions: allBodyReactions,
+      behaviors: allBehaviors,
+
+      // 保留自訂原始資料
+      customEmotions,
+      customBodyReactions,
+      customBehaviors,
+
+      // 給 Daily 使用的完整反應
+      fullReactions: {
+        emotions: allEmotions,
+        bodyReactions: allBodyReactions,
+        behaviors: allBehaviors,
+      },
+
+      postMood: allEmotions[0] || formData.emotions[0] || null,
       timestamp: Date.now(),
     };
 
-    await ApiService.completePractice(practiceId, {
-      practice_type: '思維調節練習',
-      duration: Math.max(1, Math.ceil(totalSeconds / 60)),
-      duration_seconds: totalSeconds,
-      form_data: payloadFormData,
-    });
+    console.log('📦 [思維調節] form_data:', JSON.stringify(payloadFormData, null, 2));
+
+    try {
+      await ApiService.completePractice(practiceId, {
+        practice_type: '思維調節練習',
+        duration: Math.max(1, Math.ceil(totalSeconds / 60)),
+        duration_seconds: totalSeconds,
+        form_data: payloadFormData,
+      });
+
+      await ApiService.getPracticeStats();
+      console.log('✅ [思維調節] 完成成功（只會一次）');
+    } catch (err) {
+      // 若失敗，允許重試
+      setHasCompleted(false);
+      console.error('❌ [思維調節] 完成失敗，已解除鎖定', err);
+      throw err;
+    }
   };
+
 
   // ==================== 生命週期 ====================
   useEffect(() => {
@@ -412,7 +567,7 @@ export default function CognitiveReframingPractice({ onBack, navigation, onHome 
       assessment: () => setCurrentPage('action'),
       review: () => setCurrentPage('assessment'),
       completion: () => { 
-        // 從完成頁面返回就直接回首頁，不再回到 review
+        // ⭐ 從完成頁直接離開
         onBack?.() || navigation?.goBack();
       },
     };
@@ -429,43 +584,68 @@ export default function CognitiveReframingPractice({ onBack, navigation, onHome 
   };
 
   const handleAddCustom = (type) => {
-    if (!customInput.trim()) return;
-
-    const newItem = customInput.trim();
+    let inputValue = '';
+    
+    // 根據類型取得對應的輸入值
+    switch (type) {
+      case 'emotion':
+        inputValue = customEmotionInput.trim();
+        break;
+      case 'body':
+        inputValue = customBodyInput.trim();
+        break;
+      case 'behavior':
+        inputValue = customBehaviorInput.trim();
+        break;
+    }
+    
+    if (!inputValue) return;
 
     switch (type) {
       case 'emotion':
-        if (!DEFAULT_EMOTIONS.includes(newItem) && !customEmotions.includes(newItem)) {
-          setCustomEmotions([...customEmotions, newItem]);
+        // ⭐ 只加入 customEmotions 陣列，不加入 formData
+        if (!DEFAULT_EMOTIONS.includes(inputValue) && !customEmotions.includes(inputValue)) {
+          setCustomEmotions([...customEmotions, inputValue]);
         }
-        setFormData(prev => ({
-          ...prev,
-          emotions: prev.emotions.includes(newItem) ? prev.emotions : [...prev.emotions, newItem]
-        }));
+        // ⭐ 同時更新 formData（勾選狀態）
+        if (!formData.emotions.includes(inputValue)) {
+          setFormData(prev => ({
+            ...prev,
+            emotions: [...prev.emotions, inputValue]
+          }));
+        }
         setIsAddingCustomEmotion(false);
+        setCustomEmotionInput('');  // ⭐ 清空對應的輸入框
         break;
+        
       case 'body':
-        if (!DEFAULT_BODY_REACTIONS.includes(newItem) && !customBodyReactions.includes(newItem)) {
-          setCustomBodyReactions([...customBodyReactions, newItem]);
+        if (!DEFAULT_BODY_REACTIONS.includes(inputValue) && !customBodyReactions.includes(inputValue)) {
+          setCustomBodyReactions([...customBodyReactions, inputValue]);
         }
-        setFormData(prev => ({
-          ...prev,
-          bodyReactions: prev.bodyReactions.includes(newItem) ? prev.bodyReactions : [...prev.bodyReactions, newItem]
-        }));
+        if (!formData.bodyReactions.includes(inputValue)) {
+          setFormData(prev => ({
+            ...prev,
+            bodyReactions: [...prev.bodyReactions, inputValue]
+          }));
+        }
         setIsAddingCustomBody(false);
+        setCustomBodyInput('');  // ⭐ 清空對應的輸入框
         break;
+        
       case 'behavior':
-        if (!DEFAULT_BEHAVIORS.includes(newItem) && !customBehaviors.includes(newItem)) {
-          setCustomBehaviors([...customBehaviors, newItem]);
+        if (!DEFAULT_BEHAVIORS.includes(inputValue) && !customBehaviors.includes(inputValue)) {
+          setCustomBehaviors([...customBehaviors, inputValue]);
         }
-        setFormData(prev => ({
-          ...prev,
-          behaviors: prev.behaviors.includes(newItem) ? prev.behaviors : [...prev.behaviors, newItem]
-        }));
+        if (!formData.behaviors.includes(inputValue)) {
+          setFormData(prev => ({
+            ...prev,
+            behaviors: [...prev.behaviors, inputValue]
+          }));
+        }
         setIsAddingCustomBehavior(false);
+        setCustomBehaviorInput('');  // ⭐ 清空對應的輸入框
         break;
     }
-    setCustomInput('');
   };
 
   const selectInspirationCard = (card) => {
@@ -476,26 +656,6 @@ export default function CognitiveReframingPractice({ onBack, navigation, onHome 
     setFormData(prev => ({ ...prev, selectedAction: action }));
   };
 
-  // 導航到呼吸練習
-  const handleGoToBreathing = async () => {
-    try {
-      console.log('🫁 準備導航到呼吸練習，先完成當前練習');
-      
-      // ✅ 使用正確定義的常數
-      await completePractice(PRACTICE_TYPE.COGNITIVE_REFRAMING);
-      
-      // 導航到呼吸練習
-      navigation.navigate('BreathingExercise', {
-        onComplete: (breathingData) => {
-          console.log('🫁 呼吸練習完成，返回思維調節');
-          navigation.goBack();
-        }
-      });
-    } catch (error) {
-      console.error('❌ [思維調節] 完成練習失敗:', error);
-      Alert.alert('錯誤', '無法完成練習，請稍後再試');
-    }
-  };
 
   // ==================== 頁面渲染 ====================
 
@@ -588,7 +748,7 @@ export default function CognitiveReframingPractice({ onBack, navigation, onHome 
   const renderBreathingPage = () => (
     <View style={styles.fullScreen}>
       <LinearGradient
-        colors={['#f0f9ff', '#e0f2fe']}
+        colors={['#FFFFFF', '#F8F9FA']}
         style={styles.gradientBg}
       >
         <View style={styles.breathingContent}>
@@ -883,10 +1043,7 @@ export default function CognitiveReframingPractice({ onBack, navigation, onHome 
           {!isAdding ? (
             <TouchableOpacity
               style={styles.customTagButton}
-              onPress={() => {
-                setIsAdding(true);
-                setCustomInput('');
-              }}
+              onPress={() => setIsAdding(true)}
             >
               <Plus size={14} color="#94a3b8" />
               <Text style={styles.customTagButtonText}>自訂</Text>
@@ -895,8 +1052,16 @@ export default function CognitiveReframingPractice({ onBack, navigation, onHome 
             <View style={styles.customInputContainer}>
               <TextInput
                 style={styles.customInput}
-                value={customInput}
-                onChangeText={setCustomInput}
+                value={
+                  type === 'emotion' ? customEmotionInput : 
+                  type === 'body' ? customBodyInput : 
+                  customBehaviorInput
+                }
+                onChangeText={(text) => {
+                  if (type === 'emotion') setCustomEmotionInput(text);
+                  else if (type === 'body') setCustomBodyInput(text);
+                  else setCustomBehaviorInput(text);
+                }}
                 placeholder="輸入..."
                 placeholderTextColor="#cbd5e1"
                 autoFocus
@@ -911,7 +1076,9 @@ export default function CognitiveReframingPractice({ onBack, navigation, onHome 
               <TouchableOpacity
                 onPress={() => {
                   setIsAdding(false);
-                  setCustomInput('');
+                  if (type === 'emotion') setCustomEmotionInput('');
+                  else if (type === 'body') setCustomBodyInput('');
+                  else setCustomBehaviorInput('');
                 }}
                 style={styles.customCloseButton}
               >
@@ -1339,10 +1506,8 @@ export default function CognitiveReframingPractice({ onBack, navigation, onHome 
             </View>
 
             <View style={styles.sliderContainer}>
-              {/* ✅ 自訂軌道背景（灰色） */}
               <View style={styles.customSliderTrackBackground} />
               
-              {/* ✅ 自訂填充軌道（藍色，動態寬度） */}
               <View 
                 style={[
                   styles.customSliderTrackFilled, 
@@ -1350,7 +1515,6 @@ export default function CognitiveReframingPractice({ onBack, navigation, onHome 
                 ]} 
               />
               
-              {/* ✅ 原生 Slider（設為透明，只用來接收觸摸） */}
               <Slider
                 style={styles.slider}
                 minimumValue={1}
@@ -1360,7 +1524,7 @@ export default function CognitiveReframingPractice({ onBack, navigation, onHome 
                 onValueChange={value => setFormData(prev => ({ ...prev, postScore: value }))}
                 minimumTrackTintColor="transparent"
                 maximumTrackTintColor="transparent"
-                thumbTintColor={Platform.OS === 'android' ? '#164b88ff' : '#FFFFFF'}  // ⭐ Android 使用深色 thumb
+                thumbTintColor={Platform.OS === 'android' ? '#164b88ff' : '#FFFFFF'}
               />
               
               <View style={styles.sliderLabels}>
@@ -1369,28 +1533,7 @@ export default function CognitiveReframingPractice({ onBack, navigation, onHome 
               </View>
             </View>
 
-            {/* ⭐ 當分數為 1 時顯示呼吸練習建議 */}
-            {formData.postScore === 1 && (
-              <View style={styles.breathingSuggestion}>
-                <View style={styles.breathingSuggestionIcon}>
-                  <Wind size={20} color="#0ea5e9" />
-                </View>
-                <View style={styles.breathingSuggestionContent}>
-                  <Text style={styles.breathingSuggestionTitle}>
-                    情緒還是很不舒服嗎？
-                  </Text>
-                  <Text style={styles.breathingSuggestionText}>
-                    試試呼吸練習，幫助身心放鬆
-                  </Text>
-                </View>
-                <TouchableOpacity
-                  style={styles.breathingSuggestionButton}
-                  onPress={handleGoToBreathing}
-                >
-                  <Text style={styles.breathingSuggestionButtonText}>去練習</Text>
-                </TouchableOpacity>
-              </View>
-            )}
+            {/* ✅ 已移除呼吸練習建議卡片 */}
 
             <TouchableOpacity
               style={styles.assessmentButton}
@@ -1410,8 +1553,25 @@ export default function CognitiveReframingPractice({ onBack, navigation, onHome 
     </View>
   );
 
-  // 9. 練習回顧頁
+  const handleViewJournal = () => {
+  // ⭐ 直接導航，不需要再次 complete（因為已經在 review 頁面完成了）
+  navigation.navigate('MainTabs', {
+    screen: 'Daily',
+    params: { highlightPracticeId: practiceId }
+  });
+};
+  // 9. 练习回顾页（約第 1040 行開始）
   const renderReviewPage = () => {
+    const displayEmotions = [...new Set([...formData.emotions, ...customEmotions])];
+    const displayBodyReactions = [...new Set([...formData.bodyReactions, ...customBodyReactions])];
+    const displayBehaviors = [...new Set([...formData.behaviors, ...customBehaviors])];
+
+    console.log('📋 [回顧] 顯示資料:', {
+      emotions: displayEmotions,
+      bodyReactions: displayBodyReactions,
+      behaviors: displayBehaviors,
+    });
+
     const getSelectedActionText = () => {
       if (formData.customAction.trim()) return formData.customAction;
       const action = MICRO_ACTIONS.find(a => a.id === formData.selectedAction);
@@ -1452,18 +1612,18 @@ export default function CognitiveReframingPractice({ onBack, navigation, onHome 
             </View>
 
             {/* 情緒反應 */}
-            {(formData.emotions.length > 0 || formData.bodyReactions.length > 0 || formData.behaviors.length > 0) && (
+            {(displayEmotions.length > 0 || displayBodyReactions.length > 0 || displayBehaviors.length > 0) && (
               <View style={styles.reviewSection}>
                 <View style={styles.reviewLabelRow}>
                   <View style={[styles.reviewDot, { backgroundColor: '#f59e0b' }]} />
                   <Text style={styles.reviewLabel}>情緒反應</Text>
                 </View>
                 
-                {formData.emotions.length > 0 && (
+                {displayEmotions.length > 0 && (
                   <View style={styles.reviewReactionGroup}>
                     <Text style={styles.reviewReactionLabel}>情緒：</Text>
                     <View style={styles.reviewTagsContainer}>
-                      {formData.emotions.map((emotion, index) => (
+                      {displayEmotions.map((emotion, index) => (
                         <View key={index} style={styles.reviewTag}>
                           <Text style={styles.reviewTagText}>{emotion}</Text>
                         </View>
@@ -1472,11 +1632,11 @@ export default function CognitiveReframingPractice({ onBack, navigation, onHome 
                   </View>
                 )}
 
-                {formData.bodyReactions.length > 0 && (
+                {displayBodyReactions.length > 0 && (
                   <View style={styles.reviewReactionGroup}>
                     <Text style={styles.reviewReactionLabel}>身體：</Text>
                     <View style={styles.reviewTagsContainer}>
-                      {formData.bodyReactions.map((reaction, index) => (
+                      {displayBodyReactions.map((reaction, index) => (
                         <View key={index} style={styles.reviewTag}>
                           <Text style={styles.reviewTagText}>{reaction}</Text>
                         </View>
@@ -1485,11 +1645,11 @@ export default function CognitiveReframingPractice({ onBack, navigation, onHome 
                   </View>
                 )}
 
-                {formData.behaviors.length > 0 && (
+                {displayBehaviors.length > 0 && (
                   <View style={styles.reviewReactionGroup}>
                     <Text style={styles.reviewReactionLabel}>行為：</Text>
                     <View style={styles.reviewTagsContainer}>
-                      {formData.behaviors.map((behavior, index) => (
+                      {displayBehaviors.map((behavior, index) => (
                         <View key={index} style={styles.reviewTag}>
                           <Text style={styles.reviewTagText}>{behavior}</Text>
                         </View>
@@ -1531,9 +1691,25 @@ export default function CognitiveReframingPractice({ onBack, navigation, onHome 
           <View style={styles.footer}>
             <TouchableOpacity
               style={styles.nextButton}
-              onPress={() => {
-                setIsTiming(false);
-                setCurrentPage('completion');
+              onPress={async () => {  // ⭐⭐⭐ 關鍵修改：改為 async
+                try {
+                  console.log('📤 [思維調節] 準備完成練習');
+                  setIsTiming(false);
+                  
+                  // ⭐ 先完成練習
+                  await completeOnce();
+                  console.log('✅ [思維調節] 完成成功');
+                  
+                  // ⭐ 等待一小段時間確保 API 完成
+                  await new Promise(resolve => setTimeout(resolve, 300));
+                  
+                  // ⭐ 再切換到完成頁
+                  setCurrentPage('completion');
+                } catch (error) {
+                  console.error('❌ [思維調節] 完成練習失敗:', error);
+                  // 即使失敗也顯示完成頁
+                  setCurrentPage('completion');
+                }
               }}
             >
               <LinearGradient
@@ -1550,110 +1726,19 @@ export default function CognitiveReframingPractice({ onBack, navigation, onHome 
     );
   };
 
-  // 10. 完成頁（含星星動畫）
+  // 10. 完成頁（含星星動畫）（約第 1200 行開始）
   const renderCompletionPage = () => {
-    // 星星流星动画（优化后的 Android 兼容版本）
-    const StarConfetti = ({ index }) => {
-      const animatedValue = useRef(new Animated.Value(0)).current;
-      
-      // ⭐ 使用 useState 替代 useMemo，更稳定
-      const [meteorConfig] = useState(() => {
-        // 从屏幕不同边缘开始
-        const side = index % 4; // 0=上, 1=右, 2=下, 3=左
-        let startX, startY, angle;
-        
-        if (side === 0) {
-          startX = Math.random() * SCREEN_WIDTH;
-          startY = -50;
-          angle = 45 + (Math.random() - 0.5) * 60;
-        } else if (side === 1) {
-          startX = SCREEN_WIDTH + 50;
-          startY = Math.random() * SCREEN_HEIGHT;
-          angle = 135 + (Math.random() - 0.5) * 60;
-        } else if (side === 2) {
-          startX = Math.random() * SCREEN_WIDTH;
-          startY = SCREEN_HEIGHT + 50;
-          angle = 225 + (Math.random() - 0.5) * 60;
-        } else {
-          startX = -50;
-          startY = Math.random() * SCREEN_HEIGHT;
-          angle = 315 + (Math.random() - 0.5) * 60;
+
+    const handleViewJournal = () => {
+      // ⭐⭐⭐ 關鍵修改：直接導航，不需要再次 complete
+      console.log('📖 [思維調節] 導航到日記頁面');
+      navigation.navigate('MainTabs', {
+        screen: 'Daily',
+        params: { 
+          highlightPracticeId: practiceId,
+          forceRefresh: true  // ⭐ 加上強制刷新
         }
-        
-        const angleInRadians = (angle * Math.PI) / 180;
-        const distance = 800 + Math.random() * 400;
-        
-        return {
-          startX,
-          startY,
-          endX: startX + Math.cos(angleInRadians) * distance,
-          endY: startY + Math.sin(angleInRadians) * distance,
-          starSize: 24 + Math.random() * 16,
-          delay: Math.random() * 1000,
-        };
       });
-      
-      useEffect(() => {
-        setTimeout(() => {
-          Animated.timing(animatedValue, {
-            toValue: 1,
-            duration: 2000 + Math.random() * 1000,
-            useNativeDriver: true,
-          }).start();
-        }, meteorConfig.delay);
-      }, []);
-      
-      const translateX = animatedValue.interpolate({
-        inputRange: [0, 1],
-        outputRange: [meteorConfig.startX, meteorConfig.endX],
-      });
-      
-      const translateY = animatedValue.interpolate({
-        inputRange: [0, 1],
-        outputRange: [meteorConfig.startY, meteorConfig.endY],
-      });
-      
-      const opacity = animatedValue.interpolate({
-        inputRange: [0, 0.1, 0.7, 1],
-        outputRange: [0, 1, 0.8, 0],
-      });
-
-      return (
-        <Animated.View
-          pointerEvents="none"  // ✅ 添加这个，避免阻挡触摸
-          style={[
-            {
-              position: 'absolute',
-              left: 0,
-              top: 0,
-              transform: [
-                { translateX },
-                { translateY },
-              ],
-              opacity,
-            }
-          ]}
-        >
-          <Star 
-            size={meteorConfig.starSize} 
-            color="#60a5fa" 
-            fill="#bae6fd" 
-          />
-        </Animated.View>
-      );
-    };
-
-    const handleViewJournal = async () => {
-      try {
-        await handleComplete();
-        navigation.navigate('MainTabs', {
-          screen: 'Daily',
-          params: { highlightPracticeId: practiceId }
-        });
-      } catch (error) {
-        console.error('完成練習失敗:', error);
-        navigation.navigate('MainTabs', { screen: 'Daily' });
-      }
     };
 
     return (
@@ -1663,7 +1748,7 @@ export default function CognitiveReframingPractice({ onBack, navigation, onHome 
           style={styles.gradientBg}
         >
           <View style={styles.completionContent}>
-            {/* ✅ 星星动画容器 - 放在最底层 */}
+            {/* 星星動畫容器 */}
             <View 
               style={{
                 position: 'absolute',
@@ -1721,14 +1806,6 @@ export default function CognitiveReframingPractice({ onBack, navigation, onHome 
             >
               <BookOpen size={16} color="#0ea5e9" />
               <Text style={styles.viewJournalText}>查看日記</Text>
-            </TouchableOpacity>
-
-            {/* 做個呼吸練習 */}
-            <TouchableOpacity
-              style={styles.breathingLinkButton}
-              onPress={handleGoToBreathing}
-            >
-              <Text style={styles.breathingLinkText}>做個呼吸練習放鬆一下</Text>
             </TouchableOpacity>
           </View>
         </LinearGradient>
@@ -2574,52 +2651,6 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
 
-  // ⭐ 呼吸練習建議卡片
-  breathingSuggestion: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f0f9ff',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: '#bae6fd',
-  },
-  breathingSuggestionIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#e0f2fe',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  breathingSuggestionContent: {
-    flex: 1,
-  },
-  breathingSuggestionTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1e293b',
-    marginBottom: 2,
-  },
-  breathingSuggestionText: {
-    fontSize: 12,
-    color: '#64748b',
-  },
-  breathingSuggestionButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    backgroundColor: '#0ea5e9',
-    borderRadius: 12,
-    marginLeft: 8,
-  },
-  breathingSuggestionButtonText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-
   assessmentButton: {
     width: '100%',
     height: 56,
@@ -2843,14 +2874,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: '#0ea5e9',
-  },
-  breathingLinkButton: {
-    paddingVertical: 12,
-  },
-  breathingLinkText: {
-    fontSize: 14,
-    color: '#94a3b8',
-    textDecorationLine: 'underline',
   },
 
   // ========== 底部按鈕 ==========

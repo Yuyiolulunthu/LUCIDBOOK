@@ -659,9 +659,17 @@ export default function GoodThingsJournalNew({ onBack, navigation, onHome }) {
               <ScrollView
                 contentContainerStyle={[
                   styles.scrollContent,
-                  { paddingBottom: isKeyboardVisible ? 200 : 120 }
+                  { paddingBottom: isKeyboardVisible ? 450 : 120 }
                 ]}
                 keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+                // ⭐ 新增性能優化設置
+                removeClippedSubviews={true}           // 移除屏幕外的子視圖
+                scrollEventThrottle={16}                // 每 16ms 觸發一次滾動事件
+                overScrollMode="auto"                   // Android 專用
+                bounces={true}                          // iOS 彈性效果
+                bouncesZoom={false}                     // 禁用縮放彈性
+                decelerationRate="normal"               // 正常減速率
               >
                 <View style={styles.emotionCard}>
                   <View style={styles.emotionTagsContainer}>
@@ -799,10 +807,16 @@ export default function GoodThingsJournalNew({ onBack, navigation, onHome }) {
               <ScrollView
                 contentContainerStyle={[
                   styles.scrollContent,
-                  { paddingBottom: isKeyboardVisible ? 200 : 120 }
+                  { paddingBottom: isKeyboardVisible ? 450 : 120 }
                 ]}
                 keyboardShouldPersistTaps="handled"
                 showsVerticalScrollIndicator={false}
+                removeClippedSubviews={true}           // 移除屏幕外的子視圖
+                scrollEventThrottle={16}                // 每 16ms 觸發一次滾動事件
+                overScrollMode="auto"                   // Android 專用
+                bounces={true}                          // iOS 彈性效果
+                bouncesZoom={false}                     // 禁用縮放彈性
+                decelerationRate="normal"               // 正常減速率
               >
                 <View style={styles.inputCard}>
                   <TextInput
