@@ -1389,7 +1389,7 @@ export default function GratitudePractice({ onBack, navigation, onHome }) {
                 onValueChange={value => setFormData(prev => ({ ...prev, postScore: value }))}
                 minimumTrackTintColor="transparent"
                 maximumTrackTintColor="transparent"
-                thumbTintColor="#FFFFFF"
+                thumbTintColor={Platform.OS === 'android' ? '#164b88ff' : '#FFFFFF'}  // ⭐ Android 使用深色 thumb
               />
 
               <View style={styles.sliderLabels}>
@@ -1418,14 +1418,16 @@ export default function GratitudePractice({ onBack, navigation, onHome }) {
 
   // ==================== 完成頁 ====================
   const renderCompletionPage = () => {
-    // 星星流星動畫
+    // 星星流星动画（优化后的 Android 兼容版本）
     const StarConfetti = ({ index }) => {
       const animatedValue = useRef(new Animated.Value(0)).current;
-
-      const meteorConfig = useMemo(() => {
-        const side = index % 4;
+      
+      // ⭐ 使用 useState 替代 useMemo，更稳定
+      const [meteorConfig] = useState(() => {
+        // 从屏幕不同边缘开始
+        const side = index % 4; // 0=上, 1=右, 2=下, 3=左
         let startX, startY, angle;
-
+        
         if (side === 0) {
           startX = Math.random() * SCREEN_WIDTH;
           startY = -50;
@@ -1443,10 +1445,10 @@ export default function GratitudePractice({ onBack, navigation, onHome }) {
           startY = Math.random() * SCREEN_HEIGHT;
           angle = 315 + (Math.random() - 0.5) * 60;
         }
-
+        
         const angleInRadians = (angle * Math.PI) / 180;
         const distance = 800 + Math.random() * 400;
-
+        
         return {
           startX,
           startY,
@@ -1455,8 +1457,8 @@ export default function GratitudePractice({ onBack, navigation, onHome }) {
           starSize: 24 + Math.random() * 16,
           delay: Math.random() * 1000,
         };
-      }, []);
-
+      });
+      
       useEffect(() => {
         setTimeout(() => {
           Animated.timing(animatedValue, {
@@ -1466,17 +1468,17 @@ export default function GratitudePractice({ onBack, navigation, onHome }) {
           }).start();
         }, meteorConfig.delay);
       }, []);
-
+      
       const translateX = animatedValue.interpolate({
         inputRange: [0, 1],
         outputRange: [meteorConfig.startX, meteorConfig.endX],
       });
-
+      
       const translateY = animatedValue.interpolate({
         inputRange: [0, 1],
         outputRange: [meteorConfig.startY, meteorConfig.endY],
       });
-
+      
       const opacity = animatedValue.interpolate({
         inputRange: [0, 0.1, 0.7, 1],
         outputRange: [0, 1, 0.8, 0],
@@ -1484,16 +1486,25 @@ export default function GratitudePractice({ onBack, navigation, onHome }) {
 
       return (
         <Animated.View
-          style={{
-            position: 'absolute',
-            left: 0,
-            top: 0,
-            transform: [{ translateX }, { translateY }],
-            opacity,
-            zIndex: -1,
-          }}
+          pointerEvents="none"  // ✅ 添加这个，避免阻挡触摸
+          style={[
+            {
+              position: 'absolute',
+              left: 0,
+              top: 0,
+              transform: [
+                { translateX },
+                { translateY },
+              ],
+              opacity,
+            }
+          ]}
         >
-          <Star size={meteorConfig.starSize} color="#60a5fa" fill="#bae6fd" />
+          <Star 
+            size={meteorConfig.starSize} 
+            color="#60a5fa" 
+            fill="#bae6fd" 
+          />
         </Animated.View>
       );
     };
@@ -1530,10 +1541,21 @@ export default function GratitudePractice({ onBack, navigation, onHome }) {
       <View style={styles.fullScreen}>
         <LinearGradient colors={['#f0f9ff', '#e0f2fe']} style={styles.gradientBg}>
           <View style={styles.completionContent}>
-            {/* 星星動畫 */}
-            {[...Array(20)].map((_, i) => (
-              <StarConfetti key={i} index={i} />
-            ))}
+            {/* ✅ 星星动画容器 - 放在最底层 */}
+            <View 
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+              }}
+              pointerEvents="none"
+            >
+              {[...Array(20)].map((_, i) => (
+                <StarConfetti key={i} index={i} />
+              ))}
+            </View>
 
             {/* 中心圖標 */}
             <Animated.View
@@ -2074,9 +2096,9 @@ const styles = StyleSheet.create({
   assessmentAccentBar: {
     position: 'absolute',
     top: 0,
-    left: '5%',
-    right: '5%',
-    height: 6,
+    left: '2%',
+    right: '2%',
+    height: 8,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
   },
@@ -2124,27 +2146,52 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
   sliderContainer: {
-    marginBottom: 28,
+    marginBottom: 32,
     position: 'relative',
+    ...Platform.select({
+      android: {
+        paddingVertical: 4,  // 為邊框留空間
+      },
+    }),
   },
   customSliderTrackBackground: {
     position: 'absolute',
     top: 18,
     left: 0,
     right: 0,
-    height: 10,
+    height: 12,
     backgroundColor: '#DFE6E9',
-    borderRadius: 5,
+    borderRadius: 6,
     zIndex: 1,
+    ...Platform.select({
+      android: {
+        borderWidth: 1,
+        borderColor: '#CBD5E0',
+        elevation: 2,
+      },
+    }),
   },
   customSliderTrackFilled: {
     position: 'absolute',
     top: 18,
     left: 0,
-    height: 10,
+    height: 12,
     backgroundColor: '#29B6F6',
-    borderRadius: 5,
+    borderRadius: 6,
     zIndex: 2,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#29B6F6',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.4,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 4,  // Android 使用 elevation
+        borderWidth: 1,
+        borderColor: '#1E88A8',  // 深色邊框增強效果
+      },
+    }),
   },
   slider: {
     width: '100%',
@@ -2155,10 +2202,10 @@ const styles = StyleSheet.create({
   sliderLabels: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 6,
+    marginTop: 8,
   },
   sliderLabel: {
-    fontSize: 11,
+    fontSize: 12,
     color: '#636E72',
     fontWeight: '500',
   },

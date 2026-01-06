@@ -528,38 +528,6 @@ const DailyScreen = ({ navigation, route }) => {
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.modalScrollContent}>
               {/* 標題區域 */}
               <View style={styles.modalHeaderSection}>
-                {/* ⭐ 新增：翻頁控制（當有多筆記錄時顯示） */}
-                {currentDayRecords.length > 1 && (
-                  <View style={styles.recordNavigator}>
-                    <TouchableOpacity 
-                      onPress={handlePrevRecord} 
-                      disabled={currentRecordIndex === 0}
-                      style={[styles.navButton, currentRecordIndex === 0 && styles.navButtonDisabled]}
-                    >
-                      <ChevronLeft 
-                        color={currentRecordIndex === 0 ? '#CBD5E1' : '#166CB5'} 
-                        size={20} 
-                        strokeWidth={2.5} 
-                      />
-                    </TouchableOpacity>
-                    
-                    <Text style={styles.recordCounter}>
-                      {currentRecordIndex + 1} / {currentDayRecords.length}
-                    </Text>
-                    
-                    <TouchableOpacity 
-                      onPress={handleNextRecord} 
-                      disabled={currentRecordIndex === currentDayRecords.length - 1}
-                      style={[styles.navButton, currentRecordIndex === currentDayRecords.length - 1 && styles.navButtonDisabled]}
-                    >
-                      <ChevronRight 
-                        color={currentRecordIndex === currentDayRecords.length - 1 ? '#CBD5E1' : '#166CB5'} 
-                        size={20} 
-                        strokeWidth={2.5} 
-                      />
-                    </TouchableOpacity>
-                  </View>
-                )}
                 
                 <Text style={styles.modalTitle}>
                   {isCognitive ? '思維調節' : isGratitude ? getGratitudeTitle() : selectedPractice.practice_type}
@@ -876,6 +844,47 @@ const DailyScreen = ({ navigation, route }) => {
                       <Text style={styles.thermometerBarLabel}>高強度</Text>
                     </View>
                   </View>
+                </View>
+              )}
+
+              {/* ⭐ 切頁控制（移到內容底部） */}
+              {currentDayRecords.length > 1 && (
+                <View style={styles.recordNavigatorBottom}>
+                  <TouchableOpacity 
+                    onPress={handlePrevRecord} 
+                    disabled={currentRecordIndex === 0}
+                    style={[
+                      styles.navButtonBottom, 
+                      currentRecordIndex === 0 && styles.navButtonDisabled
+                    ]}
+                    activeOpacity={0.7}
+                  >
+                    <ChevronLeft 
+                      color={currentRecordIndex === 0 ? '#CBD5E1' : '#76787aff'} 
+                      size={20} 
+                      strokeWidth={2.5} 
+                    />
+                  </TouchableOpacity>
+                  
+                  <Text style={styles.recordCounterBottom}>
+                    {currentRecordIndex + 1} / {currentDayRecords.length}
+                  </Text>
+                  
+                  <TouchableOpacity 
+                    onPress={handleNextRecord} 
+                    disabled={currentRecordIndex === currentDayRecords.length - 1}
+                    style={[
+                      styles.navButtonBottom, 
+                      currentRecordIndex === currentDayRecords.length - 1 && styles.navButtonDisabled
+                    ]}
+                    activeOpacity={0.7}
+                  >
+                    <ChevronRight 
+                      color={currentRecordIndex === currentDayRecords.length - 1 ? '#CBD5E1' : '#76787aff'} 
+                      size={20} 
+                      strokeWidth={2.5} 
+                    />
+                  </TouchableOpacity>
                 </View>
               )}
 
@@ -1219,32 +1228,41 @@ const styles = StyleSheet.create({
   modalCloseBtn: { position: 'absolute', top: 16, right: 16, zIndex: 10 },
   modalCloseBtnCircle: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#F1F5F9', justifyContent: 'center', alignItems: 'center' },
   modalHeaderSection: { alignItems: 'center', marginBottom: 16 },
-  // ⭐ 新增樣式
-  recordNavigator: {
+  // ⭐ 日記切頁控制（底部版本）
+  recordNavigatorBottom: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 12,
-    gap: 16,
+    justifyContent: 'space-between',
+    marginTop: 32,
+    marginBottom: -15,
+    paddingTop: 24,
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
   },
-  navButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#F1F5F9',
-    justifyContent: 'center',
+  navButtonBottom: {
+    flexDirection: 'row',
     alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    backgroundColor: '#F1F5F9',
+    gap: 8,
   },
   navButtonDisabled: {
-    backgroundColor: '#F8FAFC',
-    opacity: 0.5,
+    opacity: 0.4,
   },
-  recordCounter: {
+  navButtonText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#166CB5',
-    minWidth: 60,
-    textAlign: 'center',
+    color: '#1c1d1eff',
+  },
+  navButtonTextDisabled: {
+    color: '#CBD5E1',
+  },
+  recordCounterBottom: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#76787aff',
   },
   modalTitle: { fontSize: 22, fontWeight: '700', color: '#1E293B', textAlign: 'center', marginBottom: 6, letterSpacing: 0.3 },
   modalDate: { fontSize: 14, color: '#94A3B8', textAlign: 'center', fontWeight: '500' },

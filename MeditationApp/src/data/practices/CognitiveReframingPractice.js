@@ -50,9 +50,17 @@ import {
   Heart,
 } from 'lucide-react-native';
 import ApiService from '../../../api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
-
+// ⭐ 練習類型常數定義
+const PRACTICE_TYPE = {
+  COGNITIVE_REFRAMING: '思維調節練習',
+  BREATHING: '呼吸穩定力練習',
+  GRATITUDE: '感恩日記',
+  GOOD_THINGS: '好事書寫練習',
+  MOOD: '心情溫度計'
+};
 // ==================== 初始表單資料 ====================
 const INITIAL_FORM_DATA = {
   event: '',           // A: 發生什麼事
@@ -469,11 +477,24 @@ export default function CognitiveReframingPractice({ onBack, navigation, onHome 
   };
 
   // 導航到呼吸練習
-  const handleGoToBreathing = () => {
-    console.log('🫁 導航到呼吸練習');
-    navigation.navigate('PracticeNavigator', {
-      practiceType: '呼吸穩定力練習',
-    });
+  const handleGoToBreathing = async () => {
+    try {
+      console.log('🫁 準備導航到呼吸練習，先完成當前練習');
+      
+      // ✅ 使用正確定義的常數
+      await completePractice(PRACTICE_TYPE.COGNITIVE_REFRAMING);
+      
+      // 導航到呼吸練習
+      navigation.navigate('BreathingExercise', {
+        onComplete: (breathingData) => {
+          console.log('🫁 呼吸練習完成，返回思維調節');
+          navigation.goBack();
+        }
+      });
+    } catch (error) {
+      console.error('❌ [思維調節] 完成練習失敗:', error);
+      Alert.alert('錯誤', '無法完成練習，請稍後再試');
+    }
   };
 
   // ==================== 頁面渲染 ====================
@@ -1318,28 +1339,18 @@ export default function CognitiveReframingPractice({ onBack, navigation, onHome 
             </View>
 
             <View style={styles.sliderContainer}>
-              {/* 背景軌道 */}
+              {/* ✅ 自訂軌道背景（灰色） */}
               <View style={styles.customSliderTrackBackground} />
               
-              {/* 填充的漸層軌道 */}
-              <LinearGradient
-                colors={['#fca5a5', '#fde68a', '#6ee7b7', '#a5f3fc', '#60a5fa']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
+              {/* ✅ 自訂填充軌道（藍色，動態寬度） */}
+              <View 
                 style={[
-                  styles.customSliderTrackFilled,
+                  styles.customSliderTrackFilled, 
                   { width: `${(formData.postScore / 10) * 100}%` }
-                ]}
+                ]} 
               />
-
-              {/* 刻度標記 */}
-              <View style={styles.sliderMarks}>
-                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(mark => (
-                  <View key={mark} style={styles.sliderMark} />
-                ))}
-              </View>
-
-              {/* 實際的拉桿 */}
+              
+              {/* ✅ 原生 Slider（設為透明，只用來接收觸摸） */}
               <Slider
                 style={styles.slider}
                 minimumValue={1}
@@ -1349,18 +1360,12 @@ export default function CognitiveReframingPractice({ onBack, navigation, onHome 
                 onValueChange={value => setFormData(prev => ({ ...prev, postScore: value }))}
                 minimumTrackTintColor="transparent"
                 maximumTrackTintColor="transparent"
-                thumbTintColor="#0288D1"
+                thumbTintColor={Platform.OS === 'android' ? '#164b88ff' : '#FFFFFF'}  // ⭐ Android 使用深色 thumb
               />
-
+              
               <View style={styles.sliderLabels}>
-                <View style={styles.sliderLabelContainer}>
-                  <Text style={styles.sliderLabel}>沒有減緩</Text>
-                  <Text style={styles.sliderLabelNumber}>1</Text>
-                </View>
-                <View style={styles.sliderLabelContainer}>
-                  <Text style={styles.sliderLabel}>完全消失</Text>
-                  <Text style={styles.sliderLabelNumber}>10</Text>
-                </View>
+                <Text style={styles.sliderLabel}>1 (沒有減緩)</Text>
+                <Text style={styles.sliderLabel}>10 (完全消失)</Text>
               </View>
             </View>
 
@@ -1547,14 +1552,16 @@ export default function CognitiveReframingPractice({ onBack, navigation, onHome 
 
   // 10. 完成頁（含星星動畫）
   const renderCompletionPage = () => {
-    // 星星流星動畫
+    // 星星流星动画（优化后的 Android 兼容版本）
     const StarConfetti = ({ index }) => {
       const animatedValue = useRef(new Animated.Value(0)).current;
-
-      const meteorConfig = useMemo(() => {
-        const side = index % 4;
+      
+      // ⭐ 使用 useState 替代 useMemo，更稳定
+      const [meteorConfig] = useState(() => {
+        // 从屏幕不同边缘开始
+        const side = index % 4; // 0=上, 1=右, 2=下, 3=左
         let startX, startY, angle;
-
+        
         if (side === 0) {
           startX = Math.random() * SCREEN_WIDTH;
           startY = -50;
@@ -1572,10 +1579,10 @@ export default function CognitiveReframingPractice({ onBack, navigation, onHome 
           startY = Math.random() * SCREEN_HEIGHT;
           angle = 315 + (Math.random() - 0.5) * 60;
         }
-
+        
         const angleInRadians = (angle * Math.PI) / 180;
         const distance = 800 + Math.random() * 400;
-
+        
         return {
           startX,
           startY,
@@ -1584,8 +1591,8 @@ export default function CognitiveReframingPractice({ onBack, navigation, onHome 
           starSize: 24 + Math.random() * 16,
           delay: Math.random() * 1000,
         };
-      }, []);
-
+      });
+      
       useEffect(() => {
         setTimeout(() => {
           Animated.timing(animatedValue, {
@@ -1595,17 +1602,17 @@ export default function CognitiveReframingPractice({ onBack, navigation, onHome 
           }).start();
         }, meteorConfig.delay);
       }, []);
-
+      
       const translateX = animatedValue.interpolate({
         inputRange: [0, 1],
         outputRange: [meteorConfig.startX, meteorConfig.endX],
       });
-
+      
       const translateY = animatedValue.interpolate({
         inputRange: [0, 1],
         outputRange: [meteorConfig.startY, meteorConfig.endY],
       });
-
+      
       const opacity = animatedValue.interpolate({
         inputRange: [0, 0.1, 0.7, 1],
         outputRange: [0, 1, 0.8, 0],
@@ -1613,19 +1620,24 @@ export default function CognitiveReframingPractice({ onBack, navigation, onHome 
 
       return (
         <Animated.View
-          style={{
-            position: 'absolute',
-            left: 0,
-            top: 0,
-            transform: [{ translateX }, { translateY }],
-            opacity,
-            zIndex: -1,
-          }}
+          pointerEvents="none"  // ✅ 添加这个，避免阻挡触摸
+          style={[
+            {
+              position: 'absolute',
+              left: 0,
+              top: 0,
+              transform: [
+                { translateX },
+                { translateY },
+              ],
+              opacity,
+            }
+          ]}
         >
-          <Star
-            size={meteorConfig.starSize}
-            color="#60a5fa"
-            fill="#bae6fd"
+          <Star 
+            size={meteorConfig.starSize} 
+            color="#60a5fa" 
+            fill="#bae6fd" 
           />
         </Animated.View>
       );
@@ -1651,10 +1663,21 @@ export default function CognitiveReframingPractice({ onBack, navigation, onHome 
           style={styles.gradientBg}
         >
           <View style={styles.completionContent}>
-            {/* 星星動畫 */}
-            {[...Array(20)].map((_, i) => (
-              <StarConfetti key={i} index={i} />
-            ))}
+            {/* ✅ 星星动画容器 - 放在最底层 */}
+            <View 
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+              }}
+              pointerEvents="none"
+            >
+              {[...Array(20)].map((_, i) => (
+                <StarConfetti key={i} index={i} />
+              ))}
+            </View>
 
             {/* 中心圖標 */}
             <Animated.View
@@ -2435,8 +2458,8 @@ const styles = StyleSheet.create({
   assessmentAccentBar: {
     position: 'absolute',
     top: 0,
-    left: '5%',
-    right: '5%',
+    left: '2%',
+    right: '2%',
     height: 8,
     borderTopLeftRadius: 32,
     borderTopRightRadius: 32,
@@ -2489,71 +2512,66 @@ const styles = StyleSheet.create({
   sliderContainer: {
     marginBottom: 32,
     position: 'relative',
-    paddingHorizontal: 8,
+    ...Platform.select({
+      android: {
+        paddingVertical: 4,  // 為邊框留空間
+      },
+    }),
   },
   customSliderTrackBackground: {
     position: 'absolute',
-    top: 20,
-    left: 8,
-    right: 8,
-    height: 16,
-    backgroundColor: '#e2e8f0',
-    borderRadius: 8,
+    top: 18,
+    left: 0,
+    right: 0,
+    height: 12,
+    backgroundColor: '#DFE6E9',
+    borderRadius: 6,
     zIndex: 1,
-    borderWidth: 2,
-    borderColor: '#cbd5e1',
+    ...Platform.select({
+      android: {
+        borderWidth: 1,
+        borderColor: '#CBD5E0',
+        elevation: 2,
+      },
+    }),
   },
   customSliderTrackFilled: {
     position: 'absolute',
-    top: 22,
-    left: 10,
+    top: 18,
+    left: 0,
     height: 12,
+    backgroundColor: '#29B6F6',
     borderRadius: 6,
     zIndex: 2,
-  },
-  sliderMarks: {
-    position: 'absolute',
-    top: 20,
-    left: 8,
-    right: 8,
-    height: 16,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 4,
-    zIndex: 3,
-  },
-  sliderMark: {
-    width: 2,
-    height: 8,
-    backgroundColor: '#FFFFFF',
-    opacity: 0.5,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#29B6F6',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.4,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 4,  // Android 使用 elevation
+        borderWidth: 1,
+        borderColor: '#1E88A8',  // 深色邊框增強效果
+      },
+    }),
   },
   slider: {
     width: '100%',
-    height: 56,
+    height: 44,
     position: 'relative',
-    zIndex: 4,
+    zIndex: 3,
   },
   sliderLabels: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 12,
-    paddingHorizontal: 8,
-  },
-  sliderLabelContainer: {
-    alignItems: 'center',
+    marginTop: 8,
   },
   sliderLabel: {
-    fontSize: 13,
-    color: '#64748b',
+    fontSize: 12,
+    color: '#636E72',
     fontWeight: '500',
-    marginBottom: 4,
-  },
-  sliderLabelNumber: {
-    fontSize: 16,
-    color: '#0288D1',
-    fontWeight: '700',
   },
 
   // ⭐ 呼吸練習建議卡片

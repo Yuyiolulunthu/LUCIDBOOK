@@ -41,7 +41,7 @@ const INITIAL_FORM_DATA = {
   goodThing: '',
   emotions: [],
   reason: '',
-  postScore: 8,
+  postScore: 5,
   timestamp: 0,
 };
 
@@ -527,10 +527,7 @@ export default function GoodThingsJournalNew({ onBack, navigation, onHome }) {
                   { paddingBottom: isKeyboardVisible ? 200 : 120 }
                 ]}
                 keyboardShouldPersistTaps="handled"
-                removeClippedSubviews={true} 
-                maxToRenderPerBatch={10} 
-                updateCellsBatchingPeriod={50}
-                windowSize={7}
+                showsVerticalScrollIndicator={false}
               >
                 <View style={styles.inputCard}>
                   <TextInput
@@ -805,10 +802,7 @@ export default function GoodThingsJournalNew({ onBack, navigation, onHome }) {
                   { paddingBottom: isKeyboardVisible ? 200 : 120 }
                 ]}
                 keyboardShouldPersistTaps="handled"
-                removeClippedSubviews={true} 
-                maxToRenderPerBatch={10}   
-                updateCellsBatchingPeriod={50} 
-                windowSize={7}
+                showsVerticalScrollIndicator={false}
               >
                 <View style={styles.inputCard}>
                   <TextInput
@@ -959,7 +953,7 @@ export default function GoodThingsJournalNew({ onBack, navigation, onHome }) {
                 onValueChange={value => setFormData(prev => ({ ...prev, postScore: value }))}
                 minimumTrackTintColor="transparent"  // 改透明
                 maximumTrackTintColor="transparent"  // 改透明
-                thumbTintColor="#FFFFFF"  // thumb 保持白色
+                thumbTintColor={Platform.OS === 'android' ? '#164b88ff' : '#FFFFFF'}  // ⭐ Android 使用深色 thumb
               />
               
               <View style={styles.sliderLabels}>
@@ -1017,40 +1011,36 @@ export default function GoodThingsJournalNew({ onBack, navigation, onHome }) {
     const CENTER_X = 80;
     const CENTER_Y = 80; 
 
-    // 星星流星動畫（流星雨放射效果）
+    // 星星流星动画（优化后的 Android 兼容版本）
     const StarConfetti = ({ index }) => {
       const animatedValue = useRef(new Animated.Value(0)).current;
       
-      // ⭐ 使用 useMemo 確保隨機值永遠不變
-      const meteorConfig = useMemo(() => {
-        // 從屏幕不同邊緣開始
+      // ⭐ 使用 useState 替代 useMemo，更稳定
+      const [meteorConfig] = useState(() => {
+        // 从屏幕不同边缘开始
         const side = index % 4; // 0=上, 1=右, 2=下, 3=左
         let startX, startY, angle;
         
         if (side === 0) {
-          // 從上方進入
           startX = Math.random() * SCREEN_WIDTH;
           startY = -50;
-          angle = 45 + (Math.random() - 0.5) * 60; // 向下偏移
+          angle = 45 + (Math.random() - 0.5) * 60;
         } else if (side === 1) {
-          // 從右方進入
           startX = SCREEN_WIDTH + 50;
           startY = Math.random() * SCREEN_HEIGHT;
-          angle = 135 + (Math.random() - 0.5) * 60; // 向左下
+          angle = 135 + (Math.random() - 0.5) * 60;
         } else if (side === 2) {
-          // 從下方進入
           startX = Math.random() * SCREEN_WIDTH;
           startY = SCREEN_HEIGHT + 50;
-          angle = 225 + (Math.random() - 0.5) * 60; // 向上偏移
+          angle = 225 + (Math.random() - 0.5) * 60;
         } else {
-          // 從左方進入
           startX = -50;
           startY = Math.random() * SCREEN_HEIGHT;
-          angle = 315 + (Math.random() - 0.5) * 60; // 向右下
+          angle = 315 + (Math.random() - 0.5) * 60;
         }
         
         const angleInRadians = (angle * Math.PI) / 180;
-        const distance = 800 + Math.random() * 400; // 流星飛行距離
+        const distance = 800 + Math.random() * 400;
         
         return {
           startX,
@@ -1058,20 +1048,19 @@ export default function GoodThingsJournalNew({ onBack, navigation, onHome }) {
           endX: startX + Math.cos(angleInRadians) * distance,
           endY: startY + Math.sin(angleInRadians) * distance,
           starSize: 24 + Math.random() * 16,
-          delay: Math.random() * 1000, // 隨機延遲 0-1 秒
+          delay: Math.random() * 1000,
         };
-      }, []); // ⭐ 空依賴陣列 = 永遠不重新計算
+      });
       
       useEffect(() => {
-        // 延遲後播放動畫
         setTimeout(() => {
           Animated.timing(animatedValue, {
             toValue: 1,
-            duration: 2000 + Math.random() * 1000, // 2-3 秒完成
+            duration: 2000 + Math.random() * 1000,
             useNativeDriver: true,
           }).start();
         }, meteorConfig.delay);
-      }, []); // ⭐ 只執行一次
+      }, []);
       
       const translateX = animatedValue.interpolate({
         inputRange: [0, 1],
@@ -1083,14 +1072,14 @@ export default function GoodThingsJournalNew({ onBack, navigation, onHome }) {
         outputRange: [meteorConfig.startY, meteorConfig.endY],
       });
       
-      // ✅ 淡入淡出效果
       const opacity = animatedValue.interpolate({
         inputRange: [0, 0.1, 0.7, 1],
-        outputRange: [0, 1, 0.8, 0], // 快速淡入 → 維持 → 淡出
+        outputRange: [0, 1, 0.8, 0],
       });
 
       return (
         <Animated.View
+          pointerEvents="none"  // ✅ 添加这个，避免阻挡触摸
           style={[
             {
               position: 'absolute',
@@ -1101,7 +1090,6 @@ export default function GoodThingsJournalNew({ onBack, navigation, onHome }) {
                 { translateY },
               ],
               opacity,
-              zIndex: -1, // ✅ 在最底層
             }
           ]}
         >
@@ -1121,8 +1109,24 @@ export default function GoodThingsJournalNew({ onBack, navigation, onHome }) {
           style={styles.gradientBg}
         >
           <View style={styles.completionContent}>
-            {/* 中心圖標 */}
             <View style={styles.confettiCenter}>
+              {/* ✅ 星星动画容器 - 放在最底层 */}
+              <View 
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                }}
+                pointerEvents="none"
+              >
+                {[...Array(20)].map((_, i) => (
+                  <StarConfetti key={i} index={i} />
+                ))}
+              </View>
+
+              {/* 中心圖標 */}
               <Animated.View 
                 style={[
                   styles.completionIconContainer,
@@ -1746,6 +1750,11 @@ const styles = StyleSheet.create({
   sliderContainer: {
     marginBottom: 32,
     position: 'relative',
+    ...Platform.select({
+      android: {
+        paddingVertical: 4,  // 為邊框留空間
+      },
+    }),
   },
   customSliderTrackBackground: {
     position: 'absolute',
@@ -1756,6 +1765,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#DFE6E9',
     borderRadius: 6,
     zIndex: 1,
+    ...Platform.select({
+      android: {
+        borderWidth: 1,
+        borderColor: '#CBD5E0',
+        elevation: 2,
+      },
+    }),
   },
   customSliderTrackFilled: {
     position: 'absolute',
@@ -1765,6 +1781,19 @@ const styles = StyleSheet.create({
     backgroundColor: '#29B6F6',
     borderRadius: 6,
     zIndex: 2,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#29B6F6',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.4,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 4,  // Android 使用 elevation
+        borderWidth: 1,
+        borderColor: '#1E88A8',  // 深色邊框增強效果
+      },
+    }),
   },
   slider: {
     width: '100%',

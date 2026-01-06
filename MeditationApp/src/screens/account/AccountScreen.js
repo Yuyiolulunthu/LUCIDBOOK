@@ -1,11 +1,12 @@
 // ==========================================
 // 檔案名稱: AccountScreen.js
-// 版本: V9.0 - 套用統一鎖定遮罩邏輯
+// 版本: V9.1 - 添加時數單位顯示
 // 
 // ✅ 使用統一的 LockedOverlay
 // ✅ 未登入顯示登入鎖定
 // ✅ 無企業碼顯示企業碼鎖定
 // ✅ 背景內容模糊但可見
+// ✅ 練習時數顯示單位 "hr"
 // ==========================================
 
 import React, { useState, useEffect } from 'react';
@@ -69,7 +70,6 @@ const AccountScreen = ({ navigation, route }) => {
           
           console.log('📋 [AccountScreen] API 返回的完整用戶資料:', JSON.stringify(response.user, null, 2));
           
-          // ⭐ 修正：完整保存用戶資料
           const userData = {
             id: response.user.id,
             name: response.user.name,
@@ -89,7 +89,6 @@ const AccountScreen = ({ navigation, route }) => {
           setUser(userData);
           setIsLoggedIn(true);
 
-          // 檢查企業引薦碼
           const hasCode = !!response.user.enterprise_code;
           console.log('📋 [AccountScreen] 企業引薦碼狀態:', {
             hasCode,
@@ -182,7 +181,6 @@ const AccountScreen = ({ navigation, route }) => {
     return Math.floor((new Date().getTime() - new Date(user.created_at).getTime()) / (1000 * 60 * 60 * 24));
   };
 
-  // ⭐ 取得顯示的公司名稱（優先顯示企業名稱）
   const getDisplayCompany = () => {
     if (user?.enterprise_name) {
       return user.enterprise_name;
@@ -190,7 +188,6 @@ const AccountScreen = ({ navigation, route }) => {
     return user?.company || '';
   };
 
-  // ⭐ 渲染頭像
   const renderAvatar = () => {
     if (user?.avatar) {
       return (
@@ -219,7 +216,6 @@ const AccountScreen = ({ navigation, route }) => {
   // 渲染邏輯
   // ========================================
 
-  // 1️⃣ 載入中狀態
   if (loading) {
     return (
       <View style={styles.container}>
@@ -234,9 +230,7 @@ const AccountScreen = ({ navigation, route }) => {
     );
   }
 
-  // 2️⃣ 渲染主要內容（統一結構）
   const renderContent = () => {
-    // 如果沒登入，顯示簡單的佔位內容
     if (!isLoggedIn) {
       return (
         <View style={styles.content}>
@@ -252,7 +246,6 @@ const AccountScreen = ({ navigation, route }) => {
       );
     }
 
-    // 如果已登入但沒企業碼，顯示模糊的完整內容
     if (isLoggedIn && !hasEnterpriseCode) {
       return (
         <View style={styles.content}>
@@ -297,7 +290,11 @@ const AccountScreen = ({ navigation, route }) => {
 
           <View style={styles.statsGrid}>
             <View style={styles.statCard}>
-              <Text style={styles.statValue}>{practiceStats.totalHours}</Text>
+              {/* ⭐ 修改：添加時數單位 */}
+              <View style={styles.statValueContainer}>
+                <Text style={styles.statValue}>{practiceStats.totalHours}</Text>
+                <Text style={styles.statUnit}>hr</Text>
+              </View>
               <Text style={styles.statLabel}>累積練習時數</Text>
             </View>
             <View style={styles.statCard}>
@@ -309,7 +306,6 @@ const AccountScreen = ({ navigation, route }) => {
       );
     }
 
-    // 已登入且有企業碼，顯示完整內容
     return (
       <View style={styles.content}>
         <View style={styles.header}>
@@ -357,7 +353,11 @@ const AccountScreen = ({ navigation, route }) => {
 
         <View style={styles.statsGrid}>
           <View style={styles.statCard}>
-            <Text style={styles.statValue}>{practiceStats.totalHours}</Text>
+            {/* ⭐ 修改：添加時數單位 */}
+            <View style={styles.statValueContainer}>
+              <Text style={styles.statValue}>{practiceStats.totalHours}</Text>
+              <Text style={styles.statUnit}>hr</Text>
+            </View>
             <Text style={styles.statLabel}>累積練習時數</Text>
           </View>
           <View style={styles.statCard}>
@@ -396,7 +396,6 @@ const AccountScreen = ({ navigation, route }) => {
     );
   };
 
-  // 3️⃣ 統一返回結構
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#166CB5" />
@@ -418,7 +417,6 @@ const AccountScreen = ({ navigation, route }) => {
 
       <BottomNavigation navigation={navigation} activeTab="profile" />
 
-      {/* 未登入鎖定 */}
       {!isLoggedIn && (
         <LockedOverlay 
           navigation={navigation} 
@@ -427,7 +425,6 @@ const AccountScreen = ({ navigation, route }) => {
         />
       )}
       
-      {/* 無企業碼鎖定 */}
       {isLoggedIn && !hasEnterpriseCode && (
         <LockedOverlay 
           navigation={navigation} 
@@ -456,7 +453,6 @@ const styles = StyleSheet.create({
     color: '#6B7280',
   },
 
-  // Scrollable Content
   scrollView: {
     flex: 1,
   },
@@ -465,12 +461,10 @@ const styles = StyleSheet.create({
     paddingBottom: 100,
   },
 
-  // Content
   content: {
     paddingHorizontal: 20,
   },
 
-  // Header Section
   header: {
     marginBottom: 32,
   },
@@ -482,7 +476,6 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
 
-  // User Card
   userCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 24,
@@ -548,7 +541,6 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   
-  // 企業/公司標籤
   enterpriseTag: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -565,7 +557,6 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   
-  // 到期日行
   expiryRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -578,7 +569,6 @@ const styles = StyleSheet.create({
     color: '#9CA3AF',
   },
 
-  // Stats Grid
   statsGrid: {
     flexDirection: 'row',
     gap: 12,
@@ -598,11 +588,23 @@ const styles = StyleSheet.create({
     elevation: 2,
     alignItems: 'center',
   },
+  // ⭐ 新增：數值容器（包含數字和單位）
+  statValueContainer: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    marginBottom: 4,
+  },
   statValue: {
     fontSize: 24,
     fontWeight: 'bold',
     color: '#166CB5',
-    marginBottom: 4,
+  },
+  // ⭐ 新增：單位樣式
+  statUnit: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#9CA3AF',
+    marginLeft: 4,
   },
   statLabel: {
     fontSize: 12,
@@ -610,7 +612,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 
-  // Menu Container
   menuContainer: {
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
@@ -649,7 +650,6 @@ const styles = StyleSheet.create({
     color: '#374151',
   },
 
-  // Logout Button
   logoutButton: {
     flexDirection: 'row',
     alignItems: 'center',

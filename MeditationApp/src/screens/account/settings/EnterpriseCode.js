@@ -12,6 +12,7 @@
 // 🆕 Onboarding Modal
 // 🆕 登出功能（避免用戶被困住）
 // 🔧 修復：導航錯誤 'Home' -> 'MainTabs'
+// 🔧 優化：游標統一顯示在左側，無重複輸入框
 // ==========================================
 
 import React, { useState, useRef, useEffect } from 'react';
@@ -29,6 +30,7 @@ import {
   Dimensions,
   FlatList,
   Animated,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -194,19 +196,11 @@ const OnboardingModal = ({ visible, onComplete }) => {
 // Main Component
 // ==========================================
 const EnterpriseCode = ({ navigation, route }) => {
-  const [code, setCode] = useState(['', '', '', '', '', '']);
+  const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
-  const [focusedIndex, setFocusedIndex] = useState(0);
   const [showOnboarding, setShowOnboarding] = useState(false);
   
-  const inputRefs = [
-    useRef(null), 
-    useRef(null), 
-    useRef(null), 
-    useRef(null), 
-    useRef(null), 
-    useRef(null)
-  ];
+  const inputRef = useRef(null);
 
   // 獲取導航參數
   const isFromLogin = route?.params?.fromLogin || false;
@@ -232,34 +226,38 @@ const EnterpriseCode = ({ navigation, route }) => {
 
   useEffect(() => {
     setTimeout(() => {
-      inputRefs[0].current?.focus();
+      inputRef.current?.focus();
     }, 300);
   }, []);
 
-  const handleCodeChange = (text, index) => {
-    if (text && !/^[0-9a-zA-Z]$/.test(text)) {
-      return;
-    }
+  // ⭐ 計算當前輸入框的 left 位置
+  const getCurrentInputLeft = () => {
+    const boxWidth = 48;
+    const gap = 12;
+    const currentIndex = code.length < 6 ? code.length : 5;
+    return currentIndex * (boxWidth + gap);
+  };
 
-    const newCode = [...code];
-    newCode[index] = text.toUpperCase();
-    setCode(newCode);
-
-    if (text && index < 5) {
-      inputRefs[index + 1].current?.focus();
+  // ⭐ 處理輸入：將新字符添加到 code
+  const handleCodeChange = (text) => {
+    if (text) {
+      // 有新輸入
+      const cleaned = text.toUpperCase().replace(/[^0-9A-Z]/g, '');
+      if (cleaned && code.length < 6) {
+        setCode(code + cleaned.charAt(0));
+      }
     }
   };
 
-  const handleKeyPress = (e, index) => {
-    if (e.nativeEvent.key === 'Backspace' && !code[index] && index > 0) {
-      inputRefs[index - 1].current?.focus();
+  // ⭐ 處理刪除
+  const handleKeyPress = ({ nativeEvent }) => {
+    if (nativeEvent.key === 'Backspace' && code.length > 0) {
+      setCode(code.slice(0, -1));
     }
   };
 
   const handleSubmit = async () => {
-    const fullCode = code.join('');
-    
-    if (fullCode.length !== 6) {
+    if (code.length !== 6) {
       Alert.alert('提示', '請輸入完整的6位數驗證碼');
       return;
     }
@@ -268,14 +266,14 @@ const EnterpriseCode = ({ navigation, route }) => {
     Keyboard.dismiss();
 
     try {
-      const response = await ApiService.verifyEnterpriseCode(fullCode);
+      const response = await ApiService.verifyEnterpriseCode(code);
       
       if (response.success) {
         const expiryDate = new Date();
         expiryDate.setMonth(expiryDate.getMonth() + 1);
         
         await AsyncStorage.multiSet([
-          ['enterpriseCode', fullCode],
+          ['enterpriseCode', code],
           ['enterpriseCodeExpiry', expiryDate.toISOString()],
           ['enterpriseName', response.enterprise?.name || ''],
           ['enterpriseId', response.enterprise?.id || ''],
@@ -300,14 +298,14 @@ const EnterpriseCode = ({ navigation, route }) => {
         }
       } else {
         Alert.alert('驗證失敗', response.message || '引薦碼無效或已過期，請檢查後重試');
-        setCode(['', '', '', '', '', '']);
-        inputRefs[0].current?.focus();
+        setCode('');
+        inputRef.current?.focus();
       }
     } catch (error) {
       console.error('驗證失敗:', error);
       Alert.alert('錯誤', '驗證失敗，請稍後再試');
-      setCode(['', '', '', '', '', '']);
-      inputRefs[0].current?.focus();
+      setCode('');
+      inputRef.current?.focus();
     } finally {
       setLoading(false);
     }
@@ -479,7 +477,7 @@ const EnterpriseCode = ({ navigation, route }) => {
     }
   };
 
-  const isComplete = code.every(digit => digit !== '');
+  const isComplete = code.length === 6;
 
   return (
     <View style={styles.container}>
@@ -532,31 +530,52 @@ const EnterpriseCode = ({ navigation, route }) => {
               輸入6位英數字驗證碼以解鎖企業為您準備的練習模組
             </Text>
 
-            {/* 6個驗證碼輸入框 */}
-            <View style={styles.codeContainer}>
-              {code.map((digit, index) => (
-                <View key={index} style={styles.inputWrapper}>
-                  <TextInput
-                    ref={inputRefs[index]}
-                    style={[
-                      styles.codeInput,
-                      digit && styles.codeInputFilled,
-                      focusedIndex === index && !digit && styles.codeInputActive,
-                    ]}
-                    value={digit}
-                    onChangeText={(text) => handleCodeChange(text, index)}
-                    onKeyPress={(e) => handleKeyPress(e, index)}
-                    onFocus={() => setFocusedIndex(index)}
-                    onBlur={() => setFocusedIndex(-1)}
-                    keyboardType="default"
-                    autoCapitalize="characters"
-                    maxLength={1}
-                    selectTextOnFocus
-                    editable={!loading}
-                  />
+            {/* ⭐ 單一輸入框方案：視覺框 + 固定 TextInput */}
+            <TouchableWithoutFeedback onPress={() => inputRef.current?.focus()}>
+              <View style={styles.codeContainer}>
+                {/* 視覺化顯示的 6 個框 */}
+                <View style={styles.codeDisplay}>
+                  {[0, 1, 2, 3, 4, 5].map((index) => (
+                    <View 
+                      key={index} 
+                      style={[
+                        styles.codeBox,
+                        code.length === index && styles.codeBoxActive,
+                        code.length > index && styles.codeBoxFilled,
+                      ]}
+                    >
+                      <Text style={styles.codeBoxText}>
+                        {code[index] || ''}
+                      </Text>
+                    </View>
+                  ))}
                 </View>
-              ))}
-            </View>
+
+                {/* ⭐ 固定的 TextInput，通過 left 位置移動 */}
+                <TextInput
+                  ref={inputRef}
+                  style={[
+                    styles.cursorInput,
+                    { left: getCurrentInputLeft() }  // ⭐ 動態位置
+                  ]}
+                  value=""  // ⭐ 永遠是空的，只顯示游標
+                  onChangeText={handleCodeChange}
+                  onKeyPress={handleKeyPress}
+                  keyboardType="default"
+                  autoCapitalize="characters"
+                  maxLength={1}  // ⭐ 限制為 1 個字符
+                  autoFocus
+                  editable={!loading}
+                  onSubmitEditing={handleSubmit}
+                  returnKeyType="done"
+                  textContentType="oneTimeCode"
+                  autoCorrect={false}
+                  spellCheck={false}
+                  caretColor="#166CB5"
+                  selection={{ start: 0, end: 0 }}  // ⭐ 強制游標在最左邊
+                />
+              </View>
+            </TouchableWithoutFeedback>
 
             {/* 完成按鈕 */}
             <TouchableOpacity 
@@ -696,29 +715,27 @@ const styles = StyleSheet.create({
     marginBottom: 48,
   },
   codeContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 12,
+    position: 'relative',          // ⭐ 添加相對定位
     marginBottom: 48,
     paddingHorizontal: 8,
   },
-  inputWrapper: {
-    flex: 1,
-    maxWidth: 56,
+  // ⭐ 視覺化顯示區域
+  codeDisplay: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 12,
   },
-  codeInput: {
-    width: '100%',
+  codeBox: {
+    width: 48,
     height: 64,
     borderRadius: 12,
     borderWidth: 2,
     borderColor: '#DEE2E6',
     backgroundColor: '#F8F9FA',
-    fontSize: 24,
-    fontWeight: '500',
-    color: '#1F2937',
-    textAlign: 'center',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  codeInputActive: {
+  codeBoxActive: {
     borderColor: '#166CB5',
     backgroundColor: '#FFF',
     shadowColor: '#166CB5',
@@ -728,10 +745,30 @@ const styles = StyleSheet.create({
     elevation: 4,
     transform: [{ scale: 1.05 }],
   },
-  codeInputFilled: {
+  codeBoxFilled: {
     borderColor: 'rgba(22, 108, 181, 0.4)',
     backgroundColor: '#FFF',
   },
+  codeBoxText: {
+    fontSize: 24,
+    fontWeight: '500',
+    color: '#1F2937',
+  },
+  
+  // ⭐ 游標輸入框（固定在 codeDisplay 上，通過 left 動態移動）
+  cursorInput: {
+    position: 'absolute',
+    top: 0,
+    width: 48,                       // ⭐ 與格子同寬
+    height: 64,                      // ⭐ 與格子同高
+    fontSize: 24,
+    textAlign: 'left',               // ⭐ 左對齊
+    paddingLeft: 10,                 // ⭐ 往右一點點
+    color: 'transparent',            // 文字透明（不顯示）
+    backgroundColor: 'transparent',
+    borderWidth: 0,
+  },
+  
   submitButton: {
     width: '100%',
     paddingVertical: 18,
