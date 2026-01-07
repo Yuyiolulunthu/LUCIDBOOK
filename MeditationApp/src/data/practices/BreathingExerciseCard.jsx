@@ -385,18 +385,29 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
   // ============================================
 
   const loadAudio = async () => {
-    // ⭐ 檢查是否已載入
+    // ⭐ 檢查是否需要重新載入
     if (sound.current) {
       try {
         const status = await sound.current.getStatusAsync();
         if (status.isLoaded) {
-          console.log('✅ 音檔已載入，跳過重複載入');
-          return;
+          // ⭐ 新增：檢查當前音檔 URI 是否與目標一致
+          const currentUri = status.uri;
+          const targetUri = currentPractice.audioFile.uri;
+          
+          if (currentUri === targetUri) {
+            console.log('✅ 音檔已載入且正確，跳過重複載入');
+            return;
+          } else {
+            console.log('🔄 音檔不一致，重新載入');
+            console.log('  當前:', currentUri);
+            console.log('  目標:', targetUri);
+          }
         }
       } catch (e) {
         console.log('檢查音檔狀態失敗，重新載入');
       }
       
+      // ⭐ 卸載舊音檔
       await sound.current.unloadAsync();
       sound.current = null;
     }
