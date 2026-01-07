@@ -1835,12 +1835,12 @@ const styles = StyleSheet.create({
   },
   customSliderTrackBackground: {
     position: 'absolute',
-    top: 18,
+    top: 20,
     left: 0,
     right: 0,
-    height: 12,
+    height: 16,
     backgroundColor: '#DFE6E9',
-    borderRadius: 6,
+    borderRadius: 8,
     zIndex: 1,
     ...Platform.select({
       android: {
@@ -1852,11 +1852,11 @@ const styles = StyleSheet.create({
   },
   customSliderTrackFilled: {
     position: 'absolute',
-    top: 18,
+    top: 20,
     left: 0,
-    height: 12,
+    height: 16,
     backgroundColor: '#29B6F6',
-    borderRadius: 6,
+    borderRadius: 8,
     zIndex: 2,
     ...Platform.select({
       ios: {
@@ -1874,7 +1874,7 @@ const styles = StyleSheet.create({
   },
   slider: {
     width: '100%',
-    height: 44,
+    height: 56,
     position: 'relative',
     zIndex: 3,
   },
@@ -2078,7 +2078,7 @@ const styles = StyleSheet.create({
   successSubtitle: {
     fontSize: 16,
     color: '#6b7280',
-    marginBottom: 32,
+    marginBottom: 28,
     textAlign: 'center',
   },
   statsCard: {
@@ -2147,15 +2147,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     gap: 8,
-    paddingVertical: 16,
+    paddingVertical: 14,
     backgroundColor: '#FFFFFF',
-    borderRadius: 28,
+    borderRadius: 24,
     borderWidth: 1,
     borderColor: 'rgba(14, 165, 233, 0.2)',
-    marginTop: 62,
   },
   viewJournalText: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
     color: '#0ea5e9',
   },

@@ -2597,12 +2597,12 @@ const styles = StyleSheet.create({
   },
   customSliderTrackBackground: {
     position: 'absolute',
-    top: 18,
+    top: 20,
     left: 0,
     right: 0,
-    height: 12,
+    height: 16,
     backgroundColor: '#DFE6E9',
-    borderRadius: 6,
+    borderRadius: 8,
     zIndex: 1,
     ...Platform.select({
       android: {
@@ -2614,11 +2614,11 @@ const styles = StyleSheet.create({
   },
   customSliderTrackFilled: {
     position: 'absolute',
-    top: 18,
+    top: 20,
     left: 0,
-    height: 12,
+    height: 16,
     backgroundColor: '#29B6F6',
-    borderRadius: 6,
+    borderRadius: 8,
     zIndex: 2,
     ...Platform.select({
       ios: {
@@ -2636,7 +2636,7 @@ const styles = StyleSheet.create({
   },
   slider: {
     width: '100%',
-    height: 44,
+    height: 56,
     position: 'relative',
     zIndex: 3,
   },
@@ -2845,13 +2845,14 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: '700',
     color: '#1f2937',
-    marginBottom: 12,
+    marginBottom: 8,
   },
   completionSubtitle: {
-    fontSize: 16,
+    fontSize: 15,
     color: '#6b7280',
     textAlign: 'center',
     lineHeight: 24,
+    marginBottom: 28,
   },
   decorativeStars: {
     flexDirection: 'row',
@@ -2859,9 +2860,9 @@ const styles = StyleSheet.create({
   },
   viewJournalButton: {
     width: '100%',
-    paddingVertical: 16,
+    paddingVertical: 14,
     backgroundColor: '#FFFFFF',
-    borderRadius: 28,
+    borderRadius: 24,
     borderWidth: 1,
     borderColor: 'rgba(14, 165, 233, 0.2)',
     flexDirection: 'row',
@@ -2871,7 +2872,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   viewJournalText: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
     color: '#0ea5e9',
   },
