@@ -47,6 +47,13 @@
         {
           "sounds": []
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": false,
+          "cameraPermission": "LUCIDBOOK 需要使用相機以完成您的大頭貼設定"
+        }
       ]
     ],
     "extra": {
