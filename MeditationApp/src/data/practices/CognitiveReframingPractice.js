@@ -2597,12 +2597,12 @@ const styles = StyleSheet.create({
   },
   customSliderTrackBackground: {
     position: 'absolute',
-    top: 20,
+    top: 16,
     left: 0,
     right: 0,
-    height: 16,
+    height: 24,
     backgroundColor: '#DFE6E9',
-    borderRadius: 8,
+    borderRadius: 12,
     zIndex: 1,
     ...Platform.select({
       android: {
@@ -2614,11 +2614,11 @@ const styles = StyleSheet.create({
   },
   customSliderTrackFilled: {
     position: 'absolute',
-    top: 20,
+    top: 16,
     left: 0,
-    height: 16,
+    height: 24,
     backgroundColor: '#29B6F6',
-    borderRadius: 8,
+    borderRadius: 12,
     zIndex: 2,
     ...Platform.select({
       ios: {
@@ -2636,7 +2636,7 @@ const styles = StyleSheet.create({
   },
   slider: {
     width: '100%',
-    height: 56,
+    height: 64,
     position: 'relative',
     zIndex: 3,
   },
