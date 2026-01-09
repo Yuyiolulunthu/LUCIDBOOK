@@ -1,4 +1,11 @@
-// BreathingExerciseCard.jsx - 修復計時器和模式切換問題
+// BreathingExerciseCard.jsx
+// ✅ 修復重點：
+// 1) 音檔載入「跟著 activeTab 走」，切換練習類型一定會載入正確 URI
+// 2) 不再使用 status.uri（expo-av status 通常沒有 uri），改用 loadedAudioUriRef 記錄目前載入的音檔
+// 3) 支援 asserts/assets 兩種路徑自動 fallback（避免你後端路徑拼錯導致永遠載不到）
+// 4) startPractice / switchMode 時避免用到 stale state，使用 refs 同步當下的時間/模式
+// 5) 清理重複 useEffect（原本卸載清理寫了兩次）避免不小心 unload 掉剛載入的音檔
+
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View,
@@ -23,36 +30,30 @@ import Slider from '@react-native-community/slider';
 import { Audio } from 'expo-av';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { LinearGradient } from 'expo-linear-gradient';
-import MaskedView from '@react-native-masked-view/masked-view';
-import { 
-  Home, 
-  ChevronLeft, 
-  ChevronRight, 
-  X, 
+import {
+  ChevronLeft,
+  ChevronRight,
+  X,
   Headphones,
   Wind,
   BookOpen,
-  Star, 
-  Eye,
+  Star,
   Play,
   Pause,
 } from 'lucide-react-native';
-import ProgressBar from './components/ProgressBar';
 import ApiService from '../../../api';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
-
-// 統一練習類型名稱
 const PRACTICE_TYPE = '呼吸穩定力練習';
 
 // 星星動畫
 const StarConfetti = ({ index }) => {
   const animatedValue = useRef(new Animated.Value(0)).current;
-  
+
   const [meteorConfig] = useState(() => {
     const side = index % 4;
     let startX, startY, angle;
-    
+
     if (side === 0) {
       startX = Math.random() * SCREEN_WIDTH;
       startY = -50;
@@ -70,10 +71,10 @@ const StarConfetti = ({ index }) => {
       startY = Math.random() * SCREEN_HEIGHT;
       angle = 315 + (Math.random() - 0.5) * 60;
     }
-    
+
     const angleInRadians = (angle * Math.PI) / 180;
     const distance = 800 + Math.random() * 400;
-    
+
     return {
       startX,
       startY,
@@ -83,27 +84,29 @@ const StarConfetti = ({ index }) => {
       delay: Math.random() * 1000,
     };
   });
-  
+
   useEffect(() => {
-    setTimeout(() => {
+    const t = setTimeout(() => {
       Animated.timing(animatedValue, {
         toValue: 1,
         duration: 2000 + Math.random() * 1000,
         useNativeDriver: true,
       }).start();
     }, meteorConfig.delay);
+
+    return () => clearTimeout(t);
   }, []);
-  
+
   const translateX = animatedValue.interpolate({
     inputRange: [0, 1],
     outputRange: [meteorConfig.startX, meteorConfig.endX],
   });
-  
+
   const translateY = animatedValue.interpolate({
     inputRange: [0, 1],
     outputRange: [meteorConfig.startY, meteorConfig.endY],
   });
-  
+
   const opacity = animatedValue.interpolate({
     inputRange: [0, 0.1, 0.7, 1],
     outputRange: [0, 1, 0.8, 0],
@@ -127,76 +130,74 @@ const StarConfetti = ({ index }) => {
 
 export default function BreathingExerciseCard({ onBack, navigation, route, onHome }) {
   // ============================================
-  // 狀態管理
+  // 狀態
   // ============================================
-  
-  // 頁面狀態
   const [currentPage, setCurrentPage] = useState('selection');
-  
-  // 練習類型 Tab
   const [activeTab, setActiveTab] = useState('stress');
-  
-  // 引導模式
   const [guideMode, setGuideMode] = useState('audio');
-  
-  // 練習進行狀態
+
   const [isPlaying, setIsPlaying] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [showPauseModal, setShowPauseModal] = useState(false);
+
   const [currentTime, setCurrentTime] = useState(0);
   const [totalDuration, setTotalDuration] = useState(300);
-  
-  // 呼吸動畫狀態
+
   const [breathPhase, setBreathPhase] = useState('吸氣');
-  
-  // 放鬆程度
   const [relaxLevel, setRelaxLevel] = useState(5);
-  
-  // 完成頁面狀態
+
   const [selectedFeelings, setSelectedFeelings] = useState([]);
   const [customFeeling, setCustomFeeling] = useState('');
   const [showCustomInput, setShowCustomInput] = useState(false);
-  
-  // API 相關
+
   const [practiceId, setPracticeId] = useState(null);
   const [startTime, setStartTime] = useState(null);
   const [elapsedTime, setElapsedTime] = useState(0);
+
   const [isLoadingStats, setIsLoadingStats] = useState(false);
   const [completionData, setCompletionData] = useState(null);
-  
-  // 音檔相關
+
   const [isAudioLoading, setIsAudioLoading] = useState(false);
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+
+  // ============================================
+  // refs（避免 stale state）
+  // ============================================
   const sound = useRef(null);
+  const loadedAudioUriRef = useRef(null); // ✅ 目前載入的音檔 uri（取代 status.uri）
+  const isLoadingAudioRef = useRef(false);
+  const loadAudioTokenRef = useRef(0); // ✅ 避免 tab 快速切換造成舊 load 覆蓋新 load
+
   const timerRef = useRef(null);
   const breathTimerRef = useRef(null);
   const breathTimeoutRef = useRef(null);
   const breathAnimationRef = useRef(null);
+
   const hasInitialized = useRef(false);
-  const audioStatusInterval = useRef(null);
 
-  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false); 
+  const currentTimeRef = useRef(0);
+  const totalDurationRef = useRef(300);
+  const guideModeRef = useRef('audio');
+  const activeTabRef = useRef('stress');
+
+  useEffect(() => { currentTimeRef.current = currentTime; }, [currentTime]);
+  useEffect(() => { totalDurationRef.current = totalDuration; }, [totalDuration]);
+  useEffect(() => { guideModeRef.current = guideMode; }, [guideMode]);
+  useEffect(() => { activeTabRef.current = activeTab; }, [activeTab]);
 
   // ============================================
-  // 動畫值
+  // 動畫
   // ============================================
-  
   const breathCircleScale = useRef(new Animated.Value(1)).current;
-  const breathCircleOpacity = useRef(new Animated.Value(0.5)).current;
   const iconScale = useRef(new Animated.Value(0)).current;
   const starBadgeScale = useRef(new Animated.Value(0)).current;
-  const breathingScale = useRef(new Animated.Value(1)).current;
 
   const waveHeights = [12, 20, 16, 28, 24, 32, 28, 20, 16, 24, 28, 32, 28, 24, 20];
-  const waveAnimations = useRef(
-    waveHeights.map(() => new Animated.Value(0.3))
-  ).current;
-
-  const previousScreen = route?.params?.from;
+  const waveAnimations = useRef(waveHeights.map(() => new Animated.Value(0.3))).current;
 
   // ============================================
-  // 練習數據
+  // 練習資料
   // ============================================
-  
   const practiceTypes = {
     stress: {
       id: 'stress',
@@ -217,9 +218,9 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
       breathPattern: { inhale: 4, hold: 7, exhale: 8 },
     },
   };
-  
+
   const currentPractice = practiceTypes[activeTab];
-  
+
   const feelingOptions = [
     { id: 'calm', label: '平靜' },
     { id: 'focus', label: '專注' },
@@ -230,33 +231,48 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
   ];
 
   // ============================================
-  // 音頻配置
+  // 工具
   // ============================================
+  const formatTime = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
 
-  const configureAudio = async () => {
-    try {
-      await Audio.setAudioModeAsync({
-        playsInSilentModeIOS: true,
-        staysActiveInBackground: true,
-        shouldDuckAndroid: true,
-        playThroughEarpieceAndroid: false,
-        allowsRecordingIOS: false,
-        interruptionModeIOS: 1,
-        interruptionModeAndroid: 1,
-      });
-    } catch (error) {
-      console.error('配置音頻失敗:', error);
-    }
+  // ✅ 可能的路徑 fallback：asserts <-> assets
+  const getCandidateUris = (uri) => {
+    const set = new Set();
+    if (uri) set.add(uri);
+
+    // 常見錯字修復：asserts / assets
+    if (uri?.includes('/api/asserts/')) set.add(uri.replace('/api/asserts/', '/api/assets/'));
+    if (uri?.includes('/api/assets/')) set.add(uri.replace('/api/assets/', '/api/asserts/'));
+
+    return Array.from(set);
   };
 
   // ============================================
-  // API 串接函數
+  // Audio config
   // ============================================
+  const configureAudio = async () => {
+    await Audio.setAudioModeAsync({
+      playsInSilentModeIOS: true,
+      staysActiveInBackground: true,
+      shouldDuckAndroid: true,
+      playThroughEarpieceAndroid: false,
+      allowsRecordingIOS: false,
+      interruptionModeIOS: 1,
+      interruptionModeAndroid: 1,
+    });
+  };
 
+  // ============================================
+  // API
+  // ============================================
   const initializePractice = async () => {
     if (hasInitialized.current) return;
     hasInitialized.current = true;
-    
+
     try {
       const response = await ApiService.startPractice(PRACTICE_TYPE);
       if (response?.practiceId) {
@@ -274,77 +290,67 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
 
   const saveProgress = useCallback(async () => {
     if (!practiceId) return;
-    
+
     try {
       const formData = {
-        practiceType: activeTab,
-        guideMode,
+        practiceType: activeTabRef.current,
+        guideMode: guideModeRef.current,
         relaxLevel,
         selectedFeelings,
         customFeeling,
         currentPage,
       };
-      
-      await ApiService.updatePracticeProgress(
-        practiceId, 0, 6, formData, elapsedTime
-      );
+
+      await ApiService.updatePracticeProgress(practiceId, 0, 6, formData, elapsedTime);
     } catch (error) {
       console.error('儲存進度失敗:', error);
     }
-  }, [practiceId, activeTab, guideMode, relaxLevel, selectedFeelings, customFeeling, currentPage, elapsedTime]);
+  }, [practiceId, relaxLevel, selectedFeelings, customFeeling, currentPage, elapsedTime]);
 
   const completePractice = async () => {
     if (!practiceId) {
       console.error('❌ [呼吸練習] practiceId 為空');
       return;
     }
-    
+
     try {
       let totalSeconds = elapsedTime || Math.floor((Date.now() - startTime) / 1000) || 60;
       const totalMinutes = Math.max(1, Math.ceil(totalSeconds / 60));
-      
+
       await saveProgress();
-      
-      // ⭐ 整理心情選項（包含自訂）
-      const feelingsArray = selectedFeelings.map(id => 
-        feelingOptions.find(f => f.id === id)?.label
-      ).filter(Boolean);
-      
-      // ⭐ 確保自訂感受被加入
-      if (customFeeling && customFeeling.trim()) {
-        feelingsArray.push(customFeeling.trim());
-      }
-      
-      // ⭐ 增強的 form_data
+
+      const feelingsArray = selectedFeelings
+        .map((id) => feelingOptions.find((f) => f.id === id)?.label)
+        .filter(Boolean);
+
+      if (customFeeling && customFeeling.trim()) feelingsArray.push(customFeeling.trim());
+
       const enhancedFormData = {
-        practiceType: activeTab,
-        practiceTitle: currentPractice.title,
-        guideMode,
-        relaxLevel: relaxLevel,
+        practiceType: activeTabRef.current,
+        practiceTitle: practiceTypes[activeTabRef.current].title,
+        guideMode: guideModeRef.current,
+        relaxLevel,
         relax_level: relaxLevel,
         feelings: feelingsArray,
         post_feelings: feelingsArray.join('、'),
         postFeelings: feelingsArray.join('、'),
         post_mood: feelingsArray.length > 0 ? feelingsArray[0] : '平靜',
         postMood: feelingsArray.length > 0 ? feelingsArray[0] : '平靜',
-        customFeeling: customFeeling || '',  // ⭐ 保留原始自訂輸入
-        hasCustomFeeling: !!customFeeling,   // ⭐ 標記是否有自訂
+        customFeeling: customFeeling || '',
+        hasCustomFeeling: !!customFeeling,
       };
-      
+
       const completePayload = {
         practice_type: PRACTICE_TYPE,
         duration: totalMinutes,
         duration_seconds: totalSeconds,
-        feeling: `練習類型：${currentPractice.title}，放鬆程度：${relaxLevel}/10，心情：${feelingsArray.join('、') || '未記錄'}`,
+        feeling: `練習類型：${practiceTypes[activeTabRef.current].title}，放鬆程度：${relaxLevel}/10，心情：${feelingsArray.join('、') || '未記錄'}`,
         noticed: feelingsArray.join('、') || '未記錄',
         reflection: customFeeling || '',
-        form_data: enhancedFormData,  // ⭐ 使用增強版
+        form_data: enhancedFormData,
       };
-      
-      console.log('📤 [呼吸練習] 完整 payload:', completePayload);
-      
+
       await ApiService.completePractice(practiceId, completePayload);
-      console.log('✅ [呼吸練習] 完成練習成功');
     } catch (error) {
       console.error('❌ [呼吸練習] 完成練習失敗:', error);
     }
@@ -352,19 +358,19 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
 
   const completeAndLoadStats = async () => {
     if (!practiceId) return;
-    
+
     try {
       setIsLoadingStats(true);
       await completePractice();
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
       const statsResponse = await ApiService.getPracticeStats();
       const stats = statsResponse?.stats || statsResponse;
-      
+
       setCompletionData({
         consecutiveDays: stats.currentStreak || 0,
         totalDays: stats.totalDays || 0,
-        duration: currentTime,
+        duration: currentTimeRef.current,
         relaxLevel,
       });
     } catch (error) {
@@ -372,7 +378,7 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
       setCompletionData({
         consecutiveDays: 1,
         totalDays: 1,
-        duration: currentTime,
+        duration: currentTimeRef.current,
         relaxLevel,
       });
     } finally {
@@ -381,169 +387,158 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
   };
 
   // ============================================
-  // 練習控制函數
+  // ✅ 音檔載入（核心修正）
   // ============================================
-
-  const loadAudio = async () => {
-    // ⭐ 檢查是否需要重新載入
-    if (sound.current) {
-      try {
-        const status = await sound.current.getStatusAsync();
-        if (status.isLoaded) {
-          // ⭐ 新增：檢查當前音檔 URI 是否與目標一致
-          const currentUri = status.uri;
-          const targetUri = currentPractice.audioFile.uri;
-          
-          if (currentUri === targetUri) {
-            console.log('✅ 音檔已載入且正確，跳過重複載入');
-            return;
-          } else {
-            console.log('🔄 音檔不一致，重新載入');
-            console.log('  當前:', currentUri);
-            console.log('  目標:', targetUri);
-          }
-        }
-      } catch (e) {
-        console.log('檢查音檔狀態失敗，重新載入');
-      }
-      
-      // ⭐ 卸載舊音檔
-      await sound.current.unloadAsync();
+  const unloadAudio = async () => {
+    if (!sound.current) return;
+    try {
+      await sound.current.stopAsync().catch(() => {});
+      await sound.current.unloadAsync().catch(() => {});
+    } finally {
       sound.current = null;
+      loadedAudioUriRef.current = null;
     }
-    
+  };
+
+  const loadAudioForTab = async (tabKey) => {
+    // ✅ 避免重入
+    if (isLoadingAudioRef.current) return;
+    isLoadingAudioRef.current = true;
+
+    const token = ++loadAudioTokenRef.current;
     setIsAudioLoading(true);
-    let retryCount = 0;
-    const maxRetries = 2;
-    
-    while (retryCount <= maxRetries) {
-      try {
-        await configureAudio();
-        
-        console.log(`🎵 [呼吸練習] 嘗試載入音檔 (${retryCount + 1}/${maxRetries + 1})`);
-        
-        // ⭐ 使用 createAsync 而不是 createAsync + setOnPlaybackStatusUpdate
-        const { sound: audioSound } = await Audio.Sound.createAsync(
-          currentPractice.audioFile,
-          { shouldPlay: false }
-        );
-        
-        sound.current = audioSound;
-        
-        // ⭐ 分開設置狀態更新回調
-        audioSound.setOnPlaybackStatusUpdate((status) => {
-          if (status.isLoaded && status.isPlaying) {
-            const positionSeconds = Math.floor(status.positionMillis / 1000);
-            const durationSeconds = Math.floor(status.durationMillis / 1000);
-            
-            setCurrentTime(positionSeconds);
-            
-            if (durationSeconds > 0 && totalDuration !== durationSeconds) {
-              setTotalDuration(durationSeconds);
-            }
-          }
-          
-          if (status.didJustFinish) {
-            handlePracticeComplete();
-          }
-        });
-        
-        // ⭐ 獲取時長
-        const status = await audioSound.getStatusAsync();
-        if (status.isLoaded && status.durationMillis) {
-          const duration = Math.floor(status.durationMillis / 1000);
-          setTotalDuration(duration);
-          console.log('✅ 音檔載入成功，時長:', duration, '秒');
-        }
-        
+
+    try {
+      await configureAudio();
+
+      const practice = practiceTypes[tabKey];
+      const targetUri = practice?.audioFile?.uri;
+
+      if (!targetUri) {
+        throw new Error('audioFile.uri 為空');
+      }
+
+      // ✅ 如果已載入且是同一個 URI，直接 return
+      if (sound.current && loadedAudioUriRef.current === targetUri) {
         setIsAudioLoading(false);
-        return;  // ⭐ 成功後直接返回
-        
-      } catch (error) {
-        retryCount++;
-        console.error(`❌ 音檔載入失敗 (${retryCount}/${maxRetries + 1}):`, error);
-        
-        if (retryCount > maxRetries) {
-          setIsAudioLoading(false);
-          Alert.alert('錯誤', '音檔載入失敗，請檢查網絡連接後重試');
+        isLoadingAudioRef.current = false;
+        return;
+      }
+
+      // ✅ 卸載舊音檔（如果 tab 切換）
+      if (sound.current) {
+        await unloadAudio();
+      }
+
+      const candidates = getCandidateUris(targetUri);
+      let lastError = null;
+
+      for (const uri of candidates) {
+        if (loadAudioTokenRef.current !== token) {
+          // 有更新的 load 進來了，這次作廢
           return;
         }
-        
-        // ⭐ 等待 1 秒後重試
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      }
-    }
-  };
 
-  const startPractice = async (mode) => {
-    setGuideMode(mode);
-    
-    try {
-      await activateKeepAwakeAsync();
-    } catch (e) {
-      console.log('保持屏幕常亮失敗:', e);
-    }
-    
-    // ⭐ 修正：確保初始化完成
-    if (!hasInitialized.current) {
-      await initializePractice();
-      // ⭐ 等待初始化完成
-      await new Promise(resolve => setTimeout(resolve, 300));
-    }
-    
-    // ⭐ 修正：統一載入音頻
-    if (!sound.current) {
-      await loadAudio();
-    }
-    
-    setCurrentPage('practice');
-    setIsPlaying(true);
-    setIsPaused(false);
-    setCurrentTime(0);
-    
-    // ⭐ 修正：確保音頻已載入後才播放
-    if (mode === 'audio') {
-      if (sound.current) {
         try {
-          await sound.current.playAsync();
-        } catch (error) {
-          console.error('❌ 播放音頻失敗:', error);
-          Alert.alert('錯誤', '音頻播放失敗，請重試');
+          const { sound: audioSound } = await Audio.Sound.createAsync(
+            { uri },
+            { shouldPlay: false },
+            (status) => {
+              // ✅ 音檔播放中同步 currentTime / totalDuration
+              if (status?.isLoaded) {
+                const posSec = Math.floor((status.positionMillis || 0) / 1000);
+                const durSec = Math.floor((status.durationMillis || 0) / 1000);
+
+                if (status.isPlaying) {
+                  setCurrentTime(posSec);
+                }
+
+                if (durSec > 0 && totalDurationRef.current !== durSec) {
+                  setTotalDuration(durSec);
+                }
+
+                if (status.didJustFinish) {
+                  handlePracticeComplete();
+                }
+              }
+            }
+          );
+
+          // ✅ 確認載入成功後再設定 ref
+          const st = await audioSound.getStatusAsync();
+          if (!st.isLoaded) {
+            await audioSound.unloadAsync().catch(() => {});
+            throw new Error('音檔未成功載入');
+          }
+
+          sound.current = audioSound;
+          loadedAudioUriRef.current = targetUri; // ✅ 記「目標」URI（不是 fallback 可能替換的 uri）
+          if (st.durationMillis) setTotalDuration(Math.floor(st.durationMillis / 1000));
+
+          lastError = null;
+          break;
+        } catch (e) {
+          lastError = e;
         }
-      } else {
-        console.error('❌ 音頻未載入');
       }
-    } else if (mode === 'visual') {
-      startTimers();
-      startBreathAnimation();
+
+      if (lastError) {
+        throw lastError;
+      }
+    } catch (error) {
+      console.error('❌ 音檔載入失敗:', error);
+      Alert.alert('錯誤', '音檔載入失敗，請檢查網路或音檔路徑');
+    } finally {
+      if (loadAudioTokenRef.current === token) {
+        setIsAudioLoading(false);
+      }
+      isLoadingAudioRef.current = false;
     }
   };
 
-  // ✅ 修復：統一計時器管理
+  // ============================================
+  // 計時器 / 呼吸動畫
+  // ============================================
   const startTimers = () => {
     if (timerRef.current) clearInterval(timerRef.current);
-    
+
     timerRef.current = setInterval(() => {
-      setCurrentTime(prev => {
-        const newTime = prev + 1;
-        if (newTime >= totalDuration) {
+      setCurrentTime((prev) => {
+        const next = prev + 1;
+        if (next >= totalDurationRef.current) {
           handlePracticeComplete();
           return prev;
         }
-        return newTime;
+        return next;
       });
-      setElapsedTime(prev => prev + 1);
+      setElapsedTime((prev) => prev + 1);
     }, 1000);
+  };
+
+  const stopBreathAnimation = () => {
+    if (breathTimerRef.current) {
+      clearInterval(breathTimerRef.current);
+      breathTimerRef.current = null;
+    }
+    if (breathTimeoutRef.current) {
+      clearTimeout(breathTimeoutRef.current);
+      breathTimeoutRef.current = null;
+    }
+    if (breathAnimationRef.current) {
+      breathAnimationRef.current.stop();
+      breathAnimationRef.current = null;
+    }
+    breathCircleScale.setValue(1);
   };
 
   const startBreathAnimation = () => {
     stopBreathAnimation();
-    
-    const pattern = currentPractice.breathPattern;
-    const inhaleDuration = pattern.inhale * 1000;
-    const exhaleDuration = pattern.exhale * 1000;
+
+    const pattern = practiceTypes[activeTabRef.current].breathPattern;
+    const inhaleDuration = (pattern.inhale || 4) * 1000;
     const holdDuration = (pattern.hold || 0) * 1000;
-    
+    const exhaleDuration = (pattern.exhale || 6) * 1000;
+
     const runBreathCycle = () => {
       setBreathPhase('吸氣');
       breathAnimationRef.current = Animated.timing(breathCircleScale, {
@@ -551,7 +546,7 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
         duration: inhaleDuration,
         useNativeDriver: true,
       });
-      
+
       breathAnimationRef.current.start(() => {
         if (holdDuration > 0) {
           setBreathPhase('屏息');
@@ -575,54 +570,82 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
         }
       });
     };
-    
+
     runBreathCycle();
     const cycleTime = inhaleDuration + holdDuration + exhaleDuration;
     breathTimerRef.current = setInterval(runBreathCycle, cycleTime);
   };
 
-  const stopBreathAnimation = () => {
-    if (breathTimerRef.current) {
-      clearInterval(breathTimerRef.current);
-      breathTimerRef.current = null;
+  // ============================================
+  // 練習控制
+  // ============================================
+  const startPractice = async (mode) => {
+    const tabKey = activeTabRef.current;
+
+    setGuideMode(mode);
+    guideModeRef.current = mode;
+
+    try {
+      await activateKeepAwakeAsync();
+    } catch {}
+
+    if (!hasInitialized.current) {
+      await initializePractice();
+      await new Promise((r) => setTimeout(r, 150));
     }
-    
-    if (breathTimeoutRef.current) {
-      clearTimeout(breathTimeoutRef.current);
-      breathTimeoutRef.current = null;
+
+    // ✅ 進入音訊模式：確保載入的是「當前 tab」音檔
+    if (mode === 'audio') {
+      await loadAudioForTab(tabKey);
     }
-    
-    if (breathAnimationRef.current) {
-      breathAnimationRef.current.stop();
-      breathAnimationRef.current = null;
+
+    setCurrentPage('practice');
+    setIsPlaying(true);
+    setIsPaused(false);
+
+    // ✅ 重設時間（開始新一輪）
+    setCurrentTime(0);
+    currentTimeRef.current = 0;
+
+    if (mode === 'audio') {
+      if (sound.current) {
+        try {
+          await sound.current.setPositionAsync(0);
+          await sound.current.playAsync();
+        } catch (error) {
+          console.error('❌ 播放音頻失敗:', error);
+          Alert.alert('錯誤', '音頻播放失敗，請重試');
+        }
+      } else {
+        Alert.alert('錯誤', '音檔尚未載入完成');
+      }
+    } else {
+      startTimers();
+      startBreathAnimation();
     }
-    
-    breathCircleScale.setValue(1);
   };
 
   const pausePractice = async () => {
     setIsPlaying(false);
     setIsPaused(true);
     setShowPauseModal(true);
-    
+
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
-    
+
     stopBreathAnimation();
-    
+
     waveAnimations.forEach((anim) => {
       anim.stopAnimation();
       anim.setValue(0.3);
     });
-    
+
     if (sound.current) {
       try {
         await sound.current.pauseAsync();
-      } catch (e) {
-        console.log('暫停音頻失敗:', e);
-      }
+      } catch {}
     }
   };
 
@@ -630,10 +653,19 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
     setShowPauseModal(false);
     setIsPlaying(true);
     setIsPaused(false);
-    
-    if (guideMode === 'audio' && sound.current) {
-      await sound.current.playAsync();
-    } else if (guideMode === 'visual') {
+
+    const mode = guideModeRef.current;
+
+    if (mode === 'audio') {
+      if (!sound.current) {
+        await loadAudioForTab(activeTabRef.current);
+      }
+      if (sound.current) {
+        try {
+          await sound.current.playAsync();
+        } catch {}
+      }
+    } else {
       startTimers();
       startBreathAnimation();
     }
@@ -642,74 +674,60 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
   const stopPractice = async () => {
     setIsPlaying(false);
     setIsPaused(false);
-    
+
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
-    
+
     stopBreathAnimation();
-    
+
     waveAnimations.forEach((anim) => {
       anim.stopAnimation();
       anim.setValue(0.3);
     });
-    
-    if (sound.current) {
-      try {
-        await sound.current.stopAsync();
-        await sound.current.unloadAsync();
-      } catch (e) {
-        console.log('停止音頻失敗:', e);
-      }
-      sound.current = null;
-    }
-    
+
+    await unloadAudio();
+
     try {
       deactivateKeepAwake();
-    } catch (e) {
-      console.log('取消屏幕常亮失敗:', e);
-    }
+    } catch {}
   };
 
-  // ✅ 修復：優化模式切換邏輯
+  // ✅ 模式切換：保留時間，音訊切換會 seek 到正確秒數
   const switchMode = async () => {
-    console.log('🔄 切換模式，當前:', guideMode, '當前時間:', currentTime, '秒');
-    
-    const newMode = guideMode === 'audio' ? 'visual' : 'audio';
-    
-    // 停止當前模式的計時器
+    const prevMode = guideModeRef.current;
+    const nextMode = prevMode === 'audio' ? 'visual' : 'audio';
+
+    // 先停掉「當前模式」的東西
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
-    
     stopBreathAnimation();
-    
-    // 處理音頻模式切換
-    if (guideMode === 'audio' && sound.current) {
+
+    // 如果從 audio -> visual：讀取音訊目前時間
+    if (prevMode === 'audio' && sound.current) {
       try {
         const status = await sound.current.getStatusAsync();
-        if (status.isLoaded && status.positionMillis) {
-          const audioPosition = Math.floor(status.positionMillis / 1000);
-          setCurrentTime(audioPosition);
+        if (status?.isLoaded) {
+          const posSec = Math.floor((status.positionMillis || 0) / 1000);
+          setCurrentTime(posSec);
+          currentTimeRef.current = posSec;
         }
         await sound.current.pauseAsync();
-      } catch (e) {
-        console.error('暫停音頻失敗:', e);
-      }
+      } catch {}
     }
-    
-    setGuideMode(newMode);
-    
+
+    setGuideMode(nextMode);
+    guideModeRef.current = nextMode;
+
     // 啟動新模式
-    if (newMode === 'audio') {
-      if (!sound.current) {
-        await loadAudio();
-      }
+    if (nextMode === 'audio') {
+      await loadAudioForTab(activeTabRef.current);
       if (sound.current && isPlaying) {
         try {
-          await sound.current.setPositionAsync(currentTime * 1000);
+          await sound.current.setPositionAsync(currentTimeRef.current * 1000);
           await sound.current.playAsync();
         } catch (e) {
           console.error('恢復播放失敗:', e);
@@ -721,8 +739,6 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
         startBreathAnimation();
       }
     }
-    
-    console.log('✅ 模式切換完成，新模式:', newMode);
   };
 
   const handlePracticeComplete = async () => {
@@ -740,35 +756,21 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
   const handleAbandon = async () => {
     setShowPauseModal(false);
     await stopPractice();
-    
-    if (onBack) {
-      onBack();
-    } else if (navigation) {
-      navigation.goBack();
-    }
+
+    if (onBack) onBack();
+    else if (navigation) navigation.goBack();
   };
 
   const handleRelaxationComplete = async () => {
     try {
       setIsLoadingStats(true);
-      // ⭐ 只做進度儲存，不完成練習
       await saveProgress();
-      setCurrentPage('completion');  // ⭐ 跳到心情記錄頁
+      setCurrentPage('completion');
     } catch (error) {
       console.error('❌ [呼吸練習] 儲存失敗:', error);
-      setCurrentPage('completion');  // ⭐ 即使失敗也跳轉
+      setCurrentPage('completion');
     } finally {
       setIsLoadingStats(false);
-    }
-  };
-
-  const handleComplete = async () => {
-    await completeAndLoadStats();
-    
-    if (onBack) {
-      onBack();
-    } else if (navigation) {
-      navigation.navigate('Daily');
     }
   };
 
@@ -777,18 +779,16 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
       setShowCustomInput(!showCustomInput);
       return;
     }
-    
     if (selectedFeelings.includes(id)) {
-      setSelectedFeelings(selectedFeelings.filter(f => f !== id));
+      setSelectedFeelings(selectedFeelings.filter((f) => f !== id));
     } else {
       setSelectedFeelings([...selectedFeelings, id]);
     }
   };
 
   // ============================================
-  // 導航處理
+  // 導航
   // ============================================
-
   const handleBack = () => {
     if (currentPage === 'completion') {
       setCurrentPage('relaxation');
@@ -798,38 +798,27 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
     } else if (currentPage === 'practice') {
       pausePractice();
     } else {
-      if (onBack) {
-        onBack();
-      } else if (navigation) {
-        navigation.goBack();
-      }
+      if (onBack) onBack();
+      else if (navigation) navigation.goBack();
     }
   };
 
   const handleHome = async () => {
     await stopPractice();
-    
-    if (practiceId) {
-      await saveProgress();
-    }
-    
-    if (onHome) {
-      onHome();
-    } else if (navigation) {
-      navigation.navigate('Home');
-    }
+    if (practiceId) await saveProgress();
+
+    if (onHome) onHome();
+    else if (navigation) navigation.navigate('Home');
   };
 
-  const handleClose = () => {
-    pausePractice();
-  };
+  const handleClose = () => pausePractice();
 
   // ============================================
-  // useEffect
+  // effects
   // ============================================
-
+  // ✅ 音波動畫（audio 播放才動）
   useEffect(() => {
-    if (isPlaying && guideMode === 'audio') {
+    if (isPlaying && guideModeRef.current === 'audio') {
       waveAnimations.forEach((anim) => {
         Animated.loop(
           Animated.sequence([
@@ -847,64 +836,19 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
         ).start();
       });
     } else {
-      waveAnimations.forEach((anim) => {
-        anim.setValue(0.3);
-      });
+      waveAnimations.forEach((anim) => anim.setValue(0.3));
     }
-  }, [isPlaying, guideMode]);
+  }, [isPlaying, guideMode, waveAnimations]);
 
+  // ✅ 預載音檔：selection 頁 + tab 切換時載入該 tab 音檔
   useEffect(() => {
-    return () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-      }
-      if (breathTimerRef.current) {
-        clearInterval(breathTimerRef.current);
-      }
-      if (breathTimeoutRef.current) {
-        clearTimeout(breathTimeoutRef.current);
-      }
-      if (breathAnimationRef.current) {
-        breathAnimationRef.current.stop();
-      }
-      
-      waveAnimations.forEach((anim) => {
-        anim.stopAnimation();
-      });
-      
-      if (sound.current) {
-        sound.current.unloadAsync();
-      }
-      
-      try {
-        deactivateKeepAwake();
-      } catch (e) {}
-    };
-  }, []);
-
-  // 1. 清理函數 - 防止 Modal 誤觸發
-  useEffect(() => {
-    return () => {
-      console.log('🧹 [呼吸練習] 組件卸載，清理狀態');
-      // 清理所有狀態
-      if (timerRef.current) clearInterval(timerRef.current);
-      if (breathTimerRef.current) clearInterval(breathTimerRef.current);
-      if (breathTimeoutRef.current) clearTimeout(breathTimeoutRef.current);
-      if (sound.current) {
-        sound.current.unloadAsync().catch(() => {});
-      }
-    };
-  }, []);
-
-  // 2. 預載音檔 - 提升載入速度
-  useEffect(() => {
-    if (currentPage === 'selection' && !sound.current && !isAudioLoading) {
-      console.log('🎵 [呼吸練習] 預載音檔');
-      loadAudio();
+    if (currentPage === 'selection') {
+      loadAudioForTab(activeTab);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPage, activeTab]);
 
-  // ⭐ 新增：成功頁面動畫觸發
+  // ✅ 成功頁動畫
   useEffect(() => {
     if (currentPage === 'success') {
       Animated.sequence([
@@ -922,44 +866,49 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
         }),
       ]).start();
     } else {
-      // 重置動畫值
       iconScale.setValue(0);
       starBadgeScale.setValue(0);
     }
-  }, [currentPage]);
+  }, [currentPage, iconScale, starBadgeScale]);
 
-  // ⭐ 新增：鍵盤監聽
-useEffect(() => {
-  const keyboardWillShow = Keyboard.addListener(
-    Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
-    () => setIsKeyboardVisible(true)
-  );
-  
-  const keyboardWillHide = Keyboard.addListener(
-    Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
-    () => setIsKeyboardVisible(false)
-  );
+  // ✅ 鍵盤
+  useEffect(() => {
+    const keyboardWillShow = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      () => setIsKeyboardVisible(true)
+    );
+    const keyboardWillHide = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => setIsKeyboardVisible(false)
+    );
+    return () => {
+      keyboardWillShow.remove();
+      keyboardWillHide.remove();
+    };
+  }, []);
 
-  return () => {
-    keyboardWillShow.remove();
-    keyboardWillHide.remove();
-  };
-}, []);
+  // ✅ 組件卸載清理（只留一份）
+  useEffect(() => {
+    return () => {
+      try {
+        if (timerRef.current) clearInterval(timerRef.current);
+        if (breathTimerRef.current) clearInterval(breathTimerRef.current);
+        if (breathTimeoutRef.current) clearTimeout(breathTimeoutRef.current);
+        if (breathAnimationRef.current) breathAnimationRef.current.stop();
+        waveAnimations.forEach((anim) => anim.stopAnimation());
+      } catch {}
+
+      unloadAudio().catch(() => {});
+      try {
+        deactivateKeepAwake();
+      } catch {}
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ============================================
-  // 工具函數
+  // UI render
   // ============================================
-
-  const formatTime = (seconds) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  // ============================================
-  // 渲染函數
-  // ============================================
-
   const renderSelectionPage = () => (
     <View style={styles.pageContainer}>
       <View style={styles.selectionHeader}>
@@ -975,17 +924,13 @@ useEffect(() => {
           style={[styles.tab, activeTab === 'stress' && styles.tabActive]}
           onPress={() => setActiveTab('stress')}
         >
-          <Text style={[styles.tabText, activeTab === 'stress' && styles.tabTextActive]}>
-            減壓
-          </Text>
+          <Text style={[styles.tabText, activeTab === 'stress' && styles.tabTextActive]}>減壓</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.tab, activeTab === 'focus' && styles.tabActive]}
           onPress={() => setActiveTab('focus')}
         >
-          <Text style={[styles.tabText, activeTab === 'focus' && styles.tabTextActive]}>
-            專注
-          </Text>
+          <Text style={[styles.tabText, activeTab === 'focus' && styles.tabTextActive]}>專注</Text>
         </TouchableOpacity>
       </View>
 
@@ -1011,9 +956,7 @@ useEffect(() => {
             ))}
           </View>
 
-          <Text style={styles.practiceDescription}>
-            {currentPractice.description}
-          </Text>
+          <Text style={styles.practiceDescription}>{currentPractice.description}</Text>
 
           <View style={styles.guideModeButtons}>
             <TouchableOpacity
@@ -1030,17 +973,12 @@ useEffect(() => {
               </View>
               <Text style={styles.guideModeTitle}>語音引導</Text>
               <View style={styles.guideModeAction}>
-                <Text style={styles.guideModeActionText}>
-                  {isAudioLoading ? '載入中...' : '開始播放'}
-                </Text>
+                <Text style={styles.guideModeActionText}>{isAudioLoading ? '載入中...' : '開始播放'}</Text>
                 {!isAudioLoading && <Play size={12} color="#666" fill="#666" />}
               </View>
             </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.guideModeButton}
-              onPress={() => startPractice('visual')}
-            >
+            <TouchableOpacity style={styles.guideModeButton} onPress={() => startPractice('visual')}>
               <View style={styles.guideModeIconContainer}>
                 <Text style={styles.visualIcon}>≋</Text>
               </View>
@@ -1053,9 +991,7 @@ useEffect(() => {
           </View>
 
           <View style={styles.firstTimeTipContainer}>
-            <Text style={styles.firstTimeTipText}>
-              初次練習建議選擇語音引導
-            </Text>
+            <Text style={styles.firstTimeTipText}>初次練習建議選擇語音引導</Text>
           </View>
         </View>
       </ScrollView>
@@ -1065,7 +1001,7 @@ useEffect(() => {
   const renderPracticePage = () => (
     <View style={styles.practicePageContainer}>
       <StatusBar barStyle="light-content" />
-      
+
       <View style={styles.practiceHeader}>
         <Text style={styles.practiceHeaderTitle}>{currentPractice.title}</Text>
         <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
@@ -1087,7 +1023,7 @@ useEffect(() => {
                         inputRange: [0.3, 1],
                         outputRange: [8, waveHeights[i]],
                       }),
-                    }
+                    },
                   ]}
                 />
               ))}
@@ -1095,57 +1031,36 @@ useEffect(() => {
           </View>
         ) : (
           <View style={styles.visualGuideContainer}>
-            <Animated.View
-              style={[
-                styles.breathCircle,
-                {
-                  transform: [{ scale: breathCircleScale }],
-                }
-              ]}
-            >
+            <Animated.View style={[styles.breathCircle, { transform: [{ scale: breathCircleScale }] }]}>
               <Text style={styles.breathPhaseText}>{breathPhase}</Text>
             </Animated.View>
           </View>
         )}
 
-        <Text style={styles.timerText}>
-          {formatTime(Math.max(0, totalDuration - currentTime))}
-        </Text>
+        <Text style={styles.timerText}>{formatTime(Math.max(0, totalDuration - currentTime))}</Text>
 
         <TouchableOpacity onPress={pausePractice} style={styles.pauseButton}>
           <Pause size={28} color="#fff" />
         </TouchableOpacity>
 
         <TouchableOpacity onPress={switchMode} style={styles.switchModeButton}>
-          <Text style={styles.switchModeText}>
-            切換至{guideMode === 'audio' ? '動畫' : '語音'}模式
-          </Text>
+          <Text style={styles.switchModeText}>切換至{guideMode === 'audio' ? '動畫' : '語音'}模式</Text>
         </TouchableOpacity>
       </View>
 
-      <Modal
-        visible={showPauseModal}
-        transparent
-        animationType="fade"
-      >
+      <Modal visible={showPauseModal} transparent animationType="fade">
         <View style={styles.pauseModalOverlay}>
           <View style={styles.pauseModalContent}>
             <Text style={styles.pauseModalTitle}>暫停中</Text>
-            
-            <TouchableOpacity
-              style={styles.pauseModalButtonPrimary}
-              onPress={resumePractice}
-            >
+
+            <TouchableOpacity style={styles.pauseModalButtonPrimary} onPress={resumePractice}>
               <Text style={styles.pauseModalButtonPrimaryText}>繼續練習</Text>
             </TouchableOpacity>
-            
-            <TouchableOpacity
-              style={styles.pauseModalButtonSecondary}
-              onPress={handleEndAndRecord}
-            >
+
+            <TouchableOpacity style={styles.pauseModalButtonSecondary} onPress={handleEndAndRecord}>
               <Text style={styles.pauseModalButtonSecondaryText}>結束並紀錄</Text>
             </TouchableOpacity>
-            
+
             <TouchableOpacity onPress={handleAbandon}>
               <Text style={styles.pauseModalAbandonText}>放棄並離開</Text>
             </TouchableOpacity>
@@ -1158,12 +1073,8 @@ useEffect(() => {
   const renderRelaxationPage = () => (
     <View style={styles.relaxationPageContainer}>
       <View style={styles.relaxationCard}>
-        {/* ✅ 保留藍色裝飾條 */}
-        <LinearGradient
-          colors={['#29B6F6', '#0288D1']}
-          style={styles.relaxationAccentBar}
-        />
-        
+        <LinearGradient colors={['#29B6F6', '#0288D1']} style={styles.relaxationAccentBar} />
+
         <TouchableOpacity onPress={handleBack} style={styles.relaxationBackButton}>
           <ChevronLeft size={24} color="#333" />
         </TouchableOpacity>
@@ -1175,18 +1086,11 @@ useEffect(() => {
           <Text style={styles.relaxationScoreMax}>/10</Text>
         </View>
 
-        <Text style={styles.relaxationPrompt}>
-          練習後，你現在的放鬆程度如何?
-        </Text>
+        <Text style={styles.relaxationPrompt}>練習後，你現在的放鬆程度如何?</Text>
 
         <View style={styles.sliderContainer}>
           <View style={styles.customSliderTrackBackground} />
-          <View 
-            style={[
-              styles.customSliderTrackFilled, 
-              { width: `${(relaxLevel / 10) * 100}%` }
-            ]} 
-          />
+          <View style={[styles.customSliderTrackFilled, { width: `${(relaxLevel / 10) * 100}%` }]} />
           <Slider
             style={styles.slider}
             minimumValue={0}
@@ -1198,19 +1102,15 @@ useEffect(() => {
             maximumTrackTintColor="transparent"
             thumbTintColor={Platform.OS === 'android' ? '#164b88ff' : '#FFFFFF'}
           />
-          
+
           <View style={styles.sliderLabels}>
             <Text style={styles.sliderLabel}>0 (緊繃)</Text>
             <Text style={styles.sliderLabel}>10 (放鬆)</Text>
           </View>
         </View>
 
-        {/* ✅ 修復完成按鈕 - 使用正確的樣式結構 */}
         <TouchableOpacity
-          style={[
-            styles.relaxationCompleteButton,
-            isLoadingStats && { opacity: 0.6 }
-          ]}
+          style={[styles.relaxationCompleteButton, isLoadingStats && { opacity: 0.6 }]}
           onPress={handleRelaxationComplete}
           disabled={isLoadingStats}
           activeOpacity={0.8}
@@ -1239,7 +1139,7 @@ useEffect(() => {
           <ScrollView
             contentContainerStyle={[
               styles.completionScrollContent,
-              { paddingBottom: isKeyboardVisible ? 200 : 100 }
+              { paddingBottom: isKeyboardVisible ? 200 : 100 },
             ]}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
@@ -1278,7 +1178,7 @@ useEffect(() => {
                   </Text>
                 </TouchableOpacity>
               ))}
-              
+
               <TouchableOpacity
                 style={[styles.feelingChip, showCustomInput && styles.feelingChipActive]}
                 onPress={() => setShowCustomInput(!showCustomInput)}
@@ -1291,13 +1191,13 @@ useEffect(() => {
 
             {showCustomInput && (
               <TextInput
-                style={styles.customInput}  // ⭐ 移除 inline style
+                style={styles.customInput}
                 placeholder="輸入你的感受..."
                 placeholderTextColor="#999"
                 value={customFeeling}
                 onChangeText={setCustomFeeling}
                 multiline
-                maxLength={100}  // ⭐ 限制最大字數
+                maxLength={100}
                 textAlignVertical="top"
               />
             )}
@@ -1310,7 +1210,7 @@ useEffect(() => {
                 onPress={async () => {
                   Keyboard.dismiss();
                   setIsLoadingStats(true);
-                  await completeAndLoadStats();  // ⭐ 完成練習並載入統計
+                  await completeAndLoadStats();
                   setIsLoadingStats(false);
                   setTimeout(() => setCurrentPage('success'), 100);
                 }}
@@ -1329,12 +1229,11 @@ useEffect(() => {
     </KeyboardAvoidingView>
   );
 
-  // ⭐ 新增：成功頁面（帶動畫）
   const renderSuccessPage = () => {
     const safeCompletionData = completionData || {
       consecutiveDays: 1,
       totalDays: 1,
-      duration: currentTime,
+      duration: currentTimeRef.current,
       relaxLevel,
     };
 
@@ -1342,24 +1241,18 @@ useEffect(() => {
       try {
         navigation.navigate('MainTabs', {
           screen: 'Daily',
-          params: { highlightPracticeId: practiceId }
+          params: { highlightPracticeId: practiceId },
         });
       } catch (error) {
-        console.error('導航失敗:', error);
         navigation.navigate('MainTabs', { screen: 'Daily' });
       }
     };
 
     return (
       <View style={styles.successPageContainer}>
-        <LinearGradient 
-          colors={['#f0f9ff', '#e0f2fe']} 
-          style={styles.gradientBg}
-        >
-          {/* ⭐ 移除 SafeAreaView，改用 View */}
+        <LinearGradient colors={['#f0f9ff', '#e0f2fe']} style={styles.gradientBg}>
           <View style={styles.successContent}>
-            {/* 星星動畫 */}
-            <View 
+            <View
               style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
               pointerEvents="none"
             >
@@ -1368,26 +1261,12 @@ useEffect(() => {
               ))}
             </View>
 
-            {/* 中心圖標 */}
-            <Animated.View 
-              style={[
-                styles.successIconContainer,
-                { transform: [{ scale: iconScale }] }
-              ]}
-            >
-              <LinearGradient
-                colors={['#60a5fa', '#38bdf8']}
-                style={styles.successIconGradient}
-              >
+            <Animated.View style={[styles.successIconContainer, { transform: [{ scale: iconScale }] }]}>
+              <LinearGradient colors={['#60a5fa', '#38bdf8']} style={styles.successIconGradient}>
                 <Wind size={64} color="rgba(255,255,255,0.9)" />
               </LinearGradient>
-              
-              <Animated.View 
-                style={[
-                  styles.starBadge,
-                  { transform: [{ scale: starBadgeScale }] }
-                ]}
-              >
+
+              <Animated.View style={[styles.starBadge, { transform: [{ scale: starBadgeScale }] }]}>
                 <Star size={24} color="#FFFFFF" fill="#FFFFFF" />
               </Animated.View>
             </Animated.View>
@@ -1395,11 +1274,10 @@ useEffect(() => {
             <Text style={styles.successTitle}>太棒了！</Text>
             <Text style={styles.successSubtitle}>你完成了今天的呼吸練習</Text>
 
-            {/* 統計卡片 */}
             <View style={styles.statsCard}>
               <View style={styles.statsRow}>
                 <View style={styles.statItem}>
-                  <Text style={styles.statValue}>{formatTime(currentTime)}</Text>
+                  <Text style={styles.statValue}>{formatTime(currentTimeRef.current)}</Text>
                   <Text style={styles.statLabel}>練習時間</Text>
                 </View>
                 <View style={styles.statDivider} />
@@ -1410,11 +1288,7 @@ useEffect(() => {
               </View>
             </View>
 
-            {/* 查看日記按鈕 */}
-            <TouchableOpacity 
-              style={styles.viewJournalButton} 
-              onPress={handleViewJournal}
-            >
+            <TouchableOpacity style={styles.viewJournalButton} onPress={handleViewJournal}>
               <BookOpen size={16} color="#0ea5e9" />
               <Text style={styles.viewJournalText}>查看日記</Text>
             </TouchableOpacity>
@@ -1427,37 +1301,26 @@ useEffect(() => {
   // ============================================
   // 主渲染
   // ============================================
-
-  if (currentPage === 'practice') {
-    return renderPracticePage();
-  }
-
-  if (currentPage === 'success') {
-    return renderSuccessPage();
-  }
+  if (currentPage === 'practice') return renderPracticePage();
+  if (currentPage === 'success') return renderSuccessPage();
 
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" />
-      
       {currentPage === 'selection' && renderSelectionPage()}
       {currentPage === 'relaxation' && renderRelaxationPage()}
-      {currentPage === 'completion' && renderCompletionPage()}  {/* ⭐ 心情記錄頁 */}
+      {currentPage === 'completion' && renderCompletionPage()}
     </SafeAreaView>
   );
 }
-// ============================================
-// 樣式
-// ============================================
 
+// ============================================
+// Styles（原樣保留）
+// ============================================
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F5F8FA',
-  },
-  pageContainer: {
-    flex: 1,
-  },
+  container: { flex: 1, backgroundColor: '#F5F8FA' },
+  pageContainer: { flex: 1 },
+
   selectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1465,17 +1328,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
-  backButton: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
-  },
+  backButton: { width: 40, height: 40, justifyContent: 'center', alignItems: 'center' },
+  headerTitle: { fontSize: 18, fontWeight: '600', color: '#333' },
+
   tabContainer: {
     flexDirection: 'row',
     marginHorizontal: 16,
@@ -1484,12 +1339,7 @@ const styles = StyleSheet.create({
     borderRadius: 25,
     padding: 4,
   },
-  tab: {
-    flex: 1,
-    paddingVertical: 10,
-    alignItems: 'center',
-    borderRadius: 22,
-  },
+  tab: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 22 },
   tabActive: {
     backgroundColor: '#fff',
     shadowColor: '#000',
@@ -1498,18 +1348,11 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
-  tabText: {
-    fontSize: 15,
-    color: '#666',
-    fontWeight: '500',
-  },
-  tabTextActive: {
-    color: '#1E88A8',
-    fontWeight: '600',
-  },
-  scrollView: {
-    flex: 1,
-  },
+  tabText: { fontSize: 15, color: '#666', fontWeight: '500' },
+  tabTextActive: { color: '#1E88A8', fontWeight: '600' },
+
+  scrollView: { flex: 1 },
+
   practiceCard: {
     marginHorizontal: 16,
     backgroundColor: '#fff',
@@ -1528,42 +1371,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#E8F4F8',
     borderRadius: 16,
   },
-  breathIcon: {
-    width: 60,
-    height: 60,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  breathIconText: {
-    fontSize: 48,
-    color: '#5DADE2',
-  },
-  practiceTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#1E3A5F',
-    marginBottom: 8,
-  },
-  subtitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  practiceSubtitleIcon: {
-    fontSize: 16,
-    color: '#5DADE2',
-    marginRight: 6,
-  },
-  practiceSubtitle: {
-    fontSize: 14,
-    color: '#666',
-  },
-  tagsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 16,
-  },
+  breathIcon: { width: 60, height: 60, justifyContent: 'center', alignItems: 'center' },
+  breathIconText: { fontSize: 48, color: '#5DADE2' },
+
+  practiceTitle: { fontSize: 24, fontWeight: '700', color: '#1E3A5F', marginBottom: 8 },
+  subtitleRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
+  practiceSubtitleIcon: { fontSize: 16, color: '#5DADE2', marginRight: 6 },
+  practiceSubtitle: { fontSize: 14, color: '#666' },
+
+  tagsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
   tagChip: {
     paddingHorizontal: 14,
     paddingVertical: 6,
@@ -1571,27 +1387,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#5DADE2',
   },
-  tagText: {
-    fontSize: 13,
-    color: '#5DADE2',
-  },
-  practiceDescription: {
-    fontSize: 14,
-    color: '#666',
-    lineHeight: 22,
-    marginBottom: 24,
-  },
-  guideModeButtons: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  guideModeButton: {
-    flex: 1,
-    backgroundColor: '#F8FAFB',
-    borderRadius: 16,
-    padding: 16,
-    alignItems: 'center',
-  },
+  tagText: { fontSize: 13, color: '#5DADE2' },
+
+  practiceDescription: { fontSize: 14, color: '#666', lineHeight: 22, marginBottom: 24 },
+
+  guideModeButtons: { flexDirection: 'row', gap: 12 },
+  guideModeButton: { flex: 1, backgroundColor: '#F8FAFB', borderRadius: 16, padding: 16, alignItems: 'center' },
   guideModeIconContainer: {
     width: 48,
     height: 48,
@@ -1601,25 +1402,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 12,
   },
-  visualIcon: {
-    fontSize: 24,
-    color: '#4ECDC4',
-  },
-  guideModeTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 4,
-  },
-  guideModeAction: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  guideModeActionText: {
-    fontSize: 12,
-    color: '#666',
-  },
+  visualIcon: { fontSize: 24, color: '#4ECDC4' },
+  guideModeTitle: { fontSize: 14, fontWeight: '600', color: '#333', marginBottom: 4 },
+  guideModeAction: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  guideModeActionText: { fontSize: 12, color: '#666' },
+
   firstTimeTipContainer: {
     marginTop: 16,
     paddingVertical: 12,
@@ -1628,15 +1415,9 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
   },
-  firstTimeTipText: {
-    fontSize: 13,
-    color: '#1E88A8',
-    lineHeight: 18,
-  },
-  practicePageContainer: {
-    flex: 1,
-    backgroundColor: '#1E5F8A',
-  },
+  firstTimeTipText: { fontSize: 13, color: '#1E88A8', lineHeight: 18 },
+
+  practicePageContainer: { flex: 1, backgroundColor: '#1E5F8A' },
   practiceHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1645,11 +1426,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     position: 'relative',
   },
-  practiceHeaderTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#fff',
-  },
+  practiceHeaderTitle: { fontSize: 18, fontWeight: '600', color: '#fff' },
   closeButton: {
     position: 'absolute',
     right: 20,
@@ -1659,30 +1436,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  practiceContent: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingBottom: 100,
-  },
-  audioGuideContainer: {
-    marginBottom: 60,
-  },
-  audioWaveContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-    height: 60,
-  },
-  audioWaveBar: {
-    width: 4,
-    backgroundColor: 'rgba(255, 255, 255, 0.6)',
-    borderRadius: 2,
-  },
-  visualGuideContainer: {
-    marginBottom: 60,
-  },
+  practiceContent: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: 100 },
+
+  audioGuideContainer: { marginBottom: 60 },
+  audioWaveContainer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, height: 60 },
+  audioWaveBar: { width: 4, backgroundColor: 'rgba(255, 255, 255, 0.6)', borderRadius: 2 },
+
+  visualGuideContainer: { marginBottom: 60 },
   breathCircle: {
     width: 140,
     height: 140,
@@ -1692,17 +1452,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  breathPhaseText: {
-    fontSize: 20,
-    color: '#fff',
-    fontWeight: '500',
-  },
-  timerText: {
-    fontSize: 72,
-    fontWeight: '300',
-    color: '#fff',
-    marginBottom: 40,
-  },
+  breathPhaseText: { fontSize: 20, color: '#fff', fontWeight: '500' },
+
+  timerText: { fontSize: 72, fontWeight: '300', color: '#fff', marginBottom: 40 },
   pauseButton: {
     width: 64,
     height: 64,
@@ -1713,30 +1465,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 24,
   },
-  switchModeButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-  },
-  switchModeText: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.7)',
-  },
-  pauseModalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.85)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  pauseModalContent: {
-    width: SCREEN_WIDTH - 64,
-    alignItems: 'center',
-  },
-  pauseModalTitle: {
-    fontSize: 28,
-    fontWeight: '600',
-    color: '#fff',
-    marginBottom: 40,
-  },
+  switchModeButton: { paddingVertical: 8, paddingHorizontal: 16 },
+  switchModeText: { fontSize: 14, color: 'rgba(255, 255, 255, 0.7)' },
+
+  pauseModalOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.85)', justifyContent: 'center', alignItems: 'center' },
+  pauseModalContent: { width: SCREEN_WIDTH - 64, alignItems: 'center' },
+  pauseModalTitle: { fontSize: 28, fontWeight: '600', color: '#fff', marginBottom: 40 },
   pauseModalButtonPrimary: {
     width: '100%',
     backgroundColor: '#fff',
@@ -1745,11 +1479,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 12,
   },
-  pauseModalButtonPrimaryText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1E5F8A',
-  },
+  pauseModalButtonPrimaryText: { fontSize: 16, fontWeight: '600', color: '#1E5F8A' },
   pauseModalButtonSecondary: {
     width: '100%',
     backgroundColor: 'transparent',
@@ -1760,21 +1490,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 24,
   },
-  pauseModalButtonSecondaryText: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#fff',
-  },
-  pauseModalAbandonText: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.6)',
-  },
-  relaxationPageContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 24,
-  },
+  pauseModalButtonSecondaryText: { fontSize: 16, fontWeight: '500', color: '#fff' },
+  pauseModalAbandonText: { fontSize: 14, color: 'rgba(255, 255, 255, 0.6)' },
+
+  relaxationPageContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24 },
   relaxationCard: {
     width: '100%',
     backgroundColor: '#fff',
@@ -1806,43 +1525,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 16,
   },
-  relaxationTitle: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#333',
-    textAlign: 'center',
-    marginBottom: 24,
-  },
-  relaxationScoreContainer: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    justifyContent: 'center',
-    marginBottom: 12,
-  },
-  relaxationScore: {
-    fontSize: 64,
-    fontWeight: '700',
-    color: '#2196F3',
-  },
-  relaxationScoreMax: {
-    fontSize: 24,
-    color: '#999',
-    marginLeft: 4,
-  },
-  relaxationPrompt: {
-    fontSize: 14,
-    color: '#666',
-    textAlign: 'center',
-    marginBottom: 32,
-  },
+  relaxationTitle: { fontSize: 22, fontWeight: '700', color: '#333', textAlign: 'center', marginBottom: 24 },
+  relaxationScoreContainer: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'center', marginBottom: 12 },
+  relaxationScore: { fontSize: 64, fontWeight: '700', color: '#2196F3' },
+  relaxationScoreMax: { fontSize: 24, color: '#999', marginLeft: 4 },
+  relaxationPrompt: { fontSize: 14, color: '#666', textAlign: 'center', marginBottom: 32 },
+
   sliderContainer: {
     marginBottom: 8,
     position: 'relative',
-    ...Platform.select({
-      android: {
-        paddingVertical: 4,  // 為邊框留空間
-      },
-    }),
+    ...Platform.select({ android: { paddingVertical: 4 } }),
   },
   customSliderTrackBackground: {
     position: 'absolute',
@@ -1853,13 +1545,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#DFE6E9',
     borderRadius: 8,
     zIndex: 1,
-    ...Platform.select({
-      android: {
-        borderWidth: 1,
-        borderColor: '#CBD5E0',
-        elevation: 2,
-      },
-    }),
+    ...Platform.select({ android: { borderWidth: 1, borderColor: '#CBD5E0', elevation: 2 } }),
   },
   customSliderTrackFilled: {
     position: 'absolute',
@@ -1870,129 +1556,35 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     zIndex: 2,
     ...Platform.select({
-      ios: {
-        shadowColor: '#29B6F6',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.4,
-        shadowRadius: 4,
-      },
-      android: {
-        elevation: 4,  // Android 使用 elevation
-        borderWidth: 1,
-        borderColor: '#1E88A8',  // 深色邊框增強效果
-      },
+      ios: { shadowColor: '#29B6F6', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.4, shadowRadius: 4 },
+      android: { elevation: 4, borderWidth: 1, borderColor: '#1E88A8' },
     }),
   },
-  slider: {
-    width: '100%',
-    height: 56,
-    position: 'relative',
-    zIndex: 3,
-  },
-  sliderLabels: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 32,
-    paddingHorizontal: 4,
-    marginTop: 8,
-  },
-  sliderLabel: {
-    fontSize: 12,
-    color: '#636E72',
-    fontWeight: '500',
-  },
-  relaxationCompleteButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#2196F3',
-    borderRadius: 30,
-    paddingVertical: 16,
-    gap: 8,
-  },
-  relaxationCompleteButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#fff',
-  },
-  completionPageContainer: {
-    flex: 1,
-    backgroundColor: '#F5F8FA',
-    paddingHorizontal: 24,
-    paddingTop: 40,
-  },
-  completionHeader: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
-    marginBottom: 40,
-  },
-  completionTime: {
-    fontSize: 72,
-    fontWeight: '700',
-    color: '#1E5F8A',
-    textAlign: 'center',
-  },
-  completionTimeLabel: {
-    fontSize: 14,
-    color: '#666',
-    textAlign: 'center',
-    marginBottom: 60,
-  },
-  completionRelaxContainer: {
-    alignItems: 'center',
-    marginBottom: 40,
-  },
-  completionRelaxLabel: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 8,
-  },
-  completionRelaxScore: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-  },
-  completionRelaxNumber: {
-    fontSize: 36,
-    fontWeight: '700',
-    color: '#2196F3',
-  },
-  completionRelaxMax: {
-    fontSize: 18,
-    color: '#999',
-    marginLeft: 2,
-  },
-  feelingsTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#333',
-    marginBottom: 16,
-  },
-  feelingsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-    marginBottom: 24,
-  },
-  feelingChip: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#DDD',
-    backgroundColor: '#fff',
-  },
-  feelingChipActive: {
-    borderColor: '#2196F3',
-    backgroundColor: '#E3F2FD',
-  },
-  feelingChipText: {
-    fontSize: 14,
-    color: '#666',
-  },
-  feelingChipTextActive: {
-    color: '#2196F3',
-  },
+  slider: { width: '100%', height: 56, position: 'relative', zIndex: 3 },
+  sliderLabels: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 32, paddingHorizontal: 4, marginTop: 8 },
+  sliderLabel: { fontSize: 12, color: '#636E72', fontWeight: '500' },
+
+  relaxationCompleteButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#2196F3', borderRadius: 30, paddingVertical: 16, gap: 8 },
+  relaxationCompleteButtonText: { fontSize: 16, fontWeight: '600', color: '#fff' },
+
+  completionPageContainer: { flex: 1, backgroundColor: '#F5F8FA', paddingHorizontal: 24, paddingTop: 40 },
+  completionHeader: { fontSize: 16, color: '#666', textAlign: 'center', marginBottom: 40 },
+  completionTime: { fontSize: 72, fontWeight: '700', color: '#1E5F8A', textAlign: 'center' },
+  completionTimeLabel: { fontSize: 14, color: '#666', textAlign: 'center', marginBottom: 60 },
+
+  completionRelaxContainer: { alignItems: 'center', marginBottom: 40 },
+  completionRelaxLabel: { fontSize: 14, color: '#666', marginBottom: 8 },
+  completionRelaxScore: { flexDirection: 'row', alignItems: 'baseline' },
+  completionRelaxNumber: { fontSize: 36, fontWeight: '700', color: '#2196F3' },
+  completionRelaxMax: { fontSize: 18, color: '#999', marginLeft: 2 },
+
+  feelingsTitle: { fontSize: 18, fontWeight: '700', color: '#333', marginBottom: 16 },
+  feelingsContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 24 },
+  feelingChip: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 20, borderWidth: 1, borderColor: '#DDD', backgroundColor: '#fff' },
+  feelingChipActive: { borderColor: '#2196F3', backgroundColor: '#E3F2FD' },
+  feelingChipText: { fontSize: 14, color: '#666' },
+  feelingChipTextActive: { color: '#2196F3' },
+
   customInput: {
     borderWidth: 1,
     borderColor: '#DDD',
@@ -2002,59 +1594,37 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#333',
     marginBottom: 24,
-    height: 50,  // ⭐ 固定高度，不會過大
+    height: 50,
     maxHeight: 80,
   },
-  completionButton: {
-    backgroundColor: '#2196F3',
-    borderRadius: 30,
-    paddingVertical: 16,
-    alignItems: 'center',
-    marginTop: 'auto',
-    marginBottom: 40,
-  },
-  completionButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#fff',
-  },
-  completionScrollContent: {
-    flexGrow: 1,
-    paddingHorizontal: 24,
-    paddingTop: 40,
-    paddingBottom: 100,  // ⭐ 基礎底部間距
-  },
+
+  completionButton: { backgroundColor: '#2196F3', borderRadius: 30, paddingVertical: 16, alignItems: 'center', marginTop: 'auto', marginBottom: 40 },
+  completionButtonText: { fontSize: 16, fontWeight: '600', color: '#fff' },
+
+  completionScrollContent: { flexGrow: 1, paddingHorizontal: 24, paddingTop: 40, paddingBottom: 100 },
   completionButtonContainer: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
     paddingHorizontal: 24,
-    paddingBottom: Platform.OS === 'ios' ? 40 : 20,  // ⭐ iOS 額外底部空間
+    paddingBottom: Platform.OS === 'ios' ? 40 : 20,
     backgroundColor: '#F5F8FA',
-    borderTopWidth: 1,  // ⭐ 新增頂部邊框
-    borderTopColor: '#E0E0E0',  // ⭐ 邊框顏色
+    borderTopWidth: 1,
+    borderTopColor: '#E0E0E0',
   },
-  successPageContainer: {
-    flex: 1,
-  },
-  gradientBg: {
-    flex: 1,
-  },
+
+  successPageContainer: { flex: 1 },
+  gradientBg: { flex: 1 },
   successContent: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 24,
-    paddingTop: Platform.OS === 'ios' ? 60 : 40,  // ⭐ 新增頂部內距
-    paddingBottom: Platform.OS === 'ios' ? 60 : 40,  // ⭐ 新增底部內距
+    paddingTop: Platform.OS === 'ios' ? 60 : 40,
+    paddingBottom: Platform.OS === 'ios' ? 60 : 40,
   },
-  successIconContainer: {
-    position: 'relative',
-    width: 128,
-    height: 128,
-    marginBottom: 32,
-  },
+  successIconContainer: { position: 'relative', width: 128, height: 128, marginBottom: 32 },
   successIconGradient: {
     width: 128,
     height: 128,
@@ -2080,18 +1650,9 @@ const styles = StyleSheet.create({
     borderWidth: 4,
     borderColor: '#FFFFFF',
   },
-  successTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#1f2937',
-    marginBottom: 8,
-  },
-  successSubtitle: {
-    fontSize: 16,
-    color: '#6b7280',
-    marginBottom: 28,
-    textAlign: 'center',
-  },
+  successTitle: { fontSize: 24, fontWeight: '700', color: '#1f2937', marginBottom: 8 },
+  successSubtitle: { fontSize: 16, color: '#6b7280', marginBottom: 28, textAlign: 'center' },
+
   statsCard: {
     width: '100%',
     backgroundColor: '#fff',
@@ -2104,54 +1665,12 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 2,
   },
-  statsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  statItem: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  statValue: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#2196F3',
-    marginBottom: 4,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: '#666',
-  },
-  statDivider: {
-    width: 1,
-    height: 40,
-    backgroundColor: '#E0E0E0',
-  },
-  streakCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: '#FFF7ED',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    marginBottom: 24,
-  },
-  streakText: {
-    fontSize: 14,
-    color: '#F59E0B',
-    fontWeight: '600',
-  },
-  streakNumber: {
-    fontSize: 36,
-    fontWeight: '700',
-    color: '#0ea5e9',
-  },
-  streakUnit: {
-    fontSize: 18,
-    color: '#9ca3af',
-    marginBottom: 4,
-  },
+  statsRow: { flexDirection: 'row', alignItems: 'center' },
+  statItem: { flex: 1, alignItems: 'center' },
+  statValue: { fontSize: 28, fontWeight: '700', color: '#2196F3', marginBottom: 4 },
+  statLabel: { fontSize: 12, color: '#666' },
+  statDivider: { width: 1, height: 40, backgroundColor: '#E0E0E0' },
+
   viewJournalButton: {
     width: '100%',
     flexDirection: 'row',
@@ -2164,9 +1683,5 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(14, 165, 233, 0.2)',
   },
-  viewJournalText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#0ea5e9',
-  },
-})
+  viewJournalText: { fontSize: 15, fontWeight: '700', color: '#0ea5e9' },
+});
