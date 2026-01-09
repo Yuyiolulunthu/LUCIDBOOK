@@ -1560,7 +1560,7 @@ const styles = StyleSheet.create({
       android: { elevation: 4, borderWidth: 1, borderColor: '#1E88A8' },
     }),
   },
-  slider: { width: '100%', height: 56, position: 'relative', zIndex: 3, transform: [{ scaleY: 1.4 }] },
+  slider: { width: '100%', height: 56, position: 'relative', zIndex: 3, transform: [{ scale: 1.4 }] },
   sliderLabels: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 32, paddingHorizontal: 4, marginTop: 8 },
   sliderLabel: { fontSize: 12, color: '#636E72', fontWeight: '500' },
 

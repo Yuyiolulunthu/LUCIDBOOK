@@ -2198,7 +2198,7 @@ const styles = StyleSheet.create({
     height: 56,
     position: 'relative',
     zIndex: 3,
-    transform: [{ scaleY: 1.4 }],
+    transform: [{ scale: 1.4 }],
   },
   sliderLabels: {
     flexDirection: 'row',
