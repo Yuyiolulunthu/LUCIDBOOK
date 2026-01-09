@@ -1,7 +1,7 @@
 // ==========================================
 // 檔案名稱: CognitiveReframingPractice.js
 // 思維調節練習 - ABCD 認知行為療法
-// 版本: V1.2 - 優化拉桿視覺 + 加入呼吸練習引導
+// 版本: V1.3 - 加回呼吸練習建議卡片
 // ==========================================
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
@@ -1475,7 +1475,7 @@ export default function CognitiveReframingPractice({ onBack, navigation, onHome 
     );
   };
 
-  // 8. 情緒評估頁 ⭐ 加入呼吸練習建議 + 優化拉桿視覺
+  // 8. 情緒評估頁 ⭐⭐⭐ 加回呼吸練習建議卡片 ⭐⭐⭐
   const renderAssessmentPage = () => (
     <View style={styles.fullScreen}>
       <LinearGradient
@@ -1533,7 +1533,31 @@ export default function CognitiveReframingPractice({ onBack, navigation, onHome 
               </View>
             </View>
 
-            {/* ✅ 已移除呼吸練習建議卡片 */}
+            {/* ⭐⭐⭐ 呼吸練習建議卡片 (當評分 ≤ 3 時顯示) ⭐⭐⭐ */}
+            {formData.postScore <= 3 && (
+              <View style={styles.breathingSuggestionCard}>
+                <View style={styles.breathingSuggestionHeader}>
+                  <Wind size={20} color="#0ea5e9" />
+                  <Text style={styles.breathingSuggestionTitle}>需要更多幫助嗎？</Text>
+                </View>
+                <Text style={styles.breathingSuggestionText}>
+                  情緒還是有點緊繃，要不要先做個呼吸練習，讓身心都緩和下來？
+                </Text>
+                <TouchableOpacity
+                  style={styles.breathingSuggestionButton}
+                  onPress={() => {
+                    // 導航到呼吸練習（假設你有這個頁面）
+                    navigation.navigate('BreathingPractice');
+                    
+                    // 或者在當前流程中插入呼吸練習：
+                    // setCurrentPage('breathing');
+                  }}
+                >
+                  <Wind size={16} color="#FFFFFF" />
+                  <Text style={styles.breathingSuggestionButtonText}>開始呼吸練習</Text>
+                </TouchableOpacity>
+              </View>
+            )}
 
             <TouchableOpacity
               style={styles.assessmentButton}
@@ -1554,13 +1578,14 @@ export default function CognitiveReframingPractice({ onBack, navigation, onHome 
   );
 
   const handleViewJournal = () => {
-  // ⭐ 直接導航，不需要再次 complete（因為已經在 review 頁面完成了）
-  navigation.navigate('MainTabs', {
-    screen: 'Daily',
-    params: { highlightPracticeId: practiceId }
-  });
-};
-  // 9. 练习回顾页（約第 1040 行開始）
+    // ⭐ 直接導航，不需要再次 complete（因為已經在 review 頁面完成了）
+    navigation.navigate('MainTabs', {
+      screen: 'Daily',
+      params: { highlightPracticeId: practiceId }
+    });
+  };
+
+  // 9. 练习回顾页
   const renderReviewPage = () => {
     const displayEmotions = [...new Set([...formData.emotions, ...customEmotions])];
     const displayBodyReactions = [...new Set([...formData.bodyReactions, ...customBodyReactions])];
@@ -1691,7 +1716,7 @@ export default function CognitiveReframingPractice({ onBack, navigation, onHome 
           <View style={styles.footer}>
             <TouchableOpacity
               style={styles.nextButton}
-              onPress={async () => {  // ⭐⭐⭐ 關鍵修改：改為 async
+              onPress={async () => {
                 try {
                   console.log('📤 [思維調節] 準備完成練習');
                   setIsTiming(false);
@@ -1726,17 +1751,15 @@ export default function CognitiveReframingPractice({ onBack, navigation, onHome 
     );
   };
 
-  // 10. 完成頁（含星星動畫）（約第 1200 行開始）
+  // 10. 完成頁（含星星動畫）
   const renderCompletionPage = () => {
-
     const handleViewJournal = () => {
-      // ⭐⭐⭐ 關鍵修改：直接導航，不需要再次 complete
       console.log('📖 [思維調節] 導航到日記頁面');
       navigation.navigate('MainTabs', {
         screen: 'Daily',
         params: { 
           highlightPracticeId: practiceId,
-          forceRefresh: true  // ⭐ 加上強制刷新
+          forceRefresh: true
         }
       });
     };
@@ -2591,18 +2614,18 @@ const styles = StyleSheet.create({
     position: 'relative',
     ...Platform.select({
       android: {
-        paddingVertical: 4,  // 為邊框留空間
+        paddingVertical: 4,
       },
     }),
   },
   customSliderTrackBackground: {
     position: 'absolute',
-    top: 16,
+    top: 20,
     left: 0,
     right: 0,
-    height: 24,
+    height: 16,
     backgroundColor: '#DFE6E9',
-    borderRadius: 12,
+    borderRadius: 8,
     zIndex: 1,
     ...Platform.select({
       android: {
@@ -2614,11 +2637,11 @@ const styles = StyleSheet.create({
   },
   customSliderTrackFilled: {
     position: 'absolute',
-    top: 16,
+    top: 20,
     left: 0,
-    height: 24,
+    height: 16,
     backgroundColor: '#29B6F6',
-    borderRadius: 12,
+    borderRadius: 8,
     zIndex: 2,
     ...Platform.select({
       ios: {
@@ -2628,15 +2651,15 @@ const styles = StyleSheet.create({
         shadowRadius: 4,
       },
       android: {
-        elevation: 4,  // Android 使用 elevation
+        elevation: 4,
         borderWidth: 1,
-        borderColor: '#1E88A8',  // 深色邊框增強效果
+        borderColor: '#1E88A8',
       },
     }),
   },
   slider: {
     width: '100%',
-    height: 64,
+    height: 56,
     position: 'relative',
     zIndex: 3,
   },
@@ -2649,6 +2672,47 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#636E72',
     fontWeight: '500',
+  },
+
+  // ⭐⭐⭐ 呼吸練習建議卡片樣式 ⭐⭐⭐
+  breathingSuggestionCard: {
+    backgroundColor: '#f0f9ff',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: '#bae6fd',
+  },
+  breathingSuggestionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  breathingSuggestionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#0369a1',
+  },
+  breathingSuggestionText: {
+    fontSize: 14,
+    color: '#64748b',
+    lineHeight: 22,
+    marginBottom: 16,
+  },
+  breathingSuggestionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#0ea5e9',
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+  breathingSuggestionButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
 
   assessmentButton: {
