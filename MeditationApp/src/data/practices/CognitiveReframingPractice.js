@@ -1,10 +1,10 @@
 // ==========================================
 // 檔案名稱: CognitiveReframingPractice.js
 // 思維調節練習 - ABCD 認知行為療法
-// 版本: V1.3 - 加回呼吸練習建議卡片
+// 版本: V1.5 - 優化評估頁滑桿（保留原始美感）
 // ==========================================
 
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -20,7 +20,6 @@ import {
   Platform,
   Modal,
   Dimensions,
-  FlatList,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Slider from '@react-native-community/slider';
@@ -50,29 +49,21 @@ import {
   Heart,
 } from 'lucide-react-native';
 import ApiService from '../../../api';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
-// ⭐ 練習類型常數定義
-const PRACTICE_TYPE = {
-  COGNITIVE_REFRAMING: '思維調節練習',
-  BREATHING: '呼吸穩定力練習',
-  GRATITUDE: '感恩日記',
-  GOOD_THINGS: '好事書寫練習',
-  MOOD: '心情溫度計'
-};
+
 // ==================== 初始表單資料 ====================
 const INITIAL_FORM_DATA = {
-  event: '',           // A: 發生什麼事
-  thought: '',         // B: 當下的想法
-  emotions: [],        // C: 情緒反應
-  bodyReactions: [],   // C: 身體反應
-  behaviors: [],       // C: 行為反應
-  selectedCard: null,  // D: 選擇的靈感小卡
-  newPerspective: '',  // D: 新觀點
-  selectedAction: null, // 選擇的微小行動
-  customAction: '',    // 自訂行動
-  postScore: 5,        // 情緒減緩程度
+  event: '',
+  thought: '',
+  emotions: [],
+  bodyReactions: [],
+  behaviors: [],
+  selectedCard: null,
+  newPerspective: '',
+  selectedAction: null,
+  customAction: '',
+  postScore: 5,
   timestamp: 0,
 };
 
@@ -276,8 +267,15 @@ const StarConfetti = ({ index }) => {
   );
 };
 
+// 箭頭向下圖標組件
+const ArrowDown = ({ size, color }) => (
+  <View style={{ transform: [{ rotate: '90deg' }] }}>
+    <ArrowRight size={size} color={color} />
+  </View>
+);
+
 // ==================== 主組件 ====================
-export default function CognitiveReframingPractice({ onBack, navigation, onHome }) {
+export default function CognitiveReframingPractice({ onBack, navigation }) {
   const [currentPage, setCurrentPage] = useState('intro');
   const [formData, setFormData] = useState(INITIAL_FORM_DATA);
   const [showInfoModal, setShowInfoModal] = useState(false);
@@ -366,7 +364,6 @@ export default function CognitiveReframingPractice({ onBack, navigation, onHome 
   const saveProgress = async () => {
     if (!practiceId) return;
     try {
-      // ⭐⭐⭐ 关键修改：即时合并自定义选项 ⭐⭐⭐
       const currentAllEmotions = [...new Set([...formData.emotions, ...customEmotions])];
       const currentAllBodyReactions = [...new Set([...formData.bodyReactions, ...customBodyReactions])];
       const currentAllBehaviors = [...new Set([...formData.behaviors, ...customBehaviors])];
@@ -379,7 +376,6 @@ export default function CognitiveReframingPractice({ onBack, navigation, onHome 
         customEmotions: customEmotions,
         customBodyReactions: customBodyReactions,
         customBehaviors: customBehaviors,
-        // ⭐ 也保存 fullReactions
         fullReactions: {
           emotions: currentAllEmotions,
           bodyReactions: currentAllBodyReactions,
@@ -387,23 +383,21 @@ export default function CognitiveReframingPractice({ onBack, navigation, onHome 
         },
       };
       
-      console.log('💾 [思维调节] 保存进度，包含自定义选项');
-      
       await ApiService.updatePracticeProgress(
         practiceId,
         getCurrentStep(),
         totalSteps,
-        progressFormData,  // ⭐ 使用合并后的数据
+        progressFormData,
         elapsedTime
       );
     } catch (err) {
-      console.log('❌ 保存进度失败:', err);
+      console.log('❌ 保存進度失敗:', err);
     }
   };
 
   const completeOnce = async () => {
     if (hasCompleted) {
-      console.log('⚠️ [思維調節] 已完成過，略過重複 complete');
+      console.log('⚠️ 已完成過，略過重複 complete');
       return;
     }
 
@@ -411,40 +405,26 @@ export default function CognitiveReframingPractice({ onBack, navigation, onHome 
 
     let totalSeconds = elapsedTime || 60;
 
-    // ⭐⭐⭐ 合併所有選項（包含自訂）⭐⭐⭐
     const allEmotions = [...new Set([...formData.emotions, ...customEmotions])];
     const allBodyReactions = [...new Set([...formData.bodyReactions, ...customBodyReactions])];
     const allBehaviors = [...new Set([...formData.behaviors, ...customBehaviors])];
-
-    // ⭐ 詳細 log（方便除錯）
-    console.log('📤 [思維調節] 準備完成練習（一次性）');
-    console.log('  - 合併後情緒:', allEmotions);
-    console.log('  - 合併後身體反應:', allBodyReactions);
-    console.log('  - 合併後行為:', allBehaviors);
 
     const payloadFormData = {
       ...formData,
       emotions: allEmotions,
       bodyReactions: allBodyReactions,
       behaviors: allBehaviors,
-
-      // 保留自訂原始資料
       customEmotions,
       customBodyReactions,
       customBehaviors,
-
-      // 給 Daily 使用的完整反應
       fullReactions: {
         emotions: allEmotions,
         bodyReactions: allBodyReactions,
         behaviors: allBehaviors,
       },
-
       postMood: allEmotions[0] || formData.emotions[0] || null,
       timestamp: Date.now(),
     };
-
-    console.log('📦 [思維調節] form_data:', JSON.stringify(payloadFormData, null, 2));
 
     try {
       await ApiService.completePractice(practiceId, {
@@ -455,15 +435,13 @@ export default function CognitiveReframingPractice({ onBack, navigation, onHome 
       });
 
       await ApiService.getPracticeStats();
-      console.log('✅ [思維調節] 完成成功（只會一次）');
+      console.log('✅ 完成成功');
     } catch (err) {
-      // 若失敗，允許重試
       setHasCompleted(false);
-      console.error('❌ [思維調節] 完成失敗，已解除鎖定', err);
+      console.error('❌ 完成失敗:', err);
       throw err;
     }
   };
-
 
   // ==================== 生命週期 ====================
   useEffect(() => {
@@ -519,7 +497,6 @@ export default function CognitiveReframingPractice({ onBack, navigation, onHome 
       );
       breatheAnimation.start();
 
-      // 10秒後自動跳轉（完整呼吸一次）
       const timer = setTimeout(() => {
         setCurrentPage('event');
       }, 10000);
@@ -566,10 +543,7 @@ export default function CognitiveReframingPractice({ onBack, navigation, onHome 
       action: () => setCurrentPage('reframe'),
       assessment: () => setCurrentPage('action'),
       review: () => setCurrentPage('assessment'),
-      completion: () => { 
-        // ⭐ 從完成頁直接離開
-        onBack?.() || navigation?.goBack();
-      },
+      completion: () => onBack?.() || navigation?.goBack(),
     };
     backMap[currentPage]?.();
   };
@@ -586,7 +560,6 @@ export default function CognitiveReframingPractice({ onBack, navigation, onHome 
   const handleAddCustom = (type) => {
     let inputValue = '';
     
-    // 根據類型取得對應的輸入值
     switch (type) {
       case 'emotion':
         inputValue = customEmotionInput.trim();
@@ -603,11 +576,9 @@ export default function CognitiveReframingPractice({ onBack, navigation, onHome 
 
     switch (type) {
       case 'emotion':
-        // ⭐ 只加入 customEmotions 陣列，不加入 formData
         if (!DEFAULT_EMOTIONS.includes(inputValue) && !customEmotions.includes(inputValue)) {
           setCustomEmotions([...customEmotions, inputValue]);
         }
-        // ⭐ 同時更新 formData（勾選狀態）
         if (!formData.emotions.includes(inputValue)) {
           setFormData(prev => ({
             ...prev,
@@ -615,7 +586,7 @@ export default function CognitiveReframingPractice({ onBack, navigation, onHome 
           }));
         }
         setIsAddingCustomEmotion(false);
-        setCustomEmotionInput('');  // ⭐ 清空對應的輸入框
+        setCustomEmotionInput('');
         break;
         
       case 'body':
@@ -629,7 +600,7 @@ export default function CognitiveReframingPractice({ onBack, navigation, onHome 
           }));
         }
         setIsAddingCustomBody(false);
-        setCustomBodyInput('');  // ⭐ 清空對應的輸入框
+        setCustomBodyInput('');
         break;
         
       case 'behavior':
@@ -643,7 +614,7 @@ export default function CognitiveReframingPractice({ onBack, navigation, onHome 
           }));
         }
         setIsAddingCustomBehavior(false);
-        setCustomBehaviorInput('');  // ⭐ 清空對應的輸入框
+        setCustomBehaviorInput('');
         break;
     }
   };
@@ -655,7 +626,6 @@ export default function CognitiveReframingPractice({ onBack, navigation, onHome 
   const selectAction = (action) => {
     setFormData(prev => ({ ...prev, selectedAction: action }));
   };
-
 
   // ==================== 頁面渲染 ====================
 
@@ -688,11 +658,8 @@ export default function CognitiveReframingPractice({ onBack, navigation, onHome 
           </View>
 
           <Text style={styles.introTitle}>思維調節</Text>
-          <Text style={styles.introSubtitle}>
-            重整想法，緩解情緒
-          </Text>
+          <Text style={styles.introSubtitle}>重整想法，緩解情緒</Text>
 
-          {/* 三個步驟 */}
           <View style={styles.stepsContainer}>
             <View style={styles.stepItem}>
               <View style={[styles.stepIcon, { backgroundColor: '#fef3c7' }]}>
@@ -778,7 +745,7 @@ export default function CognitiveReframingPractice({ onBack, navigation, onHome 
     </View>
   );
 
-  // 3. 事件描述頁 (A: Activating Event)
+  // 3. 事件描述頁
   const renderEventPage = () => {
     const tips = [
       '只描述客觀發生的事情',
@@ -894,7 +861,7 @@ export default function CognitiveReframingPractice({ onBack, navigation, onHome 
     );
   };
 
-  // 4. 想法描述頁 (B: Belief)
+  // 4. 想法描述頁
   const renderThoughtPage = () => {
     const tips = [
       '當時你的第一個念頭是什麼？',
@@ -926,14 +893,10 @@ export default function CognitiveReframingPractice({ onBack, navigation, onHome 
 
               <View style={styles.titleSection}>
                 <Text style={styles.pageTitle}>當下腦中的想法是？</Text>
-                <Text style={styles.pageSubtitle}>
-                  這就是大腦慣性迴路的運作
-                </Text>
+                <Text style={styles.pageSubtitle}>這就是大腦慣性迴路的運作</Text>
                 <View style={styles.noteContainer}>
                   <Star size={16} color="#fbbf24" fill="#fbbf24" />
-                  <Text style={styles.noteText}>
-                    捕捉當下瞬間的念頭或聲音
-                  </Text>
+                  <Text style={styles.noteText}>捕捉當下瞬間的念頭或聲音</Text>
                 </View>
               </View>
 
@@ -1010,7 +973,7 @@ export default function CognitiveReframingPractice({ onBack, navigation, onHome 
     );
   };
 
-  // 5. 反應選擇頁 (C: Consequence)
+  // 5. 反應選擇頁
   const renderReactionPage = () => {
     const allEmotions = [...DEFAULT_EMOTIONS, ...customEmotions];
     const allBodyReactions = [...DEFAULT_BODY_REACTIONS, ...customBodyReactions];
@@ -1186,7 +1149,7 @@ export default function CognitiveReframingPractice({ onBack, navigation, onHome 
     );
   };
 
-  // 6. 換個角度想頁 (D: Dispute)
+  // 6. 換個角度想頁
   const renderReframePage = () => {
     const scrollToCard = (index) => {
       cardScrollRef.current?.scrollTo({
@@ -1233,7 +1196,6 @@ export default function CognitiveReframingPractice({ onBack, navigation, onHome 
                 ]}
                 keyboardShouldPersistTaps="handled"
               >
-                {/* 文字輸入區 */}
                 <View style={styles.inputCard}>
                   <TextInput
                     style={styles.textarea}
@@ -1246,7 +1208,6 @@ export default function CognitiveReframingPractice({ onBack, navigation, onHome 
                   />
                 </View>
 
-                {/* 靈感小卡區 */}
                 <View style={styles.cardsSection}>
                   <View style={styles.cardsSectionHeader}>
                     <RefreshCw size={16} color="#0ea5e9" />
@@ -1266,7 +1227,7 @@ export default function CognitiveReframingPractice({ onBack, navigation, onHome 
                       setCurrentCardIndex(index);
                     }}
                   >
-                    {INSPIRATION_CARDS.map((card, index) => (
+                    {INSPIRATION_CARDS.map((card) => (
                       <TouchableOpacity
                         key={card.id}
                         style={[
@@ -1288,7 +1249,6 @@ export default function CognitiveReframingPractice({ onBack, navigation, onHome 
                     ))}
                   </ScrollView>
 
-                  {/* 小卡導航 */}
                   <View style={styles.cardsNavigation}>
                     <TouchableOpacity
                       onPress={() => scrollToCard(Math.max(0, currentCardIndex - 1))}
@@ -1391,7 +1351,6 @@ export default function CognitiveReframingPractice({ onBack, navigation, onHome 
                 ]}
                 keyboardShouldPersistTaps="handled"
               >
-                {/* 行動選項網格 */}
                 <View style={styles.actionsGrid}>
                   {MICRO_ACTIONS.map(action => {
                     const Icon = action.icon;
@@ -1424,7 +1383,6 @@ export default function CognitiveReframingPractice({ onBack, navigation, onHome 
                   })}
                 </View>
 
-                {/* 自訂行動 */}
                 <View style={styles.customActionCard}>
                   <Text style={styles.customActionLabel}>或是，你想做什麼？</Text>
                   <TextInput
@@ -1475,286 +1433,109 @@ export default function CognitiveReframingPractice({ onBack, navigation, onHome 
     );
   };
 
-  // 8. 情緒評估頁 ⭐⭐⭐ 加回呼吸練習建議卡片 ⭐⭐⭐
-  const renderAssessmentPage = () => (
-    <View style={styles.fullScreen}>
-      <LinearGradient
-        colors={['#f0f9ff', '#e0f2fe']}
-        style={styles.gradientBg}
-      >
-        <View style={styles.progressBarTop}>
-          <ProgressBar currentStep={getCurrentStep()} totalSteps={totalSteps} />
-        </View>
+// 8. 情緒評估頁 ⭐⭐⭐ 完美版本 - 大球圆形好拉 ⭐⭐⭐
+const renderAssessmentPage = () => (
+  <View style={styles.fullScreen}>
+    <LinearGradient
+      colors={['#f0f9ff', '#e0e3feff']}
+      style={styles.gradientBg}
+    >
+      <View style={styles.progressBarTop}>
+        <ProgressBar currentStep={getCurrentStep()} totalSteps={totalSteps} />
+      </View>
 
-        <View style={styles.assessmentContent}>
-          <View style={styles.assessmentCard}>
+      <View style={styles.assessmentContent}>
+        <View style={styles.assessmentCard}>
+          <LinearGradient
+            colors={['#29B6F6', '#0288D1']}
+            style={styles.assessmentAccentBar}
+          />
+
+          <TouchableOpacity onPress={handleBack} style={styles.assessmentBackButton}>
+            <ArrowLeft size={20} color="#64748b" />
+          </TouchableOpacity>
+
+          <Text style={styles.assessmentTitle}>感覺有好一點嗎？</Text>
+          <Text style={styles.assessmentSubtitle}>請評估原本不舒服情緒的減緩程度</Text>
+
+          <View style={styles.scoreDisplay}>
+            <Text style={styles.scoreNumber}>{formData.postScore}</Text>
+            <Text style={styles.scoreLabel}>分</Text>
+          </View>
+
+          <View style={styles.sliderContainer}>
+            {/* 背景軌道 */}
+            <View style={styles.customSliderTrackBackground} />
+            
+            {/* 填充軌道 */}
+            <View 
+              style={[
+                styles.customSliderTrackFilled, 
+                { width: `${((formData.postScore - 1) / 9) * 100}%` }
+              ]} 
+            />
+            
+            {/* Slider 組件 */}
+            <Slider
+              style={styles.slider}
+              minimumValue={1}
+              maximumValue={10}
+              step={1}
+              value={formData.postScore}
+              onValueChange={value => setFormData(prev => ({ ...prev, postScore: value }))}
+              minimumTrackTintColor="transparent"
+              maximumTrackTintColor="transparent"
+              thumbTintColor="rgba(9, 90, 147, 1)"
+            />
+            
+            {/* 標籤 */}
+            <View style={styles.sliderLabels}>
+              <Text style={styles.sliderLabel}>1 (沒有減緩)</Text>
+              <Text style={styles.sliderLabel}>10 (完全消失)</Text>
+            </View>
+          </View>
+
+          {formData.postScore <= 3 && (
+            <View style={styles.breathingSuggestionCard}>
+              <View style={styles.breathingSuggestionHeader}>
+                <Wind size={20} color="#0ea5e9" />
+                <Text style={styles.breathingSuggestionTitle}>需要更多幫助嗎？</Text>
+              </View>
+              <Text style={styles.breathingSuggestionText}>
+                情緒還是有點緊繃，要不要先做個呼吸練習，讓身心都緩和下來？
+              </Text>
+              <TouchableOpacity
+                style={styles.breathingSuggestionButton}
+                onPress={() => {
+                  navigation.navigate('BreathingPractice');
+                }}
+              >
+                <Wind size={16} color="#FFFFFF" />
+                <Text style={styles.breathingSuggestionButtonText}>開始呼吸練習</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          <TouchableOpacity
+            style={styles.assessmentButton}
+            onPress={() => setCurrentPage('review')}
+          >
             <LinearGradient
               colors={['#29B6F6', '#0288D1']}
-              style={styles.assessmentAccentBar}
-            />
-
-            <TouchableOpacity onPress={handleBack} style={styles.assessmentBackButton}>
-              <ArrowLeft size={20} color="#64748b" />
-            </TouchableOpacity>
-
-            <Text style={styles.assessmentTitle}>感覺有好一點嗎？</Text>
-            <Text style={styles.assessmentSubtitle}>請評估原本不舒服情緒的減緩程度</Text>
-
-            <View style={styles.scoreDisplay}>
-              <Text style={styles.scoreNumber}>{formData.postScore}</Text>
-              <Text style={styles.scoreLabel}>分</Text>
-            </View>
-
-            <View style={styles.sliderContainer}>
-              <View style={styles.customSliderTrackBackground} />
-              
-              <View 
-                style={[
-                  styles.customSliderTrackFilled, 
-                  { width: `${(formData.postScore / 10) * 100}%` }
-                ]} 
-              />
-              
-              <Slider
-                style={styles.slider}
-                minimumValue={1}
-                maximumValue={10}
-                step={1}
-                value={formData.postScore}
-                onValueChange={value => setFormData(prev => ({ ...prev, postScore: value }))}
-                minimumTrackTintColor="transparent"
-                maximumTrackTintColor="transparent"
-                thumbTintColor={Platform.OS === 'android' ? '#164b88ff' : '#FFFFFF'}
-              />
-              
-              <View style={styles.sliderLabels}>
-                <Text style={styles.sliderLabel}>1 (沒有減緩)</Text>
-                <Text style={styles.sliderLabel}>10 (完全消失)</Text>
-              </View>
-            </View>
-
-            {/* ⭐⭐⭐ 呼吸練習建議卡片 (當評分 ≤ 3 時顯示) ⭐⭐⭐ */}
-            {formData.postScore <= 3 && (
-              <View style={styles.breathingSuggestionCard}>
-                <View style={styles.breathingSuggestionHeader}>
-                  <Wind size={20} color="#0ea5e9" />
-                  <Text style={styles.breathingSuggestionTitle}>需要更多幫助嗎？</Text>
-                </View>
-                <Text style={styles.breathingSuggestionText}>
-                  情緒還是有點緊繃，要不要先做個呼吸練習，讓身心都緩和下來？
-                </Text>
-                <TouchableOpacity
-                  style={styles.breathingSuggestionButton}
-                  onPress={() => {
-                    // 導航到呼吸練習（假設你有這個頁面）
-                    navigation.navigate('BreathingPractice');
-                    
-                    // 或者在當前流程中插入呼吸練習：
-                    // setCurrentPage('breathing');
-                  }}
-                >
-                  <Wind size={16} color="#FFFFFF" />
-                  <Text style={styles.breathingSuggestionButtonText}>開始呼吸練習</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-
-            <TouchableOpacity
-              style={styles.assessmentButton}
-              onPress={() => setCurrentPage('review')}
+              style={styles.assessmentButtonGradient}
             >
-              <LinearGradient
-                colors={['#29B6F6', '#0288D1']}
-                style={styles.assessmentButtonGradient}
-              >
-                <Text style={styles.assessmentButtonText}>完成紀錄</Text>
-                <ArrowRight size={20} color="#FFFFFF" />
-              </LinearGradient>
-            </TouchableOpacity>
-          </View>
+              <Text style={styles.assessmentButtonText}>完成紀錄</Text>
+              <ArrowRight size={20} color="#FFFFFF" />
+            </LinearGradient>
+          </TouchableOpacity>
         </View>
-      </LinearGradient>
-    </View>
-  );
-
-  const handleViewJournal = () => {
-    // ⭐ 直接導航，不需要再次 complete（因為已經在 review 頁面完成了）
-    navigation.navigate('MainTabs', {
-      screen: 'Daily',
-      params: { highlightPracticeId: practiceId }
-    });
-  };
-
-  // 9. 练习回顾页
-  const renderReviewPage = () => {
-    const displayEmotions = [...new Set([...formData.emotions, ...customEmotions])];
-    const displayBodyReactions = [...new Set([...formData.bodyReactions, ...customBodyReactions])];
-    const displayBehaviors = [...new Set([...formData.behaviors, ...customBehaviors])];
-
-    console.log('📋 [回顧] 顯示資料:', {
-      emotions: displayEmotions,
-      bodyReactions: displayBodyReactions,
-      behaviors: displayBehaviors,
-    });
-
-    const getSelectedActionText = () => {
-      if (formData.customAction.trim()) return formData.customAction;
-      const action = MICRO_ACTIONS.find(a => a.id === formData.selectedAction);
-      return action?.title || '';
-    };
-
-    return (
-      <View style={styles.fullScreen}>
-        <LinearGradient
-          colors={['#f0f9ff', '#e0f2fe']}
-          style={styles.gradientBg}
-        >
-          <View style={styles.reviewHeader}>
-            <TouchableOpacity onPress={handleBack} style={styles.headerBackButton}>
-              <ArrowLeft size={24} color="#64748b" />
-            </TouchableOpacity>
-            <Text style={styles.reviewHeaderTitle}>練習回顧</Text>
-            <View style={{ width: 40 }} />
-          </View>
-
-          <ScrollView
-            contentContainerStyle={styles.reviewScrollContent}
-            showsVerticalScrollIndicator={false}
-          >
-            {/* 事件 */}
-            <View style={styles.reviewSection}>
-              <Text style={styles.reviewLabel}>事件</Text>
-              <Text style={styles.reviewText}>{formData.event}</Text>
-            </View>
-
-            {/* 當時的想法 */}
-            <View style={styles.reviewSection}>
-              <View style={styles.reviewLabelRow}>
-                <View style={styles.reviewDot} />
-                <Text style={styles.reviewLabel}>當時的想法</Text>
-              </View>
-              <Text style={styles.reviewText}>{formData.thought}</Text>
-            </View>
-
-            {/* 情緒反應 */}
-            {(displayEmotions.length > 0 || displayBodyReactions.length > 0 || displayBehaviors.length > 0) && (
-              <View style={styles.reviewSection}>
-                <View style={styles.reviewLabelRow}>
-                  <View style={[styles.reviewDot, { backgroundColor: '#f59e0b' }]} />
-                  <Text style={styles.reviewLabel}>情緒反應</Text>
-                </View>
-                
-                {displayEmotions.length > 0 && (
-                  <View style={styles.reviewReactionGroup}>
-                    <Text style={styles.reviewReactionLabel}>情緒：</Text>
-                    <View style={styles.reviewTagsContainer}>
-                      {displayEmotions.map((emotion, index) => (
-                        <View key={index} style={styles.reviewTag}>
-                          <Text style={styles.reviewTagText}>{emotion}</Text>
-                        </View>
-                      ))}
-                    </View>
-                  </View>
-                )}
-
-                {displayBodyReactions.length > 0 && (
-                  <View style={styles.reviewReactionGroup}>
-                    <Text style={styles.reviewReactionLabel}>身體：</Text>
-                    <View style={styles.reviewTagsContainer}>
-                      {displayBodyReactions.map((reaction, index) => (
-                        <View key={index} style={styles.reviewTag}>
-                          <Text style={styles.reviewTagText}>{reaction}</Text>
-                        </View>
-                      ))}
-                    </View>
-                  </View>
-                )}
-
-                {displayBehaviors.length > 0 && (
-                  <View style={styles.reviewReactionGroup}>
-                    <Text style={styles.reviewReactionLabel}>行為：</Text>
-                    <View style={styles.reviewTagsContainer}>
-                      {displayBehaviors.map((behavior, index) => (
-                        <View key={index} style={styles.reviewTag}>
-                          <Text style={styles.reviewTagText}>{behavior}</Text>
-                        </View>
-                      ))}
-                    </View>
-                  </View>
-                )}
-              </View>
-            )}
-
-            {/* 箭頭 */}
-            <View style={styles.reviewArrow}>
-              <View style={styles.reviewArrowCircle}>
-                <ArrowDown size={20} color="#0ea5e9" />
-              </View>
-            </View>
-
-            {/* 轉念後的觀點 */}
-            <View style={styles.reviewSection}>
-              <View style={styles.reviewLabelRow}>
-                <View style={[styles.reviewDot, { backgroundColor: '#10b981' }]} />
-                <Text style={styles.reviewLabel}>轉念後的觀點</Text>
-              </View>
-              <Text style={styles.reviewText}>{formData.newPerspective}</Text>
-            </View>
-
-            {/* 接下來的微小行動 */}
-            <View style={styles.reviewActionSection}>
-              <Text style={styles.reviewActionLabel}>接下來的微小行動</Text>
-              <View style={styles.reviewActionItem}>
-                <View style={styles.reviewActionCheck}>
-                  <Check size={14} color="#FFFFFF" />
-                </View>
-                <Text style={styles.reviewActionText}>{getSelectedActionText()}</Text>
-              </View>
-            </View>
-          </ScrollView>
-
-          <View style={styles.footer}>
-            <TouchableOpacity
-              style={styles.nextButton}
-              onPress={async () => {
-                try {
-                  console.log('📤 [思維調節] 準備完成練習');
-                  setIsTiming(false);
-                  
-                  // ⭐ 先完成練習
-                  await completeOnce();
-                  console.log('✅ [思維調節] 完成成功');
-                  
-                  // ⭐ 等待一小段時間確保 API 完成
-                  await new Promise(resolve => setTimeout(resolve, 300));
-                  
-                  // ⭐ 再切換到完成頁
-                  setCurrentPage('completion');
-                } catch (error) {
-                  console.error('❌ [思維調節] 完成練習失敗:', error);
-                  // 即使失敗也顯示完成頁
-                  setCurrentPage('completion');
-                }
-              }}
-            >
-              <LinearGradient
-                colors={['#0ea5e9', '#0ea5e9']}
-                style={styles.nextButtonGradient}
-              >
-                <BookOpen size={20} color="#FFFFFF" />
-                <Text style={styles.nextButtonText}>存入日記</Text>
-              </LinearGradient>
-            </TouchableOpacity>
-          </View>
-        </LinearGradient>
       </View>
-    );
-  };
-
-  // 10. 完成頁（含星星動畫）
+    </LinearGradient>
+  </View>
+);
+  // 10. 完成頁
   const renderCompletionPage = () => {
     const handleViewJournal = () => {
-      console.log('📖 [思維調節] 導航到日記頁面');
       navigation.navigate('MainTabs', {
         screen: 'Daily',
         params: { 
@@ -1771,7 +1552,6 @@ export default function CognitiveReframingPractice({ onBack, navigation, onHome 
           style={styles.gradientBg}
         >
           <View style={styles.completionContent}>
-            {/* 星星動畫容器 */}
             <View 
               style={{
                 position: 'absolute',
@@ -1787,7 +1567,6 @@ export default function CognitiveReframingPractice({ onBack, navigation, onHome 
               ))}
             </View>
 
-            {/* 中心圖標 */}
             <Animated.View
               style={[
                 styles.completionIconContainer,
@@ -1815,14 +1594,12 @@ export default function CognitiveReframingPractice({ onBack, navigation, onHome 
             <Text style={styles.completionSubtitle}>你成功暫停了自動導航，</Text>
             <Text style={styles.completionSubtitle}>拿回了思維的主控權。</Text>
 
-            {/* 裝飾星星 */}
             <View style={styles.decorativeStars}>
               <Star size={16} color="#fbbf24" fill="#fbbf24" style={{ opacity: 0.6 }} />
               <Star size={12} color="#fbbf24" fill="#fbbf24" style={{ opacity: 0.4, marginLeft: 40, marginTop: -20 }} />
               <Star size={14} color="#fbbf24" fill="#fbbf24" style={{ opacity: 0.5, marginLeft: -60, marginTop: 10 }} />
             </View>
 
-            {/* 查看日記按鈕 */}
             <TouchableOpacity
               style={styles.viewJournalButton}
               onPress={handleViewJournal}
@@ -1853,13 +1630,6 @@ export default function CognitiveReframingPractice({ onBack, navigation, onHome 
     </View>
   );
 }
-
-// 箭頭向下圖標組件
-const ArrowDown = ({ size, color }) => (
-  <View style={{ transform: [{ rotate: '90deg' }] }}>
-    <ArrowRight size={size} color={color} />
-  </View>
-);
 
 // ==================== 樣式 ====================
 const styles = StyleSheet.create({
@@ -2533,200 +2303,219 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
 
-  // ========== 評估頁 ⭐⭐⭐ 優化後的拉桿樣式 ⭐⭐⭐ ==========
-  assessmentContent: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 24,
-  },
-  assessmentCard: {
-    width: '100%',
-    maxWidth: 400,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 32,
-    padding: 32,
-    paddingTop: 40,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 8,
-    position: 'relative',
-    overflow: 'hidden',
-  },
-  assessmentAccentBar: {
-    position: 'absolute',
-    top: 0,
-    left: '2%',
-    right: '2%',
-    height: 8,
-    borderTopLeftRadius: 32,
-    borderTopRightRadius: 32,
-  },
-  assessmentBackButton: {
-    position: 'absolute',
-    top: 32,
-    left: 24,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#f1f5f9',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 10,
-  },
-  assessmentTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#2D3436',
-    textAlign: 'center',
-    marginBottom: 8,
-    marginTop: 16,
-  },
-  assessmentSubtitle: {
-    fontSize: 14,
-    color: '#6B7280',
-    textAlign: 'center',
-    marginBottom: 32,
-  },
-  scoreDisplay: {
-    alignItems: 'center',
-    marginBottom: 32,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 4,
-  },
-  scoreNumber: {
-    fontSize: 72,
-    fontWeight: '700',
-    color: '#0288D1',
-    lineHeight: 72,
-  },
-  scoreLabel: {
-    fontSize: 24,
-    fontWeight: '600',
-    color: '#94a3b8',
-    marginTop: 20,
-  },
-  sliderContainer: {
-    marginBottom: 32,
-    position: 'relative',
-    ...Platform.select({
-      android: {
-        paddingVertical: 4,
-      },
-    }),
-  },
-  customSliderTrackBackground: {
-    position: 'absolute',
-    top: 20,
-    left: 0,
-    right: 0,
-    height: 16,
-    backgroundColor: '#DFE6E9',
-    borderRadius: 8,
-    zIndex: 1,
-    ...Platform.select({
-      android: {
-        borderWidth: 1,
-        borderColor: '#CBD5E0',
-        elevation: 2,
-      },
-    }),
-  },
-  customSliderTrackFilled: {
-    position: 'absolute',
-    top: 20,
-    left: 0,
-    height: 16,
-    backgroundColor: '#29B6F6',
-    borderRadius: 8,
-    zIndex: 2,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#29B6F6',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.4,
-        shadowRadius: 4,
-      },
-      android: {
-        elevation: 4,
-        borderWidth: 1,
-        borderColor: '#1E88A8',
-      },
-    }),
-  },
-  slider: {
-    width: '100%',
-    height: 56,
-    position: 'relative',
-    zIndex: 3,
-    transform: [{ scale: 1.4 }],
-  },
-  sliderLabels: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 8,
-  },
-  sliderLabel: {
-    fontSize: 12,
-    color: '#636E72',
-    fontWeight: '500',
-  },
+  // ========== 評估頁 ⭐⭐⭐ 完美版本 - 大球圆形好拉 ⭐⭐⭐ ==========
+assessmentContent: {
+  flex: 1,
+  justifyContent: 'center',
+  alignItems: 'center',
+  paddingHorizontal: 24,
+},
+assessmentCard: {
+  width: '100%',
+  maxWidth: 400,
+  backgroundColor: '#FFFFFF',
+  borderRadius: 32,
+  padding: 32,
+  paddingTop: 40,
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 4 },
+  shadowOpacity: 0.1,
+  shadowRadius: 12,
+  elevation: 8,
+  position: 'relative',
+  overflow: 'hidden',
+},
+assessmentAccentBar: {
+  position: 'absolute',
+  top: 0,
+  left: '2%',
+  right: '2%',
+  height: 8,
+  borderTopLeftRadius: 32,
+  borderTopRightRadius: 32,
+},
+assessmentBackButton: {
+  position: 'absolute',
+  top: 32,
+  left: 24,
+  width: 40,
+  height: 40,
+  borderRadius: 20,
+  backgroundColor: '#f1f5f9',
+  justifyContent: 'center',
+  alignItems: 'center',
+  zIndex: 10,
+},
+assessmentTitle: {
+  fontSize: 24,
+  fontWeight: '700',
+  color: '#2D3436',
+  textAlign: 'center',
+  marginBottom: 8,
+  marginTop: 16,
+},
+assessmentSubtitle: {
+  fontSize: 14,
+  color: '#6B7280',
+  textAlign: 'center',
+  marginBottom: 32,
+},
+scoreDisplay: {
+  alignItems: 'center',
+  marginBottom: 40,
+  flexDirection: 'row',
+  justifyContent: 'center',
+  gap: 4,
+},
+scoreNumber: {
+  fontSize: 72,
+  fontWeight: '700',
+  color: '#0288D1',
+  lineHeight: 72,
+},
+scoreLabel: {
+  fontSize: 24,
+  fontWeight: '600',
+  color: '#94a3b8',
+  marginTop: 20,
+},
 
-  // ⭐⭐⭐ 呼吸練習建議卡片樣式 ⭐⭐⭐
-  breathingSuggestionCard: {
-    backgroundColor: '#f0f9ff',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 24,
-    borderWidth: 1,
-    borderColor: '#bae6fd',
-  },
-  breathingSuggestionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 8,
-  },
-  breathingSuggestionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#0369a1',
-  },
-  breathingSuggestionText: {
-    fontSize: 14,
-    color: '#64748b',
-    lineHeight: 22,
-    marginBottom: 16,
-  },
-  breathingSuggestionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: '#0ea5e9',
-    paddingVertical: 12,
-    borderRadius: 12,
-  },
-  breathingSuggestionButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
+// ⭐⭐⭐ 修正版：球不会超出轨道 ⭐⭐⭐
+sliderContainer: {
+  marginBottom: 32,
+  position: 'relative',
+  height: 100,
+  paddingHorizontal: 10,  // ⭐ 添加左右内边距
+},
+customSliderTrackBackground: {
+  position: 'absolute',
+  top: 42,
+  left: 10,   // ⭐ 对应 container 的 padding
+  right: 10,  // ⭐ 对应 container 的 padding
+  height: 16,
+  backgroundColor: '#DFE6E9',
+  borderRadius: 8,
+  ...Platform.select({
+    android: {
+      borderWidth: 1,
+      borderColor: '#CBD5E0',
+      elevation: 2,
+    },
+  }),
+},
+customSliderTrackFilled: {
+  position: 'absolute',
+  top: 42,
+  left: 10,   // ⭐ 对应 container 的 padding
+  height: 16,
+  backgroundColor: '#29B6F6',
+  borderRadius: 8,
+  ...Platform.select({
+    ios: {
+      shadowColor: '#29B6F6',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.4,
+      shadowRadius: 4,
+    },
+    android: {
+      elevation: 4,
+      borderWidth: 1,
+      borderColor: '#1E88A8',
+    },
+  }),
+},
+slider: {
+  width: '100%',
+  height: 40,
+  position: 'absolute',
+  top: 30,
+  left: 0,    // ⭐ 从 0 开始，因为 container 已经有 padding
+  right: 0,   // ⭐ 确保占满整个宽度
+  ...Platform.select({
+    ios: {
+      // iOS 原生就够大
+    },
+    android: {
+      transform: [{ scale: 1.8 }],
+    },
+  }),
+},
+sliderLabels: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  position: 'absolute',
+  bottom: 10,
+  left: 10,   // ⭐ 对应 container 的 padding
+  right: 10,  // ⭐ 对应 container 的 padding
+},
+sliderLabel: {
+  fontSize: 12,
+  color: '#636E72',
+  fontWeight: '500',
+},
 
-  assessmentButton: {
-    width: '100%',
-    height: 56,
-    borderRadius: 16,
-    overflow: 'hidden',
-    shadowColor: '#bae6fd',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
-  },
+breathingSuggestionCard: {
+  backgroundColor: '#f0f9ff',
+  borderRadius: 16,
+  padding: 20,
+  marginBottom: 24,
+  borderWidth: 1,
+  borderColor: '#bae6fd',
+},
+breathingSuggestionHeader: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 8,
+  marginBottom: 8,
+},
+breathingSuggestionTitle: {
+  fontSize: 16,
+  fontWeight: '600',
+  color: '#0369a1',
+},
+breathingSuggestionText: {
+  fontSize: 14,
+  color: '#64748b',
+  lineHeight: 22,
+  marginBottom: 16,
+},
+breathingSuggestionButton: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: 8,
+  backgroundColor: '#0ea5e9',
+  paddingVertical: 12,
+  borderRadius: 12,
+},
+breathingSuggestionButtonText: {
+  fontSize: 14,
+  fontWeight: '600',
+  color: '#FFFFFF',
+},
+assessmentButton: {
+  width: '100%',
+  height: 56,
+  borderRadius: 16,
+  overflow: 'hidden',
+  shadowColor: '#bae6fd',
+  shadowOffset: { width: 0, height: 4 },
+  shadowOpacity: 0.3,
+  shadowRadius: 8,
+  elevation: 4,
+},
+assessmentButtonGradient: {
+  flex: 1,
+  flexDirection: 'row',
+  justifyContent: 'center',
+  alignItems: 'center',
+  gap: 8,
+},
+assessmentButtonText: {
+  fontSize: 18,
+  fontWeight: '700',
+  color: '#FFFFFF',
+},
   assessmentButtonGradient: {
     flex: 1,
     flexDirection: 'row',
@@ -2828,7 +2617,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#e0f2fe',
+    backgroundColor: '#216fa3ff',
     justifyContent: 'center',
     alignItems: 'center',
   },
