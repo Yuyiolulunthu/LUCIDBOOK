@@ -14,10 +14,10 @@ import {
   KeyboardAvoidingView,
   Platform,
   Modal,
+  Dimensions,
+  PanResponder,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import Slider from '@react-native-community/slider';
-import { Dimensions } from 'react-native';
 import { 
   X, 
   HelpCircle, 
@@ -35,6 +35,201 @@ import {
   ChevronUp,
 } from 'lucide-react-native';
 import ApiService from '../../../api';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
+// ==================== 自定義滑杆組件 ====================
+const CustomSlider = ({ value, onValueChange, min = 0, max = 10 }) => {
+  const SLIDER_WIDTH = SCREEN_WIDTH - 120;
+  const THUMB_SIZE = 36;
+  const TRACK_HEIGHT = 16;
+
+  const [internalValue, setInternalValue] = useState(value);
+
+  const position = useRef(
+    new Animated.Value(((value - min) / (max - min)) * SLIDER_WIDTH)
+  ).current;
+
+  const startPosition = useRef(0);
+  const isDragging = useRef(false);
+
+  const valueRef = useRef(value);
+  useEffect(() => {
+    valueRef.current = internalValue;
+  }, [internalValue]);
+
+  const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
+
+  const posToValue = (pos) => {
+    const raw = (pos / SLIDER_WIDTH) * (max - min) + min;
+    return Math.round(raw);
+  };
+
+  const valueToPos = (v) => ((v - min) / (max - min)) * SLIDER_WIDTH;
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+
+      onPanResponderGrant: () => {
+        isDragging.current = true;
+        startPosition.current = valueToPos(valueRef.current);
+      },
+
+      onPanResponderMove: (_, gestureState) => {
+        let newPos = startPosition.current + gestureState.dx;
+        newPos = clamp(newPos, 0, SLIDER_WIDTH);
+
+        position.setValue(newPos);
+
+        const newValue = posToValue(newPos);
+
+        if (newValue !== valueRef.current) {
+          valueRef.current = newValue;
+          setInternalValue(newValue);
+          onValueChange?.(newValue);
+        }
+      },
+
+      onPanResponderRelease: () => {
+        const snapPos = valueToPos(valueRef.current);
+
+        Animated.spring(position, {
+          toValue: snapPos,
+          damping: 15,
+          stiffness: 150,
+          useNativeDriver: false,
+        }).start(() => {
+          isDragging.current = false;
+        });
+      },
+
+      onPanResponderTerminate: () => {
+        const snapPos = valueToPos(valueRef.current);
+        Animated.spring(position, {
+          toValue: snapPos,
+          damping: 15,
+          stiffness: 150,
+          useNativeDriver: false,
+        }).start(() => {
+          isDragging.current = false;
+        });
+      },
+    })
+  ).current;
+
+  useEffect(() => {
+    if (!isDragging.current && value !== valueRef.current) {
+      valueRef.current = value;
+      setInternalValue(value);
+      Animated.timing(position, {
+        toValue: valueToPos(value),
+        duration: 200,
+        useNativeDriver: false,
+      }).start();
+    }
+  }, [value, min, max]);
+
+  return (
+    <View style={customSliderStyles.container}>
+      <View style={[customSliderStyles.track, { height: TRACK_HEIGHT }]} />
+
+      <Animated.View
+        style={[
+          customSliderStyles.fill,
+          {
+            height: TRACK_HEIGHT,
+            width: position.interpolate({
+              inputRange: [0, SLIDER_WIDTH],
+              outputRange: [THUMB_SIZE / 2, SLIDER_WIDTH + THUMB_SIZE / 2],
+              extrapolate: 'clamp',
+            }),
+          },
+        ]}
+      />
+
+      <Animated.View
+        {...panResponder.panHandlers}
+        style={[
+          customSliderStyles.thumb,
+          {
+            width: THUMB_SIZE,
+            height: THUMB_SIZE,
+            borderRadius: THUMB_SIZE / 2,
+            left: -THUMB_SIZE / 2,
+            transform: [
+              {
+                translateX: position.interpolate({
+                  inputRange: [0, SLIDER_WIDTH],
+                  outputRange: [0, SLIDER_WIDTH],
+                  extrapolate: 'clamp',
+                }),
+              },
+            ],
+          },
+        ]}
+      />
+    </View>
+  );
+};
+
+const customSliderStyles = StyleSheet.create({
+  container: {
+    width: SCREEN_WIDTH - 120,
+    height: 60,
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  track: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    backgroundColor: '#DFE6E9',
+    borderRadius: 8,
+    ...Platform.select({
+      android: {
+        borderWidth: 1,
+        borderColor: '#CBD5E0',
+      },
+    }),
+  },
+  fill: {
+    position: 'absolute',
+    left: 0,
+    backgroundColor: '#29B6F6',
+    borderRadius: 8,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#29B6F6',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.4,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 3,
+      },
+    }),
+  },
+  thumb: {
+    position: 'absolute',
+    top: 12,
+    backgroundColor: '#0288D1',
+    borderWidth: 4,
+    borderColor: '#FFFFFF',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 8,
+      },
+    }),
+  },
+});
 
 // ==================== 初始表單資料 ====================
 const INITIAL_FORM_DATA = {
@@ -945,31 +1140,14 @@ export default function GoodThingsJournalNew({ onBack, navigation, onHome }) {
 
             <Text style={styles.assessmentSubtitle}>寫完好事後，你現在的心情如何？</Text>
 
-            <View style={styles.sliderContainer}>
-              {/* ✅ 自訂軌道背景（灰色） */}
-              <View style={styles.customSliderTrackBackground} />
-              
-              {/* ✅ 自訂填充軌道（藍色，動態寬度） */}
-              <View 
-                style={[
-                  styles.customSliderTrackFilled, 
-                  { width: `${(formData.postScore / 10) * 100}%` }
-                ]} 
-              />
-              
-              {/* ✅ 原生 Slider（設為透明，只用來接收觸摸） */}
-              <Slider
-                style={styles.slider}
-                minimumValue={0}
-                maximumValue={10}
-                step={1}
+            <View style={styles.sliderWrapper}>
+              <CustomSlider
                 value={formData.postScore}
-                onValueChange={value => setFormData(prev => ({ ...prev, postScore: value }))}
-                minimumTrackTintColor="transparent"  // 改透明
-                maximumTrackTintColor="transparent"  // 改透明
-                thumbTintColor={Platform.OS === 'android' ? '#164b88ff' : '#FFFFFF'}  // ⭐ Android 使用深色 thumb
+                onValueChange={(value) => setFormData(prev => ({ ...prev, postScore: value }))}
+                min={0}
+                max={10}
               />
-              
+
               <View style={styles.sliderLabels}>
                 <Text style={styles.sliderLabel}>0 心情低落</Text>
                 <Text style={styles.sliderLabel}>10 心情愉悅</Text>
@@ -1761,65 +1939,15 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 40,
   },
-  sliderContainer: {
+  sliderWrapper: {
     marginBottom: 32,
-    position: 'relative',
-    ...Platform.select({
-      android: {
-        paddingVertical: 4,  // 為邊框留空間
-      },
-    }),
-  },
-  customSliderTrackBackground: {
-    position: 'absolute',
-    top: 20,
-    left: 0,
-    right: 0,
-    height: 16,
-    backgroundColor: '#DFE6E9',
-    borderRadius: 8,
-    zIndex: 1,
-    ...Platform.select({
-      android: {
-        borderWidth: 1,
-        borderColor: '#CBD5E0',
-        elevation: 2,
-      },
-    }),
-  },
-  customSliderTrackFilled: {
-    position: 'absolute',
-    top: 20,
-    left: 0,
-    height: 16,
-    backgroundColor: '#29B6F6',
-    borderRadius: 8,
-    zIndex: 2,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#29B6F6',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.4,
-        shadowRadius: 4,
-      },
-      android: {
-        elevation: 4,  // Android 使用 elevation
-        borderWidth: 1,
-        borderColor: '#1E88A8',  // 深色邊框增強效果
-      },
-    }),
-  },
-  slider: {
-    width: '100%',
-    height: 56,
-    position: 'relative',
-    zIndex: 3,
-    transform: [{ scale: 1.4 }],
+    alignItems: 'center',
   },
   sliderLabels: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 8,
+    width: SCREEN_WIDTH - 120,
+    marginTop: 12,
   },
   sliderLabel: {
     fontSize: 12,

@@ -25,8 +25,8 @@ import {
   ActivityIndicator,
   Modal,
   Dimensions,
+  PanResponder,
 } from 'react-native';
-import Slider from '@react-native-community/slider';
 import { Audio } from 'expo-av';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -45,6 +45,199 @@ import ApiService from '../../../api';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const PRACTICE_TYPE = '呼吸穩定力練習';
+
+// ==================== 自定義滑杆組件 ====================
+const CustomSlider = ({ value, onValueChange, min = 0, max = 10 }) => {
+  const SLIDER_WIDTH = SCREEN_WIDTH - 120;
+  const THUMB_SIZE = 36;
+  const TRACK_HEIGHT = 16;
+
+  const [internalValue, setInternalValue] = useState(value);
+
+  const position = useRef(
+    new Animated.Value(((value - min) / (max - min)) * SLIDER_WIDTH)
+  ).current;
+
+  const startPosition = useRef(0);
+  const isDragging = useRef(false);
+
+  const valueRef = useRef(value);
+  useEffect(() => {
+    valueRef.current = internalValue;
+  }, [internalValue]);
+
+  const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
+
+  const posToValue = (pos) => {
+    const raw = (pos / SLIDER_WIDTH) * (max - min) + min;
+    return Math.round(raw);
+  };
+
+  const valueToPos = (v) => ((v - min) / (max - min)) * SLIDER_WIDTH;
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+
+      onPanResponderGrant: () => {
+        isDragging.current = true;
+        startPosition.current = valueToPos(valueRef.current);
+      },
+
+      onPanResponderMove: (_, gestureState) => {
+        let newPos = startPosition.current + gestureState.dx;
+        newPos = clamp(newPos, 0, SLIDER_WIDTH);
+
+        position.setValue(newPos);
+
+        const newValue = posToValue(newPos);
+
+        if (newValue !== valueRef.current) {
+          valueRef.current = newValue;
+          setInternalValue(newValue);
+          onValueChange?.(newValue);
+        }
+      },
+
+      onPanResponderRelease: () => {
+        const snapPos = valueToPos(valueRef.current);
+
+        Animated.spring(position, {
+          toValue: snapPos,
+          damping: 15,
+          stiffness: 150,
+          useNativeDriver: false,
+        }).start(() => {
+          isDragging.current = false;
+        });
+      },
+
+      onPanResponderTerminate: () => {
+        const snapPos = valueToPos(valueRef.current);
+        Animated.spring(position, {
+          toValue: snapPos,
+          damping: 15,
+          stiffness: 150,
+          useNativeDriver: false,
+        }).start(() => {
+          isDragging.current = false;
+        });
+      },
+    })
+  ).current;
+
+  useEffect(() => {
+    if (!isDragging.current && value !== valueRef.current) {
+      valueRef.current = value;
+      setInternalValue(value);
+      Animated.timing(position, {
+        toValue: valueToPos(value),
+        duration: 200,
+        useNativeDriver: false,
+      }).start();
+    }
+  }, [value, min, max]);
+
+  return (
+    <View style={customSliderStyles.container}>
+      <View style={[customSliderStyles.track, { height: TRACK_HEIGHT }]} />
+
+      <Animated.View
+        style={[
+          customSliderStyles.fill,
+          {
+            height: TRACK_HEIGHT,
+            width: position.interpolate({
+              inputRange: [0, SLIDER_WIDTH],
+              outputRange: [THUMB_SIZE / 2, SLIDER_WIDTH + THUMB_SIZE / 2],
+              extrapolate: 'clamp',
+            }),
+          },
+        ]}
+      />
+
+      <Animated.View
+        {...panResponder.panHandlers}
+        style={[
+          customSliderStyles.thumb,
+          {
+            width: THUMB_SIZE,
+            height: THUMB_SIZE,
+            borderRadius: THUMB_SIZE / 2,
+            left: -THUMB_SIZE / 2,
+            transform: [
+              {
+                translateX: position.interpolate({
+                  inputRange: [0, SLIDER_WIDTH],
+                  outputRange: [0, SLIDER_WIDTH],
+                  extrapolate: 'clamp',
+                }),
+              },
+            ],
+          },
+        ]}
+      />
+    </View>
+  );
+};
+
+const customSliderStyles = StyleSheet.create({
+  container: {
+    width: SCREEN_WIDTH - 120,
+    height: 60,
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  track: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    backgroundColor: '#DFE6E9',
+    borderRadius: 8,
+    ...Platform.select({
+      android: {
+        borderWidth: 1,
+        borderColor: '#CBD5E0',
+      },
+    }),
+  },
+  fill: {
+    position: 'absolute',
+    left: 0,
+    backgroundColor: '#29B6F6',
+    borderRadius: 8,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#29B6F6',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.4,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 3,
+      },
+    }),
+  },
+  thumb: {
+    position: 'absolute',
+    top: 12,
+    backgroundColor: '#0288D1',
+    borderWidth: 4,
+    borderColor: '#FFFFFF',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 8,
+      },
+    }),
+  },
+});
 
 // 星星動畫
 const StarConfetti = ({ index }) => {
@@ -1088,19 +1281,12 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
 
         <Text style={styles.relaxationPrompt}>練習後，你現在的放鬆程度如何?</Text>
 
-        <View style={styles.sliderContainer}>
-          <View style={styles.customSliderTrackBackground} />
-          <View style={[styles.customSliderTrackFilled, { width: `${(relaxLevel / 10) * 100}%` }]} />
-          <Slider
-            style={styles.slider}
-            minimumValue={0}
-            maximumValue={10}
-            step={1}
+        <View style={styles.sliderWrapper}>
+          <CustomSlider
             value={relaxLevel}
-            onValueChange={(value) => setRelaxLevel(Math.round(value))}
-            minimumTrackTintColor="transparent"
-            maximumTrackTintColor="transparent"
-            thumbTintColor={Platform.OS === 'android' ? '#164b88ff' : '#FFFFFF'}
+            onValueChange={(value) => setRelaxLevel(value)}
+            min={0}
+            max={10}
           />
 
           <View style={styles.sliderLabels}>
@@ -1531,37 +1717,11 @@ const styles = StyleSheet.create({
   relaxationScoreMax: { fontSize: 24, color: '#999', marginLeft: 4 },
   relaxationPrompt: { fontSize: 14, color: '#666', textAlign: 'center', marginBottom: 32 },
 
-  sliderContainer: {
+  sliderWrapper: {
     marginBottom: 8,
-    position: 'relative',
-    ...Platform.select({ android: { paddingVertical: 4 } }),
+    alignItems: 'center',
   },
-  customSliderTrackBackground: {
-    position: 'absolute',
-    top: 20,
-    left: 0,
-    right: 0,
-    height: 16,
-    backgroundColor: '#DFE6E9',
-    borderRadius: 8,
-    zIndex: 1,
-    ...Platform.select({ android: { borderWidth: 1, borderColor: '#CBD5E0', elevation: 2 } }),
-  },
-  customSliderTrackFilled: {
-    position: 'absolute',
-    top: 20,
-    left: 0,
-    height: 16,
-    backgroundColor: '#29B6F6',
-    borderRadius: 8,
-    zIndex: 2,
-    ...Platform.select({
-      ios: { shadowColor: '#29B6F6', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.4, shadowRadius: 4 },
-      android: { elevation: 4, borderWidth: 1, borderColor: '#1E88A8' },
-    }),
-  },
-  slider: { width: '100%', height: 56, position: 'relative', zIndex: 3, transform: [{ scale: 1.4 }] },
-  sliderLabels: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 32, paddingHorizontal: 4, marginTop: 8 },
+  sliderLabels: { flexDirection: 'row', justifyContent: 'space-between', width: SCREEN_WIDTH - 120, marginBottom: 32, paddingHorizontal: 4, marginTop: 8 },
   sliderLabel: { fontSize: 12, color: '#636E72', fontWeight: '500' },
 
   relaxationCompleteButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#2196F3', borderRadius: 30, paddingVertical: 16, gap: 8 },
