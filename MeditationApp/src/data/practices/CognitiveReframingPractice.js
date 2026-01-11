@@ -1,7 +1,7 @@
 // ==========================================
 // 檔案名稱: CognitiveReframingPractice.js
 // 思維調節練習 - ABCD 認知行為療法
-// 版本: V1.5 - 優化評估頁滑桿（保留原始美感）
+// 版本: V2.2 - 最终版本（无刻度）
 // ==========================================
 
 import React, { useState, useRef, useEffect } from 'react';
@@ -20,9 +20,9 @@ import {
   Platform,
   Modal,
   Dimensions,
+  PanResponder,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import Slider from '@react-native-community/slider';
 import {
   X,
   HelpCircle,
@@ -51,6 +51,210 @@ import {
 import ApiService from '../../../api';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+
+// ==================== 自定義滑杆組件（最终版）====================
+// ==================== 自定義滑杆組件（修復：不再彈回中間）====================
+const CustomSlider = ({ value, onValueChange, min = 1, max = 10 }) => {
+  const SLIDER_WIDTH = SCREEN_WIDTH - 120;
+  const THUMB_SIZE = 36;
+  const TRACK_HEIGHT = 16;
+
+  const [internalValue, setInternalValue] = useState(value);
+
+  // 位置動畫
+  const position = useRef(
+    new Animated.Value(((value - min) / (max - min)) * SLIDER_WIDTH)
+  ).current;
+
+  const startPosition = useRef(0);
+  const isDragging = useRef(false);
+
+  // ✅ 用 ref 存最新 value（避免 setState 非同步造成 release 用到舊值）
+  const valueRef = useRef(value);
+  useEffect(() => {
+    valueRef.current = internalValue;
+  }, [internalValue]);
+
+  const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
+
+  const posToValue = (pos) => {
+    const raw = (pos / SLIDER_WIDTH) * (max - min) + min;
+    return Math.round(raw);
+  };
+
+  const valueToPos = (v) => ((v - min) / (max - min)) * SLIDER_WIDTH;
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+
+      onPanResponderGrant: () => {
+        isDragging.current = true;
+        // 用 ref 的值拿到「當下最新」的位置作為起點
+        startPosition.current = valueToPos(valueRef.current);
+      },
+
+      onPanResponderMove: (_, gestureState) => {
+        let newPos = startPosition.current + gestureState.dx;
+        newPos = clamp(newPos, 0, SLIDER_WIDTH);
+
+        position.setValue(newPos);
+
+        const newValue = posToValue(newPos);
+
+        if (newValue !== valueRef.current) {
+          valueRef.current = newValue; // ✅ 同步更新
+          setInternalValue(newValue);
+          onValueChange?.(newValue);
+        }
+      },
+
+      onPanResponderRelease: () => {
+        // ✅ release 時直接用 ref 的最新值算 snap，不會再跳回錯的位置
+        const snapPos = valueToPos(valueRef.current);
+
+        Animated.spring(position, {
+          toValue: snapPos,
+          damping: 15,
+          stiffness: 150,
+          useNativeDriver: false,
+        }).start(() => {
+          isDragging.current = false;
+        });
+      },
+
+      onPanResponderTerminate: () => {
+        // 被中斷也要回到正確位置
+        const snapPos = valueToPos(valueRef.current);
+        Animated.spring(position, {
+          toValue: snapPos,
+          damping: 15,
+          stiffness: 150,
+          useNativeDriver: false,
+        }).start(() => {
+          isDragging.current = false;
+        });
+      },
+    })
+  ).current;
+
+  // 外部 value 改變時同步更新（非拖曳狀態才更新，避免手感被搶）
+  useEffect(() => {
+    if (!isDragging.current && value !== valueRef.current) {
+      valueRef.current = value;
+      setInternalValue(value);
+      Animated.timing(position, {
+        toValue: valueToPos(value),
+        duration: 200,
+        useNativeDriver: false,
+      }).start();
+    }
+  }, [value, min, max]);
+
+  return (
+    <View style={customSliderStyles.container}>
+      {/* 背景轨道 */}
+      <View style={[customSliderStyles.track, { height: TRACK_HEIGHT }]} />
+
+      {/* 填充轨道 */}
+      <Animated.View
+        style={[
+          customSliderStyles.fill,
+          {
+            height: TRACK_HEIGHT,
+            width: position.interpolate({
+              inputRange: [0, SLIDER_WIDTH],
+              outputRange: [THUMB_SIZE / 2, SLIDER_WIDTH + THUMB_SIZE / 2],
+              extrapolate: 'clamp',
+            }),
+          },
+        ]}
+      />
+
+      {/* 可拖动的球 */}
+      <Animated.View
+        {...panResponder.panHandlers}
+        style={[
+          customSliderStyles.thumb,
+          {
+            width: THUMB_SIZE,
+            height: THUMB_SIZE,
+            borderRadius: THUMB_SIZE / 2,
+            left: -THUMB_SIZE / 2,
+            transform: [
+              {
+                translateX: position.interpolate({
+                  inputRange: [0, SLIDER_WIDTH],
+                  outputRange: [0, SLIDER_WIDTH],
+                  extrapolate: 'clamp',
+                }),
+              },
+            ],
+          },
+        ]}
+      />
+    </View>
+  );
+};
+
+
+const customSliderStyles = StyleSheet.create({
+  container: {
+    width: SCREEN_WIDTH - 120,
+    height: 60,
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  track: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    backgroundColor: '#DFE6E9',
+    borderRadius: 8,
+    ...Platform.select({
+      android: {
+        borderWidth: 1,
+        borderColor: '#CBD5E0',
+      },
+    }),
+  },
+  fill: {
+    position: 'absolute',
+    left: 0,
+    backgroundColor: '#29B6F6',
+    borderRadius: 8,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#29B6F6',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.4,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 3,
+      },
+    }),
+  },
+  thumb: {
+    position: 'absolute',
+    top: 12,
+    backgroundColor: '#0288D1',
+    borderWidth: 4,
+    borderColor: '#FFFFFF',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 8,
+      },
+    }),
+  },
+});
 
 // ==================== 初始表單資料 ====================
 const INITIAL_FORM_DATA = {
@@ -1433,106 +1637,235 @@ export default function CognitiveReframingPractice({ onBack, navigation }) {
     );
   };
 
-// 8. 情緒評估頁 ⭐⭐⭐ 完美版本 - 大球圆形好拉 ⭐⭐⭐
-const renderAssessmentPage = () => (
-  <View style={styles.fullScreen}>
-    <LinearGradient
-      colors={['#f0f9ff', '#e0e3feff']}
-      style={styles.gradientBg}
-    >
-      <View style={styles.progressBarTop}>
-        <ProgressBar currentStep={getCurrentStep()} totalSteps={totalSteps} />
-      </View>
+  // 8. 情緒評估頁（使用自定義滑杆）
+  const renderAssessmentPage = () => (
+    <View style={styles.fullScreen}>
+      <LinearGradient
+        colors={['#f0f9ff', '#e0f2fe']}
+        style={styles.gradientBg}
+      >
+        <View style={styles.progressBarTop}>
+          <ProgressBar currentStep={getCurrentStep()} totalSteps={totalSteps} />
+        </View>
 
-      <View style={styles.assessmentContent}>
-        <View style={styles.assessmentCard}>
-          <LinearGradient
-            colors={['#29B6F6', '#0288D1']}
-            style={styles.assessmentAccentBar}
-          />
-
-          <TouchableOpacity onPress={handleBack} style={styles.assessmentBackButton}>
-            <ArrowLeft size={20} color="#64748b" />
-          </TouchableOpacity>
-
-          <Text style={styles.assessmentTitle}>感覺有好一點嗎？</Text>
-          <Text style={styles.assessmentSubtitle}>請評估原本不舒服情緒的減緩程度</Text>
-
-          <View style={styles.scoreDisplay}>
-            <Text style={styles.scoreNumber}>{formData.postScore}</Text>
-            <Text style={styles.scoreLabel}>分</Text>
-          </View>
-
-          <View style={styles.sliderContainer}>
-            {/* 背景軌道 */}
-            <View style={styles.customSliderTrackBackground} />
-            
-            {/* 填充軌道 */}
-            <View 
-              style={[
-                styles.customSliderTrackFilled, 
-                { width: `${((formData.postScore - 1) / 9) * 100}%` }
-              ]} 
-            />
-            
-            {/* Slider 組件 */}
-            <Slider
-              style={styles.slider}
-              minimumValue={1}
-              maximumValue={10}
-              step={1}
-              value={formData.postScore}
-              onValueChange={value => setFormData(prev => ({ ...prev, postScore: value }))}
-              minimumTrackTintColor="transparent"
-              maximumTrackTintColor="transparent"
-              thumbTintColor="rgba(9, 90, 147, 1)"
-            />
-            
-            {/* 標籤 */}
-            <View style={styles.sliderLabels}>
-              <Text style={styles.sliderLabel}>1 (沒有減緩)</Text>
-              <Text style={styles.sliderLabel}>10 (完全消失)</Text>
-            </View>
-          </View>
-
-          {formData.postScore <= 3 && (
-            <View style={styles.breathingSuggestionCard}>
-              <View style={styles.breathingSuggestionHeader}>
-                <Wind size={20} color="#0ea5e9" />
-                <Text style={styles.breathingSuggestionTitle}>需要更多幫助嗎？</Text>
-              </View>
-              <Text style={styles.breathingSuggestionText}>
-                情緒還是有點緊繃，要不要先做個呼吸練習，讓身心都緩和下來？
-              </Text>
-              <TouchableOpacity
-                style={styles.breathingSuggestionButton}
-                onPress={() => {
-                  navigation.navigate('BreathingPractice');
-                }}
-              >
-                <Wind size={16} color="#FFFFFF" />
-                <Text style={styles.breathingSuggestionButtonText}>開始呼吸練習</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-
-          <TouchableOpacity
-            style={styles.assessmentButton}
-            onPress={() => setCurrentPage('review')}
-          >
+        <View style={styles.assessmentContent}>
+          <View style={styles.assessmentCard}>
             <LinearGradient
               colors={['#29B6F6', '#0288D1']}
-              style={styles.assessmentButtonGradient}
+              style={styles.assessmentAccentBar}
+            />
+
+            <TouchableOpacity onPress={handleBack} style={styles.assessmentBackButton}>
+              <ArrowLeft size={20} color="#64748b" />
+            </TouchableOpacity>
+
+            <Text style={styles.assessmentTitle}>感覺有好一點嗎？</Text>
+            <Text style={styles.assessmentSubtitle}>請評估原本不舒服情緒的減緩程度</Text>
+
+            <View style={styles.scoreDisplay}>
+              <Text style={styles.scoreNumber}>{formData.postScore}</Text>
+              <Text style={styles.scoreLabel}>分</Text>
+            </View>
+
+            {/* ⭐ 自定义滑杆 ⭐ */}
+            <View style={styles.sliderWrapper}>
+              <CustomSlider
+                value={formData.postScore}
+                onValueChange={(value) => setFormData(prev => ({ ...prev, postScore: value }))}
+                min={1}
+                max={10}
+              />
+              
+              <View style={styles.sliderLabels}>
+                <Text style={styles.sliderLabel}>1 (沒有減緩)</Text>
+                <Text style={styles.sliderLabel}>10 (完全消失)</Text>
+              </View>
+            </View>
+
+            {formData.postScore <= 3 && (
+              <View style={styles.breathingSuggestionCard}>
+                <View style={styles.breathingSuggestionHeader}>
+                  <Wind size={20} color="#0ea5e9" />
+                  <Text style={styles.breathingSuggestionTitle}>需要更多幫助嗎？</Text>
+                </View>
+                <Text style={styles.breathingSuggestionText}>
+                  情緒還是有點緊繃，要不要先做個呼吸練習，讓身心都緩和下來？
+                </Text>
+                <TouchableOpacity
+                  style={styles.breathingSuggestionButton}
+                  onPress={() => {
+                    navigation.navigate('BreathingPractice');
+                  }}
+                >
+                  <Wind size={16} color="#FFFFFF" />
+                  <Text style={styles.breathingSuggestionButtonText}>開始呼吸練習</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            <TouchableOpacity
+              style={styles.assessmentButton}
+              onPress={() => setCurrentPage('review')}
             >
-              <Text style={styles.assessmentButtonText}>完成紀錄</Text>
-              <ArrowRight size={20} color="#FFFFFF" />
-            </LinearGradient>
-          </TouchableOpacity>
+              <LinearGradient
+                colors={['#29B6F6', '#0288D1']}
+                style={styles.assessmentButtonGradient}
+              >
+                <Text style={styles.assessmentButtonText}>完成紀錄</Text>
+                <ArrowRight size={20} color="#FFFFFF" />
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
         </View>
+      </LinearGradient>
+    </View>
+  );
+
+  // 9. 練習回顧頁
+  const renderReviewPage = () => {
+    const displayEmotions = [...new Set([...formData.emotions, ...customEmotions])];
+    const displayBodyReactions = [...new Set([...formData.bodyReactions, ...customBodyReactions])];
+    const displayBehaviors = [...new Set([...formData.behaviors, ...customBehaviors])];
+
+    const getSelectedActionText = () => {
+      if (formData.customAction.trim()) return formData.customAction;
+      const action = MICRO_ACTIONS.find(a => a.id === formData.selectedAction);
+      return action?.title || '';
+    };
+
+    return (
+      <View style={styles.fullScreen}>
+        <LinearGradient
+          colors={['#f0f9ff', '#e0f2fe']}
+          style={styles.gradientBg}
+        >
+          <View style={styles.reviewHeader}>
+            <TouchableOpacity onPress={handleBack} style={styles.headerBackButton}>
+              <ArrowLeft size={24} color="#64748b" />
+            </TouchableOpacity>
+            <Text style={styles.reviewHeaderTitle}>練習回顧</Text>
+            <View style={{ width: 40 }} />
+          </View>
+
+          <ScrollView
+            contentContainerStyle={styles.reviewScrollContent}
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={styles.reviewSection}>
+              <Text style={styles.reviewLabel}>事件</Text>
+              <Text style={styles.reviewText}>{formData.event}</Text>
+            </View>
+
+            <View style={styles.reviewSection}>
+              <View style={styles.reviewLabelRow}>
+                <View style={styles.reviewDot} />
+                <Text style={styles.reviewLabel}>當時的想法</Text>
+              </View>
+              <Text style={styles.reviewText}>{formData.thought}</Text>
+            </View>
+
+            {(displayEmotions.length > 0 || displayBodyReactions.length > 0 || displayBehaviors.length > 0) && (
+              <View style={styles.reviewSection}>
+                <View style={styles.reviewLabelRow}>
+                  <View style={[styles.reviewDot, { backgroundColor: '#f59e0b' }]} />
+                  <Text style={styles.reviewLabel}>情緒反應</Text>
+                </View>
+                
+                {displayEmotions.length > 0 && (
+                  <View style={styles.reviewReactionGroup}>
+                    <Text style={styles.reviewReactionLabel}>情緒：</Text>
+                    <View style={styles.reviewTagsContainer}>
+                      {displayEmotions.map((emotion, index) => (
+                        <View key={index} style={styles.reviewTag}>
+                          <Text style={styles.reviewTagText}>{emotion}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                )}
+
+                {displayBodyReactions.length > 0 && (
+                  <View style={styles.reviewReactionGroup}>
+                    <Text style={styles.reviewReactionLabel}>身體：</Text>
+                    <View style={styles.reviewTagsContainer}>
+                      {displayBodyReactions.map((reaction, index) => (
+                        <View key={index} style={styles.reviewTag}>
+                          <Text style={styles.reviewTagText}>{reaction}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                )}
+
+                {displayBehaviors.length > 0 && (
+                  <View style={styles.reviewReactionGroup}>
+                    <Text style={styles.reviewReactionLabel}>行為：</Text>
+                    <View style={styles.reviewTagsContainer}>
+                      {displayBehaviors.map((behavior, index) => (
+                        <View key={index} style={styles.reviewTag}>
+                          <Text style={styles.reviewTagText}>{behavior}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                )}
+              </View>
+            )}
+
+            <View style={styles.reviewArrow}>
+              <View style={styles.reviewArrowCircle}>
+                <ArrowDown size={20} color="#0ea5e9" />
+              </View>
+            </View>
+
+            <View style={styles.reviewSection}>
+              <View style={styles.reviewLabelRow}>
+                <View style={[styles.reviewDot, { backgroundColor: '#10b981' }]} />
+                <Text style={styles.reviewLabel}>轉念後的觀點</Text>
+              </View>
+              <Text style={styles.reviewText}>{formData.newPerspective}</Text>
+            </View>
+
+            <View style={styles.reviewActionSection}>
+              <Text style={styles.reviewActionLabel}>接下來的微小行動</Text>
+              <View style={styles.reviewActionItem}>
+                <View style={styles.reviewActionCheck}>
+                  <Check size={14} color="#FFFFFF" />
+                </View>
+                <Text style={styles.reviewActionText}>{getSelectedActionText()}</Text>
+              </View>
+            </View>
+          </ScrollView>
+
+          <View style={styles.footer}>
+            <TouchableOpacity
+              style={styles.nextButton}
+              onPress={async () => {
+                try {
+                  setIsTiming(false);
+                  await completeOnce();
+                  await new Promise(resolve => setTimeout(resolve, 300));
+                  setCurrentPage('completion');
+                } catch (error) {
+                  console.error('❌ 完成練習失敗:', error);
+                  setCurrentPage('completion');
+                }
+              }}
+            >
+              <LinearGradient
+                colors={['#0ea5e9', '#0ea5e9']}
+                style={styles.nextButtonGradient}
+              >
+                <BookOpen size={20} color="#FFFFFF" />
+                <Text style={styles.nextButtonText}>存入日記</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+        </LinearGradient>
       </View>
-    </LinearGradient>
-  </View>
-);
+    );
+  };
+
   // 10. 完成頁
   const renderCompletionPage = () => {
     const handleViewJournal = () => {
@@ -2303,219 +2636,147 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
 
-  // ========== 評估頁 ⭐⭐⭐ 完美版本 - 大球圆形好拉 ⭐⭐⭐ ==========
-assessmentContent: {
-  flex: 1,
-  justifyContent: 'center',
-  alignItems: 'center',
-  paddingHorizontal: 24,
-},
-assessmentCard: {
-  width: '100%',
-  maxWidth: 400,
-  backgroundColor: '#FFFFFF',
-  borderRadius: 32,
-  padding: 32,
-  paddingTop: 40,
-  shadowColor: '#000',
-  shadowOffset: { width: 0, height: 4 },
-  shadowOpacity: 0.1,
-  shadowRadius: 12,
-  elevation: 8,
-  position: 'relative',
-  overflow: 'hidden',
-},
-assessmentAccentBar: {
-  position: 'absolute',
-  top: 0,
-  left: '2%',
-  right: '2%',
-  height: 8,
-  borderTopLeftRadius: 32,
-  borderTopRightRadius: 32,
-},
-assessmentBackButton: {
-  position: 'absolute',
-  top: 32,
-  left: 24,
-  width: 40,
-  height: 40,
-  borderRadius: 20,
-  backgroundColor: '#f1f5f9',
-  justifyContent: 'center',
-  alignItems: 'center',
-  zIndex: 10,
-},
-assessmentTitle: {
-  fontSize: 24,
-  fontWeight: '700',
-  color: '#2D3436',
-  textAlign: 'center',
-  marginBottom: 8,
-  marginTop: 16,
-},
-assessmentSubtitle: {
-  fontSize: 14,
-  color: '#6B7280',
-  textAlign: 'center',
-  marginBottom: 32,
-},
-scoreDisplay: {
-  alignItems: 'center',
-  marginBottom: 40,
-  flexDirection: 'row',
-  justifyContent: 'center',
-  gap: 4,
-},
-scoreNumber: {
-  fontSize: 72,
-  fontWeight: '700',
-  color: '#0288D1',
-  lineHeight: 72,
-},
-scoreLabel: {
-  fontSize: 24,
-  fontWeight: '600',
-  color: '#94a3b8',
-  marginTop: 20,
-},
-
-// ⭐⭐⭐ 修正版：球不会超出轨道 ⭐⭐⭐
-sliderContainer: {
-  marginBottom: 32,
-  position: 'relative',
-  height: 100,
-  paddingHorizontal: 10,  // ⭐ 添加左右内边距
-},
-customSliderTrackBackground: {
-  position: 'absolute',
-  top: 42,
-  left: 10,   // ⭐ 对应 container 的 padding
-  right: 10,  // ⭐ 对应 container 的 padding
-  height: 16,
-  backgroundColor: '#DFE6E9',
-  borderRadius: 8,
-  ...Platform.select({
-    android: {
-      borderWidth: 1,
-      borderColor: '#CBD5E0',
-      elevation: 2,
-    },
-  }),
-},
-customSliderTrackFilled: {
-  position: 'absolute',
-  top: 42,
-  left: 10,   // ⭐ 对应 container 的 padding
-  height: 16,
-  backgroundColor: '#29B6F6',
-  borderRadius: 8,
-  ...Platform.select({
-    ios: {
-      shadowColor: '#29B6F6',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.4,
-      shadowRadius: 4,
-    },
-    android: {
-      elevation: 4,
-      borderWidth: 1,
-      borderColor: '#1E88A8',
-    },
-  }),
-},
-slider: {
-  width: '100%',
-  height: 40,
-  position: 'absolute',
-  top: 30,
-  left: 0,    // ⭐ 从 0 开始，因为 container 已经有 padding
-  right: 0,   // ⭐ 确保占满整个宽度
-  ...Platform.select({
-    ios: {
-      // iOS 原生就够大
-    },
-    android: {
-      transform: [{ scale: 1.8 }],
-    },
-  }),
-},
-sliderLabels: {
-  flexDirection: 'row',
-  justifyContent: 'space-between',
-  position: 'absolute',
-  bottom: 10,
-  left: 10,   // ⭐ 对应 container 的 padding
-  right: 10,  // ⭐ 对应 container 的 padding
-},
-sliderLabel: {
-  fontSize: 12,
-  color: '#636E72',
-  fontWeight: '500',
-},
-
-breathingSuggestionCard: {
-  backgroundColor: '#f0f9ff',
-  borderRadius: 16,
-  padding: 20,
-  marginBottom: 24,
-  borderWidth: 1,
-  borderColor: '#bae6fd',
-},
-breathingSuggestionHeader: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  gap: 8,
-  marginBottom: 8,
-},
-breathingSuggestionTitle: {
-  fontSize: 16,
-  fontWeight: '600',
-  color: '#0369a1',
-},
-breathingSuggestionText: {
-  fontSize: 14,
-  color: '#64748b',
-  lineHeight: 22,
-  marginBottom: 16,
-},
-breathingSuggestionButton: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  justifyContent: 'center',
-  gap: 8,
-  backgroundColor: '#0ea5e9',
-  paddingVertical: 12,
-  borderRadius: 12,
-},
-breathingSuggestionButtonText: {
-  fontSize: 14,
-  fontWeight: '600',
-  color: '#FFFFFF',
-},
-assessmentButton: {
-  width: '100%',
-  height: 56,
-  borderRadius: 16,
-  overflow: 'hidden',
-  shadowColor: '#bae6fd',
-  shadowOffset: { width: 0, height: 4 },
-  shadowOpacity: 0.3,
-  shadowRadius: 8,
-  elevation: 4,
-},
-assessmentButtonGradient: {
-  flex: 1,
-  flexDirection: 'row',
-  justifyContent: 'center',
-  alignItems: 'center',
-  gap: 8,
-},
-assessmentButtonText: {
-  fontSize: 18,
-  fontWeight: '700',
-  color: '#FFFFFF',
-},
+  // ========== 評估頁（自定義滑杆）==========
+  assessmentContent: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+  },
+  assessmentCard: {
+    width: '100%',
+    maxWidth: 400,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 32,
+    padding: 32,
+    paddingTop: 40,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 8,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  assessmentAccentBar: {
+    position: 'absolute',
+    top: 0,
+    left: '2%',
+    right: '2%',
+    height: 8,
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+  },
+  assessmentBackButton: {
+    position: 'absolute',
+    top: 32,
+    left: 24,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#f1f5f9',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  assessmentTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#2D3436',
+    textAlign: 'center',
+    marginBottom: 8,
+    marginTop: 16,
+  },
+  assessmentSubtitle: {
+    fontSize: 14,
+    color: '#6B7280',
+    textAlign: 'center',
+    marginBottom: 32,
+  },
+  scoreDisplay: {
+    alignItems: 'center',
+    marginBottom: 40,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 4,
+  },
+  scoreNumber: {
+    fontSize: 72,
+    fontWeight: '700',
+    color: '#0288D1',
+    lineHeight: 72,
+  },
+  scoreLabel: {
+    fontSize: 24,
+    fontWeight: '600',
+    color: '#94a3b8',
+    marginTop: 20,
+  },
+  sliderWrapper: {
+    marginBottom: 32,
+    alignItems: 'center',
+  },
+  sliderLabels: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: SCREEN_WIDTH - 120,
+    marginTop: 12,
+  },
+  sliderLabel: {
+    fontSize: 12,
+    color: '#636E72',
+    fontWeight: '500',
+  },
+  breathingSuggestionCard: {
+    backgroundColor: '#f0f9ff',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: '#bae6fd',
+  },
+  breathingSuggestionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  breathingSuggestionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#0369a1',
+  },
+  breathingSuggestionText: {
+    fontSize: 14,
+    color: '#64748b',
+    lineHeight: 22,
+    marginBottom: 16,
+  },
+  breathingSuggestionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#0ea5e9',
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+  breathingSuggestionButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  assessmentButton: {
+    width: '100%',
+    height: 56,
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: '#bae6fd',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
   assessmentButtonGradient: {
     flex: 1,
     flexDirection: 'row',
@@ -2617,7 +2878,7 @@ assessmentButtonText: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#216fa3ff',
+    backgroundColor: '#e0f2fe',
     justifyContent: 'center',
     alignItems: 'center',
   },
