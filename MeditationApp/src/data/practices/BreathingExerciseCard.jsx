@@ -404,11 +404,11 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
     focus: {
       id: 'focus',
       title: '專注穩定',
-      subtitle: '4-7-8 呼吸法',
+      subtitle: '4-4-4 呼吸法',
       tags: ['專注', '穩壓', '清晰'],
-      description: '4秒吸氣，7秒屏息，8秒吐氣。透過屏息呼吸來提升專注力與穩定性，幫助您集中注意力，保持清晰的思維。',
+      description: '4秒吸氣，4秒屏息，4秒吐氣。透過屏息呼吸來提升專注力與穩定性，幫助您集中注意力，保持清晰的思維。',
       audioFile: { uri: 'https://curiouscreate.com/api/asserts/breath-holding.mp3' },
-      breathPattern: { inhale: 4, hold: 7, exhale: 8 },
+      breathPattern: { inhale: 4, hold: 4, exhale: 4 },
     },
   };
 
