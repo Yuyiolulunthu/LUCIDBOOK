@@ -1,10 +1,5 @@
 // BreathingExerciseCard.jsx
-// ✅ 修復重點：
-// 1) 音檔載入「跟著 activeTab 走」，切換練習類型一定會載入正確 URI
-// 2) 不再使用 status.uri（expo-av status 通常沒有 uri），改用 loadedAudioUriRef 記錄目前載入的音檔
-// 3) 支援 asserts/assets 兩種路徑自動 fallback（避免你後端路徑拼錯導致永遠載不到）
-// 4) startPractice / switchMode 時避免用到 stale state，使用 refs 同步當下的時間/模式
-// 5) 清理重複 useEffect（原本卸載清理寫了兩次）避免不小心 unload 掉剛載入的音檔
+// 修復版本 - 正確的返回導航
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
@@ -357,9 +352,9 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
   // refs（避免 stale state）
   // ============================================
   const sound = useRef(null);
-  const loadedAudioUriRef = useRef(null); // ✅ 目前載入的音檔 uri（取代 status.uri）
+  const loadedAudioUriRef = useRef(null);
   const isLoadingAudioRef = useRef(false);
-  const loadAudioTokenRef = useRef(0); // ✅ 避免 tab 快速切換造成舊 load 覆蓋新 load
+  const loadAudioTokenRef = useRef(0);
 
   const timerRef = useRef(null);
   const breathTimerRef = useRef(null);
@@ -432,12 +427,10 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  // ✅ 可能的路徑 fallback：asserts <-> assets
   const getCandidateUris = (uri) => {
     const set = new Set();
     if (uri) set.add(uri);
 
-    // 常見錯字修復：asserts / assets
     if (uri?.includes('/api/asserts/')) set.add(uri.replace('/api/asserts/', '/api/assets/'));
     if (uri?.includes('/api/assets/')) set.add(uri.replace('/api/assets/', '/api/asserts/'));
 
@@ -580,7 +573,7 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
   };
 
   // ============================================
-  // ✅ 音檔載入（核心修正）
+  // 音檔載入
   // ============================================
   const unloadAudio = async () => {
     if (!sound.current) return;
@@ -594,7 +587,6 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
   };
 
   const loadAudioForTab = async (tabKey) => {
-    // ✅ 避免重入
     if (isLoadingAudioRef.current) return;
     isLoadingAudioRef.current = true;
 
@@ -611,14 +603,12 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
         throw new Error('audioFile.uri 為空');
       }
 
-      // ✅ 如果已載入且是同一個 URI，直接 return
       if (sound.current && loadedAudioUriRef.current === targetUri) {
         setIsAudioLoading(false);
         isLoadingAudioRef.current = false;
         return;
       }
 
-      // ✅ 卸載舊音檔（如果 tab 切換）
       if (sound.current) {
         await unloadAudio();
       }
@@ -628,7 +618,6 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
 
       for (const uri of candidates) {
         if (loadAudioTokenRef.current !== token) {
-          // 有更新的 load 進來了，這次作廢
           return;
         }
 
@@ -637,7 +626,6 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
             { uri },
             { shouldPlay: false },
             (status) => {
-              // ✅ 音檔播放中同步 currentTime / totalDuration
               if (status?.isLoaded) {
                 const posSec = Math.floor((status.positionMillis || 0) / 1000);
                 const durSec = Math.floor((status.durationMillis || 0) / 1000);
@@ -657,7 +645,6 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
             }
           );
 
-          // ✅ 確認載入成功後再設定 ref
           const st = await audioSound.getStatusAsync();
           if (!st.isLoaded) {
             await audioSound.unloadAsync().catch(() => {});
@@ -665,7 +652,7 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
           }
 
           sound.current = audioSound;
-          loadedAudioUriRef.current = targetUri; // ✅ 記「目標」URI（不是 fallback 可能替換的 uri）
+          loadedAudioUriRef.current = targetUri;
           if (st.durationMillis) setTotalDuration(Math.floor(st.durationMillis / 1000));
 
           lastError = null;
@@ -787,7 +774,6 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
       await new Promise((r) => setTimeout(r, 150));
     }
 
-    // ✅ 進入音訊模式：確保載入的是「當前 tab」音檔
     if (mode === 'audio') {
       await loadAudioForTab(tabKey);
     }
@@ -796,7 +782,6 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
     setIsPlaying(true);
     setIsPaused(false);
 
-    // ✅ 重設時間（開始新一輪）
     setCurrentTime(0);
     currentTimeRef.current = 0;
 
@@ -887,19 +872,16 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
     } catch {}
   };
 
-  // ✅ 模式切換：保留時間，音訊切換會 seek 到正確秒數
   const switchMode = async () => {
     const prevMode = guideModeRef.current;
     const nextMode = prevMode === 'audio' ? 'visual' : 'audio';
 
-    // 先停掉「當前模式」的東西
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
     stopBreathAnimation();
 
-    // 如果從 audio -> visual：讀取音訊目前時間
     if (prevMode === 'audio' && sound.current) {
       try {
         const status = await sound.current.getStatusAsync();
@@ -915,7 +897,6 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
     setGuideMode(nextMode);
     guideModeRef.current = nextMode;
 
-    // 啟動新模式
     if (nextMode === 'audio') {
       await loadAudioForTab(activeTabRef.current);
       if (sound.current && isPlaying) {
@@ -950,8 +931,11 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
     setShowPauseModal(false);
     await stopPractice();
 
-    if (onBack) onBack();
-    else if (navigation) navigation.goBack();
+    if (navigation?.canGoBack()) {
+      navigation.goBack();
+    } else if (onBack) {
+      onBack();
+    }
   };
 
   const handleRelaxationComplete = async () => {
@@ -980,19 +964,37 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
   };
 
   // ============================================
-  // 導航
+  // 導航 - 修復版本
   // ============================================
   const handleBack = () => {
-    if (currentPage === 'completion') {
+    if (currentPage === 'success') {
+      // 成功頁返回主頁
+      if (navigation?.canGoBack()) {
+        navigation.goBack();
+      } else if (onBack) {
+        onBack();
+      }
+    } else if (currentPage === 'completion') {
       setCurrentPage('relaxation');
     } else if (currentPage === 'relaxation') {
       setCurrentPage('practice');
       resumePractice();
     } else if (currentPage === 'practice') {
       pausePractice();
+    } else if (currentPage === 'selection') {
+      // selection 頁返回主頁
+      if (navigation?.canGoBack()) {
+        navigation.goBack();
+      } else if (onBack) {
+        onBack();
+      }
     } else {
-      if (onBack) onBack();
-      else if (navigation) navigation.goBack();
+      // 其他情況返回主頁
+      if (navigation?.canGoBack()) {
+        navigation.goBack();
+      } else if (onBack) {
+        onBack();
+      }
     }
   };
 
@@ -1009,7 +1011,6 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
   // ============================================
   // effects
   // ============================================
-  // ✅ 音波動畫（audio 播放才動）
   useEffect(() => {
     if (isPlaying && guideModeRef.current === 'audio') {
       waveAnimations.forEach((anim) => {
@@ -1033,15 +1034,12 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
     }
   }, [isPlaying, guideMode, waveAnimations]);
 
-  // ✅ 預載音檔：selection 頁 + tab 切換時載入該 tab 音檔
   useEffect(() => {
     if (currentPage === 'selection') {
       loadAudioForTab(activeTab);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPage, activeTab]);
 
-  // ✅ 成功頁動畫
   useEffect(() => {
     if (currentPage === 'success') {
       Animated.sequence([
@@ -1064,7 +1062,6 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
     }
   }, [currentPage, iconScale, starBadgeScale]);
 
-  // ✅ 鍵盤
   useEffect(() => {
     const keyboardWillShow = Keyboard.addListener(
       Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
@@ -1080,7 +1077,6 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
     };
   }, []);
 
-  // ✅ 組件卸載清理（只留一份）
   useEffect(() => {
     return () => {
       try {
@@ -1096,7 +1092,6 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
         deactivateKeepAwake();
       } catch {}
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ============================================
@@ -1437,6 +1432,13 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
     return (
       <View style={styles.successPageContainer}>
         <LinearGradient colors={['#f0f9ff', '#e0f2fe']} style={styles.gradientBg}>
+          {/* 添加關閉按鈕 */}
+          <TouchableOpacity onPress={handleBack} style={styles.successCloseButton}>
+            <View style={styles.closeButtonCircle}>
+              <X size={20} color="#64748b" />
+            </View>
+          </TouchableOpacity>
+
           <View style={styles.successContent}>
             <View
               style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
@@ -1501,7 +1503,7 @@ export default function BreathingExerciseCard({ onBack, navigation, route, onHom
 }
 
 // ============================================
-// Styles（原樣保留）
+// Styles
 // ============================================
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F5F8FA' },
@@ -1776,6 +1778,23 @@ const styles = StyleSheet.create({
 
   successPageContainer: { flex: 1 },
   gradientBg: { flex: 1 },
+  // 添加關閉按鈕樣式
+  successCloseButton: {
+    position: 'absolute',
+    top: 49,
+    left: 24,
+    zIndex: 20,
+  },
+  closeButtonCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.5)',
+  },
   successContent: {
     flex: 1,
     justifyContent: 'center',

@@ -16,7 +16,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import ApiService from '../../../api';
+import ApiService from '../../../../api';
 
 export default function EmotionPractice({ onBack, navigation }) {
   const [practiceId, setPracticeId] = useState(null);
