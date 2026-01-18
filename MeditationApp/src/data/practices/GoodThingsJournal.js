@@ -309,7 +309,7 @@ const InfoModal = ({ visible, onClose }) => {
               <View style={styles.modalTextContainer}>
                 <Text style={styles.modalSectionTitle}>好事書寫只是在強迫自己正向？</Text>
                 <Text style={styles.modalSectionText}>
-                  好事書寫的並非否認痛苦、強迫正向。我們的大腦有天生容易注意與記住「負面事件」的原始設定，透過刻意把注意力拉回到微小的正向感受，讓視角與大腦更平衡。你可以一面承認今天的疲憊與煩躁，也能同時看見今天支撐著你的小事。
+                  好事書寫的並非否認痛苦、強迫正向。我們的大腦有天生容易注意與記住「負面事件」的原始設定，透過刻意把注意力拉回到微小的正向感受,讓視角與大腦更平衡。你可以一面承認今天的疲憊與煩躁，也能同時看見今天支撐著你的小事。
                 </Text>
               </View>
             </View>
@@ -489,7 +489,7 @@ export default function GoodThingsJournalNew({ onBack, navigation, onHome }) {
       practice_type: '好事書寫練習',
       duration: Math.max(1, Math.ceil(totalSeconds / 60)),
       duration_seconds: totalSeconds,
-      form_data: payloadFormData, // ✅ 關鍵：改成 form_data
+      form_data: payloadFormData,
     });
   };
 
@@ -513,7 +513,7 @@ export default function GoodThingsJournalNew({ onBack, navigation, onHome }) {
 
   useEffect(() => {
     if (!practiceId) return;
-    if (currentPage === 'completion') return; // ⭐ 關鍵
+    if (currentPage === 'completion') return;
 
     const interval = setInterval(() => {
       saveProgress();
@@ -559,14 +559,25 @@ export default function GoodThingsJournalNew({ onBack, navigation, onHome }) {
   // ==================== 操作函數 ====================
   const handleBack = () => {
     const backMap = {
-      intro: () => onBack?.() || navigation?.goBack(),
+      intro: () => {
+        // 從介紹頁返回就直接回主頁
+        if (navigation) {
+          navigation.navigate('MainTabs', { screen: 'Home' });
+        } else {
+          onBack?.();
+        }
+      },
       event: () => setCurrentPage('intro'),
       emotion: () => setCurrentPage('event'),
       reason: () => setCurrentPage('emotion'),
       assessment: () => setCurrentPage('reason'),
       completion: () => {
-        // 從完成頁面返回就直接回首頁
-        onBack?.() || navigation?.goBack();
+        // 從完成頁面返回就直接回主頁
+        if (navigation) {
+          navigation.navigate('MainTabs', { screen: 'Home' });
+        } else {
+          onBack?.();
+        }
       },
     };
     backMap[currentPage]?.();
@@ -858,13 +869,12 @@ export default function GoodThingsJournalNew({ onBack, navigation, onHome }) {
                 ]}
                 keyboardShouldPersistTaps="handled"
                 showsVerticalScrollIndicator={false}
-                // ⭐ 新增性能優化設置
-                removeClippedSubviews={true}           // 移除屏幕外的子視圖
-                scrollEventThrottle={16}                // 每 16ms 觸發一次滾動事件
-                overScrollMode="auto"                   // Android 專用
-                bounces={true}                          // iOS 彈性效果
-                bouncesZoom={false}                     // 禁用縮放彈性
-                decelerationRate="normal"               // 正常減速率
+                removeClippedSubviews={true}
+                scrollEventThrottle={16}
+                overScrollMode="auto"
+                bounces={true}
+                bouncesZoom={false}
+                decelerationRate="normal"
               >
                 <View style={styles.emotionCard}>
                   <View style={styles.emotionTagsContainer}>
@@ -1006,12 +1016,12 @@ export default function GoodThingsJournalNew({ onBack, navigation, onHome }) {
                 ]}
                 keyboardShouldPersistTaps="handled"
                 showsVerticalScrollIndicator={false}
-                removeClippedSubviews={true}           // 移除屏幕外的子視圖
-                scrollEventThrottle={16}                // 每 16ms 觸發一次滾動事件
-                overScrollMode="auto"                   // Android 專用
-                bounces={true}                          // iOS 彈性效果
-                bouncesZoom={false}                     // 禁用縮放彈性
-                decelerationRate="normal"               // 正常減速率
+                removeClippedSubviews={true}
+                scrollEventThrottle={16}
+                overScrollMode="auto"
+                bounces={true}
+                bouncesZoom={false}
+                decelerationRate="normal"
               >
                 <View style={styles.inputCard}>
                   <TextInput
@@ -1207,7 +1217,6 @@ export default function GoodThingsJournalNew({ onBack, navigation, onHome }) {
     const StarConfetti = ({ index }) => {
       const animatedValue = useRef(new Animated.Value(0)).current;
       
-      // ⭐ 使用 useState 替代 useMemo，更稳定
       const [meteorConfig] = useState(() => {
         // 从屏幕不同边缘开始
         const side = index % 4; // 0=上, 1=右, 2=下, 3=左
@@ -1271,7 +1280,7 @@ export default function GoodThingsJournalNew({ onBack, navigation, onHome }) {
 
       return (
         <Animated.View
-          pointerEvents="none"  // ✅ 添加这个，避免阻挡触摸
+          pointerEvents="none"
           style={[
             {
               position: 'absolute',
@@ -1302,7 +1311,7 @@ export default function GoodThingsJournalNew({ onBack, navigation, onHome }) {
         >
           <View style={styles.completionContent}>
             <View style={styles.confettiCenter}>
-              {/* ✅ 星星动画容器 - 放在最底层 */}
+              {/* 星星动画容器 - 放在最底层 */}
               <View 
                 style={{
                   position: 'absolute',
