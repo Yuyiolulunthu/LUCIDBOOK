@@ -316,7 +316,7 @@ const InfoModal = ({ visible, onClose, type }) => {
               icon: Heart,
               iconBg: '#fce7f3',
               iconColor: '#ec4899',
-              title: '為什麼要寫感受？',
+              title: '為什麼要寫感受?',
               text: '光是列出感恩的事還不夠，當我們深入思考「這件事帶給我什麼感受」，大腦會建立更深的正向連結，效果更持久。',
             },
           ],
@@ -336,8 +336,8 @@ const InfoModal = ({ visible, onClose, type }) => {
               icon: Send,
               iconBg: '#d1fae5',
               iconColor: '#10b981',
-              title: '要真的寄出去嗎？',
-              text: '寫完後，建議你試著把這段話傳給對方！研究發現，表達感謝不只讓自己更快樂，也能大幅提升對方的幸福感，溫暖關係。',
+              title: '要真的寄出去嗎?',
+              text: '寫完後，建議你試著把這段話傳給對方!研究發現，表達感謝不只讓自己更快樂，也能大幅提升對方的幸福感，溫暖關係。',
             },
           ],
         };
@@ -349,15 +349,15 @@ const InfoModal = ({ visible, onClose, type }) => {
               icon: Sparkles,
               iconBg: '#ede9fe',
               iconColor: '#8b5cf6',
-              title: '什麼是如果練習？',
-              text: '透過想像「如果沒有某個人事物」，來覺察我們習以為常卻珍貴的擁有。這是一種「心理對比」技術，能有效提升感恩的深度。',
+              title: '什麼是如果練習?',
+              text: '透過想像「如果沒有某個人事物」,來覺察我們習以為常卻珍貴的擁有。這是一種「心理對比」技術,能有效提升感恩的深度。',
             },
             {
               icon: Heart,
               iconBg: '#fce7f3',
               iconColor: '#ec4899',
-              title: '為什麼這麼有效？',
-              text: '人類的大腦很容易「適應」美好的事物，久了就習以為常。透過想像失去，我們能重新感受到這些事物的珍貴，打破「理所當然」的慣性。',
+              title: '為什麼這麼有效?',
+              text: '人類的大腦很容易「適應」美好的事物,久了就習以為常。透過想像失去,我們能重新感受到這些事物的珍貴,打破「理所當然」的慣性。',
             },
           ],
         };
@@ -417,7 +417,7 @@ const InfoModal = ({ visible, onClose, type }) => {
 
 // ==================== 主組件 ====================
 export default function GratitudePractice({ onBack, navigation, onHome }) {
-  // 頁面狀態：menu, diary-intro, diary-write, diary-feeling, letter-intro, letter-recipient, letter-message, if-intro, if-imagine, if-appreciate, assessment, completion
+  // 頁面狀態:menu, diary-intro, diary-write, diary-feeling, letter-intro, letter-recipient, letter-message, if-intro, if-imagine, if-appreciate, assessment, completion
   const [currentPage, setCurrentPage] = useState('menu');
   const [formData, setFormData] = useState(INITIAL_FORM_DATA);
   const [showInfoModal, setShowInfoModal] = useState(false);
@@ -596,9 +596,22 @@ export default function GratitudePractice({ onBack, navigation, onHome }) {
   }, [currentPage]);
 
   // ==================== 操作函數 ====================
+  const handleBackToHome = () => {
+    // 返回主頁的統一方法
+    if (onHome) {
+      onHome();
+    } else if (navigation) {
+      navigation.navigate('MainTabs', { screen: 'Home' });
+    } else if (onBack) {
+      onBack();
+    } else if (navigation) {
+      navigation.goBack();
+    }
+  };
+
   const handleBack = () => {
     const backMap = {
-      'menu': () => onBack?.() || navigation?.goBack(),
+      'menu': handleBackToHome,
       'diary-intro': () => setCurrentPage('menu'),
       'diary-write': () => setCurrentPage('diary-intro'),
       'diary-feeling': () => setCurrentPage('diary-write'),
@@ -613,10 +626,7 @@ export default function GratitudePractice({ onBack, navigation, onHome }) {
         else if (formData.practiceType === PRACTICE_TYPES.LETTER) setCurrentPage('letter-message');
         else if (formData.practiceType === PRACTICE_TYPES.IF) setCurrentPage('if-appreciate');
       },
-      'completion': () => {  
-        // 從完成頁面返回直接回首頁
-        onBack?.() || navigation?.goBack();
-      },
+      'completion': handleBackToHome,
     };
     backMap[currentPage]?.();
   };
@@ -688,11 +698,11 @@ export default function GratitudePractice({ onBack, navigation, onHome }) {
           {/* 說明按鈕 */}
           <TouchableOpacity onPress={() => showInfo('main')} style={styles.infoButton}>
             <HelpCircle size={16} color="#0ea5e9" />
-            <Text style={styles.infoButtonText}>為什麼要練習感恩？</Text>
+            <Text style={styles.infoButtonText}>為什麼要練習感恩?</Text>
           </TouchableOpacity>
 
           <View style={styles.menuContent}>
-            <Text style={styles.menuTitle}>今天想怎麼練習感恩？</Text>
+            <Text style={styles.menuTitle}>今天想怎麼練習感恩?</Text>
 
             {menuItems.map((item, index) => {
               const Icon = item.icon;
@@ -751,13 +761,13 @@ export default function GratitudePractice({ onBack, navigation, onHome }) {
 
           <Text style={styles.introTitle}>感恩日記</Text>
           <Text style={styles.introSubtitle}>
-            記錄生活中的微小幸福，{'\n'}
+            記錄生活中的微小幸福,{'\n'}
             是建立心理韌性的第一步 。
           </Text>
 
           <TouchableOpacity onPress={() => showInfo('diary')} style={styles.introInfoLink}>
             <HelpCircle size={16} color="#0ea5e9" />
-            <Text style={styles.introInfoLinkText}>為什麼要做這個練習？</Text>
+            <Text style={styles.introInfoLinkText}>為什麼要做這個練習?</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -784,7 +794,7 @@ export default function GratitudePractice({ onBack, navigation, onHome }) {
     const tips = [
       '可以是很大、很日常的事',
       '也可以感謝自己的某個選擇或努力',
-      '不用想太多，第一個浮現的就對了',
+      '不用想太多,第一個浮現的就對了',
     ];
 
     const examples = [
@@ -792,8 +802,8 @@ export default function GratitudePractice({ onBack, navigation, onHome }) {
       '同事幫我倒了一杯水',
       '準時完成了工作',
       '和朋友聊了開心的話題',
-      '天氣很好，心情也跟著好',
-      '身體健康，能夠正常生活',
+      '天氣很好,心情也跟著好',
+      '身體健康,能夠正常生活',
     ];
 
     return (
@@ -818,7 +828,7 @@ export default function GratitudePractice({ onBack, navigation, onHome }) {
                 <View style={styles.noteCentered}>
                   <Star size={16} color="#fbbf24" fill="#fbbf24" />
                   <Text style={styles.noteTextCentered}>
-                    可以是很大、很日常的事，也可以感謝自己的某個選擇或努力
+                    可以是很大、很日常的事,也可以感謝自己的某個選擇或努力
                   </Text>
                 </View>
               </View>
@@ -917,9 +927,9 @@ export default function GratitudePractice({ onBack, navigation, onHome }) {
 
   const renderDiaryFeeling = () => {
     const tips = [
-      '這件事讓你有什麼感覺？',
-      '它提醒了你什麼重要的事？',
-      '你從中學到或體會到什麼？',
+      '這件事讓你有什麼感覺?',
+      '它提醒了你什麼重要的事?',
+      '你從中學到或體會到什麼?',
     ];
 
     return (
@@ -1024,13 +1034,13 @@ export default function GratitudePractice({ onBack, navigation, onHome }) {
 
           <Text style={styles.introTitle}>迷你感謝信</Text>
           <Text style={styles.introSubtitle}>
-            用一句簡單的謝謝，{'\n'}
-            連結彼此的心，溫暖關係。
+            用一句簡單的謝謝,{'\n'}
+            連結彼此的心,溫暖關係。
           </Text>
 
           <TouchableOpacity onPress={() => showInfo('letter')} style={styles.introInfoLink}>
             <HelpCircle size={16} color="#0ea5e9" />
-            <Text style={styles.introInfoLinkText}>為什麼要做這個練習？</Text>
+            <Text style={styles.introInfoLinkText}>為什麼要做這個練習?</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -1083,7 +1093,7 @@ export default function GratitudePractice({ onBack, navigation, onHome }) {
 
               <View style={styles.titleSection}>
                 <Text style={styles.pageTitleCentered}>迷你感謝信</Text>
-                <Text style={styles.pageSubtitleCentered}>你想寫給誰？</Text>
+                <Text style={styles.pageSubtitleCentered}>你想寫給誰?</Text>
                 <View style={styles.noteCentered}>
                   <Star size={16} color="#fbbf24" fill="#fbbf24" />
                   <Text style={styles.noteTextCentered}>選一個你想傳遞感謝的對象</Text>
@@ -1205,7 +1215,7 @@ export default function GratitudePractice({ onBack, navigation, onHome }) {
                 <Text style={styles.pageSubtitleCentered}>寫下你的感謝</Text>
                 <View style={styles.noteCentered}>
                   <Star size={16} color="#fbbf24" fill="#fbbf24" />
-                  <Text style={styles.noteTextCentered}>寫完後，試著把這段話傳遞給對方吧！</Text>
+                  <Text style={styles.noteTextCentered}>寫完後,試著把這段話傳遞給對方吧!</Text>
                 </View>
               </View>
 
@@ -1286,13 +1296,13 @@ export default function GratitudePractice({ onBack, navigation, onHome }) {
 
           <Text style={styles.introTitle}>如果練習</Text>
           <Text style={styles.introSubtitle}>
-            想像失去後的樣子，{'\n'}
+            想像失去後的樣子,{'\n'}
             讓我們學會深度珍惜當下。
           </Text>
 
           <TouchableOpacity onPress={() => showInfo('if')} style={styles.introInfoLink}>
             <HelpCircle size={16} color="#0ea5e9" />
-            <Text style={styles.introInfoLinkText}>為什麼要做這個練習？</Text>
+            <Text style={styles.introInfoLinkText}>為什麼要做這個練習?</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -1319,7 +1329,7 @@ export default function GratitudePractice({ onBack, navigation, onHome }) {
     const tips = [
       '選一個你很習慣、覺得理所當然的人事物',
       '可以是健康、家人、朋友、工作、某個能力',
-      '想像如果突然沒有了，生活會變怎樣',
+      '想像如果突然沒有了,生活會變怎樣',
     ];
 
     const examples = [
@@ -1361,7 +1371,7 @@ export default function GratitudePractice({ onBack, navigation, onHome }) {
                   <TextInput
                     style={styles.textarea}
                     multiline
-                    placeholder="如果沒有_____，我的生活會..."
+                    placeholder="如果沒有_____,我的生活會..."
                     placeholderTextColor="#cbd5e1"
                     value={formData.ifImagine}
                     onChangeText={text => setFormData(prev => ({ ...prev, ifImagine: text }))}
@@ -1401,7 +1411,7 @@ export default function GratitudePractice({ onBack, navigation, onHome }) {
                           style={styles.exampleChip}
                           onPress={() => setFormData(prev => ({
                             ...prev,
-                            ifImagine: `如果沒有${ex}，我的生活會...`
+                            ifImagine: `如果沒有${ex},我的生活會...`
                           }))}
                         >
                           <Text style={styles.exampleText}>{ex}</Text>
@@ -1446,8 +1456,8 @@ export default function GratitudePractice({ onBack, navigation, onHome }) {
   const renderIfAppreciate = () => {
     const tips = [
       '現在把注意力轉回「擁有」',
-      '因為它的存在，你能夠做什麼？',
-      '它為你的生活帶來什麼？',
+      '因為它的存在,你能夠做什麼?',
+      '它為你的生活帶來什麼?',
     ];
 
     return (
@@ -1471,7 +1481,7 @@ export default function GratitudePractice({ onBack, navigation, onHome }) {
                 <Text style={styles.pageSubtitleCentered}>轉念看見擁有的美好</Text>
                 <View style={styles.noteCentered}>
                   <Star size={16} color="#fbbf24" fill="#fbbf24" />
-                  <Text style={styles.noteTextCentered}>轉念思考，感受它的存在</Text>
+                  <Text style={styles.noteTextCentered}>轉念思考,感受它的存在</Text>
                 </View>
               </View>
 
@@ -1483,7 +1493,7 @@ export default function GratitudePractice({ onBack, navigation, onHome }) {
                   <TextInput
                     style={styles.textareaWithTemplate}
                     multiline
-                    placeholder={`我想像如果_____沒有出現（或如果我現在沒有_____），我現在可能_____，正因為它/他/她在，我才能／我學會／我...`}
+                    placeholder={`我想像如果_____沒有出現(或如果我現在沒有_____),我現在可能_____,正因為它/他/她在,我才能/我學會/我...`}
                     placeholderTextColor="#94a3b8"
                     value={formData.ifAppreciate}
                     onChangeText={text => setFormData(prev => ({ ...prev, ifAppreciate: text }))}
@@ -1562,7 +1572,7 @@ export default function GratitudePractice({ onBack, navigation, onHome }) {
               <Text style={styles.scoreTotal}>/10</Text>
             </View>
 
-            <Text style={styles.assessmentSubtitle}>完成練習後，你感覺如何？</Text>
+            <Text style={styles.assessmentSubtitle}>完成練習後,你感覺如何?</Text>
 
             <View style={styles.sliderWrapper}>
               <CustomSlider
@@ -1598,11 +1608,11 @@ export default function GratitudePractice({ onBack, navigation, onHome }) {
 
   // ==================== 完成頁 ====================
   const renderCompletionPage = () => {
-    // 星星流星动画（优化后的 Android 兼容版本）
+    // 星星流星动画(优化后的 Android 兼容版本)
     const StarConfetti = ({ index }) => {
       const animatedValue = useRef(new Animated.Value(0)).current;
       
-      // ⭐ 使用 useState 替代 useMemo，更稳定
+      // ⭐ 使用 useState 替代 useMemo,更稳定
       const [meteorConfig] = useState(() => {
         // 从屏幕不同边缘开始
         const side = index % 4; // 0=上, 1=右, 2=下, 3=左
@@ -1666,7 +1676,7 @@ export default function GratitudePractice({ onBack, navigation, onHome }) {
 
       return (
         <Animated.View
-          pointerEvents="none"  // ✅ 添加这个，避免阻挡触摸
+          pointerEvents="none"  // ✅ 添加这个,避免阻挡触摸
           style={[
             {
               position: 'absolute',
@@ -1761,7 +1771,7 @@ export default function GratitudePractice({ onBack, navigation, onHome }) {
               </Animated.View>
             </Animated.View>
 
-            <Text style={styles.completionTitle}>太棒了！</Text>
+            <Text style={styles.completionTitle}>太棒了!</Text>
             <Text style={styles.completionSubtitle}>你已完成今日的感恩儀式</Text>
 
             {/* 連續練習天數 */}
