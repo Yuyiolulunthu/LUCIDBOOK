@@ -1,7 +1,7 @@
 // ==========================================
 // 檔案名稱: CognitiveReframingPractice.js
 // 思維調節練習 - ABCD 認知行為療法
-// 版本: V2.2 - 最终版本（无刻度）
+// 版本: V2.3 - 修復返回導航與呼吸練習記錄
 // ==========================================
 
 import React, { useState, useRef, useEffect } from 'react';
@@ -52,8 +52,7 @@ import ApiService from '../../../api';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-// ==================== 自定義滑杆組件（最终版）====================
-// ==================== 自定義滑杆組件（修復：不再彈回中間）====================
+// ==================== 自定義滑杆組件 ====================
 const CustomSlider = ({ value, onValueChange, min = 1, max = 10 }) => {
   const SLIDER_WIDTH = SCREEN_WIDTH - 120;
   const THUMB_SIZE = 36;
@@ -61,7 +60,6 @@ const CustomSlider = ({ value, onValueChange, min = 1, max = 10 }) => {
 
   const [internalValue, setInternalValue] = useState(value);
 
-  // 位置動畫
   const position = useRef(
     new Animated.Value(((value - min) / (max - min)) * SLIDER_WIDTH)
   ).current;
@@ -69,7 +67,6 @@ const CustomSlider = ({ value, onValueChange, min = 1, max = 10 }) => {
   const startPosition = useRef(0);
   const isDragging = useRef(false);
 
-  // ✅ 用 ref 存最新 value（避免 setState 非同步造成 release 用到舊值）
   const valueRef = useRef(value);
   useEffect(() => {
     valueRef.current = internalValue;
@@ -91,7 +88,6 @@ const CustomSlider = ({ value, onValueChange, min = 1, max = 10 }) => {
 
       onPanResponderGrant: () => {
         isDragging.current = true;
-        // 用 ref 的值拿到「當下最新」的位置作為起點
         startPosition.current = valueToPos(valueRef.current);
       },
 
@@ -104,14 +100,13 @@ const CustomSlider = ({ value, onValueChange, min = 1, max = 10 }) => {
         const newValue = posToValue(newPos);
 
         if (newValue !== valueRef.current) {
-          valueRef.current = newValue; // ✅ 同步更新
+          valueRef.current = newValue;
           setInternalValue(newValue);
           onValueChange?.(newValue);
         }
       },
 
       onPanResponderRelease: () => {
-        // ✅ release 時直接用 ref 的最新值算 snap，不會再跳回錯的位置
         const snapPos = valueToPos(valueRef.current);
 
         Animated.spring(position, {
@@ -125,7 +120,6 @@ const CustomSlider = ({ value, onValueChange, min = 1, max = 10 }) => {
       },
 
       onPanResponderTerminate: () => {
-        // 被中斷也要回到正確位置
         const snapPos = valueToPos(valueRef.current);
         Animated.spring(position, {
           toValue: snapPos,
@@ -139,7 +133,6 @@ const CustomSlider = ({ value, onValueChange, min = 1, max = 10 }) => {
     })
   ).current;
 
-  // 外部 value 改變時同步更新（非拖曳狀態才更新，避免手感被搶）
   useEffect(() => {
     if (!isDragging.current && value !== valueRef.current) {
       valueRef.current = value;
@@ -154,10 +147,8 @@ const CustomSlider = ({ value, onValueChange, min = 1, max = 10 }) => {
 
   return (
     <View style={customSliderStyles.container}>
-      {/* 背景轨道 */}
       <View style={[customSliderStyles.track, { height: TRACK_HEIGHT }]} />
 
-      {/* 填充轨道 */}
       <Animated.View
         style={[
           customSliderStyles.fill,
@@ -172,7 +163,6 @@ const CustomSlider = ({ value, onValueChange, min = 1, max = 10 }) => {
         ]}
       />
 
-      {/* 可拖动的球 */}
       <Animated.View
         {...panResponder.panHandlers}
         style={[
@@ -197,7 +187,6 @@ const CustomSlider = ({ value, onValueChange, min = 1, max = 10 }) => {
     </View>
   );
 };
-
 
 const customSliderStyles = StyleSheet.create({
   container: {
@@ -738,7 +727,13 @@ export default function CognitiveReframingPractice({ onBack, navigation }) {
   // ==================== 操作函數 ====================
   const handleBack = () => {
     const backMap = {
-      intro: () => onBack?.() || navigation?.goBack(),
+      intro: () => {
+        if (navigation?.canGoBack()) {
+          navigation.goBack();
+        } else if (onBack) {
+          onBack();
+        }
+      },
       breathing: () => setCurrentPage('intro'),
       event: () => setCurrentPage('intro'),
       thought: () => setCurrentPage('event'),
@@ -747,7 +742,13 @@ export default function CognitiveReframingPractice({ onBack, navigation }) {
       action: () => setCurrentPage('reframe'),
       assessment: () => setCurrentPage('action'),
       review: () => setCurrentPage('assessment'),
-      completion: () => onBack?.() || navigation?.goBack(),
+      completion: () => {
+        if (navigation?.canGoBack()) {
+          navigation.goBack();
+        } else if (onBack) {
+          onBack();
+        }
+      },
     };
     backMap[currentPage]?.();
   };
@@ -829,6 +830,30 @@ export default function CognitiveReframingPractice({ onBack, navigation }) {
 
   const selectAction = (action) => {
     setFormData(prev => ({ ...prev, selectedAction: action }));
+  };
+
+  // 跳轉到呼吸練習
+  const handleGoToBreathing = async () => {
+    try {
+      // 暫停計時
+      setIsTiming(false);
+      
+      // 保存當前進度
+      await saveProgress();
+      
+      // 導航到呼吸練習
+      navigation.navigate('BreathingPractice', {
+        fromPractice: 'CognitiveReframing',
+        onReturn: () => {
+          // 返回時恢復計時
+          setIsTiming(true);
+        }
+      });
+    } catch (error) {
+      console.error('跳轉到呼吸練習失敗:', error);
+      // 即使失敗也允許跳轉
+      navigation.navigate('BreathingPractice');
+    }
   };
 
   // ==================== 頁面渲染 ====================
@@ -1667,7 +1692,6 @@ export default function CognitiveReframingPractice({ onBack, navigation }) {
               <Text style={styles.scoreLabel}>分</Text>
             </View>
 
-            {/* ⭐ 自定义滑杆 ⭐ */}
             <View style={styles.sliderWrapper}>
               <CustomSlider
                 value={formData.postScore}
@@ -1693,9 +1717,7 @@ export default function CognitiveReframingPractice({ onBack, navigation }) {
                 </Text>
                 <TouchableOpacity
                   style={styles.breathingSuggestionButton}
-                  onPress={() => {
-                    navigation.navigate('BreathingPractice');
-                  }}
+                  onPress={handleGoToBreathing}
                 >
                   <Wind size={16} color="#FFFFFF" />
                   <Text style={styles.breathingSuggestionButtonText}>開始呼吸練習</Text>
@@ -1884,6 +1906,12 @@ export default function CognitiveReframingPractice({ onBack, navigation }) {
           colors={['#f0f9ff', '#e0f2fe']}
           style={styles.gradientBg}
         >
+          <TouchableOpacity onPress={handleBack} style={styles.completionCloseButton}>
+            <View style={styles.closeButtonCircle}>
+              <X size={20} color="#64748b" />
+            </View>
+          </TouchableOpacity>
+
           <View style={styles.completionContent}>
             <View 
               style={{
@@ -2636,7 +2664,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
 
-  // ========== 評估頁（自定義滑杆）==========
+  // ========== 評估頁 ==========
   assessmentContent: {
     flex: 1,
     justifyContent: 'center',
@@ -2914,6 +2942,12 @@ const styles = StyleSheet.create({
   },
 
   // ========== 完成頁 ==========
+  completionCloseButton: {
+    position: 'absolute',
+    top: 49,
+    left: 24,
+    zIndex: 20,
+  },
   completionContent: {
     flex: 1,
     justifyContent: 'center',
