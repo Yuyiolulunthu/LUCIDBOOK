@@ -29,8 +29,8 @@ import AccountScreen from './src/screens/account/AccountScreen';
 // 練習相關頁面
 import PracticeSelectionScreen from './src/screens/practice/PracticeSelectionScreen';
 import BreathingExerciseCard from './src/data/practices/BreathingExerciseCard';
-import EmotionPractice from './src/data/practices/EmotionPractice';
-import MindfulnessPractice from './src/data/practices/MindfulnessPractice';
+import EmotionPractice from './src/data/practices/old/EmotionPractice';
+import MindfulnessPractice from './src/data/practices/old/MindfulnessPractice';
 import GoodThingsJournal from './src/data/practices/GoodThingsJournal';
 import EmotionThermometer from './src/data/practices/EmotionThermometer';
 import CognitiveReframingPractice from './src/data/practices/CognitiveReframingPractice';

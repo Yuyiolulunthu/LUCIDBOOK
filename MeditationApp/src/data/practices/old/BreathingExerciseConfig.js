@@ -138,19 +138,19 @@ export const FONTS = {
 
 export const IMAGES = {
   // 圖片資源路徑配置
-  homeIcon: '../../../assets/images/Home_icon.png',
-  leftArrow: '../../../assets/images/Left_arrow.png',
-  clockIcon: '../../../assets/images/sample_clock.png',
-  starsIcon: '../../../assets/images/stars.png',
+  homeIcon: '../../../../assets/images/Home_icon.png',
+  leftArrow: '../../../../assets/images/Left_arrow.png',
+  clockIcon: '../../../../assets/images/sample_clock.png',
+  starsIcon: '../../../../assets/images/stars.png',
   
   // 音頻控制圖標
-  playIcon: '../../../assets/images/start.png',
-  stopIcon: '../../../assets/images/stop.png',
-  forwardIcon: '../../../assets/images/forward.png',
-  backwardIcon: '../../../assets/images/backward.png',
+  playIcon: '../../../../assets/images/start.png',
+  stopIcon: '../../../../assets/images/stop.png',
+  forwardIcon: '../../../../assets/images/forward.png',
+  backwardIcon: '../../../../assets/images/backward.png',
   
   // 其他圖示
-  sittingPosition: '../../../assets/images/sitting-position.png',
+  sittingPosition: '../../../../assets/images/sitting-position.png',
 };
 
 // 滑桿配置

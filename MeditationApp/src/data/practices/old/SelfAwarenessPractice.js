@@ -748,7 +748,7 @@ export default function SelfAwarenessPractice({ onBack, navigation }) {
           <View style={styles.welcomeImageContainer}>
             <View style={styles.welcomeImageWhiteBox}>
               <Image 
-                source={require('../../../assets/images/自我覺察.png')}
+                source={require('../../../../assets/images/自我覺察.png')}
                 style={styles.welcomeImage}
                 resizeMode="contain"
               />
@@ -773,7 +773,7 @@ export default function SelfAwarenessPractice({ onBack, navigation }) {
         <View style={styles.breathingSection}>
           <View style={styles.breathingCard}>
             <Image 
-              source={require('../../../assets/images/DeepBreathe.png')}
+              source={require('../../../../assets/images/DeepBreathe.png')}
               style={styles.breathingImage}
               resizeMode="contain"
             />

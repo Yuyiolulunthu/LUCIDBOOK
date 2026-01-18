@@ -17,7 +17,7 @@ import {
   Platform,
 } from 'react-native';
 import { Audio } from 'expo-av';
-import ApiService from '../../../api';
+import ApiService from '../../../../api';
 
 export default function MindfulnessPractice({ onBack, navigation }) {
   const [currentStep, setCurrentStep] = useState(0);
@@ -601,7 +601,7 @@ export default function MindfulnessPractice({ onBack, navigation }) {
               }}
             >
               <Image 
-                source={require('../../../assets/images/backward.png')}
+                source={require('../../../../assets/images/backward.png')}
                 style={styles.miniControlImage}
                 resizeMode="contain"
               />
@@ -612,7 +612,7 @@ export default function MindfulnessPractice({ onBack, navigation }) {
               onPress={toggleBreathingPlayback}
             >
               <Image 
-                source={isBreathingPlaying ? require('../../../assets/images/stop.png') : require('../../../assets/images/start.png')}
+                source={isBreathingPlaying ? require('../../../../assets/images/stop.png') : require('../../../../assets/images/start.png')}
                 style={styles.miniPlayImage}
                 resizeMode="contain"
               />
@@ -627,7 +627,7 @@ export default function MindfulnessPractice({ onBack, navigation }) {
               }}
             >
               <Image 
-                source={require('../../../assets/images/forward.png')}
+                source={require('../../../../assets/images/forward.png')}
                 style={styles.miniControlImage}
                 resizeMode="contain"
               />
@@ -767,7 +767,7 @@ export default function MindfulnessPractice({ onBack, navigation }) {
           <View style={styles.audioCard}>
             <View style={styles.albumCover}>
               <Image 
-                source={require('../../../assets/images/正念安定.png')}
+                source={require('../../../../assets/images/正念安定.png')}
                 style={styles.albumCoverImage}
                 resizeMode="cover"
               />
@@ -803,7 +803,7 @@ export default function MindfulnessPractice({ onBack, navigation }) {
                 }}
               >
                 <Image 
-                  source={require('../../../assets/images/backward.png')}
+                  source={require('../../../../assets/images/backward.png')}
                   style={styles.controlButtonImage}
                   resizeMode="contain"
                 />
@@ -814,7 +814,7 @@ export default function MindfulnessPractice({ onBack, navigation }) {
                 onPress={togglePlayback}
               >
                 <Image 
-                  source={isPlaying ? require('../../../assets/images/stop.png') : require('../../../assets/images/start.png')}
+                  source={isPlaying ? require('../../../../assets/images/stop.png') : require('../../../../assets/images/start.png')}
                   style={styles.playButtonImage}
                   resizeMode="contain"
                 />
@@ -830,7 +830,7 @@ export default function MindfulnessPractice({ onBack, navigation }) {
                 }}
               >
                 <Image 
-                  source={require('../../../assets/images/forward.png')}
+                  source={require('../../../../assets/images/forward.png')}
                   style={styles.controlButtonImage}
                   resizeMode="contain"
                 />
@@ -869,7 +869,7 @@ export default function MindfulnessPractice({ onBack, navigation }) {
             <View style={styles.welcomeImageContainer}>
               <View style={styles.welcomeImageWhiteBox}>
                 <Image 
-                  source={require('../../../assets/images/正念安定.png')}
+                  source={require('../../../../assets/images/正念安定.png')}
                   style={styles.welcomeImage}
                   resizeMode="contain"
                 />
@@ -883,14 +883,14 @@ export default function MindfulnessPractice({ onBack, navigation }) {
             <View style={styles.positionImagesContainer}>
               <View style={styles.positionImageTop}>
                 <Image 
-                  source={require('../../../assets/images/lying-position.png')}
+                  source={require('../../../../assets/images/lying-position.png')}
                   style={styles.positionImageFile}
                   resizeMode="contain"
                 />
               </View>
               <View style={styles.positionImageBottom}>
                 <Image 
-                  source={require('../../../assets/images/sitting-position.png')}
+                  source={require('../../../../assets/images/sitting-position.png')}
                   style={styles.positionImageFile}
                   resizeMode="contain"
                 />

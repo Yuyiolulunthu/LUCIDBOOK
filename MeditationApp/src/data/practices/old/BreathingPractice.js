@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import ApiService from '../../../api';
+import ApiService from '../../../../api';
 
 // ⭐ 統一練習類型名稱
 const PRACTICE_TYPE = '呼吸穩定力練習';

@@ -35,7 +35,9 @@
       "package": "com.lucidbook",
       "versionCode": 34,
       "permissions": [
-        "CAMERA"
+        "CAMERA",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
       ]
     },
     "web": {
@@ -58,7 +60,7 @@
     ],
     "extra": {
       "eas": {
-        "projectId": "84ee6734-2720-452a-ae4a-47e575690763"
+        "projectId": "84ee6734-2720-452a-ae4a-47e575690763" 
       }
     }
   }
