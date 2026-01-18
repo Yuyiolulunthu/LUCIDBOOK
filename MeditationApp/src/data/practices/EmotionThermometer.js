@@ -1,7 +1,7 @@
 // ==========================================
 // 檔案名稱: EmotionThermometer.js
 // 心情溫度計練習 - 完整流程
-// 版本: V1.1 - 修復 UI 裝飾和文字置中
+// 版本: V1.2 - 修正關閉按鈕導航至主頁
 // ==========================================
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -130,9 +130,7 @@ const EmotionThermometer = ({ navigation, route }) => {
   };
 
   const handleBack = () => {
-    if (currentScreen === 'intro') {
-      navigation.goBack();
-    } else if (currentScreen === 'questionnaire' && currentQuestionIndex > 0) {
+    if (currentScreen === 'questionnaire' && currentQuestionIndex > 0) {
       setCurrentQuestionIndex(prev => prev - 1);
     } else if (currentScreen === 'questionnaire') {
       setCurrentScreen('intro');
@@ -233,7 +231,7 @@ const EmotionThermometer = ({ navigation, route }) => {
       colors={['#f0f9ff', '#e0f2fe']}
       style={styles.container}
     >
-      <TouchableOpacity style={styles.closeButton} onPress={handleBack}>
+      <TouchableOpacity style={styles.closeButton} onPress={handleHomeNavigation}>
         <View style={styles.closeButtonInner}>
           <X size={20} color="#64748b" />
         </View>
