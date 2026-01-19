@@ -56,11 +56,12 @@
           "photosPermission": false,
           "cameraPermission": "LUCIDBOOK 需要使用相機以完成您的大頭貼設定"
         }
-      ]
+      ],
+      "expo-secure-store"
     ],
     "extra": {
       "eas": {
-        "projectId": "84ee6734-2720-452a-ae4a-47e575690763" 
+        "projectId": "84ee6734-2720-452a-ae4a-47e575690763"
       }
     }
   }

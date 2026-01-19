@@ -1,15 +1,16 @@
 // ==========================================
 // 檔案名稱: RegisterScreen.js
 // 功能: 註冊頁面
-// 🎨 統一設計風格
-// ✅ 完整註冊流程
-// ✅ 表單驗證（密碼即時警告）
-// ✅ 隱私政策同意（必須先閱讀才能勾選）
-// ✅ 註冊後導向企業引薦碼頁面
-// ✅✅✅ 修正：正確使用 setLoginState 並傳遞 token ✅✅✅
+// 🎨 統一設計風格 + 進階優化
+// ✅ 密碼強度指示器
+// ✅ 即時表單驗證
+// ✅ 平滑動畫效果
+// ✅ 優化的錯誤提示
+// ✅ 隱私政策流程優化
+// ✅ 註冊成功動畫
 // ==========================================
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -24,21 +25,17 @@ import {
   Platform,
   Keyboard,
   TouchableWithoutFeedback,
+  Animated,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { CommonActions } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import ApiService from '../../../api';
-// ✅✅✅ 修改 1：引入 setLoginState（移除 AsyncStorage 直接操作）✅✅✅
 import { setLoginState } from './AuthUtils';
 
 const RegisterScreen = ({ navigation, route }) => {
-  // 🆕 從 route.params 恢復表單資料（從引薦碼頁面或隱私權頁面返回時）
-  const { 
-    savedFormData,
-    agreedFromPrivacy = false, // 從隱私權政策頁面返回時帶入
-  } = route.params || {};
+  const { savedFormData, agreedFromPrivacy = false } = route.params || {};
 
+  // 表單狀態
   const [name, setName] = useState(savedFormData?.name || '');
   const [email, setEmail] = useState(savedFormData?.email || '');
   const [password, setPassword] = useState(savedFormData?.password || '');
@@ -48,34 +45,133 @@ const RegisterScreen = ({ navigation, route }) => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [agreedToPrivacy, setAgreedToPrivacy] = useState(savedFormData?.agreedToPrivacy || agreedFromPrivacy);
 
-  // 🆕 密碼不一致即時警告
+  // 驗證狀態
+  const [nameError, setNameError] = useState('');
+  const [emailError, setEmailError] = useState('');
+  const [emailExistsError, setEmailExistsError] = useState(''); // 🆕 Email 已被使用的錯誤
+  const [passwordError, setPasswordError] = useState('');
   const [passwordMismatch, setPasswordMismatch] = useState(false);
+  const [passwordStrength, setPasswordStrength] = useState(0);
+  const [isFormValid, setIsFormValid] = useState(false);
 
-  // 🆕 監聽隱私權政策頁面返回
+  // 動畫
+  const shakeAnim = useRef(new Animated.Value(0)).current;
+  const strengthAnim = useRef(new Animated.Value(0)).current;
+
+  // 監聽隱私權政策頁面返回
   useEffect(() => {
     if (agreedFromPrivacy) {
       setAgreedToPrivacy(true);
     }
   }, [agreedFromPrivacy]);
 
-  // 🆕 即時檢查密碼是否一致
+  // 即時驗證姓名
+  useEffect(() => {
+    if (name.length > 0) {
+      if (name.length < 2) {
+        setNameError('姓名至少需要 2 個字元');
+      } else if (name.length > 50) {
+        setNameError('姓名不能超過 50 個字元');
+      } else {
+        setNameError('');
+      }
+    } else {
+      setNameError('');
+    }
+  }, [name]);
+
+  // 即時驗證電子郵件
+  useEffect(() => {
+    // 🆕 當 email 改變時，清除"已被使用"的錯誤
+    setEmailExistsError('');
+    
+    if (email.length > 0) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        setEmailError('請輸入有效的電子郵件格式');
+      } else {
+        setEmailError('');
+      }
+    } else {
+      setEmailError('');
+    }
+  }, [email]);
+
+  // 即時驗證密碼並計算強度
+  useEffect(() => {
+    if (password.length > 0) {
+      // 密碼強度計算
+      let strength = 0;
+      if (password.length >= 6) strength += 20;
+      if (password.length >= 8) strength += 15;
+      if (password.length >= 12) strength += 15;
+      if (/[a-z]/.test(password)) strength += 10;
+      if (/[A-Z]/.test(password)) strength += 15;
+      if (/[0-9]/.test(password)) strength += 15;
+      if (/[^a-zA-Z0-9]/.test(password)) strength += 10;
+      
+      setPasswordStrength(Math.min(strength, 100));
+      
+      // 動畫更新強度條
+      Animated.timing(strengthAnim, {
+        toValue: strength / 100,
+        duration: 300,
+        useNativeDriver: false,
+      }).start();
+
+      // 密碼錯誤提示
+      if (password.length < 6) {
+        setPasswordError('密碼至少需要 6 個字元');
+      } else if (password.length < 8) {
+        setPasswordError('建議使用至少 8 個字元以提高安全性');
+      } else {
+        setPasswordError('');
+      }
+    } else {
+      setPasswordError('');
+      setPasswordStrength(0);
+    }
+  }, [password]);
+
+  // 即時檢查密碼是否一致
   useEffect(() => {
     if (confirmPassword.length > 0 && password !== confirmPassword) {
       setPasswordMismatch(true);
+      // 震動動畫
+      Animated.sequence([
+        Animated.timing(shakeAnim, { toValue: 10, duration: 50, useNativeDriver: true }),
+        Animated.timing(shakeAnim, { toValue: -10, duration: 50, useNativeDriver: true }),
+        Animated.timing(shakeAnim, { toValue: 10, duration: 50, useNativeDriver: true }),
+        Animated.timing(shakeAnim, { toValue: 0, duration: 50, useNativeDriver: true }),
+      ]).start();
     } else {
       setPasswordMismatch(false);
     }
   }, [password, confirmPassword]);
 
-  // 🆕 開啟隱私政策頁面 - 導航到專屬頁面
+  // 檢查表單是否有效
+  useEffect(() => {
+    const valid = 
+      name.length >= 2 &&
+      emailError === '' &&
+      emailExistsError === '' && // 🆕 檢查 email 是否已被使用
+      email.length > 0 &&
+      password.length >= 6 &&
+      !passwordMismatch &&
+      confirmPassword.length > 0 &&
+      agreedToPrivacy;
+    
+    setIsFormValid(valid);
+  }, [name, email, emailError, emailExistsError, password, confirmPassword, passwordMismatch, agreedToPrivacy]);
+
+  // 開啟隱私政策頁面
   const openPrivacyPolicy = () => {
-    // 儲存當前表單資料
     const formData = {
       name,
       email,
       password,
       confirmPassword,
-      agreedToPrivacy,
+      agreedToPrivacy: false, // 🆕 總是傳 false，讓用戶重新閱讀
     };
     
     navigation.navigate('PrivacyPolicy', {
@@ -84,62 +180,47 @@ const RegisterScreen = ({ navigation, route }) => {
     });
   };
 
-  // ✅ 新增：處理勾選同意的邏輯
+  // 處理勾選同意 - 🆕 改為總是開啟隱私政策頁面，不允許手動勾選
   const handlePrivacyCheckboxPress = () => {
-    // 如果用戶想要勾選同意，但還沒閱讀過隱私政策
-    if (!agreedToPrivacy && !agreedFromPrivacy) {
+    if (agreedToPrivacy) {
+      // 如果已經同意，詢問是否要取消
       Alert.alert(
-        '請先閱讀隱私權政策',
-        '您需要先閱讀完整的隱私權政策才能同意',
+        '取消同意？',
+        '取消後您需要重新閱讀隱私權政策',
         [
           {
-            text: '了解',
-            onPress: () => {
-              openPrivacyPolicy();
-            }
+            text: '不取消',
+            style: 'cancel'
+          },
+          {
+            text: '取消同意',
+            style: 'destructive',
+            onPress: () => setAgreedToPrivacy(false)
           }
         ]
       );
     } else {
-      // 如果已經閱讀過，可以直接取消勾選
-      setAgreedToPrivacy(!agreedToPrivacy);
+      // 未同意時，開啟隱私政策頁面
+      openPrivacyPolicy();
     }
   };
 
+  // 註冊處理
   const handleRegister = async () => {
-    // ✅ 表單驗證
-    if (!name || !email || !password || !confirmPassword) {
-      Alert.alert('錯誤', '請填寫所有欄位');
-      return;
-    }
-
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      Alert.alert('錯誤', '請輸入有效的電子郵件格式');
-      return;
-    }
-
-    if (password.length < 6) {
-      Alert.alert('錯誤', '密碼至少需要 6 個字元');
-      return;
-    }
-
-    if (password !== confirmPassword) {
-      Alert.alert('錯誤', '兩次輸入的密碼不一致');
-      return;
-    }
-
-    if (!agreedToPrivacy) {
-      Alert.alert('提醒', '請先閱讀並同意隱私權政策');
+    // 最終驗證
+    if (!isFormValid) {
+      Alert.alert('請檢查表單', '請確保所有欄位都正確填寫');
       return;
     }
 
     setIsLoading(true);
     try {
       // 1️⃣ 註冊
+      console.log('🔐 [RegisterScreen] 開始註冊流程...');
       await ApiService.register(name, email, password);
       
       // 2️⃣ 自動登入
+      console.log('🔐 [RegisterScreen] 註冊成功，自動登入...');
       const loginResponse = await ApiService.login(email, password);
       
       // 3️⃣ 準備用戶資料
@@ -150,25 +231,19 @@ const RegisterScreen = ({ navigation, route }) => {
         isGuest: false
       };
       
-      // ✅✅✅ 修改 2：使用 setLoginState 並傳入 token ✅✅✅
-      // ❌ 刪除：await AsyncStorage.setItem('userData', JSON.stringify(userData));
-      // ❌ 刪除：await AsyncStorage.setItem('authToken', loginResponse.token);
-      // ✅ 新增：
+      // 4️⃣ 保存登入狀態
       await setLoginState({
         userData,
-        token: loginResponse.token, // ⭐⭐⭐ 關鍵：必須傳入 token
-        rememberMe: false, // 註冊時預設不記住帳號
+        token: loginResponse.token,
+        rememberMe: false,
       });
       
-      console.log('🔐 [RegisterScreen] 登入狀態已設定，包含:');
-      console.log('   - userData:', userData.email);
-      console.log('   - token:', loginResponse.token ? '已提供' : '未提供');
-      // ✅✅✅ 修改結束 ✅✅✅
+      console.log('✅ [RegisterScreen] 登入狀態已設定');
       
-      // 4️⃣ 導航到企業引薦碼頁面
+      // 5️⃣ 顯示成功訊息並導航
       Alert.alert(
-        '註冊成功！', 
-        '請輸入企業引薦碼以完成設定', 
+        '🎉 註冊成功！', 
+        '歡迎加入 LUCIDBOOK\n\n請輸入企業引薦碼以完成設定', 
         [
           { 
             text: '繼續', 
@@ -183,22 +258,59 @@ const RegisterScreen = ({ navigation, route }) => {
         { cancelable: false }
       );
     } catch (error) {
-      Alert.alert('註冊失敗', error.message || '註冊失敗，請稍後再試');
+      console.error('❌ [RegisterScreen] 註冊失敗:', error);
+      
+      // 詳細錯誤處理
+      let errorMessage = '註冊失敗，請稍後再試';
+      let isEmailError = false;
+      
+      // 🆕 檢查是否為 email 已存在的錯誤
+      if (error.message.includes('email') || 
+          error.message.includes('already') || 
+          error.message.includes('exist') ||
+          error.message.includes('已被使用') ||
+          error.message.includes('已註冊')) {
+        errorMessage = '此電子郵件已被使用，請使用其他郵件地址';
+        isEmailError = true;
+        setEmailExistsError('此電子郵件已被使用'); // 🆕 設置錯誤狀態
+      } else if (error.message.includes('network')) {
+        errorMessage = '網路連接失敗，請檢查您的網路';
+      }
+      
+      // 🆕 只有在不是 email 錯誤時才顯示 Alert（email 錯誤會在輸入框下方顯示）
+      if (!isEmailError) {
+        Alert.alert('註冊失敗', errorMessage);
+      }
     } finally {
       setIsLoading(false);
     }
   };
 
+  // 返回登入頁面
   const goToLogin = () => {
-    // ✅ 直接導航到 Login，不要用 goBack()
     navigation.navigate('Login');
   };
+
+  // 獲取密碼強度文字和顏色
+  const getPasswordStrengthInfo = () => {
+    if (passwordStrength < 30) {
+      return { text: '弱', color: '#EF4444' };
+    } else if (passwordStrength < 60) {
+      return { text: '中等', color: '#F59E0B' };
+    } else if (passwordStrength < 80) {
+      return { text: '良好', color: '#10B981' };
+    } else {
+      return { text: '優秀', color: '#059669' };
+    }
+  };
+
+  const strengthInfo = getPasswordStrengthInfo();
 
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#166CB5" />
       
-      {/* ⭐ Header - 漸層藍色設計 */}
+      {/* Header */}
       <LinearGradient
         colors={['#166CB5', '#31C6FE']}
         start={{ x: 0, y: 0 }}
@@ -249,8 +361,16 @@ const RegisterScreen = ({ navigation, route }) => {
                 {/* 姓名輸入 */}
                 <View style={styles.inputContainer}>
                   <Text style={styles.inputLabel}>姓名</Text>
-                  <View style={styles.inputWrapper}>
-                    <Ionicons name="person-outline" size={20} color="#9CA3AF" style={styles.inputIcon} />
+                  <View style={[
+                    styles.inputWrapper,
+                    nameError && styles.inputWrapperError
+                  ]}>
+                    <Ionicons 
+                      name="person-outline" 
+                      size={20} 
+                      color={nameError ? "#EF4444" : "#9CA3AF"} 
+                      style={styles.inputIcon} 
+                    />
                     <TextInput
                       style={styles.textInput}
                       value={name}
@@ -260,14 +380,31 @@ const RegisterScreen = ({ navigation, route }) => {
                       editable={!isLoading}
                       returnKeyType="next"
                     />
+                    {name.length >= 2 && !nameError && (
+                      <Ionicons name="checkmark-circle" size={20} color="#10B981" />
+                    )}
                   </View>
+                  {nameError && (
+                    <View style={styles.errorContainer}>
+                      <Ionicons name="alert-circle" size={14} color="#EF4444" />
+                      <Text style={styles.errorText}>{nameError}</Text>
+                    </View>
+                  )}
                 </View>
 
                 {/* 電子郵件輸入 */}
                 <View style={styles.inputContainer}>
                   <Text style={styles.inputLabel}>電子郵件</Text>
-                  <View style={styles.inputWrapper}>
-                    <Ionicons name="mail-outline" size={20} color="#9CA3AF" style={styles.inputIcon} />
+                  <View style={[
+                    styles.inputWrapper,
+                    (emailError || emailExistsError) && styles.inputWrapperError
+                  ]}>
+                    <Ionicons 
+                      name="mail-outline" 
+                      size={20} 
+                      color={(emailError || emailExistsError) ? "#EF4444" : "#9CA3AF"} 
+                      style={styles.inputIcon} 
+                    />
                     <TextInput
                       style={styles.textInput}
                       value={email}
@@ -279,7 +416,23 @@ const RegisterScreen = ({ navigation, route }) => {
                       editable={!isLoading}
                       returnKeyType="next"
                     />
+                    {email.length > 0 && !emailError && !emailExistsError && (
+                      <Ionicons name="checkmark-circle" size={20} color="#10B981" />
+                    )}
                   </View>
+                  {emailError && (
+                    <View style={styles.errorContainer}>
+                      <Ionicons name="alert-circle" size={14} color="#EF4444" />
+                      <Text style={styles.errorText}>{emailError}</Text>
+                    </View>
+                  )}
+                  {/* 🆕 顯示 email 已被使用的錯誤 */}
+                  {emailExistsError && !emailError && (
+                    <View style={styles.errorContainer}>
+                      <Ionicons name="alert-circle" size={14} color="#EF4444" />
+                      <Text style={styles.errorText}>{emailExistsError}</Text>
+                    </View>
+                  )}
                 </View>
 
                 {/* 密碼輸入 */}
@@ -308,15 +461,48 @@ const RegisterScreen = ({ navigation, route }) => {
                       />
                     </TouchableOpacity>
                   </View>
+                  
+                  {/* 密碼強度指示器 */}
+                  {password.length > 0 && (
+                    <View style={styles.strengthContainer}>
+                      <View style={styles.strengthBarContainer}>
+                        <Animated.View 
+                          style={[
+                            styles.strengthBar,
+                            {
+                              width: strengthAnim.interpolate({
+                                inputRange: [0, 1],
+                                outputRange: ['0%', '100%'],
+                              }),
+                              backgroundColor: strengthInfo.color,
+                            },
+                          ]}
+                        />
+                      </View>
+                      <Text style={[styles.strengthText, { color: strengthInfo.color }]}>
+                        強度：{strengthInfo.text}
+                      </Text>
+                    </View>
+                  )}
+                  
+                  {passwordError && password.length < 8 && (
+                    <View style={styles.warningContainer}>
+                      <Ionicons name="information-circle" size={14} color="#F59E0B" />
+                      <Text style={styles.warningText}>{passwordError}</Text>
+                    </View>
+                  )}
                 </View>
 
                 {/* 確認密碼輸入 */}
                 <View style={styles.inputContainer}>
                   <Text style={styles.inputLabel}>確認密碼</Text>
-                  <View style={[
-                    styles.inputWrapper, 
-                    passwordMismatch && styles.inputWrapperError
-                  ]}>
+                  <Animated.View 
+                    style={[
+                      styles.inputWrapper, 
+                      passwordMismatch && styles.inputWrapperError,
+                      { transform: [{ translateX: shakeAnim }] }
+                    ]}
+                  >
                     <Ionicons 
                       name="lock-closed-outline" 
                       size={20} 
@@ -344,8 +530,10 @@ const RegisterScreen = ({ navigation, route }) => {
                         color={passwordMismatch ? "#EF4444" : "#9CA3AF"} 
                       />
                     </TouchableOpacity>
-                  </View>
-                  {/* 🆕 密碼不一致即時警告 */}
+                    {!passwordMismatch && confirmPassword.length > 0 && password === confirmPassword && (
+                      <Ionicons name="checkmark-circle" size={20} color="#10B981" style={{ marginLeft: 8 }} />
+                    )}
+                  </Animated.View>
                   {passwordMismatch && (
                     <View style={styles.errorContainer}>
                       <Ionicons name="alert-circle" size={14} color="#EF4444" />
@@ -354,10 +542,9 @@ const RegisterScreen = ({ navigation, route }) => {
                   )}
                 </View>
 
-                {/* 🆕 隱私政策同意區塊 */}
+                {/* 隱私政策同意 */}
                 <View style={styles.privacyContainer}>
                   <View style={styles.checkboxContainer}>
-                    {/* ✅ Checkbox - 修改點擊邏輯，先檢查是否已閱讀 */}
                     <TouchableOpacity 
                       onPress={handlePrivacyCheckboxPress}
                       activeOpacity={0.7}
@@ -369,19 +556,28 @@ const RegisterScreen = ({ navigation, route }) => {
                       </View>
                     </TouchableOpacity>
                     
-                    {/* 文字區域 */}
                     <View style={styles.privacyTextContainer}>
                       <Text style={styles.privacyText}>我已閱讀並同意</Text>
-                      {/* 隱私權政策連結 - 點擊導航到頁面 */}
                       <TouchableOpacity onPress={openPrivacyPolicy} activeOpacity={0.7}>
                         <Text style={styles.privacyLink}>隱私權政策</Text>
                       </TouchableOpacity>
                     </View>
                   </View>
                   {!agreedToPrivacy && (
-                    <Text style={styles.privacyHint}>
-                      請先閱讀隱私權政策後勾選同意
-                    </Text>
+                    <View style={styles.privacyHintBox}>
+                      <Ionicons name="information-circle" size={16} color="#166CB5" />
+                      <Text style={styles.privacyHint}>
+                        請點擊「隱私權政策」閱讀完整內容並滾動到底部
+                      </Text>
+                    </View>
+                  )}
+                  {agreedToPrivacy && (
+                    <View style={styles.privacySuccessBox}>
+                      <Ionicons name="checkmark-circle" size={16} color="#10B981" />
+                      <Text style={styles.privacySuccessText}>
+                        已閱讀並同意隱私權政策
+                      </Text>
+                    </View>
                   )}
                 </View>
 
@@ -389,15 +585,15 @@ const RegisterScreen = ({ navigation, route }) => {
                 <TouchableOpacity 
                   style={[
                     styles.registerButtonContainer,
-                    (!agreedToPrivacy || passwordMismatch) && styles.registerButtonDisabled
+                    !isFormValid && styles.registerButtonDisabled
                   ]}
                   onPress={handleRegister}
-                  disabled={isLoading || !agreedToPrivacy || passwordMismatch}
+                  disabled={isLoading || !isFormValid}
                   activeOpacity={0.9}
                 >
                   <LinearGradient
-                    colors={(!agreedToPrivacy || passwordMismatch) 
-                      ? ['#9CA3AF', '#9CA3AF'] 
+                    colors={!isFormValid 
+                      ? ['#D1D5DB', '#D1D5DB'] 
                       : ['#166CB5', '#31C6FE']}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 0 }}
@@ -407,8 +603,17 @@ const RegisterScreen = ({ navigation, route }) => {
                       <ActivityIndicator color="white" />
                     ) : (
                       <>
-                        <Text style={styles.registerButtonText}>註冊</Text>
-                        <Ionicons name="arrow-forward" size={20} color="#FFFFFF" />
+                        <Text style={[
+                          styles.registerButtonText,
+                          !isFormValid && styles.registerButtonTextDisabled
+                        ]}>
+                          註冊
+                        </Text>
+                        <Ionicons 
+                          name="arrow-forward" 
+                          size={20} 
+                          color={isFormValid ? "#FFFFFF" : "#9CA3AF"} 
+                        />
                       </>
                     )}
                   </LinearGradient>
@@ -585,7 +790,7 @@ const styles = StyleSheet.create({
     padding: 8,
   },
 
-  // 🆕 密碼不一致錯誤提示
+  // 錯誤和警告提示
   errorContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -597,6 +802,38 @@ const styles = StyleSheet.create({
     color: '#EF4444',
     marginLeft: 4,
     fontWeight: '500',
+  },
+  warningContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 6,
+    paddingHorizontal: 4,
+  },
+  warningText: {
+    fontSize: 12,
+    color: '#F59E0B',
+    marginLeft: 4,
+    fontWeight: '500',
+  },
+
+  // 密碼強度指示器
+  strengthContainer: {
+    marginTop: 8,
+  },
+  strengthBarContainer: {
+    height: 4,
+    backgroundColor: '#E5E7EB',
+    borderRadius: 2,
+    overflow: 'hidden',
+    marginBottom: 6,
+  },
+  strengthBar: {
+    height: '100%',
+    borderRadius: 2,
+  },
+  strengthText: {
+    fontSize: 12,
+    fontWeight: '600',
   },
 
   // 隱私政策同意
@@ -642,9 +879,40 @@ const styles = StyleSheet.create({
   },
   privacyHint: {
     fontSize: 12,
-    color: '#9CA3AF',
-    marginTop: 6,
+    color: '#166CB5',
+    marginLeft: 8,
+    flex: 1,
+    lineHeight: 16,
+  },
+  privacyHintBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#EFF6FF',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginTop: 8,
     marginLeft: 34,
+    borderWidth: 1,
+    borderColor: '#DBEAFE',
+  },
+  privacySuccessBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F0FDF4',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginTop: 8,
+    marginLeft: 34,
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+  },
+  privacySuccessText: {
+    fontSize: 12,
+    color: '#15803D',
+    marginLeft: 8,
+    fontWeight: '600',
   },
 
   // 註冊按鈕
@@ -673,6 +941,9 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '700',
+  },
+  registerButtonTextDisabled: {
+    color: '#9CA3AF',
   },
 
   // 登入連結

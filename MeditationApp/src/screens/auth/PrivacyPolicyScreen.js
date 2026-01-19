@@ -1,14 +1,11 @@
 // ==========================================
 // 檔案名稱: PrivacyPolicyScreen.js
 // 功能: 隱私權政策頁面
-// 🎨 統一設計風格
-// ✅ 顯示隱私權政策內容
-// ✅✅✅ 終極修正版：絕對嚴格的滾動檢測 ✅✅✅
-// 核心改進:
-// 1. 降低自動啟用閾值 (200px → 50px)
-// 2. 添加安全檢查，防止誤判
-// 3. 更詳細的 console.log 調試信息
-// 4. 確保初始狀態正確
+// ✅ 超嚴格「必須滑到底」才可同意（修正版）
+// ✅ 不再使用 measure()，改用 onLayout + onContentSizeChange（更準）
+// ✅ 多事件檢查：onScroll + onScrollEndDrag + onMomentumScrollEnd
+// ✅ 追蹤 maxOffsetReached，避免 throttle/momentum 漏判
+// ✅ Button 真正 disabled（不只顏色）
 // ==========================================
 
 import React, { useState, useRef, useEffect } from 'react';
@@ -19,162 +16,179 @@ import {
   ScrollView,
   StyleSheet,
   StatusBar,
+  Animated,
+  Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 
 const PrivacyPolicyScreen = ({ navigation, route }) => {
   const { fromRegister, savedFormData } = route.params || {};
-  
+
+  // ====== 可調參數（越嚴格越不容易誤判） ======
+  const BOTTOM_THRESHOLD_PX = 6;  // 距離底部 <= 6px 才算到底（可再縮到 3）
+  const MIN_SCROLL_PX = 120;      // 至少真的滑動超過 120px 才算「有閱讀行為」
+
   // 狀態管理
   const [hasScrolledToBottom, setHasScrolledToBottom] = useState(false);
-  const [scrollViewHeight, setScrollViewHeight] = useState(0);
-  const [contentHeight, setContentHeight] = useState(0);
-  const [isScrollable, setIsScrollable] = useState(false);
-  const [isInitialized, setIsInitialized] = useState(false); // ⭐ 新增：追蹤初始化狀態
-  
-  const scrollViewRef = useRef(null);
+  const [readingProgress, setReadingProgress] = useState(0);
+  const [canAgree, setCanAgree] = useState(false);
 
-  // ⭐ 新增：組件掛載時記錄
+  // ScrollView 尺寸（取代 measure）
+  const [layoutHeight, setLayoutHeight] = useState(0);    // 可視高度
+  const [contentHeight, setContentHeight] = useState(0);  // 內容高度
+
+  const progressAnim = useRef(new Animated.Value(0)).current;
+  const buttonAnim = useRef(new Animated.Value(0.5)).current;
+
+  // 用 ref 追蹤「使用者真的滑過」以及「到過的最深 offset」
+  const hasUserScrolled = useRef(false);
+  const maxOffsetReached = useRef(0);
+
+  // 只要內容/版面變動，就重置狀態（避免切頁/字體縮放造成誤啟用）
   useEffect(() => {
-    console.log('🎬 [隱私條款] 頁面載入');
-    console.log('   fromRegister:', fromRegister);
-    console.log('   savedFormData:', savedFormData ? 'exists' : 'null');
-    
-    return () => {
-      console.log('👋 [隱私條款] 頁面卸載');
-    };
-  }, []);
+    setHasScrolledToBottom(false);
+    setCanAgree(false);
+    buttonAnim.setValue(0.5);
+    hasUserScrolled.current = false;
+    maxOffsetReached.current = 0;
+  }, [layoutHeight, contentHeight]);
 
-  // ✅ 當 ScrollView 布局完成時記錄高度
-  const handleScrollViewLayout = (event) => {
-    const { height } = event.nativeEvent.layout;
-    
-    console.log('📐 [隱私條款] ScrollView 高度變化:', {
-      新高度: height,
-      舊高度: scrollViewHeight,
-      首次設定: scrollViewHeight === 0,
-    });
-    
-    setScrollViewHeight(height);
+  // 取得 ScrollView 可視高度
+  const handleLayout = (e) => {
+    const h = e.nativeEvent.layout.height || 0;
+    setLayoutHeight(h);
   };
 
-  // ✅ 當內容大小改變時檢查是否需要滾動
-  const handleContentSizeChange = (width, height) => {
-    console.log('\n📏 [隱私條款] 內容大小變化:', {
-      內容高度: height,
-      視窗高度: scrollViewHeight,
-      高度差: height - scrollViewHeight,
-      是否已初始化: isInitialized,
-    });
-
-    setContentHeight(height);
-    
-    // ⭐⭐⭐ 關鍵修改 1: 降低閾值從 200px 到 50px
-    // 只有當內容高度「明顯」大於視窗時才需要滾動
-    const threshold = 50; // 降低閾值，更嚴格判斷
-    const heightDifference = height - scrollViewHeight;
-    const needsScroll = heightDifference > threshold;
-    
-    console.log('🔍 [隱私條款] 滾動需求判斷:', {
-      內容高度: height,
-      視窗高度: scrollViewHeight,
-      高度差: heightDifference,
-      閾值: threshold,
-      需要滾動: needsScroll,
-      判斷依據: needsScroll ? '內容超出視窗' : '內容完全可見',
-    });
-    
-    setIsScrollable(needsScroll);
-    
-    // ⭐⭐⭐ 關鍵修改 2: 添加多重安全檢查
-    if (!needsScroll && scrollViewHeight > 0) {
-      // 只有在確定不需要滾動時才自動啟用
-      console.log('✅ [隱私條款] 內容完全可見，自動啟用按鈕');
-      setHasScrolledToBottom(true);
-    } else if (needsScroll) {
-      // 如果需要滾動，確保按鈕是禁用的
-      console.log('🔒 [隱私條款] 需要滾動，按鈕保持禁用');
-      setHasScrolledToBottom(false);
-    }
-    
-    // ⭐ 標記為已初始化
-    if (!isInitialized && scrollViewHeight > 0) {
-      setIsInitialized(true);
-      console.log('✅ [隱私條款] 初始化完成');
-    }
+  // 取得內容高度
+  const handleContentSizeChange = (w, h) => {
+    setContentHeight(h);
   };
 
-  // ✅ 滾動事件處理
-  const handleScroll = (event) => {
-    const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
-    
-    // ⭐⭐⭐ 關鍵修改 3: 更精確的底部檢測 (只允許 3px 誤差)
-    const paddingToBottom = 3; // 從 5px 降低到 3px
-    const distanceToBottom = contentSize.height - (layoutMeasurement.height + contentOffset.y);
-    const isAtBottom = distanceToBottom <= paddingToBottom;
-    
-    // ⭐ 只在必要時輸出日誌 (避免刷屏)
-    if (Math.abs(contentOffset.y) % 50 < 10) { // 每 50px 輸出一次
-      console.log('📊 [隱私條款] 滾動位置:', {
-        當前位置: Math.round(contentOffset.y),
-        視窗高度: Math.round(layoutMeasurement.height),
-        內容總高度: Math.round(contentSize.height),
-        距離底部: Math.round(distanceToBottom),
-        到達底部: isAtBottom,
-        需要滾動: isScrollable,
-        按鈕狀態: hasScrolledToBottom ? '已啟用' : '禁用中',
-      });
-    }
-    
-    // ✅✅✅ 最終判斷：必須同時滿足三個條件
-    if (isScrollable && isAtBottom && !hasScrolledToBottom) {
-      console.log('\n✅✅✅ [隱私條款] 達成啟用條件:');
-      console.log('   ✓ 需要滾動: true');
-      console.log('   ✓ 到達底部: true');
-      console.log('   ✓ 尚未啟用: true');
-      console.log('   → 啟用「我已了解」按鈕\n');
-      setHasScrolledToBottom(true);
-    }
+  // 計算 maxScroll（真正可滑到底的距離）
+  const getMaxScroll = () => {
+    const maxScroll = Math.max(contentHeight - layoutHeight, 0);
+    return maxScroll;
   };
 
-  // 點擊「我已了解」按鈕
-  const handleAgree = () => {
-    console.log('🎯 [隱私條款] 用戶點擊「我已了解」');
-    console.log('   hasScrolledToBottom:', hasScrolledToBottom);
-    console.log('   isScrollable:', isScrollable);
-    
-    if (!hasScrolledToBottom) {
-      console.warn('⚠️ [隱私條款] 按鈕應該是禁用的，但被點擊了！');
+  // 統一的底部檢查（可在多事件呼叫）
+  const checkBottomAndMaybeEnable = (offsetY) => {
+    const maxScroll = getMaxScroll();
+
+    // 內容還沒 ready 或根本不能滑（maxScroll=0）時：你可以選擇要不要自動允許
+    // 如果你「堅持永不自動啟用」，那這裡就直接 return。
+    // 但若內容比螢幕短，使用者根本無法滑到底，會卡死。
+    // 所以我採用：maxScroll === 0 -> 直接允許（合理 UX）
+    if (layoutHeight <= 0 || contentHeight <= 0) return;
+
+    if (maxScroll === 0) {
+      // 無法滾動時，視為已完整閱讀
+      if (!hasScrolledToBottom) enableAgreement();
       return;
     }
-    
+
+    // 追蹤最深位置（避免 throttle/momentum 漏掉最後 onScroll）
+    maxOffsetReached.current = Math.max(maxOffsetReached.current, offsetY);
+
+    // 使用者是否真的滾動過一定距離
+    if (maxOffsetReached.current >= Math.min(MIN_SCROLL_PX, maxScroll * 0.25)) {
+      hasUserScrolled.current = true;
+    }
+
+    // 是否真的到底：maxOffsetReached >= maxScroll - threshold
+    const isAtBottom =
+      hasUserScrolled.current &&
+      maxOffsetReached.current >= (maxScroll - BOTTOM_THRESHOLD_PX);
+
+    // 進度計算（用 maxOffsetReached 比用 offsetY 穩定）
+    const progress = maxScroll > 0 ? (Math.min(maxOffsetReached.current, maxScroll) / maxScroll) : 1;
+    const progressPercent = Math.min(Math.max(progress * 100, 0), 100);
+    setReadingProgress(progressPercent);
+
+    Animated.timing(progressAnim, {
+      toValue: progressPercent / 100,
+      duration: 80,
+      useNativeDriver: false,
+    }).start();
+
+    // Debug（必要時再打開）
+    // console.log('📊 [隱私政策] check:', {
+    //   offsetY,
+    //   maxScroll,
+    //   maxOffsetReached: maxOffsetReached.current,
+    //   hasUserScrolled: hasUserScrolled.current,
+    //   isAtBottom,
+    //   progressPercent,
+    // });
+
+    if (isAtBottom && !hasScrolledToBottom) {
+      enableAgreement();
+    }
+  };
+
+  // onScroll：持續更新
+  const handleScroll = (event) => {
+    const { contentOffset } = event.nativeEvent;
+    const offsetY = contentOffset?.y ?? 0;
+
+    // iOS 可能有負值（拉回彈），忽略負值
+    checkBottomAndMaybeEnable(Math.max(offsetY, 0));
+  };
+
+  // onScrollEndDrag / onMomentumScrollEnd：補抓最後停下來那一下
+  const handleScrollEnd = (event) => {
+    const { contentOffset } = event.nativeEvent;
+    const offsetY = contentOffset?.y ?? 0;
+    checkBottomAndMaybeEnable(Math.max(offsetY, 0));
+  };
+
+  // 啟用同意按鈕
+  const enableAgreement = () => {
+    setHasScrolledToBottom(true);
+    setCanAgree(true);
+
+    Animated.spring(buttonAnim, {
+      toValue: 1,
+      friction: 5,
+      tension: 40,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  // 點擊「我已了解」
+  const handleAgree = () => {
+    // 再保險：即使 UI 被點到，也不讓過
+    if (!canAgree) {
+      Alert.alert(
+        '請閱讀完整內容',
+        '您需要滾動到最底部閱讀完整的隱私權政策',
+        [{ text: '了解' }]
+      );
+      return;
+    }
+
     if (fromRegister) {
-      console.log('   → 返回註冊頁面，傳遞 agreedFromPrivacy=true');
       navigation.navigate({
         name: 'Register',
         params: {
-          savedFormData: savedFormData,
-          agreedFromPrivacy: true, // ⭐ 關鍵參數
+          savedFormData,
+          agreedFromPrivacy: true,
         },
         merge: true,
       });
     } else {
-      console.log('   → 返回上一頁');
       navigation.goBack();
     }
   };
 
   // 返回按鈕
   const handleGoBack = () => {
-    console.log('◀️ [隱私條款] 用戶點擊返回');
-    
     if (fromRegister && savedFormData) {
       navigation.navigate({
         name: 'Register',
         params: {
-          savedFormData: savedFormData,
-          agreedFromPrivacy: false, // 未同意
+          savedFormData,
+          agreedFromPrivacy: false,
         },
         merge: true,
       });
@@ -186,7 +200,7 @@ const PrivacyPolicyScreen = ({ navigation, route }) => {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#166CB5" />
-      
+
       {/* Header */}
       <LinearGradient
         colors={['#166CB5', '#31C6FE']}
@@ -201,26 +215,31 @@ const PrivacyPolicyScreen = ({ navigation, route }) => {
         <View style={styles.headerPlaceholder} />
       </LinearGradient>
 
-      {/* ⭐ 調試信息面板 (開發時可見，正式版可移除) */}
-      {__DEV__ && (
-        <View style={styles.debugPanel}>
-          <Text style={styles.debugText}>
-            🔧 調試: {isScrollable ? '需滾動' : '無需滾動'} | 
-            按鈕: {hasScrolledToBottom ? '✅啟用' : '🔒禁用'} | 
-            高度差: {Math.round(contentHeight - scrollViewHeight)}px
-          </Text>
-        </View>
-      )}
+      {/* 閱讀進度條 */}
+      <View style={styles.progressBarContainer}>
+        <Animated.View
+          style={[
+            styles.progressBar,
+            {
+              width: progressAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: ['0%', '100%'],
+              }),
+            },
+          ]}
+        />
+      </View>
 
       {/* 內容區域 */}
-      <ScrollView 
-        ref={scrollViewRef}
+      <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollViewContent}
         showsVerticalScrollIndicator={true}
-        onScroll={handleScroll}
+        onLayout={handleLayout}
         onContentSizeChange={handleContentSizeChange}
-        onLayout={handleScrollViewLayout}
+        onScroll={handleScroll}
+        onScrollEndDrag={handleScrollEnd}
+        onMomentumScrollEnd={handleScrollEnd}
         scrollEventThrottle={16}
       >
         <View style={styles.contentCard}>
@@ -348,7 +367,6 @@ const PrivacyPolicyScreen = ({ navigation, route }) => {
             </Text>
           </View>
 
-          {/* ⭐ 額外內容確保需要滾動 */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>11. 資料保存期限</Text>
             <Text style={styles.sectionContent}>
@@ -369,18 +387,17 @@ const PrivacyPolicyScreen = ({ navigation, route }) => {
             </Text>
           </View>
 
-          {/* ✅ 滾動提示 - 只在需要滾動且未啟用時顯示 */}
-          {isScrollable && !hasScrolledToBottom && (
+          {/* 閱讀狀態提示 */}
+          {!canAgree && (
             <View style={styles.scrollHint}>
               <Ionicons name="arrow-down-circle" size={24} color="#F59E0B" />
               <Text style={styles.scrollHintText}>
-                ⚠️ 請向下滾動閱讀完整內容
+                請向下滾動閱讀完整內容 ({Math.round(readingProgress)}%)
               </Text>
             </View>
           )}
 
-          {/* ✅ 已讀完提示 */}
-          {hasScrolledToBottom && (
+          {canAgree && (
             <View style={styles.completionHint}>
               <Ionicons name="checkmark-circle" size={24} color="#10B981" />
               <Text style={styles.completionHintText}>
@@ -393,58 +410,50 @@ const PrivacyPolicyScreen = ({ navigation, route }) => {
 
       {/* 底部按鈕區 */}
       <View style={styles.bottomContainer}>
-        {/* ✅ 需要滾動但未完成時顯示警告 */}
-        {isScrollable && !hasScrolledToBottom && (
-          <View style={styles.scrollWarning}>
-            <Ionicons name="alert-circle" size={18} color="#DC2626" />
-            <Text style={styles.scrollWarningText}>
-              您必須滾動到底部才能繼續
+        {!canAgree && (
+          <View style={styles.progressInfo}>
+            <Text style={styles.progressText}>
+              閱讀進度：{Math.round(readingProgress)}%
             </Text>
+            <Text style={styles.progressHint}>滾動到底部以繼續</Text>
           </View>
         )}
 
-        {/* ✅ 按鈕 */}
-        <TouchableOpacity 
-          style={styles.agreeButtonContainer}
-          onPress={handleAgree}
-          activeOpacity={hasScrolledToBottom ? 0.9 : 1}
-          disabled={!hasScrolledToBottom}
-        >
-          <LinearGradient
-            colors={hasScrolledToBottom 
-              ? ['#166CB5', '#31C6FE']
-              : ['#D1D5DB', '#D1D5DB']
-            }
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.agreeButton}
+        <Animated.View style={{ transform: [{ scale: buttonAnim }] }}>
+          <TouchableOpacity
+            style={styles.agreeButtonContainer}
+            onPress={handleAgree}
+            activeOpacity={0.9}
+            disabled={!canAgree}                 // ✅ 真正禁用
           >
-            <Ionicons 
-              name={hasScrolledToBottom ? "checkmark-circle" : "lock-closed"} 
-              size={22} 
-              color={hasScrolledToBottom ? "#FFFFFF" : "#9CA3AF"} 
-            />
-            <Text style={[
-              styles.agreeButtonText,
-              !hasScrolledToBottom && styles.agreeButtonTextDisabled
-            ]}>
-              {hasScrolledToBottom ? "我已了解" : "尚未讀完"}
-            </Text>
-          </LinearGradient>
-        </TouchableOpacity>
-        
-        {/* ✅ 底部提示 */}
-        {fromRegister && hasScrolledToBottom && (
+            <LinearGradient
+              colors={
+                canAgree ? ['#166CB5', '#31C6FE'] : ['#D1D5DB', '#D1D5DB']
+              }
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.agreeButton}
+            >
+              <Ionicons
+                name={canAgree ? 'checkmark-circle' : 'lock-closed-outline'}
+                size={22}
+                color={canAgree ? '#FFFFFF' : '#9CA3AF'}
+              />
+              <Text
+                style={[
+                  styles.agreeButtonText,
+                  !canAgree && styles.agreeButtonTextDisabled,
+                ]}
+              >
+                {canAgree ? '我已了解' : '請先閱讀完整內容'}
+              </Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        </Animated.View>
+
+        {fromRegister && canAgree && (
           <Text style={styles.bottomHint}>
             點擊「我已了解」即表示您同意本隱私權政策
-          </Text>
-        )}
-        
-        {!hasScrolledToBottom && (
-          <Text style={styles.bottomHint}>
-            {isInitialized 
-              ? (isScrollable ? '📜 請閱讀完整內容' : '⏳ 正在加載...')
-              : '⏳ 正在初始化...'}
           </Text>
         )}
       </View>
@@ -456,20 +465,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F5F7FA',
-  },
-
-  // ⭐ 調試面板
-  debugPanel: {
-    backgroundColor: '#FEF3C7',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#FDE68A',
-  },
-  debugText: {
-    fontSize: 11,
-    color: '#92400E',
-    fontFamily: 'monospace',
   },
 
   // Header
@@ -498,6 +493,16 @@ const styles = StyleSheet.create({
   },
   headerPlaceholder: {
     width: 40,
+  },
+
+  // 進度條
+  progressBarContainer: {
+    height: 3,
+    backgroundColor: '#E5E7EB',
+  },
+  progressBar: {
+    height: '100%',
+    backgroundColor: '#166CB5',
   },
 
   // ScrollView
@@ -572,18 +577,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 24,
-    paddingTop: 24,
     paddingVertical: 16,
-    borderTopWidth: 2,
-    borderTopColor: '#FEF3C7',
     backgroundColor: '#FFFBEB',
     borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#FEF3C7',
     gap: 12,
   },
   scrollHintText: {
     fontSize: 14,
     color: '#92400E',
-    fontWeight: '700',
+    fontWeight: '600',
   },
 
   // Completion Hint
@@ -620,24 +624,19 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
 
-  // 滾動警告樣式
-  scrollWarning: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FEE2E2',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+  progressInfo: {
     marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#FECACA',
+    alignItems: 'center',
   },
-  scrollWarningText: {
-    fontSize: 13,
-    color: '#991B1B',
-    marginLeft: 8,
-    flex: 1,
+  progressText: {
+    fontSize: 14,
     fontWeight: '600',
+    color: '#166CB5',
+    marginBottom: 4,
+  },
+  progressHint: {
+    fontSize: 12,
+    color: '#9CA3AF',
   },
 
   agreeButtonContainer: {
