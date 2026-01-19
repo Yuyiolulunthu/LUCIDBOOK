@@ -832,29 +832,52 @@ export default function CognitiveReframingPractice({ onBack, navigation }) {
     setFormData(prev => ({ ...prev, selectedAction: action }));
   };
 
-  // 跳轉到呼吸練習
-  const handleGoToBreathing = async () => {
+  // 跳轉到呼吸練習// 跳轉到呼吸練習
+const handleGoToBreathing = async () => {
+  try {
+    // 暫停計時
+    setIsTiming(false);
+    
+    // 先完成思維調節練習並記錄日記
+    await completeOnce();
+    
+    // 導航到呼吸練習
+    navigation.navigate('BreathingPractice', {
+      fromPractice: 'CognitiveReframing',
+      onReturn: () => {
+        // 返回時直接導航到日記頁面，顯示剛完成的練習
+        navigation.navigate('MainTabs', {
+          screen: 'Daily',
+          params: { 
+            highlightPracticeId: practiceId,
+            forceRefresh: true
+          }
+        });
+      }
+    });
+  } catch (error) {
+    console.error('跳轉到呼吸練習失敗:', error);
+    // 即使失敗也先完成記錄
     try {
-      // 暫停計時
-      setIsTiming(false);
-      
-      // 保存當前進度
-      await saveProgress();
-      
-      // 導航到呼吸練習
-      navigation.navigate('BreathingPractice', {
-        fromPractice: 'CognitiveReframing',
-        onReturn: () => {
-          // 返回時恢復計時
-          setIsTiming(true);
-        }
-      });
-    } catch (error) {
-      console.error('跳轉到呼吸練習失敗:', error);
-      // 即使失敗也允許跳轉
-      navigation.navigate('BreathingPractice');
+      await completeOnce();
+    } catch (completeError) {
+      console.error('完成記錄失敗:', completeError);
     }
-  };
+    // 然後允許跳轉
+    navigation.navigate('BreathingPractice', {
+      fromPractice: 'CognitiveReframing',
+      onReturn: () => {
+        navigation.navigate('MainTabs', {
+          screen: 'Daily',
+          params: { 
+            highlightPracticeId: practiceId,
+            forceRefresh: true
+          }
+        });
+      }
+    });
+  }
+};
 
   // ==================== 頁面渲染 ====================
 
