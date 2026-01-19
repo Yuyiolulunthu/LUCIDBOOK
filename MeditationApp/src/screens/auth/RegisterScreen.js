@@ -4,8 +4,9 @@
 // 🎨 統一設計風格
 // ✅ 完整註冊流程
 // ✅ 表單驗證（密碼即時警告）
-// ✅ 隱私政策同意（導航到專屬頁面）
+// ✅ 隱私政策同意（必須先閱讀才能勾選）
 // ✅ 註冊後導向企業引薦碼頁面
+// ✅✅✅ 修正：正確使用 setLoginState 並傳遞 token ✅✅✅
 // ==========================================
 
 import React, { useState, useEffect } from 'react';
@@ -27,8 +28,9 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { CommonActions } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import ApiService from '../../../api';
+// ✅✅✅ 修改 1：引入 setLoginState（移除 AsyncStorage 直接操作）✅✅✅
+import { setLoginState } from './AuthUtils';
 
 const RegisterScreen = ({ navigation, route }) => {
   // 🆕 從 route.params 恢復表單資料（從引薦碼頁面或隱私權頁面返回時）
@@ -82,7 +84,30 @@ const RegisterScreen = ({ navigation, route }) => {
     });
   };
 
+  // ✅ 新增：處理勾選同意的邏輯
+  const handlePrivacyCheckboxPress = () => {
+    // 如果用戶想要勾選同意，但還沒閱讀過隱私政策
+    if (!agreedToPrivacy && !agreedFromPrivacy) {
+      Alert.alert(
+        '請先閱讀隱私權政策',
+        '您需要先閱讀完整的隱私權政策才能同意',
+        [
+          {
+            text: '了解',
+            onPress: () => {
+              openPrivacyPolicy();
+            }
+          }
+        ]
+      );
+    } else {
+      // 如果已經閱讀過，可以直接取消勾選
+      setAgreedToPrivacy(!agreedToPrivacy);
+    }
+  };
+
   const handleRegister = async () => {
+    // ✅ 表單驗證
     if (!name || !email || !password || !confirmPassword) {
       Alert.alert('錯誤', '請填寫所有欄位');
       return;
@@ -111,22 +136,36 @@ const RegisterScreen = ({ navigation, route }) => {
 
     setIsLoading(true);
     try {
-      // 註冊
+      // 1️⃣ 註冊
       await ApiService.register(name, email, password);
       
-      // 🆕 自動登入
+      // 2️⃣ 自動登入
       const loginResponse = await ApiService.login(email, password);
       
-      // 儲存用戶資料
+      // 3️⃣ 準備用戶資料
       const userData = {
         id: loginResponse.user.id,
         name: loginResponse.user.name,
         email: loginResponse.user.email,
         isGuest: false
       };
-      await AsyncStorage.setItem('userData', JSON.stringify(userData));
       
-      // 🆕 註冊成功後，導航到企業引薦碼頁面（必填模式）
+      // ✅✅✅ 修改 2：使用 setLoginState 並傳入 token ✅✅✅
+      // ❌ 刪除：await AsyncStorage.setItem('userData', JSON.stringify(userData));
+      // ❌ 刪除：await AsyncStorage.setItem('authToken', loginResponse.token);
+      // ✅ 新增：
+      await setLoginState({
+        userData,
+        token: loginResponse.token, // ⭐⭐⭐ 關鍵：必須傳入 token
+        rememberMe: false, // 註冊時預設不記住帳號
+      });
+      
+      console.log('🔐 [RegisterScreen] 登入狀態已設定，包含:');
+      console.log('   - userData:', userData.email);
+      console.log('   - token:', loginResponse.token ? '已提供' : '未提供');
+      // ✅✅✅ 修改結束 ✅✅✅
+      
+      // 4️⃣ 導航到企業引薦碼頁面
       Alert.alert(
         '註冊成功！', 
         '請輸入企業引薦碼以完成設定', 
@@ -134,19 +173,9 @@ const RegisterScreen = ({ navigation, route }) => {
           { 
             text: '繼續', 
             onPress: () => {
-              // 儲存表單資料以便返回時恢復
-              const formData = {
-                name,
-                email,
-                password,
-                confirmPassword,
-                agreedToPrivacy: true,
-              };
-              
               navigation.navigate('EnterpriseCode', { 
                 fromRegister: true,
-                isRequired: true, // 標記為必填
-                savedFormData: formData,
+                isRequired: true,
               });
             }
           }
@@ -161,18 +190,8 @@ const RegisterScreen = ({ navigation, route }) => {
   };
 
   const goToLogin = () => {
-    if (navigation) {
-      if (navigation.canGoBack()) {
-        navigation.goBack();
-      } else {
-        navigation.dispatch(
-          CommonActions.reset({
-            index: 0,
-            routes: [{ name: 'Login' }],
-          })
-        );
-      }
-    }
+    // ✅ 直接導航到 Login，不要用 goBack()
+    navigation.navigate('Login');
   };
 
   return (
@@ -338,9 +357,9 @@ const RegisterScreen = ({ navigation, route }) => {
                 {/* 🆕 隱私政策同意區塊 */}
                 <View style={styles.privacyContainer}>
                   <View style={styles.checkboxContainer}>
-                    {/* Checkbox - 可直接點擊勾選 */}
+                    {/* ✅ Checkbox - 修改點擊邏輯，先檢查是否已閱讀 */}
                     <TouchableOpacity 
-                      onPress={() => setAgreedToPrivacy(!agreedToPrivacy)}
+                      onPress={handlePrivacyCheckboxPress}
                       activeOpacity={0.7}
                     >
                       <View style={[styles.checkbox, agreedToPrivacy && styles.checkboxChecked]}>

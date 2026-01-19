@@ -7,6 +7,7 @@
 // ⭐ 自動保持登入 30 天
 // ✅ 登入成功後強制輸入企業引薦碼（若無）
 // ✅ 忘記密碼
+// ✅✅✅ 修正：正確傳遞 token 給 setLoginState ✅✅✅
 // ==========================================
 
 import React, { useState, useEffect } from 'react';
@@ -29,7 +30,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { CommonActions } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import ApiService from '../../../api';
-import { setLoginState, getRememberedEmail } from './AuthUtils'; // ⭐ 引入新的 AuthUtils
+import { setLoginState, getRememberedEmail } from './AuthUtils';
 
 const LoginScreen = ({ navigation, route }) => {
   const { onLoginSuccess: parentOnLoginSuccess, canGoBack = false } = route.params || {};
@@ -38,7 +39,7 @@ const LoginScreen = ({ navigation, route }) => {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false); // ⭐ 只保留「記住我」
+  const [rememberMe, setRememberMe] = useState(false);
 
   // 載入記住的帳號
   useEffect(() => {
@@ -81,11 +82,17 @@ const LoginScreen = ({ navigation, route }) => {
         isGuest: false
       };
 
-      // ⭐ 使用新的 setLoginState（自動保持 30 天）
+      // ⭐⭐⭐ 關鍵修正：傳入 token 參數
       await setLoginState({
         userData,
-        rememberMe, // 只傳遞 rememberMe（用於記住帳號）
+        token: response.token, // ✅✅✅ 傳遞 token
+        rememberMe,
       });
+      
+      console.log('🔐 [LoginScreen] 登入狀態已設定，包含:');
+      console.log('   - userData:', userData.email);
+      console.log('   - token:', response.token ? '已提供' : '未提供');
+      console.log('   - rememberMe:', rememberMe);
       
       // 檢查企業引薦碼
       console.log('🔍 [LoginScreen] 檢查企業引薦碼狀態...');
@@ -263,7 +270,7 @@ const LoginScreen = ({ navigation, route }) => {
                   </View>
                 </View>
 
-                {/* ⭐ 只保留「記住我」選項 */}
+                {/* 記住我 & 忘記密碼 */}
                 <View style={styles.rememberMeRow}>
                   <TouchableOpacity
                     style={styles.checkboxContainer}
@@ -276,7 +283,6 @@ const LoginScreen = ({ navigation, route }) => {
                     <Text style={styles.checkboxLabel}>記住我</Text>
                   </TouchableOpacity>
 
-                  {/* 忘記密碼 */}
                   <TouchableOpacity 
                     onPress={handleForgotPassword}
                     activeOpacity={0.7}
@@ -285,7 +291,7 @@ const LoginScreen = ({ navigation, route }) => {
                   </TouchableOpacity>
                 </View>
 
-                {/* ⭐ 提示訊息（說明自動保持登入） */}
+                {/* 自動登入提示 */}
                 <View style={styles.autoLoginHint}>
                   <Ionicons 
                     name="information-circle-outline" 
@@ -475,7 +481,6 @@ const styles = StyleSheet.create({
     padding: 8,
   },
 
-  // ⭐ 記住我 & 忘記密碼（單行排列）
   rememberMeRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -512,7 +517,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
-  // ⭐ 自動登入提示
   autoLoginHint: {
     flexDirection: 'row',
     alignItems: 'center',

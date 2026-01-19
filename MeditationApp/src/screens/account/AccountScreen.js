@@ -1,12 +1,13 @@
 // ==========================================
 // 檔案名稱: AccountScreen.js
-// 版本: V9.1 - 添加時數單位顯示
+// 版本: V9.2 - 修正登出邏輯
 // 
 // ✅ 使用統一的 LockedOverlay
 // ✅ 未登入顯示登入鎖定
 // ✅ 無企業碼顯示企業碼鎖定
 // ✅ 背景內容模糊但可見
 // ✅ 練習時數顯示單位 "hr"
+// ✅✅✅ 修正：登出時完整清除所有認證資料 ✅✅✅
 // ==========================================
 
 import React, { useState, useEffect } from 'react';
@@ -28,6 +29,7 @@ import BottomNavigation from '../../navigation/BottomNavigation';
 import AppHeader from '../../navigation/AppHeader';
 import ApiService from '../../../api';
 import LockedOverlay from '../../navigation/LockedOverlay';
+import { clearLoginState } from '../auth/AuthUtils'; // ⭐⭐⭐ 新增這行
 
 const AccountScreen = ({ navigation, route }) => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -145,6 +147,7 @@ const AccountScreen = ({ navigation, route }) => {
     navigation.navigate('Settings');
   };
 
+  // ✅✅✅ 修正：登出函數 - 完整清除所有認證資料
   const handleLogout = async () => {
     Alert.alert(
       '登出確認',
@@ -156,13 +159,25 @@ const AccountScreen = ({ navigation, route }) => {
           style: 'destructive',
           onPress: async () => {
             try {
-              await ApiService.clearToken();
+              console.log('📤 [AccountScreen] 開始登出...');
+              
+              // ⭐⭐⭐ 修正：使用 clearLoginState 完整清除
+              // ❌ 舊版：await ApiService.clearToken(); // 只清除 token
+              // ✅ 新版：
+              await clearLoginState(true); // 保留記住的帳號
+              
+              // 更新本地狀態
               setIsLoggedIn(false);
               setUser(null);
               setHasEnterpriseCode(false);
-              console.log('✅ [AccountScreen] 登出成功');
+              
+              console.log('✅ [AccountScreen] 登出成功（已完整清除所有認證資料）');
+              
+              // 可選：顯示成功提示
+              // Alert.alert('成功', '已登出');
             } catch (error) {
               console.error('❌ [AccountScreen] 登出失敗:', error);
+              Alert.alert('錯誤', '登出失敗，請稍後再試');
             }
           },
         },
@@ -290,7 +305,6 @@ const AccountScreen = ({ navigation, route }) => {
 
           <View style={styles.statsGrid}>
             <View style={styles.statCard}>
-              {/* ⭐ 修改：添加時數單位 */}
               <View style={styles.statValueContainer}>
                 <Text style={styles.statValue}>{practiceStats.totalHours}</Text>
                 <Text style={styles.statUnit}>hr</Text>
@@ -353,7 +367,6 @@ const AccountScreen = ({ navigation, route }) => {
 
         <View style={styles.statsGrid}>
           <View style={styles.statCard}>
-            {/* ⭐ 修改：添加時數單位 */}
             <View style={styles.statValueContainer}>
               <Text style={styles.statValue}>{practiceStats.totalHours}</Text>
               <Text style={styles.statUnit}>hr</Text>
@@ -588,7 +601,6 @@ const styles = StyleSheet.create({
     elevation: 2,
     alignItems: 'center',
   },
-  // ⭐ 新增：數值容器（包含數字和單位）
   statValueContainer: {
     flexDirection: 'row',
     alignItems: 'baseline',
@@ -599,7 +611,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#166CB5',
   },
-  // ⭐ 新增：單位樣式
   statUnit: {
     fontSize: 14,
     fontWeight: '600',
