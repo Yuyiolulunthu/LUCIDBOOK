@@ -2,7 +2,7 @@
   "expo": {
     "name": "LUCIDBOOK",
     "slug": "lucidbook",
-    "version": "2.5.3",
+    "version": "2.5.4",
     "orientation": "default",
     "icon": "./assets/images/lucidbook.png",
     "userInterfaceStyle": "light",
@@ -24,7 +24,8 @@
           "remote-notification"
         ],
         "NSCameraUsageDescription": "LUCIDBOOK 需要使用相機以完成您的大頭貼設定",
-        "NSPhotoLibraryUsageDescription": "LUCIDBOOK 需要存取您的相簿以選擇大頭貼照片"
+        "NSPhotoLibraryUsageDescription": "LUCIDBOOK 需要存取您的相簿以選擇大頭貼照片",
+        "NSFaceIDUsageDescription": "LUCIDBOOK 使用 Face ID 讓您快速安全地登入應用程式，保護您的個人資料安全。"
       }
     },
     "android": {
@@ -33,11 +34,13 @@
         "backgroundColor": "#ffffff"
       },
       "package": "com.lucidbook",
-      "versionCode": 34,
+      "versionCode": 35,
       "permissions": [
         "CAMERA",
         "android.permission.CAMERA",
-        "android.permission.RECORD_AUDIO"
+        "android.permission.RECORD_AUDIO",
+        "USE_BIOMETRIC",
+        "USE_FINGERPRINT"
       ]
     },
     "web": {
@@ -57,7 +60,13 @@
           "cameraPermission": "LUCIDBOOK 需要使用相機以完成您的大頭貼設定"
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "LUCIDBOOK 使用 Face ID 讓您快速安全地登入應用程式，保護您的個人資料安全。"
+        }
+      ]
     ],
     "extra": {
       "eas": {
