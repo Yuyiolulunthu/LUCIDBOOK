@@ -57,7 +57,7 @@ import ProfileEditScreen from './src/screens/account/settings/utils/ProfileEditS
 import PrivacySettingsScreen from './src/screens/account/settings/utils/PrivacySettingsScreen';
 import TermsOfServiceScreen from './src/screens/account/settings/utils/TermsOfServiceScreen';
 import HelpCenter from './src/screens/account/settings/utils/HelpCenter';
-import PrivacyPolicy from './src/screens/account/settings/utils/PrivacyPolicy';
+import PrivacyPolicy from './src/screens/auth/PrivacyPolicyScreen';
 import AboutUs from './src/screens/account/settings/utils/AboutUs';
 import DeleteAccountScreen from './src/screens/account/settings/utils/DeleteAccountScreen';
 

@@ -10,7 +10,7 @@
 // ✅ 註冊成功動畫
 // ==========================================
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -29,11 +29,12 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import ApiService from '../../../api';
 import { setLoginState } from './AuthUtils';
 
 const RegisterScreen = ({ navigation, route }) => {
-  const { savedFormData, agreedFromPrivacy = false } = route.params || {};
+  const { savedFormData } = route.params || {};
 
   // 表單狀態
   const [name, setName] = useState(savedFormData?.name || '');
@@ -43,12 +44,12 @@ const RegisterScreen = ({ navigation, route }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [agreedToPrivacy, setAgreedToPrivacy] = useState(savedFormData?.agreedToPrivacy || agreedFromPrivacy);
+  const [agreedToPrivacy, setAgreedToPrivacy] = useState(savedFormData?.agreedToPrivacy || false);
 
   // 驗證狀態
   const [nameError, setNameError] = useState('');
   const [emailError, setEmailError] = useState('');
-  const [emailExistsError, setEmailExistsError] = useState(''); // 🆕 Email 已被使用的錯誤
+  const [emailExistsError, setEmailExistsError] = useState('');
   const [passwordError, setPasswordError] = useState('');
   const [passwordMismatch, setPasswordMismatch] = useState(false);
   const [passwordStrength, setPasswordStrength] = useState(0);
@@ -58,12 +59,37 @@ const RegisterScreen = ({ navigation, route }) => {
   const shakeAnim = useRef(new Animated.Value(0)).current;
   const strengthAnim = useRef(new Animated.Value(0)).current;
 
-  // 監聽隱私權政策頁面返回
+  // ==========================================
+  // ✅ 核心：監聽隱私權政策頁面返回
+  // ==========================================
+  
+  // 方法1: useFocusEffect - 每次畫面獲得焦點時檢查
+  useFocusEffect(
+    useCallback(() => {
+      const params = route.params;
+      console.log('👁️ [Register] 畫面獲得焦點, agreedFromPrivacy:', params?.agreedFromPrivacy);
+      
+      if (params?.agreedFromPrivacy === true) {
+        console.log('✅ [Register] 收到同意訊號，執行勾選！');
+        setAgreedToPrivacy(true);
+        
+        // 清除參數避免重複觸發
+        navigation.setParams({ agreedFromPrivacy: undefined });
+      }
+    }, [route.params?.agreedFromPrivacy])
+  );
+
+  // 方法2: useEffect 備用 - 監聽 route.params 變化
   useEffect(() => {
-    if (agreedFromPrivacy) {
+    const agreedFromPrivacy = route.params?.agreedFromPrivacy;
+    console.log('🔍 [Register] useEffect 監聽, agreedFromPrivacy:', agreedFromPrivacy);
+    
+    if (agreedFromPrivacy === true) {
+      console.log('✅ [Register] useEffect 執行勾選！');
       setAgreedToPrivacy(true);
+      navigation.setParams({ agreedFromPrivacy: undefined });
     }
-  }, [agreedFromPrivacy]);
+  }, [route.params?.agreedFromPrivacy]);
 
   // 即時驗證姓名
   useEffect(() => {
@@ -82,7 +108,6 @@ const RegisterScreen = ({ navigation, route }) => {
 
   // 即時驗證電子郵件
   useEffect(() => {
-    // 🆕 當 email 改變時，清除"已被使用"的錯誤
     setEmailExistsError('');
     
     if (email.length > 0) {
@@ -100,7 +125,6 @@ const RegisterScreen = ({ navigation, route }) => {
   // 即時驗證密碼並計算強度
   useEffect(() => {
     if (password.length > 0) {
-      // 密碼強度計算
       let strength = 0;
       if (password.length >= 6) strength += 20;
       if (password.length >= 8) strength += 15;
@@ -112,14 +136,12 @@ const RegisterScreen = ({ navigation, route }) => {
       
       setPasswordStrength(Math.min(strength, 100));
       
-      // 動畫更新強度條
       Animated.timing(strengthAnim, {
         toValue: strength / 100,
         duration: 300,
         useNativeDriver: false,
       }).start();
 
-      // 密碼錯誤提示
       if (password.length < 6) {
         setPasswordError('密碼至少需要 6 個字元');
       } else if (password.length < 8) {
@@ -137,7 +159,6 @@ const RegisterScreen = ({ navigation, route }) => {
   useEffect(() => {
     if (confirmPassword.length > 0 && password !== confirmPassword) {
       setPasswordMismatch(true);
-      // 震動動畫
       Animated.sequence([
         Animated.timing(shakeAnim, { toValue: 10, duration: 50, useNativeDriver: true }),
         Animated.timing(shakeAnim, { toValue: -10, duration: 50, useNativeDriver: true }),
@@ -154,7 +175,7 @@ const RegisterScreen = ({ navigation, route }) => {
     const valid = 
       name.length >= 2 &&
       emailError === '' &&
-      emailExistsError === '' && // 🆕 檢查 email 是否已被使用
+      emailExistsError === '' &&
       email.length > 0 &&
       password.length >= 6 &&
       !passwordMismatch &&
@@ -166,12 +187,14 @@ const RegisterScreen = ({ navigation, route }) => {
 
   // 開啟隱私政策頁面
   const openPrivacyPolicy = () => {
+    console.log('📖 [Register] 開啟隱私政策頁面');
+    
     const formData = {
       name,
       email,
       password,
       confirmPassword,
-      agreedToPrivacy: false, // 🆕 總是傳 false，讓用戶重新閱讀
+      agreedToPrivacy: false,
     };
     
     navigation.navigate('PrivacyPolicy', {
@@ -180,34 +203,26 @@ const RegisterScreen = ({ navigation, route }) => {
     });
   };
 
-  // 處理勾選同意 - 🆕 改為總是開啟隱私政策頁面，不允許手動勾選
+  // 處理勾選同意
   const handlePrivacyCheckboxPress = () => {
+    console.log('☑️ [Register] Checkbox 被點擊, 目前狀態:', agreedToPrivacy);
+    
     if (agreedToPrivacy) {
-      // 如果已經同意，詢問是否要取消
       Alert.alert(
         '取消同意？',
         '取消後您需要重新閱讀隱私權政策',
         [
-          {
-            text: '不取消',
-            style: 'cancel'
-          },
-          {
-            text: '取消同意',
-            style: 'destructive',
-            onPress: () => setAgreedToPrivacy(false)
-          }
+          { text: '不取消', style: 'cancel' },
+          { text: '取消同意', style: 'destructive', onPress: () => setAgreedToPrivacy(false) }
         ]
       );
     } else {
-      // 未同意時，開啟隱私政策頁面
       openPrivacyPolicy();
     }
   };
 
   // 註冊處理
   const handleRegister = async () => {
-    // 最終驗證
     if (!isFormValid) {
       Alert.alert('請檢查表單', '請確保所有欄位都正確填寫');
       return;
@@ -215,15 +230,12 @@ const RegisterScreen = ({ navigation, route }) => {
 
     setIsLoading(true);
     try {
-      // 1️⃣ 註冊
       console.log('🔐 [RegisterScreen] 開始註冊流程...');
       await ApiService.register(name, email, password);
       
-      // 2️⃣ 自動登入
       console.log('🔐 [RegisterScreen] 註冊成功，自動登入...');
       const loginResponse = await ApiService.login(email, password);
       
-      // 3️⃣ 準備用戶資料
       const userData = {
         id: loginResponse.user.id,
         name: loginResponse.user.name,
@@ -231,7 +243,6 @@ const RegisterScreen = ({ navigation, route }) => {
         isGuest: false
       };
       
-      // 4️⃣ 保存登入狀態
       await setLoginState({
         userData,
         token: loginResponse.token,
@@ -240,7 +251,6 @@ const RegisterScreen = ({ navigation, route }) => {
       
       console.log('✅ [RegisterScreen] 登入狀態已設定');
       
-      // 5️⃣ 顯示成功訊息並導航
       Alert.alert(
         '🎉 註冊成功！', 
         '歡迎加入 LUCIDBOOK\n\n請輸入企業引薦碼以完成設定', 
@@ -260,11 +270,9 @@ const RegisterScreen = ({ navigation, route }) => {
     } catch (error) {
       console.error('❌ [RegisterScreen] 註冊失敗:', error);
       
-      // 詳細錯誤處理
       let errorMessage = '註冊失敗，請稍後再試';
       let isEmailError = false;
       
-      // 🆕 檢查是否為 email 已存在的錯誤
       if (error.message.includes('email') || 
           error.message.includes('already') || 
           error.message.includes('exist') ||
@@ -272,12 +280,11 @@ const RegisterScreen = ({ navigation, route }) => {
           error.message.includes('已註冊')) {
         errorMessage = '此電子郵件已被使用，請使用其他郵件地址';
         isEmailError = true;
-        setEmailExistsError('此電子郵件已被使用'); // 🆕 設置錯誤狀態
+        setEmailExistsError('此電子郵件已被使用');
       } else if (error.message.includes('network')) {
         errorMessage = '網路連接失敗，請檢查您的網路';
       }
       
-      // 🆕 只有在不是 email 錯誤時才顯示 Alert（email 錯誤會在輸入框下方顯示）
       if (!isEmailError) {
         Alert.alert('註冊失敗', errorMessage);
       }
@@ -426,7 +433,6 @@ const RegisterScreen = ({ navigation, route }) => {
                       <Text style={styles.errorText}>{emailError}</Text>
                     </View>
                   )}
-                  {/* 🆕 顯示 email 已被使用的錯誤 */}
                   {emailExistsError && !emailError && (
                     <View style={styles.errorContainer}>
                       <Ionicons name="alert-circle" size={14} color="#EF4444" />

@@ -1,14 +1,18 @@
 // ==========================================
 // 檔案名稱: PrivacyPolicyScreen.js
-// 功能: 隱私權政策頁面
-// ✅ 超嚴格「必須滑到底」才可同意（修正版）
-// ✅ 不再使用 measure()，改用 onLayout + onContentSizeChange（更準）
-// ✅ 多事件檢查：onScroll + onScrollEndDrag + onMomentumScrollEnd
-// ✅ 追蹤 maxOffsetReached，避免 throttle/momentum 漏判
-// ✅ Button 真正 disabled（不只顏色）
+// 功能: 隱私權政策頁面 (更新版樣式)
+// 
+// ✅ 現代化漸層 Header
+// ✅ 卡片式內容設計
+// ✅ 優化表格呈現
+// ✅ 視覺化承諾卡片
+// ✅ 改進的排版與間距
+// 🎨 符合最新設計規範
+// 🆕 支援從註冊頁面進入，「我已了解」返回時自動打勾
+// 🆕 必須滾動到底部才能點擊「我已了解」
 // ==========================================
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -16,448 +20,514 @@ import {
   ScrollView,
   StyleSheet,
   StatusBar,
+  Linking,
+  KeyboardAvoidingView,
+  Platform,
   Animated,
-  Alert,
 } from 'react-native';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
 
 const PrivacyPolicyScreen = ({ navigation, route }) => {
-  const { fromRegister, savedFormData } = route.params || {};
+  // 🆕 從 route.params 獲取參數
+  const { 
+    fromRegister = false, 
+    savedFormData = null,
+  } = route?.params || {};
 
-  // ====== 可調參數（越嚴格越不容易誤判） ======
-  const BOTTOM_THRESHOLD_PX = 6;  // 距離底部 <= 6px 才算到底（可再縮到 3）
-  const MIN_SCROLL_PX = 120;      // 至少真的滑動超過 120px 才算「有閱讀行為」
-
-  // 狀態管理
-  const [hasScrolledToBottom, setHasScrolledToBottom] = useState(false);
+  // ✅ 核心狀態：是否已滾動到底部（解鎖按鈕的依據）
+  const [isRead, setIsRead] = useState(false);
   const [readingProgress, setReadingProgress] = useState(0);
-  const [canAgree, setCanAgree] = useState(false);
-
-  // ScrollView 尺寸（取代 measure）
-  const [layoutHeight, setLayoutHeight] = useState(0);    // 可視高度
-  const [contentHeight, setContentHeight] = useState(0);  // 內容高度
-
+  
+  // ✅ 追蹤是否已經滾動過（防止初始狀態誤判）
+  const hasScrolledRef = useRef(false);
+  // ✅ 追蹤 layout 是否已穩定
+  const [isLayoutReady, setIsLayoutReady] = useState(false);
+  
+  // 進度條動畫
   const progressAnim = useRef(new Animated.Value(0)).current;
-  const buttonAnim = useRef(new Animated.Value(0.5)).current;
 
-  // 用 ref 追蹤「使用者真的滑過」以及「到過的最深 offset」
-  const hasUserScrolled = useRef(false);
-  const maxOffsetReached = useRef(0);
-
-  // 只要內容/版面變動，就重置狀態（避免切頁/字體縮放造成誤啟用）
-  useEffect(() => {
-    setHasScrolledToBottom(false);
-    setCanAgree(false);
-    buttonAnim.setValue(0.5);
-    hasUserScrolled.current = false;
-    maxOffsetReached.current = 0;
-  }, [layoutHeight, contentHeight]);
-
-  // 取得 ScrollView 可視高度
-  const handleLayout = (e) => {
-    const h = e.nativeEvent.layout.height || 0;
-    setLayoutHeight(h);
+  const handleEmailPress = () => {
+    Linking.openURL('mailto:team@lucidbook.tw');
   };
 
-  // 取得內容高度
-  const handleContentSizeChange = (w, h) => {
-    setContentHeight(h);
-  };
-
-  // 計算 maxScroll（真正可滑到底的距離）
-  const getMaxScroll = () => {
-    const maxScroll = Math.max(contentHeight - layoutHeight, 0);
-    return maxScroll;
-  };
-
-  // 統一的底部檢查（可在多事件呼叫）
-  const checkBottomAndMaybeEnable = (offsetY) => {
-    const maxScroll = getMaxScroll();
-
-    // 內容還沒 ready 或根本不能滑（maxScroll=0）時：你可以選擇要不要自動允許
-    // 如果你「堅持永不自動啟用」，那這裡就直接 return。
-    // 但若內容比螢幕短，使用者根本無法滑到底，會卡死。
-    // 所以我採用：maxScroll === 0 -> 直接允許（合理 UX）
-    if (layoutHeight <= 0 || contentHeight <= 0) return;
-
-    if (maxScroll === 0) {
-      // 無法滾動時，視為已完整閱讀
-      if (!hasScrolledToBottom) enableAgreement();
-      return;
-    }
-
-    // 追蹤最深位置（避免 throttle/momentum 漏掉最後 onScroll）
-    maxOffsetReached.current = Math.max(maxOffsetReached.current, offsetY);
-
-    // 使用者是否真的滾動過一定距離
-    if (maxOffsetReached.current >= Math.min(MIN_SCROLL_PX, maxScroll * 0.25)) {
-      hasUserScrolled.current = true;
-    }
-
-    // 是否真的到底：maxOffsetReached >= maxScroll - threshold
-    const isAtBottom =
-      hasUserScrolled.current &&
-      maxOffsetReached.current >= (maxScroll - BOTTOM_THRESHOLD_PX);
-
-    // 進度計算（用 maxOffsetReached 比用 offsetY 穩定）
-    const progress = maxScroll > 0 ? (Math.min(maxOffsetReached.current, maxScroll) / maxScroll) : 1;
-    const progressPercent = Math.min(Math.max(progress * 100, 0), 100);
-    setReadingProgress(progressPercent);
-
-    Animated.timing(progressAnim, {
-      toValue: progressPercent / 100,
-      duration: 80,
-      useNativeDriver: false,
-    }).start();
-
-    // Debug（必要時再打開）
-    // console.log('📊 [隱私政策] check:', {
-    //   offsetY,
-    //   maxScroll,
-    //   maxOffsetReached: maxOffsetReached.current,
-    //   hasUserScrolled: hasUserScrolled.current,
-    //   isAtBottom,
-    //   progressPercent,
-    // });
-
-    if (isAtBottom && !hasScrolledToBottom) {
-      enableAgreement();
-    }
-  };
-
-  // onScroll：持續更新
-  const handleScroll = (event) => {
-    const { contentOffset } = event.nativeEvent;
-    const offsetY = contentOffset?.y ?? 0;
-
-    // iOS 可能有負值（拉回彈），忽略負值
-    checkBottomAndMaybeEnable(Math.max(offsetY, 0));
-  };
-
-  // onScrollEndDrag / onMomentumScrollEnd：補抓最後停下來那一下
-  const handleScrollEnd = (event) => {
-    const { contentOffset } = event.nativeEvent;
-    const offsetY = contentOffset?.y ?? 0;
-    checkBottomAndMaybeEnable(Math.max(offsetY, 0));
-  };
-
-  // 啟用同意按鈕
-  const enableAgreement = () => {
-    setHasScrolledToBottom(true);
-    setCanAgree(true);
-
-    Animated.spring(buttonAnim, {
-      toValue: 1,
-      friction: 5,
-      tension: 40,
-      useNativeDriver: true,
-    }).start();
-  };
-
-  // 點擊「我已了解」
-  const handleAgree = () => {
-    // 再保險：即使 UI 被點到，也不讓過
-    if (!canAgree) {
-      Alert.alert(
-        '請閱讀完整內容',
-        '您需要滾動到最底部閱讀完整的隱私權政策',
-        [{ text: '了解' }]
-      );
-      return;
-    }
-
-    if (fromRegister) {
-      navigation.navigate({
-        name: 'Register',
-        params: {
-          savedFormData,
-          agreedFromPrivacy: true,
-        },
-        merge: true,
-      });
-    } else {
-      navigation.goBack();
-    }
-  };
-
-  // 返回按鈕
+  // 🆕 處理返回按鈕
   const handleGoBack = () => {
     if (fromRegister && savedFormData) {
-      navigation.navigate({
-        name: 'Register',
-        params: {
-          savedFormData,
-          agreedFromPrivacy: false,
-        },
-        merge: true,
+      navigation.navigate('Register', {
+        savedFormData: savedFormData,
+        agreedFromPrivacy: false,
       });
     } else {
       navigation.goBack();
     }
+  };
+
+  // 🆕 處理「我已了解」按鈕
+  const handleAgree = () => {
+    console.log('🔘 [Privacy] handleAgree 被點擊, isRead:', isRead, 'fromRegister:', fromRegister);
+    
+    if (!isRead) return; // 防呆：沒讀完不能按
+    
+    if (fromRegister) {
+      console.log('🚀 [Privacy] 發送同意訊號，返回 Register');
+      navigation.navigate('Register', {
+        agreedFromPrivacy: true,
+        savedFormData: savedFormData,
+      });
+    } else {
+      navigation.goBack();
+    }
+  };
+
+  // ✅ 滾動檢測邏輯
+  const handleScroll = (event) => {
+    const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
+    
+    // 防護：確保 layout 已穩定且有實際內容
+    if (!isLayoutReady || contentSize.height < 200) {
+      return;
+    }
+    
+    // 標記已開始滾動（至少滾動 50px）
+    if (contentOffset.y > 50) {
+      hasScrolledRef.current = true;
+    }
+    
+    // 計算進度
+    const maxScroll = Math.max(contentSize.height - layoutMeasurement.height, 1);
+    const progress = Math.min(Math.max(contentOffset.y / maxScroll, 0), 1);
+    
+    setReadingProgress(Math.round(progress * 100));
+    progressAnim.setValue(progress);
+    
+    // 如果已解鎖，不需要再檢查
+    if (isRead) return;
+    
+    // 判定是否到底（必須有實際滾動過）
+    const paddingToBottom = 50;
+    const isAtBottom = layoutMeasurement.height + contentOffset.y >= contentSize.height - paddingToBottom;
+    
+    if (isAtBottom && hasScrolledRef.current) {
+      console.log('✅ [Privacy] 到達底部且有滾動過，解鎖按鈕');
+      setIsRead(true);
+    }
+  };
+
+  // ✅ 延遲設定 layout ready
+  const handleLayout = () => {
+    setTimeout(() => {
+      console.log('📐 [Privacy] Layout ready');
+      setIsLayoutReady(true);
+    }, 500);
   };
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView 
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      onLayout={handleLayout}
+    >
       <StatusBar barStyle="light-content" backgroundColor="#166CB5" />
-
+      
       {/* Header */}
       <LinearGradient
         colors={['#166CB5', '#31C6FE']}
         start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
+        end={{ x: 1, y: 0 }}
         style={styles.header}
       >
-        <TouchableOpacity onPress={handleGoBack} style={styles.backButton}>
-          <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>隱私權政策</Text>
-        <View style={styles.headerPlaceholder} />
+        <View style={styles.headerContent}>
+          <TouchableOpacity 
+            style={styles.backButton}
+            onPress={handleGoBack}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="chevron-back" size={24} color="#FFF" />
+          </TouchableOpacity>
+          
+          <Text style={styles.headerTitle}>隱私權政策</Text>
+          
+          <View style={styles.headerPlaceholder} />
+        </View>
       </LinearGradient>
 
-      {/* 閱讀進度條 */}
-      <View style={styles.progressBarContainer}>
-        <Animated.View
-          style={[
-            styles.progressBar,
-            {
-              width: progressAnim.interpolate({
-                inputRange: [0, 1],
-                outputRange: ['0%', '100%'],
-              }),
-            },
-          ]}
-        />
-      </View>
+      {/* ✅ 進度條 */}
+      {fromRegister && (
+        <View style={styles.progressBarContainer}>
+          <Animated.View
+            style={[
+              styles.progressBar,
+              {
+                width: progressAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: ['0%', '100%'],
+                }),
+              },
+            ]}
+          />
+        </View>
+      )}
 
-      {/* 內容區域 */}
-      <ScrollView
+      {/* Content */}
+      <ScrollView 
         style={styles.scrollView}
-        contentContainerStyle={styles.scrollViewContent}
-        showsVerticalScrollIndicator={true}
-        onLayout={handleLayout}
-        onContentSizeChange={handleContentSizeChange}
+        contentContainerStyle={[
+          styles.scrollContent,
+          fromRegister && styles.scrollContentWithButton
+        ]}
+        showsVerticalScrollIndicator={false}
         onScroll={handleScroll}
-        onScrollEndDrag={handleScrollEnd}
-        onMomentumScrollEnd={handleScrollEnd}
+        onMomentumScrollEnd={handleScroll}
+        onScrollEndDrag={handleScroll}
         scrollEventThrottle={16}
       >
-        <View style={styles.contentCard}>
-          {/* 標題區 */}
-          <View style={styles.titleSection}>
-            <View style={styles.iconContainer}>
-              <Ionicons name="shield-checkmark" size={32} color="#166CB5" />
-            </View>
-            <Text style={styles.title}>LUCIDBOOK 隱私權政策</Text>
-            <Text style={styles.lastUpdated}>最後更新日期：2025 年 1 月 19 日</Text>
-          </View>
-
-          {/* 政策內容 */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>您的心理健康值得被認真對待</Text>
-            <Text style={styles.sectionContent}>
-              您在本 App 中留下的每一份記錄—無論是一行反思、一次深呼吸、或是一個自我評分—都屬於您自己。
-              {'\n\n'}
-              我們承諾，以透明、友善、穩固的方式守護您的每一份資料。
-              請花一點時間閱讀這份政策，它會告訴您，我們如何收集、保護、使用、與分享您的資訊。
+        {/* Intro Section */}
+        <View style={styles.section}>
+          <Text style={styles.updateDate}>最後更新日期：2025年11月13日</Text>
+          
+          <View style={styles.introCard}>
+            <Text style={styles.introTitle}>
+              您的心理健康值得被認真對待,您在本App中留下的每一份紀錄—無論是一行反思、一次深呼吸、或是一個自我評分—都屬於您自己。
+            </Text>
+            <Text style={styles.introText}>
+              我們承諾，以透明、友善、穩固的方式守護您的每一份資料。請花一點時間閱讀這份政策，它會告訴您，我們如何收集、保護、使用、與分享您的資料。
             </Text>
           </View>
-
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>1. 資料收集</Text>
-            <Text style={styles.sectionContent}>
-              我們收集您提供的個人資訊，包括但不限於：姓名、電子郵件地址、使用習慣數據。
-              這些資訊用於提供更好的服務體驗和個人化功能。
-              {'\n\n'}
-              我們也會記錄您的練習歷程、心情記錄等資料，以便為您提供更精準的分析和建議。
-            </Text>
-          </View>
-
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>2. 資料使用</Text>
-            <Text style={styles.sectionContent}>
-              我們使用收集的資訊來：{'\n'}
-              • 提供、維護和改進我們的服務{'\n'}
-              • 個人化您的使用體驗{'\n'}
-              • 與您溝通有關服務的更新{'\n'}
-              • 確保服務的安全性{'\n'}
-              • 進行匿名化的統計分析以改善產品
-            </Text>
-          </View>
-
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>3. 資料保護</Text>
-            <Text style={styles.sectionContent}>
-              我們採用業界標準的安全措施來保護您的個人資訊，包括加密傳輸、安全存儲和訪問控制。
-              我們不會將您的資料出售給第三方。
-              {'\n\n'}
-              所有敏感資料都經過加密處理，並且只有經過授權的人員才能訪問。
-            </Text>
-          </View>
-
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>4. 資料存取與刪除</Text>
-            <Text style={styles.sectionContent}>
-              您有權隨時存取、更正或刪除您的個人資料。如需行使這些權利，請聯繫我們的客戶服務團隊。
-              {'\n\n'}
-              您可以隨時在 App 內的設定頁面中，查看和管理您的個人資料。
-              如果您選擇刪除帳號，我們會在 30 天內完全刪除您的所有資料。
-            </Text>
-          </View>
-
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>5. Cookie 政策</Text>
-            <Text style={styles.sectionContent}>
-              我們使用 Cookie 和類似技術來改善您的使用體驗、分析服務使用情況，並提供個人化內容。
-              {'\n\n'}
-              您可以在瀏覽器設定中選擇拒絕 Cookie，但這可能會影響某些功能的正常使用。
-            </Text>
-          </View>
-
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>6. 第三方服務</Text>
-            <Text style={styles.sectionContent}>
-              我們的服務可能包含第三方服務的連結或整合。這些第三方服務有其自己的隱私政策，
-              我們建議您在使用前閱讀相關政策。
-              {'\n\n'}
-              我們會謹慎選擇合作夥伴，確保他們也遵守嚴格的資料保護標準。
-            </Text>
-          </View>
-
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>7. 兒童隱私</Text>
-            <Text style={styles.sectionContent}>
-              我們的服務不針對 13 歲以下的兒童。我們不會故意收集 13 歲以下兒童的個人資訊。
-              {'\n\n'}
-              如果我們發現不慎收集了兒童的個人資訊，我們會立即刪除相關資料。
-            </Text>
-          </View>
-
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>8. 政策更新</Text>
-            <Text style={styles.sectionContent}>
-              我們可能會不時更新本隱私權政策。更新後的政策將在本頁面公布，
-              重大變更時我們會透過電子郵件或應用程式通知您。
-              {'\n\n'}
-              我們建議您定期查看本頁面，以了解最新的隱私權政策。
-            </Text>
-          </View>
-
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>9. 聯繫我們</Text>
-            <Text style={styles.sectionContent}>
-              如果您對本隱私權政策有任何疑問，或對您的資料有任何疑慮，
-              請透過以下方式聯繫我們：{'\n\n'}
-              📧 電子郵件：privacy@lucidbook.tw{'\n'}
-              🕐 服務時間：週一至週五 9:00-18:00{'\n\n'}
-              我們會在收到您的訊息後 3 個工作天內回覆。
-            </Text>
-          </View>
-
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>10. 您的權利</Text>
-            <Text style={styles.sectionContent}>
-              根據相關法律法規，您對您的個人資料擁有以下權利：{'\n\n'}
-              • 知情權：了解我們如何處理您的資料{'\n'}
-              • 更正權：更正不正確的個人資料{'\n'}
-              • 刪除權：要求刪除您的個人資料{'\n'}
-              • 限制處理權：限制我們處理您的資料{'\n'}
-              • 資料可攜權：以結構化格式獲取您的資料{'\n'}
-              • 反對權：反對我們處理您的資料
-            </Text>
-          </View>
-
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>11. 資料保存期限</Text>
-            <Text style={styles.sectionContent}>
-              我們僅在必要的期限內保存您的個人資料。具體保存期限取決於：{'\n\n'}
-              • 服務提供需求{'\n'}
-              • 法律法規要求{'\n'}
-              • 爭議解決需求{'\n'}
-              • 合法商業需求{'\n\n'}
-              當資料不再需要時，我們會安全地刪除或匿名化處理。
-            </Text>
-          </View>
-
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>12. 跨境數據傳輸</Text>
-            <Text style={styles.sectionContent}>
-              您的資料可能會被傳輸到您所在司法管轄區以外的地方進行處理。
-              在這種情況下，我們會確保適當的保護措施，以保護您的資料安全。
-            </Text>
-          </View>
-
-          {/* 閱讀狀態提示 */}
-          {!canAgree && (
-            <View style={styles.scrollHint}>
-              <Ionicons name="arrow-down-circle" size={24} color="#F59E0B" />
-              <Text style={styles.scrollHintText}>
-                請向下滾動閱讀完整內容 ({Math.round(readingProgress)}%)
-              </Text>
-            </View>
-          )}
-
-          {canAgree && (
-            <View style={styles.completionHint}>
-              <Ionicons name="checkmark-circle" size={24} color="#10B981" />
-              <Text style={styles.completionHintText}>
-                ✓ 您已閱讀完整的隱私權政策
-              </Text>
-            </View>
-          )}
         </View>
+
+        {/* Section 1 */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>一、這份政策適用於誰與哪些情境？</Text>
+          <View style={styles.contentCard}>
+            <Text style={styles.cardText}>這份隱私權政策適用於您使用路晰書所提供的各類服務，包括但不限於：</Text>
+            <View style={styles.bulletList}>
+              <Text style={styles.bulletItem}>• 註冊與登入帳號</Text>
+              <Text style={styles.bulletItem}>• 進行心理練習、書寫日記或紀錄狀態</Text>
+              <Text style={styles.bulletItem}>• 回答心理自評問卷（如壓力、情緒、自我覺察等測驗）</Text>
+              <Text style={styles.bulletItem}>• 使用企業授權帳戶、參與團體訓練方案</Text>
+              <Text style={styles.bulletItem}>• 遞交客服問題或回饋內容</Text>
+            </View>
+            <Text style={styles.cardText}>若您透過本App連結至其他網站、平台或合作服務，請同時查閱該服務的隱私權政策。</Text>
+          </View>
+        </View>
+
+        {/* Section 2 */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>二、我們蒐集哪些資料？為什麼需要它們？</Text>
+          <View style={styles.contentCard}>
+            <Text style={styles.subTitle}>1️⃣ 您主動提供給我們的資料</Text>
+            
+            {/* Table 1 */}
+            <View style={styles.table}>
+              <View style={styles.tableHeader}>
+                <Text style={[styles.tableHeaderCell, { flex: 1 }]}>資料類型</Text>
+                <Text style={[styles.tableHeaderCell, { flex: 1 }]}>描述</Text>
+                <Text style={[styles.tableHeaderCell, { flex: 1 }]}>目的</Text>
+              </View>
+              <View style={styles.tableRow}>
+                <Text style={[styles.tableCell, styles.tableCellBold, { flex: 1 }]}>Email、密碼或登入方式</Text>
+                <Text style={[styles.tableCell, { flex: 1 }]}>註冊或登入使用者帳號</Text>
+                <Text style={[styles.tableCell, { flex: 1 }]}>保存使用進度與建立個人化內容</Text>
+              </View>
+              <View style={styles.tableRow}>
+                <Text style={[styles.tableCell, styles.tableCellBold, { flex: 1 }]}>心理練習紀錄</Text>
+                <Text style={[styles.tableCell, { flex: 1 }]}>您在App內完成與書寫的內容</Text>
+                <Text style={[styles.tableCell, { flex: 1 }]}>讓您自行回顧狀態與成長</Text>
+              </View>
+              <View style={styles.tableRow}>
+                <Text style={[styles.tableCell, styles.tableCellBold, { flex: 1 }]}>心理自評資料</Text>
+                <Text style={[styles.tableCell, { flex: 1 }]}>心理師設計的自我測驗題目與您的作答結果</Text>
+                <Text style={[styles.tableCell, { flex: 1 }]}>記錄成長趨勢、生成個人歷程或匿名統計用</Text>
+              </View>
+            </View>
+
+            {/* Commitment Box */}
+            <View style={styles.commitmentBox}>
+              <View style={styles.commitmentHeader}>
+                <Text style={styles.commitmentIcon}>✨</Text>
+                <Text style={styles.commitmentTitle}>關於心理練習的承諾</Text>
+              </View>
+              <Text style={styles.commitmentText}>
+                🌿 您在 App 裡寫的每一段思考、情緒文字，只有您能看到，我們無法查看這些內容。
+              </Text>
+            </View>
+
+            <Text style={[styles.subTitle, { marginTop: 20 }]}>2️⃣ 系統自動產生的資料（非個資化）</Text>
+            
+            {/* Table 2 */}
+            <View style={styles.table}>
+              <View style={styles.tableHeader}>
+                <Text style={[styles.tableHeaderCell, { flex: 1 }]}>資料類型</Text>
+                <Text style={[styles.tableHeaderCell, { flex: 1.5 }]}>用途</Text>
+              </View>
+              <View style={styles.tableRow}>
+                <Text style={[styles.tableCell, styles.tableCellBold, { flex: 1 }]}>App 操作紀錄</Text>
+                <Text style={[styles.tableCell, { flex: 1.5 }]}>提供個人使用介面與回顧資料</Text>
+              </View>
+              <View style={styles.tableRow}>
+                <Text style={[styles.tableCell, styles.tableCellBold, { flex: 1 }]}>裝置資訊</Text>
+                <Text style={[styles.tableCell, { flex: 1.5 }]}>用於提升相容性與使用體驗</Text>
+              </View>
+              <View style={styles.tableRow}>
+                <Text style={[styles.tableCell, styles.tableCellBold, { flex: 1 }]}>服務使用統計</Text>
+                <Text style={[styles.tableCell, { flex: 1.5 }]}>用於優化服務品質或產生匿名報表</Text>
+              </View>
+            </View>
+            
+            <Text style={styles.smallNote}>我們不會藉由這些資料追蹤您在其他網站或App上的活動。</Text>
+          </View>
+        </View>
+
+        {/* Section 3 */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>三、我們如何使用您的資料？</Text>
+          <View style={styles.contentCard}>
+            <View style={styles.checkList}>
+              <View style={styles.checkItem}>
+                <Ionicons name="checkmark-circle" size={20} color="#10B981" style={styles.checkIcon} />
+                <View style={styles.checkContent}>
+                  <Text style={styles.checkTitle}>提供路晰書App的心理練習、紀錄與追蹤服務</Text>
+                  <Text style={styles.checkDesc}>讓您能安全儲存並查看個人成長內容</Text>
+                </View>
+              </View>
+              <View style={styles.checkItem}>
+                <Ionicons name="checkmark-circle" size={20} color="#10B981" style={styles.checkIcon} />
+                <View style={styles.checkContent}>
+                  <Text style={styles.checkTitle}>幫助您回顧與理解狀態變化</Text>
+                  <Text style={styles.checkDesc}>顯示個人成長圖表與歷程紀錄</Text>
+                </View>
+              </View>
+              <View style={styles.checkItem}>
+                <Ionicons name="checkmark-circle" size={20} color="#10B981" style={styles.checkIcon} />
+                <View style={styles.checkContent}>
+                  <Text style={styles.checkTitle}>改善產品、測試功能或排除錯誤</Text>
+                  <Text style={styles.checkDesc}>分析服務流程並持續優化品質與效能</Text>
+                </View>
+              </View>
+              <View style={styles.checkItem}>
+                <Ionicons name="checkmark-circle" size={20} color="#10B981" style={styles.checkIcon} />
+                <View style={styles.checkContent}>
+                  <Text style={styles.checkTitle}>為企業方案產出匿名整體統計報告</Text>
+                  <Text style={styles.checkDesc}>協助企業了解訓練成果與心理支持成效（不含個人資料）</Text>
+                </View>
+              </View>
+              <View style={styles.checkItem}>
+                <Ionicons name="checkmark-circle" size={20} color="#10B981" style={styles.checkIcon} />
+                <View style={styles.checkContent}>
+                  <Text style={styles.checkTitle}>用於未來心理模型與內容設計</Text>
+                  <Text style={styles.checkDesc}>僅使用匿名化後資料做統計或內部研究</Text>
+                </View>
+              </View>
+            </View>
+
+            <View style={styles.infoBox}>
+              <Text style={styles.infoBoxText}>
+                🔔 我們永遠不會出售您的個資，也不會將個人資料拿去做廣告或分享給非必要的第三方。
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Section 4 */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>四、企業端使用與匿名統計資料說明</Text>
+          <View style={styles.contentCard}>
+            <Text style={styles.cardText}>
+              若您使用的是企業授權帳號，我們可能向該企業提供匿名化的整體數據報告，用於評估心理訓練成果。然而，企業端無法看到任何個別使用者的心理內容、個資或測評紀錄。
+            </Text>
+
+            {/* Can See */}
+            <View style={styles.canSeeSection}>
+              <View style={styles.canSeeHeader}>
+                <Ionicons name="checkmark-circle" size={20} color="#10B981" />
+                <Text style={styles.canSeeTitle}>企業端可以看到的內容（僅限整體統計資料）</Text>
+              </View>
+              <View style={styles.bulletList}>
+                <Text style={styles.bulletItem}>
+                  • <Text style={styles.boldText}>使用活躍比例：</Text>例如 80% 員工本月登入並使用 App
+                </Text>
+                <Text style={styles.bulletItem}>
+                  • <Text style={styles.boldText}>訓練完成率：</Text>例如平均完成率達 12 天／14 天
+                </Text>
+                <Text style={styles.bulletItem}>
+                  • <Text style={styles.boldText}>自評平均結果趨勢：</Text>例如壓力自評平均下降 15%
+                </Text>
+                <Text style={styles.bulletItem}>
+                  • <Text style={styles.boldText}>整體滿意度或回饋（匿名）：</Text>如「90% 參加者認為心情有改善」
+                </Text>
+              </View>
+            </View>
+
+            {/* Cannot See */}
+            <View style={styles.cannotSeeSection}>
+              <View style={styles.cannotSeeHeader}>
+                <Ionicons name="close-circle" size={20} color="#EF4444" />
+                <Text style={styles.cannotSeeTitle}>企業端無法看到的內容</Text>
+              </View>
+              <View style={styles.bulletList}>
+                <Text style={styles.bulletItem}>
+                  • <Text style={styles.boldText}>個別使用者的心理日記或練習內容：</Text>企業無法查看任何文字、情緒或行動紀錄
+                </Text>
+                <Text style={styles.bulletItem}>
+                  • <Text style={styles.boldText}>單一使用者的心理自評結果：</Text>不會顯示個別人員分數或回答
+                </Text>
+                <Text style={styles.bulletItem}>
+                  • <Text style={styles.boldText}>所有個人身份資料：</Text>包含Email、姓名、打卡紀錄等
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.promiseBox}>
+              <Text style={styles.promiseText}>
+                🔒 我們承諾：無論是誰為您購買帳號，您對個人心理資料與狀態紀錄的擁有權，都不會被影響或繞過。
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Section 5 */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>五、我們如何保護您的資料？</Text>
+          <View style={styles.contentCard}>
+            <Text style={styles.cardText}>我們透過以下方式保護您的資料安全：</Text>
+            <View style={styles.bulletList}>
+              <Text style={styles.bulletItem}>• 全程採用傳輸加密（HTTPS/TLS）與資料庫加密儲存</Text>
+              <Text style={styles.bulletItem}>• 心理練習文字採不可讀取設計，保障最敏感內容</Text>
+              <Text style={styles.bulletItem}>• 心理自評資料採「權限分層、用途限制」方式管理</Text>
+              <Text style={styles.bulletItem}>• 僅有限制權限之工作人員可存取相關資料</Text>
+              <Text style={styles.bulletItem}>• 若發生資料安全外洩事件，我們會於72小時內通知受影響者</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Section 6 */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>六、資料保存、刪除與您的選擇權</Text>
+          <View style={styles.contentCard}>
+            <View style={styles.bulletList}>
+              <Text style={styles.bulletItem}>• 您可以隨時聯繫我們刪除帳號，我們會一併清除與您相關的所有個人資料</Text>
+              <Text style={styles.bulletItem}>• 若您屬企業授權用戶，已納入統計的匿名報表不會被回溯修改</Text>
+              <Text style={styles.bulletItem}>• 若未來增加「資料匯出」功能，您可下載自己的練習紀錄與自評紀錄</Text>
+            </View>
+            <Text style={styles.cardText}>
+              您可透過：<Text style={styles.linkText} onPress={handleEmailPress}>team@lucidbook.tw</Text> 與我們聯繫帳務或資料權益事宜。
+            </Text>
+          </View>
+        </View>
+
+        {/* Section 7 */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>七、第三方工具或外部服務</Text>
+          <View style={styles.contentCard}>
+            <Text style={styles.cardText}>目前我們尚未使用第三方調查、廣告、分析或登錄工具。</Text>
+            <Text style={styles.cardText}>若未來引入 Firebase、Mixpanel 或其他必要工具，我們會：</Text>
+            <View style={styles.bulletList}>
+              <Text style={styles.bulletItem}>• 於引入前更新政策並明確載明用途</Text>
+              <Text style={styles.bulletItem}>• 不會加入會跨平台追蹤您的工具</Text>
+              <Text style={styles.bulletItem}>• 不會與廣告網路分享資料</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Section 8 */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>八、您的權利</Text>
+          <View style={styles.contentCard}>
+            <Text style={styles.cardText}>依據台灣《個資保護法》與 GDPR 等法規，您有權：</Text>
+            <View style={styles.bulletList}>
+              <Text style={styles.bulletItem}>• 查詢、請求閱覽或下載您的資料</Text>
+              <Text style={styles.bulletItem}>• 更正、刪除您的個人紀錄</Text>
+              <Text style={styles.bulletItem}>• 撤回同意或停止使用（同時停止相關功能）</Text>
+            </View>
+            <Text style={styles.cardText}>
+              請聯繫：<Text style={styles.linkText} onPress={handleEmailPress}>team@lucidbook.tw</Text>
+            </Text>
+          </View>
+        </View>
+
+        {/* Section 9 */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>九、政策更新</Text>
+          <View style={styles.contentCard}>
+            <Text style={styles.cardText}>
+              當我們因應法規或服務內容變更時，將適時更新本政策。若是重大變動，我們將於 App 內或以 Email 通知您。
+            </Text>
+            <Text style={styles.cardText}>更新後的政策自發布日起立即生效。</Text>
+          </View>
+        </View>
+
+        {/* Contact Footer */}
+        <View style={styles.contactFooter}>
+          <Text style={styles.contactTitle}>聯絡我們</Text>
+          <Text style={styles.contactText}>路晰書股份有限公司</Text>
+          <Text style={styles.contactText}>
+            個資保護窗口：<Text style={styles.linkText} onPress={handleEmailPress}>team@lucidbook.tw</Text>
+          </Text>
+        </View>
+
+        <View style={styles.bottomPadding} />
       </ScrollView>
 
-      {/* 底部按鈕區 */}
-      <View style={styles.bottomContainer}>
-        {!canAgree && (
-          <View style={styles.progressInfo}>
-            <Text style={styles.progressText}>
-              閱讀進度：{Math.round(readingProgress)}%
-            </Text>
-            <Text style={styles.progressHint}>滾動到底部以繼續</Text>
-          </View>
-        )}
+      {/* ✅ 從註冊頁面進入時顯示底部按鈕 */}
+      {fromRegister && (
+        <View style={styles.bottomButtonContainer}>
+          {/* 滾動提示 */}
+          {!isRead && (
+            <View style={styles.scrollHintBox}>
+              <Ionicons name="arrow-down-circle" size={18} color="#F59E0B" />
+              <Text style={styles.scrollHintText}>
+                請滾動到底部以繼續 ({readingProgress}%)
+              </Text>
+            </View>
+          )}
+          
+          {/* 已閱讀完成提示 */}
+          {isRead && (
+            <View style={styles.completionHintBox}>
+              <Ionicons name="checkmark-circle" size={18} color="#10B981" />
+              <Text style={styles.completionHintText}>✓ 您已閱讀完畢</Text>
+            </View>
+          )}
 
-        <Animated.View style={{ transform: [{ scale: buttonAnim }] }}>
           <TouchableOpacity
-            style={styles.agreeButtonContainer}
+            style={[
+              styles.agreeButtonContainer,
+              !isRead && styles.agreeButtonDisabled
+            ]}
             onPress={handleAgree}
             activeOpacity={0.9}
-            disabled={!canAgree}                 // ✅ 真正禁用
+            disabled={!isRead}
           >
-            <LinearGradient
-              colors={
-                canAgree ? ['#166CB5', '#31C6FE'] : ['#D1D5DB', '#D1D5DB']
-              }
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.agreeButton}
-            >
-              <Ionicons
-                name={canAgree ? 'checkmark-circle' : 'lock-closed-outline'}
-                size={22}
-                color={canAgree ? '#FFFFFF' : '#9CA3AF'}
-              />
-              <Text
-                style={[
-                  styles.agreeButtonText,
-                  !canAgree && styles.agreeButtonTextDisabled,
-                ]}
+            {isRead ? (
+              <LinearGradient
+                colors={['#166CB5', '#31C6FE']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.agreeButton}
               >
-                {canAgree ? '我已了解' : '請先閱讀完整內容'}
-              </Text>
-            </LinearGradient>
+                <Ionicons name="checkmark-circle" size={22} color="#FFFFFF" />
+                <Text style={styles.agreeButtonText}>我已了解</Text>
+              </LinearGradient>
+            ) : (
+              <View style={[styles.agreeButton, styles.agreeButtonGray]}>
+                <Ionicons name="lock-closed" size={22} color="#9CA3AF" />
+                <Text style={[styles.agreeButtonText, styles.agreeButtonTextGray]}>
+                  請先閱讀完畢
+                </Text>
+              </View>
+            )}
           </TouchableOpacity>
-        </Animated.View>
-
-        {fromRegister && canAgree && (
+          
           <Text style={styles.bottomHint}>
-            點擊「我已了解」即表示您同意本隱私權政策
+            {isRead 
+              ? '點擊「我已了解」即表示您同意本隱私權政策'
+              : '請向下滾動閱讀完整內容'
+            }
           </Text>
-        )}
-      </View>
-    </View>
+        </View>
+      )}
+    </KeyboardAvoidingView>
   );
 };
 
@@ -467,14 +537,21 @@ const styles = StyleSheet.create({
     backgroundColor: '#F5F7FA',
   },
 
-  // Header
+  // ========== Header ==========
   header: {
+    paddingTop: Platform.OS === 'ios' ? 50 : 40,
+    paddingBottom: 16,
+    paddingHorizontal: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  headerContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingTop: 50,
-    paddingHorizontal: 20,
-    paddingBottom: 20,
   },
   backButton: {
     width: 40,
@@ -483,19 +560,19 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
+    backdropFilter: 'blur(10px)',
   },
   headerTitle: {
-    flex: 1,
-    fontSize: 20,
-    fontWeight: '700',
+    fontSize: 18,
+    fontWeight: 'bold',
     color: '#FFFFFF',
-    textAlign: 'center',
+    letterSpacing: 0.5,
   },
   headerPlaceholder: {
     width: 40,
   },
 
-  // 進度條
+  // ✅ ========== Progress Bar ==========
   progressBarContainer: {
     height: 3,
     backgroundColor: '#E5E7EB',
@@ -505,116 +582,328 @@ const styles = StyleSheet.create({
     backgroundColor: '#166CB5',
   },
 
-  // ScrollView
+  // ========== ScrollView ==========
   scrollView: {
     flex: 1,
   },
-  scrollViewContent: {
-    padding: 20,
-    paddingBottom: 40,
-  },
-
-  // Content Card
-  contentCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
-    elevation: 4,
-  },
-
-  // Title Section
-  titleSection: {
-    alignItems: 'center',
-    marginBottom: 24,
+  scrollContent: {
+    paddingHorizontal: 24,
+    paddingTop: 32,
     paddingBottom: 24,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
   },
-  iconContainer: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#EFF6FF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  title: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#1F2937',
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  lastUpdated: {
-    fontSize: 13,
-    color: '#9CA3AF',
+  scrollContentWithButton: {
+    paddingBottom: 180,
   },
 
-  // Sections
+  // ========== Sections ==========
   section: {
-    marginBottom: 24,
+    marginBottom: 32,
+  },
+  updateDate: {
+    fontSize: 14,
+    color: '#718096',
+    marginBottom: 16,
+    fontWeight: '500',
   },
   sectionTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#1F2937',
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#2D3748',
+    marginBottom: 12,
+    letterSpacing: 0.3,
+  },
+
+  // ========== Intro Card ==========
+  introCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  introTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#2D3748',
+    lineHeight: 24,
     marginBottom: 12,
   },
-  sectionContent: {
+  introText: {
     fontSize: 14,
-    color: '#4B5563',
+    color: '#4A5568',
     lineHeight: 24,
   },
 
-  // Scroll Hint
-  scrollHint: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 24,
-    paddingVertical: 16,
-    backgroundColor: '#FFFBEB',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#FEF3C7',
-    gap: 12,
-  },
-  scrollHintText: {
-    fontSize: 14,
-    color: '#92400E',
-    fontWeight: '600',
-  },
-
-  // Completion Hint
-  completionHint: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 24,
-    paddingVertical: 16,
-    backgroundColor: '#F0FDF4',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#BBF7D0',
-    gap: 12,
-  },
-  completionHintText: {
-    fontSize: 14,
-    color: '#15803D',
-    fontWeight: '600',
-  },
-
-  // Bottom Container
-  bottomContainer: {
+  // ========== Content Card ==========
+  contentCard: {
     backgroundColor: '#FFFFFF',
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 34,
+    borderRadius: 16,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  cardText: {
+    fontSize: 14,
+    color: '#4A5568',
+    lineHeight: 24,
+    marginBottom: 12,
+  },
+  subTitle: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    color: '#166CB5',
+    marginBottom: 16,
+    marginTop: 4,
+  },
+
+  // ========== Bullet List ==========
+  bulletList: {
+    marginBottom: 12,
+  },
+  bulletItem: {
+    fontSize: 14,
+    color: '#4A5568',
+    lineHeight: 24,
+    marginBottom: 6,
+    paddingLeft: 4,
+  },
+  boldText: {
+    fontWeight: '600',
+    color: '#2D3748',
+  },
+
+  // ========== Table ==========
+  table: {
+    marginBottom: 20,
+    marginTop: 4,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: '#FFFFFF',
+  },
+  tableHeader: {
+    flexDirection: 'row',
+    backgroundColor: '#F9FAFB',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+  },
+  tableHeaderCell: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#6B7280',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  tableRow: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+  },
+  tableCell: {
+    fontSize: 12,
+    color: '#4A5568',
+    lineHeight: 18,
+    paddingRight: 8,
+  },
+  tableCellBold: {
+    fontWeight: '600',
+    color: '#2D3748',
+  },
+
+  // ========== Commitment Box ==========
+  commitmentBox: {
+    backgroundColor: '#F0F9F4',
+    borderWidth: 1,
+    borderColor: '#C6F6D5',
+    borderRadius: 12,
+    padding: 16,
+    marginTop: 12,
+    marginBottom: 8,
+  },
+  commitmentHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  commitmentIcon: {
+    fontSize: 16,
+    marginRight: 6,
+  },
+  commitmentTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#2F855A',
+    flex: 1,
+  },
+  commitmentText: {
+    fontSize: 14,
+    color: '#276749',
+    lineHeight: 22,
+  },
+
+  // ========== Small Note ==========
+  smallNote: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    marginTop: 8,
+    fontStyle: 'italic',
+  },
+
+  // ========== Check List ==========
+  checkList: {
+    marginBottom: 16,
+  },
+  checkItem: {
+    flexDirection: 'row',
+    marginBottom: 16,
+    alignItems: 'flex-start',
+  },
+  checkIcon: {
+    marginRight: 10,
+    marginTop: 2,
+  },
+  checkContent: {
+    flex: 1,
+  },
+  checkTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#2D3748',
+    marginBottom: 4,
+    lineHeight: 20,
+  },
+  checkDesc: {
+    fontSize: 12,
+    color: '#6B7280',
+    lineHeight: 18,
+  },
+
+  // ========== Info Box ==========
+  infoBox: {
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    borderRadius: 12,
+    padding: 12,
+    marginTop: 4,
+  },
+  infoBoxText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#1E40AF',
+    lineHeight: 22,
+  },
+
+  // ========== Can/Cannot See Sections ==========
+  canSeeSection: {
+    marginTop: 20,
+    marginBottom: 16,
+  },
+  canSeeHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  canSeeTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#10B981',
+    marginLeft: 8,
+    flex: 1,
+  },
+  cannotSeeSection: {
+    marginBottom: 16,
+  },
+  cannotSeeHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  cannotSeeTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#EF4444',
+    marginLeft: 8,
+    flex: 1,
+  },
+
+  // ========== Promise Box ==========
+  promiseBox: {
+    backgroundColor: '#F9FAFB',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
+    padding: 16,
+    marginTop: 8,
+  },
+  promiseText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#374151',
+    textAlign: 'center',
+    lineHeight: 22,
+  },
+
+  // ========== Link Text ==========
+  linkText: {
+    color: '#166CB5',
+    textDecorationLine: 'underline',
+    fontWeight: '600',
+  },
+
+  // ========== Contact Footer ==========
+  contactFooter: {
+    backgroundColor: '#F5F7FA',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 16,
+    padding: 20,
+    alignItems: 'center',
+    marginTop: 8,
+    marginBottom: 24,
+  },
+  contactTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#2D3748',
+    marginBottom: 12,
+  },
+  contactText: {
+    fontSize: 14,
+    color: '#4A5568',
+    marginBottom: 6,
+    textAlign: 'center',
+  },
+
+  bottomPadding: {
+    height: 60,
+  },
+
+  // ✅ ========== Bottom Button Container ==========
+  bottomButtonContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 24,
+    paddingTop: 12,
+    paddingBottom: Platform.OS === 'ios' ? 34 : 24,
     borderTopWidth: 1,
     borderTopColor: '#E5E7EB',
     shadowColor: '#000',
@@ -623,22 +912,47 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 8,
   },
-
-  progressInfo: {
-    marginBottom: 12,
+  
+  // ✅ 滾動提示
+  scrollHintBox: {
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFBEB',
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#FEF3C7',
+    gap: 8,
   },
-  progressText: {
-    fontSize: 14,
+  scrollHintText: {
+    fontSize: 13,
+    color: '#92400E',
     fontWeight: '600',
-    color: '#166CB5',
-    marginBottom: 4,
   },
-  progressHint: {
-    fontSize: 12,
-    color: '#9CA3AF',
+  
+  // ✅ 完成提示
+  completionHintBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F0FDF4',
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+    gap: 8,
   },
-
+  completionHintText: {
+    fontSize: 13,
+    color: '#15803D',
+    fontWeight: '700',
+  },
+  
   agreeButtonContainer: {
     borderRadius: 12,
     overflow: 'hidden',
@@ -648,6 +962,10 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 5,
   },
+  agreeButtonDisabled: {
+    shadowOpacity: 0,
+    elevation: 0,
+  },
   agreeButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -655,15 +973,17 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     gap: 8,
   },
+  agreeButtonGray: {
+    backgroundColor: '#E5E7EB',
+  },
   agreeButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '700',
   },
-  agreeButtonTextDisabled: {
+  agreeButtonTextGray: {
     color: '#9CA3AF',
   },
-
   bottomHint: {
     fontSize: 12,
     color: '#9CA3AF',
