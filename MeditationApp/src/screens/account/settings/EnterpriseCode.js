@@ -13,6 +13,7 @@
 // 🆕 登出功能（避免用戶被困住）
 // 🔧 修復：導航錯誤 'Home' -> 'MainTabs'
 // 🔧 優化：游標統一顯示在左側，無重複輸入框
+// 🔧 修復：返回按鈕優先返回註冊頁
 // ==========================================
 
 import React, { useState, useRef, useEffect } from 'react';
@@ -396,10 +397,40 @@ const EnterpriseCode = ({ navigation, route }) => {
     );
   };
 
-  // 🆕 返回按鈕處理（優化後的邏輯）
+  // 🔧 修復：返回按鈕處理（優先處理 isFromRegister）
   const handleBack = () => {
-    if (isRequired) {
-      // 必填模式：顯示確認對話框，提供登出選項
+    // 🔧 優先處理從註冊頁進入的情況
+    if (isFromRegister) {
+      console.log('✅ From register → navigating back to Register');
+      // 從註冊頁進入：直接返回註冊頁
+      if (savedFormData) {
+        navigation.navigate('Register', { savedFormData });
+      } else {
+        navigation.goBack();
+      }
+    } else if (isFromLogin) {
+      // 從登入頁進入：顯示確認對話框
+      Alert.alert(
+        '確認離開',
+        '您可以選擇：\n\n• 稍後在設定中輸入引薦碼\n• 登出並換其他帳號\n• 繼續輸入引薦碼',
+        [
+          { 
+            text: '繼續輸入', 
+            style: 'cancel' 
+          },
+          { 
+            text: '稍後設定', 
+            onPress: handleSkipForNow
+          },
+          { 
+            text: '登出', 
+            style: 'destructive',
+            onPress: handleLogout
+          }
+        ]
+      );
+    } else if (isRequired) {
+      // 必填模式（非註冊/登入流程）：顯示確認對話框
       Alert.alert(
         '確認離開',
         '您可以選擇：\n\n• 稍後在設定中輸入引薦碼\n• 登出並換其他帳號\n• 繼續輸入引薦碼',
@@ -421,11 +452,7 @@ const EnterpriseCode = ({ navigation, route }) => {
       );
     } else {
       // 非必填模式：直接返回
-      if (isFromRegister && savedFormData) {
-        navigation.navigate('Register', { savedFormData });
-      } else {
-        navigation.goBack();
-      }
+      navigation.goBack();
     }
   };
 
