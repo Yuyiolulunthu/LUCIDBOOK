@@ -85,33 +85,29 @@ const EmotionalResiliencePlanScreen = ({ navigation }) => {
       setLoading(true);
       console.log('📊 [訓練計劃] 載入練習統計...');
 
-      // 調用練習統計 API
       const response = await ApiService.getPracticeStats();
       console.log('✅ [訓練計劃] API 響應:', response);
       
       if (response.success && response.stats) {
         const stats = response.stats;
         
-        // 計算本週的練習次數（從 weeklyPractices）
-        const weeklyPractices = stats.weeklyPractices || [];
+        // ⭐ 使用 categoryStats 而不是 weeklyPractices
+        const categoryStats = stats.categoryStats || [];
         
-        // 統計各類型練習次數
-        const breathingCount = weeklyPractices.filter(
-          p => p.practice_type === 'breathing' || 
-               p.practice_type === '呼吸練習' ||
-               p.practice_type === '呼吸穩定力練習'
-        ).length;
+        // 統計各類型練習次數（永久累計，不是本週）
+        const breathingStat = categoryStats.find(
+          c => c.type === '呼吸穩定力練習' || c.type === 'breathing'
+        );
+        const breathingCount = breathingStat?.sessions || 0;
         
-        const goodthingsCount = weeklyPractices.filter(
-          p => p.practice_type === 'good-things' || 
-               p.practice_type === 'goodthings' ||
-               p.practice_type === '好事書寫'
-        ).length;
+        const goodthingsStat = categoryStats.find(
+          c => c.type === '好事書寫練習' || c.type === '好事書寫' || c.type === 'goodthings'
+        );
+        const goodthingsCount = goodthingsStat?.sessions || 0;
         
-        console.log('📋 [訓練計劃] 本週練習統計:', {
+        console.log('📋 [訓練計劃] 總練習統計:', {
           breathing: breathingCount,
           goodthings: goodthingsCount,
-          total: weeklyPractices.length
         });
         
         // 更新模組進度
@@ -139,11 +135,11 @@ const EmotionalResiliencePlanScreen = ({ navigation }) => {
           ? Math.round((totalProgress / totalTarget) * 100) 
           : 0;
         
-        setOverallPercentage(percentage);
+        setOverallPercentage(Math.min(percentage, 100)); // ⭐ 上限 100%
         
         // 動畫更新進度
         Animated.timing(progressAnim, {
-          toValue: percentage,
+          toValue: Math.min(percentage, 100),
           duration: 1500,
           useNativeDriver: true,
         }).start();
@@ -151,7 +147,7 @@ const EmotionalResiliencePlanScreen = ({ navigation }) => {
         console.log('✅ [訓練計劃] 進度計算完成:', {
           breathing: `${breathingCount}/7`,
           goodthings: `${goodthingsCount}/3`,
-          overall: `${percentage}%`
+          overall: `${Math.min(percentage, 100)}%`
         });
       } else {
         console.warn('⚠️ [訓練計劃] API 返回失敗或無數據');

@@ -19,6 +19,7 @@ import BottomNavigation from './src/navigation/BottomNavigation';
 // 導入所有頁面
 import HomeScreen from './src/screens/home/HomeScreen';
 import EmotionalResiliencePlanScreen from './src/screens/home/EmotionalResiliencePlanScreen';
+import WorkplaceCommunicationPlanScreen from './src/screens/home/WorkplaceCommunicationPlanScreen';
 import LoginScreen from './src/screens/auth/LoginScreen';
 import RegisterScreen from './src/screens/auth/RegisterScreen';
 import ForgotPasswordScreen from './src/screens/auth/ForgotPasswordScreen';
@@ -163,6 +164,10 @@ const App = () => {
         <Stack.Screen 
           name="EmotionalResiliencePlan" 
           component={EmotionalResiliencePlanScreen}
+        />
+        <Stack.Screen 
+          name="WorkplaceCommunicationPlan" 
+          component={WorkplaceCommunicationPlanScreen}
         />
         
         {/* ========== 認證相關頁面 ========== */}
