@@ -1,7 +1,7 @@
 // ==========================================
 // 檔案名稱: App.js 
 // 應用主入口 - 改用Tab Navigator
-// 版本: V3.3 - 新增自動登入檢查（30天Token機制）
+// 版本: V3.4 - 新增職場溝通力計畫介紹頁面
 // ==========================================
 
 import React, { useState, useEffect } from 'react';
@@ -20,6 +20,7 @@ import BottomNavigation from './src/navigation/BottomNavigation';
 import HomeScreen from './src/screens/home/HomeScreen';
 import EmotionalResiliencePlanScreen from './src/screens/home/EmotionalResiliencePlanScreen';
 import WorkplaceCommunicationPlanScreen from './src/screens/home/WorkplaceCommunicationPlanScreen';
+import WorkplaceCommunicationPlanIntroScreen from './src/screens/home/WorkplaceCommunicationPlanIntroScreen';
 import LoginScreen from './src/screens/auth/LoginScreen';
 import RegisterScreen from './src/screens/auth/RegisterScreen';
 import ForgotPasswordScreen from './src/screens/auth/ForgotPasswordScreen';
@@ -168,6 +169,10 @@ const App = () => {
         <Stack.Screen 
           name="WorkplaceCommunicationPlan" 
           component={WorkplaceCommunicationPlanScreen}
+        />
+        <Stack.Screen 
+          name="WorkplaceCommunicationPlanIntro" 
+          component={WorkplaceCommunicationPlanIntroScreen}
         />
         
         {/* ========== 認證相關頁面 ========== */}

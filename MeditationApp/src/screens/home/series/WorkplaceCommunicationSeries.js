@@ -187,7 +187,7 @@ const WorkplaceCommunicationSeries = ({ navigation, userName }) => {
 
   const handleShowPlanIntro = () => {
     console.log('📋 [職場溝通] 查看計劃介紹');
-    // TODO: 顯示計劃介紹 Modal
+    navigation.navigate('WorkplaceCommunicationPlanIntro');
   };
 
   return (
