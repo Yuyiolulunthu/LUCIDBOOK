@@ -17,7 +17,10 @@ import { BlurView } from 'expo-blur';
 import { ArrowLeft } from 'lucide-react-native';
 import WorkplaceCommunicationSeries from './series/WorkplaceCommunicationSeries';
 
-const WorkplaceCommunicationPlanScreen = ({ navigation }) => {
+const WorkplaceCommunicationPlanScreen = ({ navigation, route }) => {
+  // 從 route 獲取用戶名稱
+  const userName = route?.params?.userName;
+
   return (
     <View style={styles.container}>
       <StatusBar
@@ -41,7 +44,10 @@ const WorkplaceCommunicationPlanScreen = ({ navigation }) => {
       </BlurView>
 
       {/* 內容 */}
-      <WorkplaceCommunicationSeries navigation={navigation} />
+      <WorkplaceCommunicationSeries 
+        navigation={navigation}
+        userName={userName}
+      />
     </View>
   );
 };
