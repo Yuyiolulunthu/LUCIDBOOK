@@ -1,16 +1,17 @@
 // ==========================================
 // 檔案名稱: AccountScreen.js
-// 版本: V9.2 - 修正登出邏輯
+// 版本: V9.3 - 修正資料快取問題
 // 
 // ✅ 使用統一的 LockedOverlay
 // ✅ 未登入顯示登入鎖定
 // ✅ 無企業碼顯示企業碼鎖定
 // ✅ 背景內容模糊但可見
 // ✅ 練習時數顯示單位 "hr"
-// ✅✅✅ 修正：登出時完整清除所有認證資料 ✅✅✅
+// ✅ 修正：登出時完整清除所有認證資料
+// ✅✅✅ 修正：每次都強制重新抓取資料，避免快取問題 ✅✅✅
 // ==========================================
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -21,6 +22,7 @@ import {
   Alert,
   ActivityIndicator,
   Image,
+  RefreshControl, // ⭐ 新增：下拉刷新
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -29,12 +31,13 @@ import BottomNavigation from '../../navigation/BottomNavigation';
 import AppHeader from '../../navigation/AppHeader';
 import ApiService from '../../../api';
 import LockedOverlay from '../../navigation/LockedOverlay';
-import { clearLoginState } from '../auth/AuthUtils'; // ⭐⭐⭐ 新增這行
+import { clearLoginState } from '../auth/AuthUtils';
 
 const AccountScreen = ({ navigation, route }) => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false); // ⭐ 新增：下拉刷新狀態
   const [hasEnterpriseCode, setHasEnterpriseCode] = useState(false);
   
   const [practiceStats, setPracticeStats] = useState({
@@ -44,23 +47,37 @@ const AccountScreen = ({ navigation, route }) => {
     currentStreak: 0,
   });
 
+  // ⭐ 修正：初次載入強制刷新
   useEffect(() => {
-    loadUserData();
+    loadUserData(true);
   }, []);
 
+  // ⭐ 修正：頁面獲得焦點時強制重新抓取
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
-      console.log('🔄 [AccountScreen] 頁面獲得焦點，重新載入數據');
-      loadUserData();
+      console.log('🔄 [AccountScreen] 頁面獲得焦點，強制重新載入數據');
+      loadUserData(true); // ⭐ 強制刷新
     });
     return unsubscribe;
   }, [navigation]);
 
-  const loadUserData = async () => {
+  // ⭐ 新增：監聽 route.params 的 refresh 信號
+  useEffect(() => {
+    if (route.params?.refresh) {
+      console.log('🔄 [AccountScreen] 收到刷新信號，重新載入數據');
+      loadUserData(true);
+      navigation.setParams({ refresh: undefined });
+    }
+  }, [route.params?.refresh]);
+
+  // ⭐ 修正：加入 forceRefresh 參數和時間戳避免快取
+  const loadUserData = async (forceRefresh = false) => {
     try {
-      setLoading(true);
+      if (!refreshing) {
+        setLoading(true);
+      }
       
-      console.log('🔍 [AccountScreen] 開始檢查登入狀態...');
+      console.log('🔍 [AccountScreen] 開始檢查登入狀態...', forceRefresh ? '(強制刷新)' : '');
       
       const loggedIn = await ApiService.isLoggedIn();
       
@@ -68,7 +85,12 @@ const AccountScreen = ({ navigation, route }) => {
         try {
           console.log('✅ [AccountScreen] 已登入，獲取用戶資料...');
           
-          const response = await ApiService.getUserProfile();
+          // ⭐ 加入時間戳避免快取
+          const timestamp = Date.now();
+          const response = await ApiService.getUserProfile({ 
+            _t: timestamp,
+            _nocache: forceRefresh ? 'true' : undefined 
+          });
           
           console.log('📋 [AccountScreen] API 返回的完整用戶資料:', JSON.stringify(response.user, null, 2));
           
@@ -100,7 +122,8 @@ const AccountScreen = ({ navigation, route }) => {
           });
           setHasEnterpriseCode(hasCode);
           
-          await loadPracticeStats();
+          // ⭐ 同樣強制刷新練習統計
+          await loadPracticeStats(forceRefresh);
           
           console.log('✅ [AccountScreen] 用戶資料載入完成');
         } catch (error) {
@@ -123,13 +146,19 @@ const AccountScreen = ({ navigation, route }) => {
       setHasEnterpriseCode(false);
     } finally {
       setLoading(false);
+      setRefreshing(false);
       console.log('🏁 [AccountScreen] 載入完成');
     }
   };
 
-  const loadPracticeStats = async () => {
+  // ⭐ 修正：練習統計也加入強制刷新
+  const loadPracticeStats = async (forceRefresh = false) => {
     try {
-      const response = await ApiService.getPracticeStats();
+      const timestamp = Date.now();
+      const response = await ApiService.getPracticeStats({ 
+        _t: timestamp,
+        _nocache: forceRefresh ? 'true' : undefined 
+      });
       if (response.success) {
         setPracticeStats({
           totalPractices: response.stats.totalPractices || 0,
@@ -143,11 +172,17 @@ const AccountScreen = ({ navigation, route }) => {
     }
   };
 
+  // ⭐ 新增：下拉刷新處理
+  const onRefresh = useCallback(() => {
+    console.log('🔄 [AccountScreen] 使用者下拉刷新');
+    setRefreshing(true);
+    loadUserData(true);
+  }, []);
+
   const handleNavigateSettings = () => {
     navigation.navigate('Settings');
   };
 
-  // ✅✅✅ 修正：登出函數 - 完整清除所有認證資料
   const handleLogout = async () => {
     Alert.alert(
       '登出確認',
@@ -161,20 +196,13 @@ const AccountScreen = ({ navigation, route }) => {
             try {
               console.log('📤 [AccountScreen] 開始登出...');
               
-              // ⭐⭐⭐ 修正：使用 clearLoginState 完整清除
-              // ❌ 舊版：await ApiService.clearToken(); // 只清除 token
-              // ✅ 新版：
-              await clearLoginState(true); // 保留記住的帳號
+              await clearLoginState(true);
               
-              // 更新本地狀態
               setIsLoggedIn(false);
               setUser(null);
               setHasEnterpriseCode(false);
               
               console.log('✅ [AccountScreen] 登出成功（已完整清除所有認證資料）');
-              
-              // 可選：顯示成功提示
-              // Alert.alert('成功', '已登出');
             } catch (error) {
               console.error('❌ [AccountScreen] 登出失敗:', error);
               Alert.alert('錯誤', '登出失敗，請稍後再試');
@@ -420,6 +448,15 @@ const AccountScreen = ({ navigation, route }) => {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
         scrollEnabled={isLoggedIn && hasEnterpriseCode}
+        // ⭐ 新增：下拉刷新功能
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={['#166CB5']}
+            tintColor="#166CB5"
+          />
+        }
       >
         <View style={[
           { opacity: (!isLoggedIn || !hasEnterpriseCode) ? 0.3 : 1 }
