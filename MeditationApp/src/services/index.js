@@ -1,5 +1,6 @@
 // src/services/api/index.js
 // 統一匯出所有服務,方便導入使用
+// V2.0 - 加入防快取機制
 
 export { default as apiClient } from './client';
 export { default as authService } from './authService';
@@ -34,10 +35,10 @@ const ApiService = {
   validateResetToken: (token) => authService.validateResetToken(token),
   resetPassword: (token, newPassword) => authService.resetPassword(token, newPassword),
   changePassword: (currentPassword, newPassword) => authService.changePassword(currentPassword, newPassword),
-  deleteAccount: () => authService.deleteAccount(), // ⭐ 新增刪除帳號
+  deleteAccount: () => authService.deleteAccount(),
   
-  // 用戶服務
-  getUserProfile: () => userProfile.getUserProfile(),
+  // ⭐ 用戶服務 - 修正：傳遞 options 參數
+  getUserProfile: (options = {}) => userProfile.getUserProfile(options),
   updateUserProfile: (data) => userProfile.updateUserProfile(data),
   uploadAvatar: (imageUri) => userProfile.uploadAvatar(imageUri),
   updateProfileWithAvatar: (profileData, avatarUri) => userProfile.updateProfileWithAvatar(profileData, avatarUri),
@@ -87,10 +88,26 @@ const ApiService = {
     }
   },
 
-  // 練習統計服務
-  getPracticeStats: async () => {
-    return apiClient.request('/practice/stats.php', {
+  // ⭐ 練習統計服務 - 修正：支援防快取參數
+  getPracticeStats: async (options = {}) => {
+    // 建構 query string 避免快取
+    const params = new URLSearchParams();
+    if (options.forceRefresh || options._t) {
+      params.append('_t', options._t || Date.now());
+    }
+    if (options._nocache) {
+      params.append('_nocache', options._nocache);
+    }
+    
+    const queryString = params.toString();
+    const url = `/practice/stats.php${queryString ? `?${queryString}` : ''}`;
+    
+    return apiClient.request(url, {
       method: 'GET',
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+      },
     });
   },
 

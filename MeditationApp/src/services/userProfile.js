@@ -1,12 +1,35 @@
 // src/services/api/userProfile.js
+// V2.0 - 加入防快取機制
 import apiClient from './client';
 
 class UserProfile {
-  /** 取得用戶資料 */
-  async getUserProfile() {
-    console.log('📱 [UserProfile] 獲取用戶資料');
-    return apiClient.request('/user/profile.php', {
+  /** 
+   * 取得用戶資料 
+   * @param {Object} options - 選項
+   * @param {boolean} options.forceRefresh - 是否強制刷新（避免快取）
+   */
+  async getUserProfile(options = {}) {
+    console.log('📱 [UserProfile] 獲取用戶資料', options.forceRefresh ? '(強制刷新)' : '');
+    
+    // ⭐ 建構 query string 避免快取
+    const params = new URLSearchParams();
+    if (options.forceRefresh || options._t) {
+      params.append('_t', options._t || Date.now());
+    }
+    if (options._nocache) {
+      params.append('_nocache', options._nocache);
+    }
+    
+    const queryString = params.toString();
+    const url = `/user/profile.php${queryString ? `?${queryString}` : ''}`;
+    
+    return apiClient.request(url, {
       method: 'GET',
+      // ⭐ 加入防快取 headers
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+      },
     });
   }
 

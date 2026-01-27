@@ -84,6 +84,8 @@ const AccountScreen = ({ navigation, route }) => {
       if (loggedIn) {
         try {
           console.log('✅ [AccountScreen] 已登入，獲取用戶資料...');
+          console.log('🔥 [DEBUG] 即將呼叫 getUserProfile...');
+
           
           // ⭐ 加入時間戳避免快取
           const timestamp = Date.now();
