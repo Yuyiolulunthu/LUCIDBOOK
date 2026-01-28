@@ -1945,7 +1945,7 @@ const styles = StyleSheet.create({
   reactionsScrollContent: {
     flexGrow: 1,
     paddingHorizontal: 24,
-    paddingTop: 180,
+    paddingTop: 15,
     paddingBottom: 120,
   },
   reactionCategory: {

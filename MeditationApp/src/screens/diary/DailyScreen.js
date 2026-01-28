@@ -34,6 +34,10 @@ import {
   Mail,
   BookOpen,
   Gift,
+  AlertCircle,
+  Target,
+  Eye,
+  Scale,
 } from 'lucide-react-native';
 import ApiService from '../../../api';
 import BottomNavigation from '../../navigation/BottomNavigation';
@@ -348,12 +352,19 @@ const DailyScreen = ({ navigation, route }) => {
       postScore: null,
       postMood: null,
       hasCustomOptions: false,
-
-      // ⭐ 內耗日記 schema
+      
+      // 內耗日記 schema
       situation: null,
       thoughts: null,
       needs: [],
       moodScore: null,
+      
+      supportingEvidence: null,   
+      opposingEvidence: null,    
+      habitPattern: null,         
+      empathyPerspective: null,    
+      controllable: null,          
+      uncontrollable: null,        
     };
 
     const splitMaybe = (v) => {
@@ -436,6 +447,13 @@ const DailyScreen = ({ navigation, route }) => {
 
           // needs：你現在是字串「被認可、界線」
           data.needs = splitMaybe(fd.needs);
+
+          data.supportingEvidence = fd.supportingEvidence || null;
+          data.opposingEvidence = fd.opposingEvidence || null;
+          data.habitPattern = fd.habitPattern || null;
+          data.empathyPerspective = fd.empathyPerspective || null;
+          data.controllable = fd.controllable || null;
+          data.uncontrollable = fd.uncontrollable || null;
 
           // 補主要心情
           if (!data.postMood && data.emotions.length > 0) {
@@ -582,6 +600,16 @@ const DailyScreen = ({ navigation, route }) => {
     };
 
     const getThemeColor = () => {
+
+      // ⭐ 內耗練習使用橘色主題
+      if (isCognitive && selectedPractice.practice_type?.includes('內耗')) {
+        return { 
+          primary: '#FF8C42', 
+          light: '#FFF4ED', 
+          accent: '#FFE8DB', 
+          gradient: ['#FF8C42', '#FF6B6B'] 
+        };
+      }
       if (isCognitive) return { primary: '#3B82F6', light: '#EFF6FF', accent: '#DBEAFE', gradient: ['#3B82F6', '#60A5FA'] };
       if (isGratitude) return { primary: '#EC4899', light: '#FDF2F8', accent: '#FCE7F3', gradient: ['#EC4899', '#F472B6'] };
       if (isBreathing) return { primary: '#10B981', light: '#ECFDF5', accent: '#D1FAE5', gradient: ['#10B981', '#34D399'] };
@@ -619,7 +647,9 @@ const DailyScreen = ({ navigation, route }) => {
                 </View>
                 <View style={styles.modalMetaTagGray}>
                   <FileText color="#64748B" size={12} strokeWidth={2} />
-                  <Text style={styles.modalMetaTextGray}>{planName}</Text>
+                  <Text style={styles.modalMetaTextGray}>
+                    {selectedPractice.practice_type?.includes('內耗') ? '職場溝通力' : '情緒抗壓力'}
+                  </Text>
                 </View>
               </View>
 
@@ -705,78 +735,45 @@ const DailyScreen = ({ navigation, route }) => {
                 </>
               )}
 
-              {/* ========== ✅ 思維調節 / 內耗練習（精緻版） ========== */}
+              {/* ========== ✅ 思維調節 / 內耗練習（帶 icon badge 設計） ========== */}
               {isCognitive && cognitiveData && (
                 <>
-                  {/* ✅✅✅ 內耗日記內容：就算 ABCD 缺，也會顯示 ✅✅✅ */}
-                  {(cognitiveData.situation || cognitiveData.thoughts || (cognitiveData.needs && cognitiveData.needs.length > 0) || cognitiveData.moodScore !== null) && (
-                    <View style={[styles.contentCard, { backgroundColor: '#F8FAFC', borderColor: '#E2E8F0' }]}>
-                      <View style={styles.contentCardHeader}>
-                        <View style={[styles.resultIconBadge, { backgroundColor: '#E2E8F0' }]}>
-                          <Brain color="#334155" size={14} />
-                        </View>
-                        <Text style={[styles.contentCardTitle, { color: '#334155' }]}>內耗練習日記</Text>
-                      </View>
-
-                      {cognitiveData.situation && (
-                        <View style={{ marginBottom: 12 }}>
-                          <Text style={[styles.sectionLabel, { marginBottom: 6 }]}>情境</Text>
-                          <Text style={styles.contentCardText}>{cognitiveData.situation}</Text>
-                        </View>
-                      )}
-
-                      {cognitiveData.thoughts && (
-                        <View style={{ marginBottom: 12 }}>
-                          <Text style={[styles.sectionLabel, { marginBottom: 6 }]}>想法</Text>
-                          <Text style={styles.contentCardText}>{cognitiveData.thoughts}</Text>
-                        </View>
-                      )}
-
-                      {cognitiveData.needs && cognitiveData.needs.length > 0 && (
-                        <View style={{ marginBottom: 12 }}>
-                          <Text style={[styles.sectionLabel, { marginBottom: 6 }]}>我需要什麼</Text>
-                          <View style={styles.tagsRow}>
-                            {cognitiveData.needs.map((n, i) => (
-                              <View key={i} style={styles.tagOutline}>
-                                <Text style={styles.tagOutlineText}>{n}</Text>
-                              </View>
-                            ))}
-                          </View>
-                        </View>
-                      )}
-
-                      {cognitiveData.moodScore !== null && (
-                        <View style={{ marginBottom: 0 }}>
-                          <Text style={[styles.sectionLabel, { marginBottom: 6 }]}>心情分數</Text>
-                          <Text style={[styles.contentCardText, { fontWeight: '700' }]}>{cognitiveData.moodScore} / 10</Text>
-                        </View>
-                      )}
-                    </View>
-                  )}
-
-                  {cognitiveData.event && (
-                    <View style={styles.abcdCard}>
+                  {/* ⭐ 事件（橘色） */}
+                  {(cognitiveData.event || cognitiveData.situation) && (
+                    <View style={[styles.abcdCard, { 
+                      backgroundColor: theme.light, 
+                      borderLeftWidth: 4, 
+                      borderLeftColor: theme.primary 
+                    }]}>
                       <View style={styles.abcdLabelRow}>
-                        <View style={[styles.abcdBadge, { backgroundColor: '#94A3B8' }]}>
-                          <Text style={styles.abcdBadgeText}>A</Text>
+                        <View style={[styles.sectionIconBadge, { backgroundColor: theme.accent }]}>
+                          <AlertCircle color={theme.primary} size={16} strokeWidth={2.5} />
                         </View>
-                        <Text style={styles.abcdLabel}>事件</Text>
+                        <Text style={[styles.abcdLabel, { color: theme.primary, fontSize: 15 }]}>事件</Text>
                       </View>
-                      <Text style={styles.abcdContent}>{cognitiveData.event}</Text>
+                      <Text style={styles.abcdContent}>
+                        {cognitiveData.event || cognitiveData.situation}
+                      </Text>
                     </View>
                   )}
 
+                  {/* ⭐ 原本的想法（紅色） */}
                   {cognitiveData.originalThought && (
                     <View style={[styles.abcdCard, styles.abcdCardNegative]}>
                       <View style={styles.abcdLabelRow}>
-                        <View style={[styles.abcdBadge, { backgroundColor: '#F87171' }]}>
-                          <Text style={styles.abcdBadgeText}>B</Text>
+                        <View style={[styles.sectionIconBadge, { backgroundColor: '#FEE2E2' }]}>
+                          <Brain color="#DC2626" size={16} strokeWidth={2.5} />
                         </View>
-                        <Text style={[styles.abcdLabel, { color: '#DC2626' }]}>原本的想法</Text>
+                        <Text style={[styles.abcdLabel, { color: '#DC2626', fontSize: 15 }]}>原本的想法</Text>
                       </View>
+                      
                       <Text style={styles.abcdContent}>{cognitiveData.originalThought}</Text>
 
-                      {(cognitiveData.emotions.length > 0 || cognitiveData.bodyReactions.length > 0 || cognitiveData.behaviors.length > 0) && (
+                      {/* 情緒 + 身體 + 行為 + 需求 */}
+                      {(cognitiveData.emotions.length > 0 || 
+                        cognitiveData.bodyReactions.length > 0 || 
+                        cognitiveData.behaviors.length > 0 ||
+                        (cognitiveData.needs && cognitiveData.needs.length > 0)) && (
                         <View style={{ marginTop: 16 }}>
                           {cognitiveData.emotions.length > 0 && (
                             <View style={{ marginBottom: 12 }}>
@@ -805,7 +802,7 @@ const DailyScreen = ({ navigation, route }) => {
                           )}
 
                           {cognitiveData.behaviors.length > 0 && (
-                            <View style={{ marginBottom: 0 }}>
+                            <View style={{ marginBottom: 12 }}>
                               <Text style={styles.reactionSubLabel}>行為：</Text>
                               <View style={styles.tagsRow}>
                                 {cognitiveData.behaviors.map((behavior, i) => (
@@ -816,35 +813,121 @@ const DailyScreen = ({ navigation, route }) => {
                               </View>
                             </View>
                           )}
+
+                          {cognitiveData.needs && cognitiveData.needs.length > 0 && (
+                            <View>
+                              <Text style={styles.reactionSubLabel}>我需要什麼：</Text>
+                              <View style={styles.tagsRow}>
+                                {cognitiveData.needs.map((need, i) => (
+                                  <View key={i} style={styles.emotionTagNegative}>
+                                    <Text style={styles.emotionTagNegativeText}>{need}</Text>
+                                  </View>
+                                ))}
+                              </View>
+                            </View>
+                          )}
                         </View>
                       )}
                     </View>
                   )}
 
-                  {cognitiveData.originalThought && cognitiveData.newThought && (
-                    <View style={styles.transitionDivider}>
-                      <View style={styles.dividerLine} />
-                      <View style={styles.transitionCircle}>
-                        <RefreshCw color="#10B981" size={16} />
-                      </View>
-                      <View style={styles.dividerLine} />
-                    </View>
-                  )}
-
-                  {cognitiveData.newThought && (
-                    <View style={[styles.abcdCard, styles.abcdCardPositive]}>
+                  {/* ⭐ 尋找證據（灰色） */}
+                  {(cognitiveData.supportingEvidence || cognitiveData.opposingEvidence) && (
+                    <View style={[styles.abcdCard, { backgroundColor: '#F8FAFC' }]}>
                       <View style={styles.abcdLabelRow}>
-                        <View style={[styles.abcdBadge, { backgroundColor: '#34D399' }]}>
-                          <Text style={styles.abcdBadgeText}>D</Text>
+                        <View style={[styles.sectionIconBadge, { backgroundColor: '#E2E8F0' }]}>
+                          <Scale color="#64748B" size={16} strokeWidth={2.5} />
                         </View>
-                        <Text style={[styles.abcdLabel, { color: '#059669' }]}>轉念後</Text>
+                        <Text style={[styles.abcdLabel, { color: '#64748B', fontSize: 15 }]}>尋找證據</Text>
                       </View>
-                      <Text style={styles.abcdContent}>{cognitiveData.newThought}</Text>
+
+                      {cognitiveData.supportingEvidence && (
+                        <View style={{ marginBottom: 12 }}>
+                          <Text style={[styles.reactionSubLabel, { color: '#64748B' }]}>
+                            支持這個想法的證據
+                          </Text>
+                          <Text style={styles.abcdContent}>{cognitiveData.supportingEvidence}</Text>
+                        </View>
+                      )}
+
+                      {cognitiveData.opposingEvidence && (
+                        <View>
+                          <Text style={[styles.reactionSubLabel, { color: '#64748B' }]}>
+                            反對這個想法的證據
+                          </Text>
+                          <Text style={styles.abcdContent}>{cognitiveData.opposingEvidence}</Text>
+                        </View>
+                      )}
                     </View>
                   )}
 
-                  {cognitiveData.postScore !== null && (
-                    <View style={[styles.resultCard, { backgroundColor: '#ECFDF5', borderColor: '#D1FAE5' }]}>
+                  {/* ⭐ 轉換視角（灰色） */}
+                  {(cognitiveData.habitPattern || cognitiveData.empathyPerspective) && (
+                    <View style={[styles.abcdCard, { backgroundColor: '#F8FAFC' }]}>
+                      <View style={styles.abcdLabelRow}>
+                        <View style={[styles.sectionIconBadge, { backgroundColor: '#E2E8F0' }]}>
+                          <Eye color="#64748B" size={16} strokeWidth={2.5} />
+                        </View>
+                        <Text style={[styles.abcdLabel, { color: '#64748B', fontSize: 15 }]}>轉換視角</Text>
+                      </View>
+
+                      {cognitiveData.habitPattern && (
+                        <View style={{ marginBottom: 12 }}>
+                          <Text style={[styles.reactionSubLabel, { color: '#64748B' }]}>
+                            這是他平常的習慣還是只有針對我呢？
+                          </Text>
+                          <Text style={styles.abcdContent}>{cognitiveData.habitPattern}</Text>
+                        </View>
+                      )}
+
+                      {cognitiveData.empathyPerspective && (
+                        <View>
+                          <Text style={[styles.reactionSubLabel, { color: '#64748B' }]}>
+                            如果我是他，我當下可能會...
+                          </Text>
+                          <Text style={styles.abcdContent}>{cognitiveData.empathyPerspective}</Text>
+                        </View>
+                      )}
+                    </View>
+                  )}
+
+                  {/* ⭐ 專注可控（灰色） */}
+                  {(cognitiveData.controllable || cognitiveData.uncontrollable) && (
+                    <View style={[styles.abcdCard, { backgroundColor: '#F8FAFC' }]}>
+                      <View style={styles.abcdLabelRow}>
+                        <View style={[styles.sectionIconBadge, { backgroundColor: '#E2E8F0' }]}>
+                          <Target color="#64748B" size={16} strokeWidth={2.5} />
+                        </View>
+                        <Text style={[styles.abcdLabel, { color: '#64748B', fontSize: 15 }]}>專注可控</Text>
+                      </View>
+
+                      {cognitiveData.controllable && (
+                        <View style={{ marginBottom: 12 }}>
+                          <Text style={[styles.reactionSubLabel, { color: '#64748B' }]}>
+                            這件事有哪些可控的部分嗎？
+                          </Text>
+                          <Text style={styles.abcdContent}>{cognitiveData.controllable}</Text>
+                        </View>
+                      )}
+
+                      {cognitiveData.uncontrollable && (
+                        <View>
+                          <Text style={[styles.reactionSubLabel, { color: '#64748B' }]}>
+                            又有哪些不可控的部分呢？
+                          </Text>
+                          <Text style={styles.abcdContent}>{cognitiveData.uncontrollable}</Text>
+                        </View>
+                      )}
+                    </View>
+                  )}
+
+                  {/* ⭐ 練習成效（綠色） */}
+                  {cognitiveData.moodScore !== null && (
+                    <View style={[styles.resultCard, { 
+                      backgroundColor: '#ECFDF5', 
+                      borderColor: '#D1FAE5',
+                      marginTop: 8
+                    }]}>
                       <View style={styles.resultCardHeader}>
                         <View style={[styles.resultIconBadge, { backgroundColor: '#D1FAE5' }]}>
                           <TrendingUp color="#10B981" size={14} />
@@ -854,7 +937,9 @@ const DailyScreen = ({ navigation, route }) => {
                       <View style={styles.scoreDisplayRow}>
                         <Text style={styles.scoreLabel}>情緒減緩程度</Text>
                         <View style={styles.scoreValueBox}>
-                          <Text style={[styles.scoreValue, { color: '#10B981' }]}>{cognitiveData.postScore}</Text>
+                          <Text style={[styles.scoreValue, { color: '#10B981' }]}>
+                            {cognitiveData.moodScore}
+                          </Text>
                           <Text style={styles.scoreMax}>/10</Text>
                         </View>
                       </View>
@@ -1165,7 +1250,9 @@ const DailyScreen = ({ navigation, route }) => {
                         </View>
                         <View style={styles.recordFooterItem}>
                           <FileText color="#9CA3AF" size={14} strokeWidth={1.5} />
-                          <Text style={styles.recordFooterText}>所屬計畫：{planName}</Text>
+                          <Text style={styles.recordFooterText}>
+                            {record.practice_type?.includes('內耗') ? '職場溝通力' : planName}
+                          </Text>
                         </View>
                       </View>
                     </TouchableOpacity>
@@ -1412,6 +1499,7 @@ const styles = StyleSheet.create({
   abcdCardNegative: { backgroundColor: '#FEF2F2', borderLeftWidth: 4, borderLeftColor: '#F87171' },
   abcdCardPositive: { backgroundColor: '#ECFDF5', borderLeftWidth: 4, borderLeftColor: '#34D399' },
   abcdLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
+  sectionIconBadge: { width: 28, height: 28, borderRadius: 8, justifyContent: 'center', alignItems: 'center',marginRight: 2 },
   abcdBadge: { width: 24, height: 24, borderRadius: 6, justifyContent: 'center', alignItems: 'center' },
   abcdBadgeText: { fontSize: 12, fontWeight: '700', color: '#FFFFFF' },
   abcdLabel: { fontSize: 13, fontWeight: '600', color: '#64748B' },

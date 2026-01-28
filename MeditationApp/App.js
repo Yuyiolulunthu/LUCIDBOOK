@@ -18,8 +18,6 @@ import BottomNavigation from './src/navigation/BottomNavigation';
 
 // 導入所有頁面
 import HomeScreen from './src/screens/home/HomeScreen';
-import EmotionalResiliencePlanScreen from './src/screens/home/EmotionalResiliencePlanScreen';
-import WorkplaceCommunicationPlanScreen from './src/screens/home/WorkplaceCommunicationPlanScreen';
 import WorkplaceCommunicationPlanIntroScreen from './src/screens/home/WorkplaceCommunicationPlanIntroScreen';
 import LoginScreen from './src/screens/auth/LoginScreen';
 import RegisterScreen from './src/screens/auth/RegisterScreen';
@@ -163,14 +161,6 @@ const App = () => {
         />
         
         {/* ========== 首頁子頁面 ========== */}
-        <Stack.Screen 
-          name="EmotionalResiliencePlan" 
-          component={EmotionalResiliencePlanScreen}
-        />
-        <Stack.Screen 
-          name="WorkplaceCommunicationPlan" 
-          component={WorkplaceCommunicationPlanScreen}
-        />
         <Stack.Screen 
           name="WorkplaceCommunicationPlanIntro" 
           component={WorkplaceCommunicationPlanIntroScreen}
