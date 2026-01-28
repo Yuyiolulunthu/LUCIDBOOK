@@ -1,7 +1,7 @@
 // ==========================================
 // 檔案名稱: src/screens/home/WorkplaceCommunicationPlanIntroScreen.js
 // 職場溝通力計劃介紹頁面
-// 版本: V2.0 - 更新 Header 和圖片樣式，採用主頁練習單元設計
+// 版本: V2.1 - 添加內耗終止鍵導航功能
 // ==========================================
 
 import React, { useState } from 'react';
@@ -222,6 +222,7 @@ const WorkplaceCommunicationPlanIntroScreen = ({ navigation }) => {
       progress: '0/3',
       tags: ['焦慮', '在乎他人反應', '情緒調節力'],
       description: '當他人的反應令你內耗不適，或是懷疑自己被針對，陷入焦慮，那麼這個練習很適合你一探究竟',
+      screen: 'InternalConflictPractice', // ⭐ 添加 screen 屬性
     },
     {
       id: 'empathy-mind-reading',
@@ -233,6 +234,7 @@ const WorkplaceCommunicationPlanIntroScreen = ({ navigation }) => {
       progress: '0/3',
       tags: ['關係卡關', '覺得被針對', '同理心', '關係提升'],
       description: '如果因為他人的反應而感到難受，或是想要敞下敵意，修復與對方的關係，請點擊練習',
+      screen: null, // 暫未開放
     },
     {
       id: 'communication-translator',
@@ -244,6 +246,7 @@ const WorkplaceCommunicationPlanIntroScreen = ({ navigation }) => {
       progress: '0/3',
       tags: ['委屈', '非暴力溝通', '開不了口', '怕衝突'],
       description: '覺得委屈卻又不知道如何開口嗎？想提要求卻又怕與人起衝突？來這裡就對了',
+      screen: null,
     },
     {
       id: 'emotional-resilience',
@@ -255,12 +258,31 @@ const WorkplaceCommunicationPlanIntroScreen = ({ navigation }) => {
       progress: '0/3',
       tags: ['理智斷線', '情緒降溫', '憤怒難耐'],
       description: '當你覺得情緒焦慮、理智快要斷掉，或是被激怒、想立刻反擊的時候，先進來靜靜吧',
+      screen: null,
     },
   ];
 
+  // ⭐⭐⭐ 修改處：添加導航邏輯
   const handleStartPractice = (practiceId) => {
     console.log('🎯 [職場溝通介紹] 開始練習:', practiceId);
-    // TODO: 導航到對應練習
+    
+    // 找到對應的練習模組
+    const practiceModule = practiceModules.find(module => module.id === practiceId);
+    
+    if (!practiceModule) {
+      console.error('❌ 找不到練習模組:', practiceId);
+      return;
+    }
+    
+    // 檢查是否有對應的頁面
+    if (practiceModule.screen) {
+      console.log('✅ 導航到:', practiceModule.screen);
+      navigation.navigate(practiceModule.screen);
+    } else {
+      // 如果沒有對應頁面，顯示提示
+      console.log('⚠️ 練習尚未開放:', practiceModule.title);
+      alert(`${practiceModule.title}\n\n此練習即將推出，敬請期待！`);
+    }
   };
 
   return (

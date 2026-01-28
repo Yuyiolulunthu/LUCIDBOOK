@@ -1,10 +1,14 @@
 // ==========================================
 // 檔案名稱: src/screens/home/series/WorkplaceCommunicationSeries.js
-// 職場溝通力計劃系列組件 - 完整修正版
-// 版本: V4.0 - 修正布局和顯示問題
+// 職場溝通力計劃系列組件
+// 版本: V6.0 - 計畫完成度(A方案)全套修正版
+// 內容包含：
+// 1) 圓環中心顯示「完成 X%」(用後端 plans.progress)
+// 2) 顯示「單元完成數」(4 模組各最多 3 次 → 12)
+// 3) useFocusEffect：從練習頁返回自動刷新
 // ==========================================
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -12,8 +16,10 @@ import {
   ScrollView,
   StyleSheet,
   Animated,
+  Alert,
+  ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Circle } from 'react-native-svg';
 import {
   RotateCcw,
@@ -23,6 +29,8 @@ import {
   Clock,
   ArrowRight,
 } from 'lucide-react-native';
+import { useFocusEffect } from '@react-navigation/native';
+import ApiService from '../../../services/index'; // ⭐ API Service
 
 const PracticeModuleCard = ({ module, onStartPractice }) => {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -30,36 +38,27 @@ const PracticeModuleCard = ({ module, onStartPractice }) => {
 
   return (
     <View style={styles.moduleCard}>
-      {/* ⭐ 上半部：內容區域（會自動伸縮）*/}
       <View style={styles.moduleContentWrapper}>
-        {/* 頂部：Icon + 標題 + 標籤（同一行）*/}
         <View style={styles.moduleHeaderRow}>
-          {/* 左側：Icon + 標題 */}
           <View style={styles.moduleTitleSection}>
-            {/* 小 Icon */}
             <View style={[styles.moduleIconSmall, { backgroundColor: module.iconBg }]}>
               <Icon color={module.iconColor} size={20} strokeWidth={2} />
             </View>
-            {/* 標題 */}
             <Text style={styles.moduleTitle}>{module.title}</Text>
           </View>
-          
-          {/* 右側：時間和進度標籤 */}
+
           <View style={styles.moduleMetaGroup}>
-            {/* 時間標籤 */}
             <View style={styles.moduleMetaTag}>
               <Clock color="#9CA3AF" size={12} />
               <Text style={styles.moduleDuration}>{module.duration}</Text>
             </View>
-            
-            {/* 進度標籤 */}
+
             <View style={styles.moduleProgressTag}>
               <Text style={styles.moduleProgressText}>{module.progress}</Text>
             </View>
           </View>
         </View>
 
-        {/* 標籤（未展開時顯示）*/}
         {!isExpanded && (
           <View style={styles.tagsContainer}>
             {module.tags.map((tag, index) => (
@@ -70,7 +69,6 @@ const PracticeModuleCard = ({ module, onStartPractice }) => {
           </View>
         )}
 
-        {/* 展開的描述（無黃色底框）*/}
         {isExpanded && (
           <Animated.View style={styles.descriptionContainer}>
             <Text style={styles.descriptionText}>{module.description}</Text>
@@ -78,22 +76,13 @@ const PracticeModuleCard = ({ module, onStartPractice }) => {
         )}
       </View>
 
-      {/* ⭐ 下半部：按鈕組（固定在底部）*/}
       <View style={styles.buttonRow}>
         <TouchableOpacity
           onPress={() => setIsExpanded(!isExpanded)}
-          style={[
-            styles.detailButton,
-            isExpanded && styles.detailButtonActive,
-          ]}
+          style={[styles.detailButton, isExpanded && styles.detailButtonActive]}
           activeOpacity={0.8}
         >
-          <Text
-            style={[
-              styles.detailButtonText,
-              isExpanded && styles.detailButtonTextActive,
-            ]}
-          >
+          <Text style={[styles.detailButtonText, isExpanded && styles.detailButtonTextActive]}>
             練習內涵
           </Text>
         </TouchableOpacity>
@@ -112,17 +101,27 @@ const PracticeModuleCard = ({ module, onStartPractice }) => {
 };
 
 const WorkplaceCommunicationSeries = ({ navigation, userName }) => {
-  const [weeklyProgress] = useState([
-    { day: '一', duration: 3 },
-    { day: '二', duration: 5 },
-    { day: '三', duration: 2 },
+  // ⭐ 狀態管理
+  const [isLoading, setIsLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const [weeklyProgress, setWeeklyProgress] = useState([
+    { day: '一', duration: 0 },
+    { day: '二', duration: 0 },
+    { day: '三', duration: 0 },
     { day: '四', duration: 0 },
     { day: '五', duration: 0 },
     { day: '六', duration: 0 },
     { day: '日', duration: 0 },
   ]);
 
-  const [practiceModules] = useState([
+  // ✅ 計畫：以「次數」為主（後端 plans.totalSessions / plans.progress）
+  const [currentProgress, setCurrentProgress] = useState(0); // 已完成次數
+  const [targetProgress] = useState(28); // ✅ 計畫目標：28 次
+  const [planPercent, setPlanPercent] = useState(0); // ✅ 圓環顯示：完成 X%
+  const [moduleCompletedTotal, setModuleCompletedTotal] = useState(0); // ✅ 4模組(各3次) → 12
+
+  const [practiceModules, setPracticeModules] = useState([
     {
       id: 'stop-internal-friction',
       title: '內耗終止鍵',
@@ -132,7 +131,10 @@ const WorkplaceCommunicationSeries = ({ navigation, userName }) => {
       duration: '5分鐘',
       progress: '0/3',
       tags: ['焦慮', '在乎他人反應', '情緒調節力'],
-      description: '當他人的反應令你內耗不適，或是懷疑自己被針對，陷入焦慮，那麼這個練習很適合你一探究竟',
+      description:
+        '當他人的反應令你內耗不適，或是懷疑自己被針對，陷入焦慮，那麼這個練習很適合你一探究竟',
+      screen: 'InternalConflictPractice',
+      practiceType: '內耗終止鍵',
     },
     {
       id: 'empathy-mind-reading',
@@ -143,7 +145,10 @@ const WorkplaceCommunicationSeries = ({ navigation, userName }) => {
       duration: '7分鐘',
       progress: '0/3',
       tags: ['關係卡關', '覺得被針對', '同理心', '關係提升'],
-      description: '如果因為他人的反應而感到難受，或是想要敞下敵意，修復與對方的關係，請點擊練習',
+      description:
+        '如果因為他人的反應而感到難受，或是想要敞下敵意，修復與對方的關係，請點擊練習',
+      screen: null,
+      practiceType: '同理讀心術',
     },
     {
       id: 'communication-translator',
@@ -155,6 +160,8 @@ const WorkplaceCommunicationSeries = ({ navigation, userName }) => {
       progress: '0/3',
       tags: ['委屈', '非暴力溝通', '開不了口', '怕衝突'],
       description: '覺得委屈卻又不知道如何開口嗎？想提要求卻又怕與人起衝突？來這裡就對了',
+      screen: null,
+      practiceType: '溝通轉譯器',
     },
     {
       id: 'emotional-resilience',
@@ -165,114 +172,274 @@ const WorkplaceCommunicationSeries = ({ navigation, userName }) => {
       duration: '4分鐘',
       progress: '0/3',
       tags: ['理智斷線', '情緒降溫', '憤怒難耐'],
-      description: '當你覺得情緒焦慮、理智快要斷掉，或是被激怒、想立刻反擊的時候，先進來靜靜吧',
+      description:
+        '當你覺得情緒焦慮、理智快要斷掉，或是被激怒、想立刻反擊的時候，先進來靜靜吧',
+      screen: null,
+      practiceType: '理智回穩力',
     },
   ]);
 
-  const currentProgress = 10;
-  const targetProgress = 30;
-  const progressPercentage = (currentProgress / targetProgress) * 100;
+  // ⭐ 初次載入
+  useEffect(() => {
+    loadStatistics(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  // 圓形進度條參數 - 加大圓環寬度
+  // ⭐ 回到本頁自動刷新（從練習頁返回也會更新）
+  useFocusEffect(
+    React.useCallback(() => {
+      loadStatistics(true); // silent refresh
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
+  );
+
+  // ⭐ 下拉刷新
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadStatistics(false);
+    setRefreshing(false);
+  };
+
+  // ⭐ 載入統計數據
+  // silent=true：不要整頁 Loading，只更新數據（回到頁面更順）
+  const loadStatistics = async (silent = false) => {
+    try {
+      console.log('📊 [職場溝通力] 載入統計數據...');
+      if (!refreshing && !silent) setIsLoading(true);
+
+      const response = await ApiService.getPracticeStats();
+
+      if (response?.success && response?.stats) {
+        console.log('✅ [職場溝通力] 統計數據:', response.stats);
+
+        // 1️⃣ 計畫總進度（次數 + 百分比）
+        const plan = response.stats?.plans?.['workplace-communication'];
+        if (plan) {
+          const totalSessions = plan.totalSessions || 0; // ✅ 後端有
+          const percent = plan.progress || 0; // ✅ 後端有
+
+          setCurrentProgress(totalSessions);
+          setPlanPercent(percent);
+
+          console.log('📈 [職場溝通] 已完成次數:', totalSessions);
+          console.log('📈 [職場溝通] 計畫完成度:', percent, '%');
+        } else {
+          setCurrentProgress(0);
+          setPlanPercent(0);
+        }
+
+        // 2️⃣ 更新本週練習數據
+        if (response.stats.weeklyPractices) {
+          processWeeklyPractices(response.stats.weeklyPractices);
+        }
+
+        // 3️⃣ 更新練習模組進度（同時計算「單元完成總數 / 12」）
+        if (response.stats.categoryStats) {
+          updateModuleProgress(response.stats.categoryStats);
+        }
+      } else {
+        console.warn('⚠️ [職場溝通力] 統計數據異常', response);
+      }
+    } catch (error) {
+      console.error('❌ [職場溝通力] 載入統計失敗:', error);
+    } finally {
+      if (!silent) setIsLoading(false);
+    }
+  };
+
+  // ⭐ 處理本週練習數據
+  const processWeeklyPractices = (weeklyPractices) => {
+    try {
+      const weekData = Array(7).fill(0);
+
+      // 計算本週一的日期
+      const today = new Date();
+      const currentDay = today.getDay();
+      const mondayOffset = currentDay === 0 ? -6 : 1 - currentDay;
+      const monday = new Date(today);
+      monday.setDate(today.getDate() + mondayOffset);
+      monday.setHours(0, 0, 0, 0);
+
+      weeklyPractices.forEach((practice) => {
+        const practiceDate = new Date(practice.created_at);
+        const daysDiff = Math.floor((practiceDate - monday) / (1000 * 60 * 60 * 24));
+        if (daysDiff >= 0 && daysDiff < 7) {
+          weekData[daysDiff] += practice.duration || 0;
+        }
+      });
+
+      const labels = ['一', '二', '三', '四', '五', '六', '日'];
+      const newWeeklyProgress = weekData.map((duration, index) => ({
+        day: labels[index],
+        duration: Math.round(duration),
+      }));
+
+      setWeeklyProgress(newWeeklyProgress);
+      console.log('📅 本週數據:', newWeeklyProgress);
+    } catch (error) {
+      console.error('❌ 處理本週數據失敗:', error);
+    }
+  };
+
+  // ⭐ 更新練習模組進度 + 計算完成總數(最多12)
+  const updateModuleProgress = (categoryStats) => {
+    try {
+      // 先算完成總數
+      let completedSum = 0;
+
+      setPracticeModules((prevModules) => {
+        const next = prevModules.map((module) => {
+          const stat = categoryStats.find(
+            (s) => s.type === module.practiceType || s.name === module.practiceType
+          );
+
+          if (stat) {
+            const sessions = stat.sessions || 0;
+            const targetSessions = 3;
+            const completedSessions = Math.min(sessions, targetSessions);
+
+            completedSum += completedSessions;
+
+            return {
+              ...module,
+              progress: `${completedSessions}/${targetSessions}`,
+            };
+          }
+
+          return module;
+        });
+
+        return next;
+      });
+
+      setModuleCompletedTotal(completedSum);
+      console.log('🧩 單元完成度:', completedSum, '/ 12');
+    } catch (error) {
+      console.error('❌ 更新進度失敗:', error);
+    }
+  };
+
+  // ✅ 圓形進度：直接用後端算好的 planPercent（有保底）
+  const progressPercentage = Math.min(planPercent, 100);
+
+  // 圓形進度條參數
   const size = 140;
   const strokeWidth = 16;
   const radius = (size - strokeWidth) / 2;
   const circumference = radius * 2 * Math.PI;
   const strokeDashoffset = circumference - (circumference * progressPercentage) / 100;
 
+  // 處理練習點擊
   const handleStartPractice = (practiceId) => {
     console.log('🎯 [職場溝通] 開始練習:', practiceId);
-    // TODO: 導航到對應練習
+
+    const practiceModule = practiceModules.find((module) => module.id === practiceId);
+
+    if (!practiceModule) {
+      console.error('❌ 找不到練習:', practiceId);
+      return;
+    }
+
+    if (practiceModule.screen) {
+      console.log('✅ 導航到:', practiceModule.screen);
+      navigation.navigate(practiceModule.screen);
+    } else {
+      console.log('⚠️ 練習尚未開放');
+      Alert.alert(practiceModule.title, '此練習即將推出，敬請期待！', [
+        { text: '確定', style: 'default' },
+      ]);
+    }
   };
 
   const handleShowPlanIntro = () => {
-    console.log('📋 [職場溝通] 查看計劃介紹');
+    console.log('📋 [職場溝通] 查看介紹');
     navigation.navigate('WorkplaceCommunicationPlanIntro');
   };
 
+  // ⭐ Loading 畫面
+  if (isLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#FF8C42" />
+        <Text style={styles.loadingText}>載入統計數據中...</Text>
+      </View>
+    );
+  }
+
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+    <ScrollView
+      style={styles.container}
+      showsVerticalScrollIndicator={false}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+    >
       {/* 標題區 */}
       <View style={styles.header}>
-        <Text style={styles.companyTitle}>
-          {userName || 'OO'}的
-        </Text>
+        <Text style={styles.companyTitle}>{userName || 'OO'}的</Text>
         <Text style={styles.companyName}>職場溝通力計劃</Text>
-        <Text style={styles.subtitle}>
-          幫助你提升職場溝通效率，建立良好人際關係！
-        </Text>
+        <Text style={styles.subtitle}>幫助你提升職場溝通效率，建立良好人際關係！</Text>
       </View>
 
-      {/* ⭐ 本週目標區域 - 左右對稱布局 */}
-        <View style={styles.goalSection}>
-        {/* 左側：圓圈進度條（無背景卡片）*/}
+      {/* 計畫目標區域 */}
+      <View style={styles.goalSection}>
         <View style={styles.progressCircleWrapper}>
-            <Svg width={size} height={size}>
-            {/* 背景圓 */}
+          <Svg width={size} height={size}>
             <Circle
-                stroke="#FEF3C7"
-                fill="none"
-                cx={size / 2}
-                cy={size / 2}
-                r={radius}
-                strokeWidth={strokeWidth}
+              stroke="#FEF3C7"
+              fill="none"
+              cx={size / 2}
+              cy={size / 2}
+              r={radius}
+              strokeWidth={strokeWidth}
             />
-            {/* 進度圓 */}
             <Circle
-                stroke="#FFD6A7"
-                fill="none"
-                cx={size / 2}
-                cy={size / 2}
-                r={radius}
-                strokeWidth={strokeWidth}
-                strokeDasharray={`${circumference} ${circumference}`}
-                strokeDashoffset={strokeDashoffset}
-                strokeLinecap="round"
-                rotation="-90"
-                origin={`${size / 2}, ${size / 2}`}
+              stroke="#FFD6A7"
+              fill="none"
+              cx={size / 2}
+              cy={size / 2}
+              r={radius}
+              strokeWidth={strokeWidth}
+              strokeDasharray={`${circumference} ${circumference}`}
+              strokeDashoffset={strokeDashoffset}
+              strokeLinecap="round"
+              rotation="-90"
+              origin={`${size / 2}, ${size / 2}`}
             />
-            </Svg>
+          </Svg>
 
-            {/* 中心文字 */}
-            <View style={styles.progressCircleCenter}>
-            <Text style={styles.progressCircleLabelSmall}>計畫累積</Text>
-            <Text style={styles.progressCircleLabelSmall}>完成度</Text>
-            </View>
+          <View style={styles.progressCircleCenter}>
+            <Text style={styles.progressCircleLabelSmall}>完成</Text>
+            <Text style={styles.progressCirclePercent}>{planPercent}%</Text>
+          </View>
         </View>
 
-        {/* 右側：本週目標卡片 */}
         <View style={styles.goalCard}>
-            <Text style={styles.goalCardTitle}>本週目標</Text>
-            <View style={styles.goalNumberWrapper}>
+          <Text style={styles.goalCardTitle}>計畫累積</Text>
+          <View style={styles.goalNumberWrapper}>
             <Text style={styles.goalNumber}>{currentProgress}</Text>
-            <Text style={styles.goalTarget}> / {targetProgress}分鐘</Text>
-            </View>
-            <Text style={styles.goalEncouragement}>每天7分鐘！加油！</Text>
+            <Text style={styles.goalTarget}> / {targetProgress}次</Text>
+          </View>
+          <Text style={styles.goalEncouragement}>每完成一次練習，就完成計畫的一步！</Text>
+          <Text style={styles.goalEncouragement}>單元完成度：{moduleCompletedTotal} / 12</Text>
         </View>
-        </View>
+      </View>
 
-      {/* 本週練習概況 - 標題 */}
+      {/* 本週練習概況 */}
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>本週練習概況</Text>
       </View>
 
-      {/* ⭐ 柱狀圖 - 獨立卡片（顯示分鐘數）*/}
       <View style={styles.chartCard}>
         <View style={styles.chartContainer}>
           {weeklyProgress.map((day, index) => {
-            const maxDuration = Math.max(...weeklyProgress.map(d => d.duration));
-            const barHeight = day.duration > 0 ? (day.duration / (maxDuration || 5)) * 60 : 4;
-            
+            const maxDuration = Math.max(...weeklyProgress.map((d) => d.duration), 5);
+            const barHeight = day.duration > 0 ? (day.duration / maxDuration) * 60 : 4;
+
             return (
               <View key={index} style={styles.barWrapper}>
-                {/* ⭐ 分鐘標籤 - 顯示在柱子上方 */}
                 <View style={styles.minuteLabelContainer}>
-                  {day.duration > 0 && (
-                    <Text style={styles.minuteLabel}>{day.duration}分鐘</Text>
-                  )}
+                  {day.duration > 0 && <Text style={styles.minuteLabel}>{day.duration}分鐘</Text>}
                 </View>
-                
-                {/* 柱子 */}
+
                 <View
                   style={[
                     styles.bar,
@@ -282,8 +449,7 @@ const WorkplaceCommunicationSeries = ({ navigation, userName }) => {
                     },
                   ]}
                 />
-                
-                {/* 星期標籤 */}
+
                 <Text style={styles.dayLabel}>{day.day}</Text>
               </View>
             );
@@ -291,32 +457,22 @@ const WorkplaceCommunicationSeries = ({ navigation, userName }) => {
         </View>
       </View>
 
-      {/* 職場溝通力計劃介紹按鈕 */}
-      <TouchableOpacity
-        onPress={handleShowPlanIntro}
-        style={styles.planIntroButton}
-        activeOpacity={0.8}
-      >
+      {/* 計劃介紹按鈕 */}
+      <TouchableOpacity onPress={handleShowPlanIntro} style={styles.planIntroButton} activeOpacity={0.8}>
         <Text style={styles.planIntroText}>職場溝通力 計劃介紹</Text>
       </TouchableOpacity>
 
-      {/* 練習單元 - 標題 */}
+      {/* 練習單元 */}
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>練習單元</Text>
       </View>
 
-      {/* 練習單元卡片 */}
       <View style={styles.modulesContainer}>
         {practiceModules.map((module) => (
-          <PracticeModuleCard
-            key={module.id}
-            module={module}
-            onStartPractice={handleStartPractice}
-          />
+          <PracticeModuleCard key={module.id} module={module} onStartPractice={handleStartPractice} />
         ))}
       </View>
 
-      {/* 底部間距 */}
       <View style={styles.bottomPadding} />
     </ScrollView>
   );
@@ -330,8 +486,17 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FFFFFF',
   },
-
-  // ========== 標題區 ==========
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 14,
+    color: '#6B7280',
+  },
   header: {
     paddingHorizontal: 20,
     paddingTop: 2,
@@ -353,8 +518,6 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     lineHeight: 20,
   },
-
-  // ========== ⭐ 本週目標區域 - 左右對稱布局 ==========
   goalSection: {
     flexDirection: 'row',
     paddingHorizontal: 20,
@@ -362,8 +525,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-
-  // 左側：本週目標卡片
   goalCard: {
     flex: 1,
     marginLeft: 12,
@@ -399,9 +560,8 @@ const styles = StyleSheet.create({
   goalEncouragement: {
     fontSize: 13,
     color: '#9CA3AF',
+    marginTop: 2,
   },
-
-  // 右側：圓圈進度條（無背景卡片）
   progressCircleWrapper: {
     position: 'relative',
     marginRight: 12,
@@ -418,11 +578,15 @@ const styles = StyleSheet.create({
   progressCircleLabelSmall: {
     fontSize: 12,
     color: '#F59E0B',
-    fontWeight: '500',
+    fontWeight: '600',
     lineHeight: 16,
   },
-
-  // 區塊標題
+  progressCirclePercent: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#F59E0B',
+    lineHeight: 28,
+  },
   sectionHeader: {
     paddingHorizontal: 20,
     marginBottom: 16,
@@ -432,8 +596,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#111827',
   },
-
-  // ========== ⭐ 柱狀圖卡片（顯示分鐘數）==========
   chartCard: {
     marginHorizontal: 20,
     marginBottom: 24,
@@ -458,8 +620,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'flex-end',
   },
-  
-  // ⭐ 分鐘標籤容器 - 固定高度確保顯示
   minuteLabelContainer: {
     height: 16,
     marginBottom: 4,
@@ -471,7 +631,6 @@ const styles = StyleSheet.create({
     color: '#99A1AF',
     fontWeight: '400',
   },
-  
   bar: {
     width: 36,
     borderRadius: 6,
@@ -483,8 +642,6 @@ const styles = StyleSheet.create({
     marginTop: 8,
     fontWeight: '500',
   },
-
-  // ========== 計劃介紹按鈕 ==========
   planIntroButton: {
     marginHorizontal: 20,
     marginBottom: 32,
@@ -505,8 +662,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#FF8C42',
   },
-
-  // ========== ⭐ 練習單元（拉長卡片）==========
   modulesContainer: {
     paddingHorizontal: 20,
   },
@@ -521,28 +676,23 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 8,
     elevation: 4,
-    justifyContent: 'space-between',  
+    justifyContent: 'space-between',
   },
   moduleContentWrapper: {
-    flex: 1,  // ⭐ 讓內容區域佔用剩餘空間
+    flex: 1,
   },
-  // ⭐ 頂部行：Icon + 標題 + 標籤
   moduleHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 12,
-    },
-
-    // 左側：Icon + 標題區域
+  },
   moduleTitleSection: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
     marginRight: 12,
   },
-
-  // 小 Icon
   moduleIconSmall: {
     width: 40,
     height: 40,
@@ -551,16 +701,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: 12,
   },
-
-  // 標題
   moduleTitle: {
     fontSize: 18,
     fontWeight: '700',
     color: '#111827',
     flex: 1,
   },
-
-  // ⭐ 右側：時間和進度標籤組（靠右）
   moduleMetaGroup: {
     flexDirection: 'row',
     gap: 6,
@@ -595,50 +741,6 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#374151',
   },
-  moduleTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#111827',
-    flex: 1,
-    marginRight: 12,
-  },
-
-  // ========== 右上角標籤組 ==========
-  moduleMetaGroup: {
-    flexDirection: 'row',
-    gap: 6,
-  },
-  moduleMetaTag: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#F9FAFB',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 100,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  moduleDuration: {
-    fontSize: 11,
-    color: '#6B7280',
-    fontWeight: '500',
-  },
-  moduleProgressTag: {
-    backgroundColor: '#F9FAFB',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 100,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  moduleProgressText: {
-    fontSize: 11,
-    fontWeight: '500',
-    color: '#374151',
-  },
-
-  // 標籤 - 靠上對齊
   tagsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -657,8 +759,6 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     fontWeight: '400',
   },
-
-  // ========== 描述區（無黃色底框）==========
   descriptionContainer: {
     marginBottom: 18,
   },
@@ -667,8 +767,6 @@ const styles = StyleSheet.create({
     color: '#374151',
     lineHeight: 20,
   },
-
-  // 按鈕組
   buttonRow: {
     flexDirection: 'row',
     gap: 12,
@@ -713,8 +811,6 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#FF8C42',
   },
-
-  // 底部間距
   bottomPadding: {
     height: 40,
   },

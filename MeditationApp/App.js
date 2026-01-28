@@ -1,7 +1,7 @@
 // ==========================================
 // 檔案名稱: App.js 
 // 應用主入口 - 改用Tab Navigator
-// 版本: V3.4 - 新增職場溝通力計畫介紹頁面
+// 版本: V3.5 - 新增內耗終止鍵
 // ==========================================
 
 import React, { useState, useEffect } from 'react';
@@ -37,6 +37,7 @@ import GoodThingsJournal from './src/data/practices/GoodThingsJournal';
 import EmotionThermometer from './src/data/practices/EmotionThermometer';
 import CognitiveReframingPractice from './src/data/practices/CognitiveReframingPractice';
 import GratitudePractice from './src/data/practices/GratitudePractice';
+import InternalConflictPractice from './src/data/practices/InternalConflictPractice'; // ⭐ 新增
 
 // 訓練計畫相關頁面
 import TrainingPlanDetailScreen from './src/screens/practice/training/TrainingPlanDetailScreen';
@@ -226,6 +227,12 @@ const App = () => {
         <Stack.Screen 
           name="GratitudePractice" 
           component={GratitudePractice}
+          options={{ animation: 'slide_from_bottom' }}
+        />
+        {/* ⭐⭐⭐ 新增：內耗終止鍵 */}
+        <Stack.Screen 
+          name="InternalConflictPractice" 
+          component={InternalConflictPractice}
           options={{ animation: 'slide_from_bottom' }}
         />
         

@@ -1,7 +1,7 @@
 // ==========================================
 // DailyScreen.js
-// 版本: V2.2 - 修正感恩練習三子類型識別
-// 更新日期: 2025/12/22
+// 版本: V2.3 - 修正「內耗練習」日記欄位解析與顯示（支援 thoughts / emotionReactions / physicalReactions / needs / moodScore）
+// 更新日期: 2026/01/28
 // ==========================================
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -23,19 +23,14 @@ import {
   TrendingUp,
   Sparkles,
   Smile,
-  Info,
-  List,
-  Grid3X3,
   Calendar as CalendarIcon,
   X,
   Heart,
   Lightbulb,
   RefreshCw,
-  Target,
   Clock,
   FileText,
   Brain,
-  MessageCircle,
   Mail,
   BookOpen,
   Gift,
@@ -100,13 +95,12 @@ const DailyScreen = ({ navigation, route }) => {
   );
 
   useEffect(() => {
-  if (route?.params?.forceRefresh) {
-    console.log('🔄 [日記] 收到強制刷新信號');
-    fetchAllData();
-    // 清除參數避免重複觸發
-    navigation.setParams({ forceRefresh: false });
-  }
-}, [route?.params?.forceRefresh]);
+    if (route?.params?.forceRefresh) {
+      console.log('🔄 [日記] 收到強制刷新信號');
+      fetchAllData();
+      navigation.setParams({ forceRefresh: false });
+    }
+  }, [route?.params?.forceRefresh]);
 
   useEffect(() => {
     if (highlightPracticeId && displayData.length > 0) {
@@ -233,14 +227,13 @@ const DailyScreen = ({ navigation, route }) => {
   const handleDayClick = (day) => {
     const records = getRecordsForDate(day);
     if (records.length > 0) {
-      setCurrentDayRecords(records);  // ⭐ 保存當天所有記錄
-      setCurrentRecordIndex(0);       // ⭐ 重置為第一筆
-      setSelectedPractice(records[0]); // ⭐ 顯示第一筆
+      setCurrentDayRecords(records);
+      setCurrentRecordIndex(0);
+      setSelectedPractice(records[0]);
       setDetailModalVisible(true);
     }
   };
 
-  // ⭐ 新增：上一筆記錄
   const handlePrevRecord = () => {
     if (currentRecordIndex > 0) {
       const newIndex = currentRecordIndex - 1;
@@ -249,7 +242,6 @@ const DailyScreen = ({ navigation, route }) => {
     }
   };
 
-  // ⭐ 新增：下一筆記錄
   const handleNextRecord = () => {
     if (currentRecordIndex < currentDayRecords.length - 1) {
       const newIndex = currentRecordIndex + 1;
@@ -268,56 +260,44 @@ const DailyScreen = ({ navigation, route }) => {
     setSelectedPractice(null);
   };
 
-  // ⭐ 練習類型判斷（修正版 - 支援感恩三子練習）
   const getPracticeType = (name) => {
     if (!name) return 'other';
     if (name.includes('好事') || name.includes('感恩書寫')) return 'good-things';
     if (name.includes('呼吸') || name.includes('4-6') || name.includes('屏息')) return 'breathing';
-    if (name.includes('思維') || name.includes('調節') || name.includes('認知')) return 'cognitive';
-    // ⭐ 修正：加入「感謝信」和「如果練習」的判斷
+    if (name.includes('思維') || name.includes('調節') || name.includes('認知') || name.includes('內耗')) return 'cognitive';
     if (name.includes('感恩') || name.includes('感謝信') || name.includes('如果練習')) return 'gratitude';
     if (name.includes('心情溫度計')) return 'thermometer';
     return 'other';
   };
 
-  // ⭐ 所屬計畫判斷（統一版 - 全部顯示為「情緒抗壓力」）
   const getPlanName = (type) => {
     return '情緒抗壓力';
   };
 
-  // ⭐ 呼吸練習資料解析（增強版）
   const extractBreathingData = (practice) => {
     let data = { 
       relaxLevel: null, 
       postFeelings: null,
-      postMood: null,  // ⭐ 新增：主要心情
+      postMood: null,
     };
-    
-    // 優先從 practice 直接取值
+
     data.relaxLevel = practice.relax_level || practice.relaxLevel || practice.positive_level || null;
     data.postFeelings = practice.post_feelings || practice.postFeelings || practice.feelings || null;
     data.postMood = practice.post_mood || practice.postMood || null;
-    
-    // 從 form_data 補充
+
     if (practice.form_data) {
       try {
         const fd = typeof practice.form_data === 'string' ? JSON.parse(practice.form_data) : practice.form_data;
         if (fd) {
-          // 放鬆程度
           data.relaxLevel = data.relaxLevel || fd.relax_level || fd.relaxLevel || null;
-          
-          // 練習後感受（字串格式）
           data.postFeelings = data.postFeelings || fd.post_feelings || fd.postFeelings || null;
-          
-          // 練習後感受（陣列格式）- 轉成字串
+
           if (!data.postFeelings && fd.feelings && Array.isArray(fd.feelings)) {
             data.postFeelings = fd.feelings.join('、');
           }
-          
-          // 主要心情
+
           data.postMood = data.postMood || fd.post_mood || fd.postMood || null;
-          
-          // 如果沒有 postMood，從 feelings 陣列取第一個
+
           if (!data.postMood && fd.feelings && Array.isArray(fd.feelings) && fd.feelings.length > 0) {
             data.postMood = fd.feelings[0];
           }
@@ -326,12 +306,11 @@ const DailyScreen = ({ navigation, route }) => {
         console.warn('[DailyScreen] 解析呼吸練習 form_data 失敗:', e);
       }
     }
-    
+
     console.log('[DailyScreen] 呼吸練習數據:', data);
     return data;
   };
 
-  // ⭐ 好事書寫資料解析
   const extractGoodThingData = (practice) => {
     let data = {
       goodThing: null,
@@ -356,107 +335,144 @@ const DailyScreen = ({ navigation, route }) => {
     return data;
   };
 
-  // ⭐⭐⭐ 思維調節練習資料解析（完整版）⭐⭐⭐
+  // ✅✅✅ 修正版：思維調節 / 內耗練習資料解析（支援你的日記 schema）✅✅✅
   const extractCognitiveData = (practice) => {
     let data = {
-      event: null,           
-      originalThought: null, 
-      emotions: [],          
-      bodyReactions: [],     
-      behaviors: [],         
+      event: null,
+      originalThought: null,
+      emotions: [],
+      bodyReactions: [],
+      behaviors: [],
       emotionIntensity: null,
-      newThought: null,      
+      newThought: null,
       postScore: null,
       postMood: null,
       hasCustomOptions: false,
+
+      // ⭐ 內耗日記 schema
+      situation: null,
+      thoughts: null,
+      needs: [],
+      moodScore: null,
+    };
+
+    const splitMaybe = (v) => {
+      if (!v) return [];
+      if (Array.isArray(v)) return v;
+      if (typeof v === 'string') {
+        return v.split(/[，,、]/).map(s => s.trim()).filter(Boolean);
+      }
+      return [String(v)];
     };
 
     if (practice.form_data) {
       try {
         const fd = typeof practice.form_data === 'string' ? JSON.parse(practice.form_data) : practice.form_data;
         if (fd) {
-          // 基本欄位
-          data.event = fd.event || fd.situation || fd.activatingEvent || fd.trigger || null;
-          data.originalThought = fd.thought || fd.originalThought || fd.original_thought || null;
-          data.emotionIntensity = fd.emotionIntensity || fd.emotion_intensity || null;
-          data.newThought = fd.newPerspective || fd.newThought || fd.new_thought || null;
-          data.postScore = fd.postScore ?? fd.post_score ?? null;
+          // A：事件 / 情境
+          data.event = fd.event || fd.activatingEvent || fd.trigger || fd.situation || null;
+
+          // 內耗日記 schema（保留）
+          data.situation = fd.situation || null;
+
+          // B：原本想法（支援 thoughts）
+          data.originalThought =
+            fd.originalThought ||
+            fd.original_thought ||
+            fd.automaticThought ||
+            fd.thought ||
+            fd.thoughts || // ✅ 你現在用的 key
+            null;
+
+          data.thoughts = fd.thoughts || fd.thought || null;
+
+          // 強度 / 轉念後
+          data.emotionIntensity = fd.emotionIntensity || fd.emotion_intensity || fd.intensity || null;
+          data.newThought = fd.newPerspective || fd.newThought || fd.new_thought || fd.balancedThought || fd.alternativeThought || null;
+
+          // 分數（內耗日記常用 moodScore）
+          data.postScore = fd.postScore ?? fd.post_score ?? fd.moodScore ?? null;
+          data.moodScore = fd.moodScore ?? null;
+
           data.postMood = fd.postMood || fd.post_mood || null;
-          
-          // ⭐⭐⭐ 關鍵修正：反應資料解析 ⭐⭐⭐
-          
-          // 方法 1: 從 fullReactions 讀取（最新格式）
+
+          // 反應資料：fullReactions（最新）
           if (fd.fullReactions) {
-            console.log('📊 [DailyScreen] 從 fullReactions 讀取');
             data.emotions = Array.isArray(fd.fullReactions.emotions) ? fd.fullReactions.emotions : [];
             data.bodyReactions = Array.isArray(fd.fullReactions.bodyReactions) ? fd.fullReactions.bodyReactions : [];
             data.behaviors = Array.isArray(fd.fullReactions.behaviors) ? fd.fullReactions.behaviors : [];
-            
-            data.hasCustomOptions = (fd.customEmotions?.length > 0) || 
-                                  (fd.customBodyReactions?.length > 0) || 
-                                  (fd.customBehaviors?.length > 0);
+            data.hasCustomOptions =
+              (fd.customEmotions?.length > 0) ||
+              (fd.customBodyReactions?.length > 0) ||
+              (fd.customBehaviors?.length > 0);
+          } else {
+            // ✅ 反應資料：支援內耗日記 schema
+            // 情緒：emotionReactions
+            if (Array.isArray(fd.emotionReactions)) data.emotions = fd.emotionReactions;
+            else if (Array.isArray(fd.emotions)) data.emotions = fd.emotions;
+            else if (fd.emotion) data.emotions = Array.isArray(fd.emotion) ? fd.emotion : [fd.emotion];
+
+            // 身體：physicalReactions
+            if (Array.isArray(fd.physicalReactions)) data.bodyReactions = fd.physicalReactions;
+            else if (Array.isArray(fd.bodyReactions)) data.bodyReactions = fd.bodyReactions;
+
+            // 行為：behaviorReactions
+            if (Array.isArray(fd.behaviorReactions)) data.behaviors = fd.behaviorReactions;
+            else if (Array.isArray(fd.behaviors)) data.behaviors = fd.behaviors;
+
+            // 自訂（你的 schema 用字串 customEmotions/customPhysical/customBehavior）
+            const hasCustomStr =
+              (typeof fd.customEmotions === 'string' && fd.customEmotions.trim().length > 0) ||
+              (typeof fd.customPhysical === 'string' && fd.customPhysical.trim().length > 0) ||
+              (typeof fd.customBehavior === 'string' && fd.customBehavior.trim().length > 0);
+
+            const hasCustomArr =
+              (Array.isArray(fd.customEmotions) && fd.customEmotions.length > 0) ||
+              (Array.isArray(fd.customBodyReactions) && fd.customBodyReactions.length > 0) ||
+              (Array.isArray(fd.customBehaviors) && fd.customBehaviors.length > 0);
+
+            data.hasCustomOptions = hasCustomStr || hasCustomArr;
           }
-          // 方法 2: 直接從根層級讀取（向後兼容）
-          else {
-            console.log('📊 [DailyScreen] 從根層級讀取');
-            
-            // 情緒
-            if (fd.emotions && Array.isArray(fd.emotions)) {
-              data.emotions = fd.emotions;
-            } else if (fd.emotion) {
-              data.emotions = Array.isArray(fd.emotion) ? fd.emotion : [fd.emotion];
-            }
-            
-            // 身體反應
-            if (fd.bodyReactions && Array.isArray(fd.bodyReactions)) {
-              data.bodyReactions = fd.bodyReactions;
-            }
-            
-            // 行為反應
-            if (fd.behaviors && Array.isArray(fd.behaviors)) {
-              data.behaviors = fd.behaviors;
-            }
-            
-            data.hasCustomOptions = (fd.customEmotions?.length > 0) || 
-                                  (fd.customBodyReactions?.length > 0) || 
-                                  (fd.customBehaviors?.length > 0);
-          }
-          
-          // 補充主要心情
+
+          // needs：你現在是字串「被認可、界線」
+          data.needs = splitMaybe(fd.needs);
+
+          // 補主要心情
           if (!data.postMood && data.emotions.length > 0) {
             data.postMood = data.emotions[0];
           }
-          
-          console.log('📋 [DailyScreen] 解析結果:', {
-            emotions: data.emotions.length,
-            bodyReactions: data.bodyReactions.length,
-            behaviors: data.behaviors.length,
-            hasCustomOptions: data.hasCustomOptions,
-          });
         }
       } catch (e) {
-        console.warn('[DailyScreen] 解析失敗:', e);
+        console.warn('[DailyScreen] 解析內耗/思維 form_data 失敗:', e);
       }
     }
-    
+
+    console.log('[DailyScreen] 內耗/思維解析結果:', {
+      event: data.event,
+      originalThought: data.originalThought,
+      emotions: data.emotions,
+      bodyReactions: data.bodyReactions,
+      behaviors: data.behaviors,
+      needs: data.needs,
+      moodScore: data.moodScore,
+    });
+
     return data;
   };
 
-  // ⭐⭐⭐ 感恩練習資料解析（完整版 - 支援三種子練習）⭐⭐⭐
   const extractGratitudeData = (practice) => {
     let data = {
-      practiceType: null,      // 子練習類型：diary / letter / if
-      gratitudeItems: null,    // 感恩日記
-      gratitudeFeeling: null,  // 感受
-      recipient: null,         // 收件人
-      thankMessage: null,      // 感謝內容
-      ifImagine: null,         // 想像沒有它
-      ifAppreciate: null,      // 轉念看見擁有
-      postScore: null,         // 幸福感程度
-      relatedEmotions: [],     // 相關情緒
+      practiceType: null,
+      gratitudeItems: null,
+      gratitudeFeeling: null,
+      recipient: null,
+      thankMessage: null,
+      ifImagine: null,
+      ifAppreciate: null,
+      postScore: null,
+      relatedEmotions: [],
     };
 
-    // ⭐ 先根據 practice_type 名稱推斷子類型
     if (practice.practice_type) {
       if (practice.practice_type.includes('感謝信')) {
         data.practiceType = 'letter';
@@ -471,25 +487,15 @@ const DailyScreen = ({ navigation, route }) => {
       try {
         const fd = typeof practice.form_data === 'string' ? JSON.parse(practice.form_data) : practice.form_data;
         if (fd) {
-          // 子類型（優先使用 form_data 中的值）
           data.practiceType = fd.practiceType || fd.practice_type || fd.subType || data.practiceType || 'diary';
-          
-          // 感恩日記欄位
           data.gratitudeItems = fd.gratitudeItems || fd.gratitude_items || fd.gratitudeContent || fd.content || fd.goodThings || null;
           data.gratitudeFeeling = fd.gratitudeFeeling || fd.gratitude_feeling || fd.feeling || fd.reflection || null;
-          
-          // 迷你感謝信欄位
           data.recipient = fd.recipient || fd.to || fd.thankTo || fd.letterTo || null;
           data.thankMessage = fd.thankMessage || fd.thank_message || fd.message || fd.letterContent || fd.thankContent || null;
-          
-          // 如果練習欄位
           data.ifImagine = fd.ifImagine || fd.if_imagine || fd.imagineWithout || fd.withoutIt || null;
           data.ifAppreciate = fd.ifAppreciate || fd.if_appreciate || fd.appreciateHaving || fd.nowAppreciate || null;
-          
-          // 幸福感評分
           data.postScore = fd.postScore ?? fd.post_score ?? fd.happinessLevel ?? fd.positiveLevel ?? fd.happiness ?? null;
-          
-          // 相關情緒
+
           if (fd.relatedEmotions && Array.isArray(fd.relatedEmotions)) {
             data.relatedEmotions = fd.relatedEmotions;
           } else if (fd.emotions && Array.isArray(fd.emotions)) {
@@ -507,7 +513,6 @@ const DailyScreen = ({ navigation, route }) => {
     return data;
   };
 
-  // ⭐ 心情溫度計資料解析
   const extractEmotionThermometerData = (practice) => {
     let data = { scores: null, totalScore: null, riskScore: null };
     if (practice.form_data) {
@@ -523,20 +528,19 @@ const DailyScreen = ({ navigation, route }) => {
     return data;
   };
 
-  // ⭐⭐⭐ 渲染詳細 Modal（完整更新版）⭐⭐⭐
   const renderDetailModal = () => {
     if (!selectedPractice) return null;
-    
+
     const totalSeconds = parseInt(selectedPractice.duration_seconds) || 0;
     const practiceType = getPracticeType(selectedPractice.practice_type);
     const planName = getPlanName(selectedPractice.practice_type);
-    
+
     const isBreathing = practiceType === 'breathing';
     const isGoodThings = practiceType === 'good-things';
     const isCognitive = practiceType === 'cognitive';
     const isGratitude = practiceType === 'gratitude';
     const isMoodThermometer = practiceType === 'thermometer';
-    
+
     const breathingData = isBreathing ? extractBreathingData(selectedPractice) : null;
     const goodThingData = isGoodThings ? extractGoodThingData(selectedPractice) : null;
     const cognitiveData = isCognitive ? extractCognitiveData(selectedPractice) : null;
@@ -577,7 +581,6 @@ const DailyScreen = ({ navigation, route }) => {
       }
     };
 
-    // 獲取練習類型對應的主題色
     const getThemeColor = () => {
       if (isCognitive) return { primary: '#3B82F6', light: '#EFF6FF', accent: '#DBEAFE', gradient: ['#3B82F6', '#60A5FA'] };
       if (isGratitude) return { primary: '#EC4899', light: '#FDF2F8', accent: '#FCE7F3', gradient: ['#EC4899', '#F472B6'] };
@@ -593,10 +596,8 @@ const DailyScreen = ({ navigation, route }) => {
       <Modal visible={detailModalVisible} transparent animationType="fade" onRequestClose={closeDetailModal}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
-            {/* 頂部裝飾條 */}
             <LinearGradient colors={theme.gradient} style={styles.modalTopAccent} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} />
-            
-            {/* 關閉按鈕 */}
+
             <TouchableOpacity style={styles.modalCloseBtn} onPress={closeDetailModal}>
               <View style={styles.modalCloseBtnCircle}>
                 <X color="#64748B" size={16} strokeWidth={2.5} />
@@ -604,16 +605,13 @@ const DailyScreen = ({ navigation, route }) => {
             </TouchableOpacity>
 
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.modalScrollContent}>
-              {/* 標題區域 */}
               <View style={styles.modalHeaderSection}>
-                
                 <Text style={styles.modalTitle}>
-                  {isCognitive ? '思維調節' : isGratitude ? getGratitudeTitle() : selectedPractice.practice_type}
+                  {isCognitive ? (selectedPractice.practice_type?.includes('內耗') ? '內耗練習' : '思維調節') : isGratitude ? getGratitudeTitle() : selectedPractice.practice_type}
                 </Text>
                 <Text style={styles.modalDate}>{formatModalDate(selectedPractice.completed_at)}</Text>
               </View>
 
-              {/* 練習資訊標籤 */}
               <View style={styles.modalMetaRow}>
                 <View style={[styles.modalMetaTag, { backgroundColor: theme.light }]}>
                   <Clock color={theme.primary} size={12} strokeWidth={2.5} />
@@ -707,9 +705,55 @@ const DailyScreen = ({ navigation, route }) => {
                 </>
               )}
 
-              {/* ========== ⭐ 思維調節練習（精緻版）========== */}
+              {/* ========== ✅ 思維調節 / 內耗練習（精緻版） ========== */}
               {isCognitive && cognitiveData && (
                 <>
+                  {/* ✅✅✅ 內耗日記內容：就算 ABCD 缺，也會顯示 ✅✅✅ */}
+                  {(cognitiveData.situation || cognitiveData.thoughts || (cognitiveData.needs && cognitiveData.needs.length > 0) || cognitiveData.moodScore !== null) && (
+                    <View style={[styles.contentCard, { backgroundColor: '#F8FAFC', borderColor: '#E2E8F0' }]}>
+                      <View style={styles.contentCardHeader}>
+                        <View style={[styles.resultIconBadge, { backgroundColor: '#E2E8F0' }]}>
+                          <Brain color="#334155" size={14} />
+                        </View>
+                        <Text style={[styles.contentCardTitle, { color: '#334155' }]}>內耗練習日記</Text>
+                      </View>
+
+                      {cognitiveData.situation && (
+                        <View style={{ marginBottom: 12 }}>
+                          <Text style={[styles.sectionLabel, { marginBottom: 6 }]}>情境</Text>
+                          <Text style={styles.contentCardText}>{cognitiveData.situation}</Text>
+                        </View>
+                      )}
+
+                      {cognitiveData.thoughts && (
+                        <View style={{ marginBottom: 12 }}>
+                          <Text style={[styles.sectionLabel, { marginBottom: 6 }]}>想法</Text>
+                          <Text style={styles.contentCardText}>{cognitiveData.thoughts}</Text>
+                        </View>
+                      )}
+
+                      {cognitiveData.needs && cognitiveData.needs.length > 0 && (
+                        <View style={{ marginBottom: 12 }}>
+                          <Text style={[styles.sectionLabel, { marginBottom: 6 }]}>我需要什麼</Text>
+                          <View style={styles.tagsRow}>
+                            {cognitiveData.needs.map((n, i) => (
+                              <View key={i} style={styles.tagOutline}>
+                                <Text style={styles.tagOutlineText}>{n}</Text>
+                              </View>
+                            ))}
+                          </View>
+                        </View>
+                      )}
+
+                      {cognitiveData.moodScore !== null && (
+                        <View style={{ marginBottom: 0 }}>
+                          <Text style={[styles.sectionLabel, { marginBottom: 6 }]}>心情分數</Text>
+                          <Text style={[styles.contentCardText, { fontWeight: '700' }]}>{cognitiveData.moodScore} / 10</Text>
+                        </View>
+                      )}
+                    </View>
+                  )}
+
                   {cognitiveData.event && (
                     <View style={styles.abcdCard}>
                       <View style={styles.abcdLabelRow}>
@@ -731,14 +775,12 @@ const DailyScreen = ({ navigation, route }) => {
                         <Text style={[styles.abcdLabel, { color: '#DC2626' }]}>原本的想法</Text>
                       </View>
                       <Text style={styles.abcdContent}>{cognitiveData.originalThought}</Text>
-                      
-                      {/* ⭐ 完整的反应信息 */}
+
                       {(cognitiveData.emotions.length > 0 || cognitiveData.bodyReactions.length > 0 || cognitiveData.behaviors.length > 0) && (
                         <View style={{ marginTop: 16 }}>
-                          {/* 情绪 */}
                           {cognitiveData.emotions.length > 0 && (
                             <View style={{ marginBottom: 12 }}>
-                              <Text style={styles.reactionSubLabel}>情绪：</Text>
+                              <Text style={styles.reactionSubLabel}>情緒：</Text>
                               <View style={styles.tagsRow}>
                                 {cognitiveData.emotions.map((emotion, i) => (
                                   <View key={i} style={styles.emotionTagNegative}>
@@ -748,11 +790,10 @@ const DailyScreen = ({ navigation, route }) => {
                               </View>
                             </View>
                           )}
-                          
-                          {/* 身体反应 */}
+
                           {cognitiveData.bodyReactions.length > 0 && (
                             <View style={{ marginBottom: 12 }}>
-                              <Text style={styles.reactionSubLabel}>身体：</Text>
+                              <Text style={styles.reactionSubLabel}>身體：</Text>
                               <View style={styles.tagsRow}>
                                 {cognitiveData.bodyReactions.map((reaction, i) => (
                                   <View key={i} style={styles.emotionTagNegative}>
@@ -762,11 +803,10 @@ const DailyScreen = ({ navigation, route }) => {
                               </View>
                             </View>
                           )}
-                          
-                          {/* 行为反应 */}
+
                           {cognitiveData.behaviors.length > 0 && (
                             <View style={{ marginBottom: 0 }}>
-                              <Text style={styles.reactionSubLabel}>行为：</Text>
+                              <Text style={styles.reactionSubLabel}>行為：</Text>
                               <View style={styles.tagsRow}>
                                 {cognitiveData.behaviors.map((behavior, i) => (
                                   <View key={i} style={styles.emotionTagNegative}>
@@ -781,7 +821,6 @@ const DailyScreen = ({ navigation, route }) => {
                     </View>
                   )}
 
-                  {/* 箭頭轉換分隔 */}
                   {cognitiveData.originalThought && cognitiveData.newThought && (
                     <View style={styles.transitionDivider}>
                       <View style={styles.dividerLine} />
@@ -824,10 +863,9 @@ const DailyScreen = ({ navigation, route }) => {
                 </>
               )}
 
-              {/* ========== ⭐ 感恩練習（精緻版）========== */}
+              {/* ========== 感恩練習（精緻版）========== */}
               {isGratitude && gratitudeData && (
                 <>
-                  {/* 感恩日記 */}
                   {gratitudeData.practiceType === 'diary' && (
                     <View style={[styles.contentCard, { backgroundColor: theme.light, borderColor: theme.accent }]}>
                       <View style={styles.contentCardHeader}>
@@ -836,11 +874,11 @@ const DailyScreen = ({ navigation, route }) => {
                         </View>
                         <Text style={[styles.contentCardTitle, { color: theme.primary }]}>感恩日記內容</Text>
                       </View>
-                      
+
                       {gratitudeData.gratitudeItems && (
                         <Text style={styles.contentCardText}>{gratitudeData.gratitudeItems}</Text>
                       )}
-                      
+
                       {gratitudeData.gratitudeFeeling && (
                         <View style={styles.contentSubSection}>
                           <Text style={[styles.contentSubLabel, { color: theme.primary }]}>這件事帶給我的感受</Text>
@@ -850,7 +888,6 @@ const DailyScreen = ({ navigation, route }) => {
                     </View>
                   )}
 
-                  {/* 迷你感謝信 */}
                   {gratitudeData.practiceType === 'letter' && (
                     <View style={[styles.contentCard, { backgroundColor: theme.light, borderColor: theme.accent }]}>
                       <View style={styles.contentCardHeader}>
@@ -859,21 +896,20 @@ const DailyScreen = ({ navigation, route }) => {
                         </View>
                         <Text style={[styles.contentCardTitle, { color: theme.primary }]}>感謝信內容</Text>
                       </View>
-                      
+
                       {gratitudeData.recipient && (
                         <View style={[styles.recipientBadge, { backgroundColor: theme.accent }]}>
                           <Heart color={theme.primary} size={11} fill={theme.primary} />
                           <Text style={[styles.recipientText, { color: theme.primary }]}>寫給：{gratitudeData.recipient}</Text>
                         </View>
                       )}
-                      
+
                       {gratitudeData.thankMessage && (
                         <Text style={styles.contentCardText}>{gratitudeData.thankMessage}</Text>
                       )}
                     </View>
                   )}
 
-                  {/* 如果練習 */}
                   {gratitudeData.practiceType === 'if' && (
                     <View style={[styles.contentCard, { backgroundColor: theme.light, borderColor: theme.accent }]}>
                       <View style={styles.contentCardHeader}>
@@ -882,14 +918,14 @@ const DailyScreen = ({ navigation, route }) => {
                         </View>
                         <Text style={[styles.contentCardTitle, { color: theme.primary }]}>如果練習內容</Text>
                       </View>
-                      
+
                       {gratitudeData.ifImagine && (
                         <View style={styles.contentSubSection}>
                           <Text style={[styles.contentSubLabel, { color: theme.primary }]}>想像如果沒有它...</Text>
                           <Text style={styles.contentSubText}>{gratitudeData.ifImagine}</Text>
                         </View>
                       )}
-                      
+
                       {gratitudeData.ifAppreciate && (
                         <View style={[styles.contentSubSection, { marginTop: 16 }]}>
                           <Text style={[styles.contentSubLabel, { color: theme.primary }]}>轉念看見擁有的美好</Text>
@@ -899,7 +935,6 @@ const DailyScreen = ({ navigation, route }) => {
                     </View>
                   )}
 
-                  {/* 通用內容（當 practiceType 不明確時的 fallback） */}
                   {!gratitudeData.practiceType && getGratitudeContent() && (
                     <View style={[styles.contentCard, { backgroundColor: theme.light, borderColor: theme.accent }]}>
                       <View style={styles.contentCardHeader}>
@@ -912,7 +947,6 @@ const DailyScreen = ({ navigation, route }) => {
                     </View>
                   )}
 
-                  {/* 幸福感評分 */}
                   {gratitudeData.postScore !== null && (
                     <View style={[styles.resultCard, { backgroundColor: theme.light, borderColor: theme.accent }]}>
                       <View style={styles.resultCardHeader}>
@@ -963,43 +997,28 @@ const DailyScreen = ({ navigation, route }) => {
                 </View>
               )}
 
-              {/* ⭐ 切頁控制（移到內容底部） */}
               {currentDayRecords.length > 1 && (
                 <View style={styles.recordNavigatorBottom}>
-                  <TouchableOpacity 
-                    onPress={handlePrevRecord} 
+                  <TouchableOpacity
+                    onPress={handlePrevRecord}
                     disabled={currentRecordIndex === 0}
-                    style={[
-                      styles.navButtonBottom, 
-                      currentRecordIndex === 0 && styles.navButtonDisabled
-                    ]}
+                    style={[styles.navButtonBottom, currentRecordIndex === 0 && styles.navButtonDisabled]}
                     activeOpacity={0.7}
                   >
-                    <ChevronLeft 
-                      color={currentRecordIndex === 0 ? '#CBD5E1' : '#76787aff'} 
-                      size={20} 
-                      strokeWidth={2.5} 
-                    />
+                    <ChevronLeft color={currentRecordIndex === 0 ? '#CBD5E1' : '#76787aff'} size={20} strokeWidth={2.5} />
                   </TouchableOpacity>
-                  
+
                   <Text style={styles.recordCounterBottom}>
                     {currentRecordIndex + 1} / {currentDayRecords.length}
                   </Text>
-                  
-                  <TouchableOpacity 
-                    onPress={handleNextRecord} 
+
+                  <TouchableOpacity
+                    onPress={handleNextRecord}
                     disabled={currentRecordIndex === currentDayRecords.length - 1}
-                    style={[
-                      styles.navButtonBottom, 
-                      currentRecordIndex === currentDayRecords.length - 1 && styles.navButtonDisabled
-                    ]}
+                    style={[styles.navButtonBottom, currentRecordIndex === currentDayRecords.length - 1 && styles.navButtonDisabled]}
                     activeOpacity={0.7}
                   >
-                    <ChevronRight 
-                      color={currentRecordIndex === currentDayRecords.length - 1 ? '#CBD5E1' : '#76787aff'} 
-                      size={20} 
-                      strokeWidth={2.5} 
-                    />
+                    <ChevronRight color={currentRecordIndex === currentDayRecords.length - 1 ? '#CBD5E1' : '#76787aff'} size={20} strokeWidth={2.5} />
                   </TouchableOpacity>
                 </View>
               )}
@@ -1029,43 +1048,23 @@ const DailyScreen = ({ navigation, route }) => {
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         <View style={styles.statsCard}>
           <View style={styles.statsRow}>
-            {/* 本月練習次數 */}
             <View style={styles.statBoxBlue}>
-              
               <TrendingUp color="#2563EB" size={24} strokeWidth={2} />
-              
-              {/* ⭐ 數值容器（固定高度） */}
               <View style={styles.statValueContainer}>
-                <Text 
-                  style={styles.statValueBlue}
-                  numberOfLines={1}
-                  adjustsFontSizeToFit
-                  minimumFontScale={0.5}
-                >
+                <Text style={styles.statValueBlue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.5}>
                   {stats.totalPractices}
                 </Text>
               </View>
-              
               <Text style={styles.statLabel}>本月練習次數</Text>
             </View>
 
-            {/* 本月練習時間 */}
             <View style={styles.statBoxPurple}>
-              
               <Clock color="#9333EA" size={24} strokeWidth={2} />
-              
-              {/* ⭐ 數值容器（固定高度） */}
               <View style={styles.statValueContainer}>
-                <Text 
-                  style={styles.statValuePurple}
-                  numberOfLines={1}
-                  adjustsFontSizeToFit
-                  minimumFontScale={0.4}
-                >
+                <Text style={styles.statValuePurple} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.4}>
                   {formatStatsDuration(stats.totalDuration)}
                 </Text>
               </View>
-              
               <Text style={styles.statLabel}>本月練習時間</Text>
             </View>
           </View>
@@ -1083,10 +1082,10 @@ const DailyScreen = ({ navigation, route }) => {
           </View>
           <View style={styles.viewToggle}>
             <TouchableOpacity onPress={() => setViewMode('list')} style={[styles.viewToggleBtn, viewMode === 'list' && styles.viewToggleBtnActive]}>
-              <List color={viewMode === 'list' ? '#166CB5' : '#C4C4C4'} size={20} strokeWidth={2} />
+              <FileText color={viewMode === 'list' ? '#166CB5' : '#C4C4C4'} size={20} strokeWidth={2} />
             </TouchableOpacity>
             <TouchableOpacity onPress={() => setViewMode('calendar')} style={[styles.viewToggleBtn, viewMode === 'calendar' && styles.viewToggleBtnActive]}>
-              <Grid3X3 color={viewMode === 'calendar' ? '#166CB5' : '#C4C4C4'} size={20} strokeWidth={2} />
+              <CalendarIcon color={viewMode === 'calendar' ? '#166CB5' : '#C4C4C4'} size={20} strokeWidth={2} />
             </TouchableOpacity>
           </View>
         </View>
@@ -1114,12 +1113,12 @@ const DailyScreen = ({ navigation, route }) => {
               ))}
               {days.map((day, idx) => {
                 if (!day) return <View key={`e-${idx}`} style={styles.calendarDay} />;
-                const hasRecord = hasRecordOnDate(day);  // ⭐ 使用新函數
+                const hasRecord = hasRecordOnDate(day);
                 return (
-                  <TouchableOpacity 
-                    key={day} 
-                    onPress={() => handleDayClick(day)} 
-                    disabled={!hasRecord} 
+                  <TouchableOpacity
+                    key={day}
+                    onPress={() => handleDayClick(day)}
+                    disabled={!hasRecord}
                     style={styles.calendarDay}
                   >
                     <Text style={[styles.calendarDayText, hasRecord && styles.calendarDayTextActive]}>
@@ -1174,7 +1173,7 @@ const DailyScreen = ({ navigation, route }) => {
                 })}
               </View>
             ) : (
-              <View style={styles.contentCard}>
+              <View style={styles.contentCardOuter}>
                 <View style={styles.emptyContent}>
                   <CalendarIcon color="#D1D5DB" size={56} strokeWidth={1.2} />
                   <Text style={styles.emptyTitle}>本月尚無符合篩選的紀錄</Text>
@@ -1196,82 +1195,74 @@ const DailyScreen = ({ navigation, route }) => {
   );
 };
 
+// ✅ 小修正：你原本 styles 裡 contentCard 重複定義兩次，會被後者覆蓋。
+// 為避免你 list / empty 區塊被影響，我把「外層白卡」改名 contentCardOuter，其他內文卡維持 contentCard。
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F3F4F6' },
   scrollView: { flex: 1 },
-  // ==================== 統計卡片樣式 ====================
-  statsCard: { 
-    backgroundColor: '#FFFFFF', 
-    borderRadius: 20, 
-    marginHorizontal: 16, 
-    marginTop: 16, 
-    padding: 16, 
-    shadowColor: '#000', 
-    shadowOffset: { width: 0, height: 2 }, 
-    shadowOpacity: 0.06, 
-    shadowRadius: 8, 
-    elevation: 3 
+
+  statsCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    marginHorizontal: 16,
+    marginTop: 16,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 3
   },
   statsRow: { flexDirection: 'row', gap: 12 },
 
-  // 藍色卡片（本月練習次數）
-  statBoxBlue: { 
-    flex: 1, 
-    backgroundColor: '#E8F4FD', 
-    borderRadius: 16, 
-    paddingVertical: 20, 
-    paddingHorizontal: 16, 
-    alignItems: 'center', 
-    position: 'relative' 
+  statBoxBlue: {
+    flex: 1,
+    backgroundColor: '#E8F4FD',
+    borderRadius: 16,
+    paddingVertical: 20,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    position: 'relative'
   },
-
-  // 紫色卡片（本月練習時間）
-  statBoxPurple: { 
-    flex: 1, 
-    backgroundColor: '#F3E8FF', 
-    borderRadius: 16, 
-    paddingVertical: 20, 
-    paddingHorizontal: 16, 
-    alignItems: 'center', 
-    position: 'relative' 
+  statBoxPurple: {
+    flex: 1,
+    backgroundColor: '#F3E8FF',
+    borderRadius: 16,
+    paddingVertical: 20,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    position: 'relative'
   },
-
-  // ⭐ 數值容器（固定高度，關鍵！）
   statValueContainer: {
-    height: 56,              // 固定高度
-    justifyContent: 'center', // 垂直居中
-    alignItems: 'center',     // 水平居中
-    marginTop: 12,           // 與上方 ICON 的間距
-    marginBottom: 8,         // 與下方標籤的間距
-    width: '100%',           // 佔滿寬度
+    height: 56,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 12,
+    marginBottom: 8,
+    width: '100%',
   },
-
-  // 藍色數值文字
-  statValueBlue: { 
-    fontSize: 40,           // 預設字體大小
-    fontWeight: '700', 
+  statValueBlue: {
+    fontSize: 40,
+    fontWeight: '700',
     color: '#2563EB',
     textAlign: 'center',
     width: '100%',
   },
-
-  // 紫色數值文字
-  statValuePurple: { 
-    fontSize: 28,           // 預設字體大小（稍小以容納長文字）
-    fontWeight: '700', 
+  statValuePurple: {
+    fontSize: 28,
+    fontWeight: '700',
     color: '#9333EA',
     textAlign: 'center',
     width: '100%',
-    paddingHorizontal: 4,   // 左右留一點空間
+    paddingHorizontal: 4,
   },
-
-  // 標籤文字
-  statLabel: { 
-    fontSize: 13, 
-    color: '#6B7280', 
+  statLabel: {
+    fontSize: 13,
+    color: '#6B7280',
     marginTop: 4,
     textAlign: 'center',
   },
+
   monthAndToggleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginHorizontal: 16, marginTop: 16 },
   monthSelector: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF', borderRadius: 25, paddingVertical: 12, paddingHorizontal: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 4, elevation: 2 },
   monthArrow: { padding: 4 },
@@ -1279,56 +1270,61 @@ const styles = StyleSheet.create({
   viewToggle: { flexDirection: 'row', backgroundColor: '#FFFFFF', borderRadius: 12, padding: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 4, elevation: 2 },
   viewToggleBtn: { width: 40, height: 40, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   viewToggleBtnActive: { backgroundColor: '#D6EEFF' },
+
   filterScrollView: { marginTop: 12 },
   filterRow: { flexDirection: 'row', paddingHorizontal: 16, gap: 10 },
   filterPillActive: { paddingHorizontal: 24, paddingVertical: 12, borderRadius: 25, backgroundColor: '#166CB5' },
   filterPillInactive: { paddingHorizontal: 24, paddingVertical: 12, borderRadius: 25, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E7EB' },
   filterPillActiveText: { fontSize: 14, fontWeight: '600', color: '#FFFFFF' },
   filterPillInactiveText: { fontSize: 14, fontWeight: '500', color: '#6B7280' },
-  contentCard: { 
-    backgroundColor: '#FFFFFF', 
-    borderRadius: 20, 
-    marginHorizontal: 16, 
-    marginTop: 16, 
-    padding: 20, 
-    shadowColor: '#000', 
-    shadowOffset: { width: 0, height: 2 }, 
-    shadowOpacity: 0.06, 
-    shadowRadius: 8, 
-    elevation: 3 
+
+  // ✅ 外層白卡（避免原本 contentCard 重複 key）
+  contentCardOuter: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    marginHorizontal: 16,
+    marginTop: 16,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 3
   },
-  
-  // ⭐ 新增：專門給日曆用的卡片樣式
-  calendarCard: { 
-    backgroundColor: '#FFFFFF', 
-    borderRadius: 20, 
-    marginHorizontal: 16,   
-    marginTop: 16, 
-    padding: 20,               
-    shadowColor: '#000', 
-    shadowOffset: { width: 0, height: 2 }, 
-    shadowOpacity: 0.06, 
-    shadowRadius: 8, 
-    elevation: 3 
+
+  calendarCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    marginHorizontal: 16,
+    marginTop: 16,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 3
   },
+
   emptyContent: { alignItems: 'center', paddingVertical: 50 },
   emptyTitle: { fontSize: 16, color: '#9CA3AF', marginTop: 20, fontWeight: '500' },
   emptySubtitle: { fontSize: 14, color: '#D1D5DB', marginTop: 6 },
-  calendarGrid: { flexDirection: 'row', flexWrap: 'wrap' , marginHorizontal: -2 },
+
+  calendarGrid: { flexDirection: 'row', flexWrap: 'wrap', marginHorizontal: -2 },
   calendarWeekday: { width: `${100 / 7}%`, paddingVertical: 8, alignItems: 'center' },
   calendarWeekdayText: { fontSize: 13, color: '#9CA3AF', fontWeight: '600' },
-  calendarDay: { 
-    flexBasis: `${100 / 7}%`, 
-    maxWidth: `${100 / 7}%`,  
-    height: 48, 
-    alignItems: 'center', 
-    justifyContent: 'center', 
+  calendarDay: {
+    flexBasis: `${100 / 7}%`,
+    maxWidth: `${100 / 7}%`,
+    height: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
     paddingBottom: 8,
     paddingHorizontal: 0,
   },
   calendarDayText: { fontSize: 15, color: '#6B7280', fontWeight: '500' },
   calendarDayTextActive: { color: '#1F2937', fontWeight: '600' },
   calendarDot: { width: 5, height: 5, borderRadius: 2.5, backgroundColor: '#166CB5', marginTop: 4 },
+
   listContainer: { paddingHorizontal: 16, marginTop: 16 },
   recordCard: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 20, marginBottom: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 3 },
   recordHeader: { marginBottom: 6 },
@@ -1337,14 +1333,15 @@ const styles = StyleSheet.create({
   recordFooter: { flexDirection: 'row', alignItems: 'center', gap: 16 },
   recordFooterItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   recordFooterText: { fontSize: 12, color: '#9CA3AF' },
+
   modalOverlay: { flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.5)', justifyContent: 'center', alignItems: 'center', padding: 20 },
-  modalContainer: { backgroundColor: '#FFFFFF', borderRadius: 24, width: '100%',maxWidth: 360, maxHeight: '85%', position: 'relative', overflow: 'hidden' },
+  modalContainer: { backgroundColor: '#FFFFFF', borderRadius: 24, width: '100%', maxWidth: 360, maxHeight: '85%', position: 'relative', overflow: 'hidden' },
   modalTopAccent: { height: 4, width: '100%' },
   modalScrollContent: { padding: 24, paddingTop: 20 },
   modalCloseBtn: { position: 'absolute', top: 16, right: 16, zIndex: 10 },
   modalCloseBtnCircle: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#F1F5F9', justifyContent: 'center', alignItems: 'center' },
   modalHeaderSection: { alignItems: 'center', marginBottom: 16 },
-  // ⭐ 日記切頁控制（底部版本）
+
   recordNavigatorBottom: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1355,11 +1352,11 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#E2E8F0',
   },
-  reactionSubLabel: { 
-    fontSize: 12, 
-    color: '#DC2626', 
-    fontWeight: '600', 
-    marginBottom: 8 
+  reactionSubLabel: {
+    fontSize: 12,
+    color: '#DC2626',
+    fontWeight: '600',
+    marginBottom: 8
   },
   navButtonBottom: {
     flexDirection: 'row',
@@ -1370,22 +1367,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#F1F5F9',
     gap: 8,
   },
-  navButtonDisabled: {
-    opacity: 0.4,
-  },
-  navButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1c1d1eff',
-  },
-  navButtonTextDisabled: {
-    color: '#CBD5E1',
-  },
-  recordCounterBottom: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#76787aff',
-  },
+  navButtonDisabled: { opacity: 0.4 },
+  recordCounterBottom: { fontSize: 16, fontWeight: '700', color: '#76787aff' },
+
   modalTitle: { fontSize: 22, fontWeight: '700', color: '#1E293B', textAlign: 'center', marginBottom: 6, letterSpacing: 0.3 },
   modalDate: { fontSize: 14, color: '#94A3B8', textAlign: 'center', fontWeight: '500' },
   modalMetaRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 12, marginBottom: 20 },
@@ -1393,6 +1377,7 @@ const styles = StyleSheet.create({
   modalMetaText: { fontSize: 13, fontWeight: '600' },
   modalMetaTagGray: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, backgroundColor: '#F8FAFC' },
   modalMetaTextGray: { fontSize: 13, color: '#64748B', fontWeight: '500' },
+
   resultCard: { borderRadius: 16, padding: 18, marginBottom: 14, borderWidth: 1 },
   resultCardHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 14 },
   resultIconBadge: { width: 28, height: 28, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
@@ -1402,9 +1387,12 @@ const styles = StyleSheet.create({
   scoreValueBox: { flexDirection: 'row', alignItems: 'baseline' },
   scoreValue: { fontSize: 36, fontWeight: '700' },
   scoreMax: { fontSize: 16, color: '#94A3B8', marginLeft: 2 },
+
   tagsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 },
   emotionTagFilled: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 16 },
   emotionTagFilledText: { fontSize: 13, color: '#FFFFFF', fontWeight: '600' },
+
+  // 內文卡（Modal 內）
   contentCard: { borderRadius: 16, padding: 18, marginBottom: 14, borderWidth: 1 },
   contentCardHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 14 },
   contentCardTitle: { fontSize: 14, fontWeight: '600' },
@@ -1412,11 +1400,14 @@ const styles = StyleSheet.create({
   contentSubSection: { paddingTop: 14, borderTopWidth: 1, borderTopColor: 'rgba(0,0,0,0.06)' },
   contentSubLabel: { fontSize: 12, fontWeight: '600', marginBottom: 6, opacity: 0.8 },
   contentSubText: { fontSize: 14, color: '#475569', lineHeight: 22 },
+
   sectionCard: { backgroundColor: '#F8FAFC', borderRadius: 14, padding: 16, marginBottom: 12 },
   sectionLabel: { fontSize: 12, color: '#94A3B8', fontWeight: '600', marginBottom: 10 },
   sectionText: { fontSize: 15, color: '#334155', lineHeight: 24 },
+
   tagOutline: { backgroundColor: '#FFFFFF', borderWidth: 1.5, borderColor: '#E2E8F0', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 14 },
   tagOutlineText: { fontSize: 13, color: '#475569', fontWeight: '500' },
+
   abcdCard: { backgroundColor: '#F8FAFC', borderRadius: 16, padding: 16, marginBottom: 12 },
   abcdCardNegative: { backgroundColor: '#FEF2F2', borderLeftWidth: 4, borderLeftColor: '#F87171' },
   abcdCardPositive: { backgroundColor: '#ECFDF5', borderLeftWidth: 4, borderLeftColor: '#34D399' },
@@ -1425,13 +1416,17 @@ const styles = StyleSheet.create({
   abcdBadgeText: { fontSize: 12, fontWeight: '700', color: '#FFFFFF' },
   abcdLabel: { fontSize: 13, fontWeight: '600', color: '#64748B' },
   abcdContent: { fontSize: 15, color: '#334155', lineHeight: 24 },
+
   emotionTagNegative: { backgroundColor: '#FFFFFF', borderWidth: 1.5, borderColor: '#FECACA', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 14 },
   emotionTagNegativeText: { fontSize: 12, color: '#DC2626', fontWeight: '600' },
+
   transitionDivider: { flexDirection: 'row', alignItems: 'center', marginVertical: 8, paddingHorizontal: 20 },
   dividerLine: { flex: 1, height: 1, backgroundColor: '#E2E8F0' },
   transitionCircle: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#ECFDF5', justifyContent: 'center', alignItems: 'center', marginHorizontal: 12, borderWidth: 2, borderColor: '#D1FAE5' },
+
   recipientBadge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, alignSelf: 'flex-start', marginBottom: 14, gap: 6 },
   recipientText: { fontSize: 13, fontWeight: '600' },
+
   thermometerCard: { borderRadius: 16, padding: 20, marginBottom: 14, borderWidth: 1, alignItems: 'center' },
   thermometerScoreContainer: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'center', marginTop: 8, marginBottom: 20 },
   thermometerScoreBig: { fontSize: 56, fontWeight: '700', lineHeight: 64 },
