@@ -15,7 +15,6 @@
       "**/*"
     ],
     "ios": {
-      "buildNumber": "4",
       "supportsTablet": true,
       "bundleIdentifier": "com.lucidbook",
       "infoPlist": {
