@@ -132,7 +132,6 @@ const HomeScreen = ({ navigation }) => {
       gradientColors: ['#166CB5', '#31C6FE'],
       glowColor: 'rgba(49, 198, 254, 0.3)',
       progress: 0,
-      screen: 'EmotionalResiliencePlan',
       units: 4,
       totalSessions: 1,
     },
@@ -145,7 +144,6 @@ const HomeScreen = ({ navigation }) => {
       gradientColors: ['#FF8C42', '#FF6B6B'],
       glowColor: 'rgba(255, 140, 66, 0.3)',
       progress: 0,
-      screen: 'WorkplaceCommunicationPlan',
       units: 4,
       totalSessions: 1,
     },
@@ -330,7 +328,7 @@ const HomeScreen = ({ navigation }) => {
   };
 
   /**
-   * ⭐ 處理計劃卡片點擊
+   * ⭐ 處理計劃卡片點擊 - 切換分類而不是導航
    */
   const handlePlanCardPress = (plan) => {
     if (!isLoggedIn) {
@@ -338,8 +336,9 @@ const HomeScreen = ({ navigation }) => {
       return;
     }
     
-    console.log('📋 [首頁] 導航到計劃:', plan.title);
-    navigation.navigate(plan.screen);
+    console.log('📋 [首頁] 切換到分類:', plan.id);
+    // ⭐ 直接設置分類，不要導航
+    setSelectedCategory(plan.id);
   };
 
   /**
