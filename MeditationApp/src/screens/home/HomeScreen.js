@@ -70,7 +70,7 @@ const PlanCard = ({ plan, onPress }) => {
         <View style={styles.planCardFooter}>
           <View style={styles.planCardStat}>
             <Text style={[styles.planCardStatIcon, { color: dotColor }]}>●</Text>
-            <Text style={styles.planCardStatText}>{plan.units}單元 • {plan.totalSessions}練習</Text>
+            <Text style={styles.planCardStatText}>{plan.units}單元</Text>
           </View>
           <View style={styles.planCardPercentage}>
             <Text style={styles.planCardPercentageIcon}>↗</Text>
