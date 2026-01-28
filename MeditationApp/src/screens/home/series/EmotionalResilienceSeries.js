@@ -1,7 +1,11 @@
 // ==========================================
 // 檔案名稱: src/screens/home/series/EmotionalResilienceSeries.js
-// 情緒抗壓力計畫系列組件 - 修正標題格式
-// 版本: V2.0
+// 情緒抗壓力計畫系列組件
+// 版本: V3.0 - 統一使用單元完成度
+// 修正內容：
+// 1) 圓環顯示「單元完成度」而非基於 13 次的計算
+// 2) 使用後端返回的 completedUnits 和 progress
+// 3) 與首頁卡片進度保持一致
 // ==========================================
 
 import React, { useState, useEffect } from 'react';
@@ -42,6 +46,10 @@ const EmotionalResilienceSeries = ({
     gratitude: { current: 0, target: 3, label: '感恩練習' },
     thermometer: { current: 0, target: 1, label: '心情溫度計' },
   });
+
+  // ⭐ 新增：來自後端的計劃統計
+  const [planProgress, setPlanProgress] = useState(0); // 後端計算的完成百分比（基於 13 次）
+
   const [previousProgress, setPreviousProgress] = useState(0);
 
   // ========== 生命週期 ==========
@@ -64,30 +72,6 @@ const EmotionalResilienceSeries = ({
   // ========== 核心功能函數 ==========
 
   /**
-   * ⭐ 統一的完成度計算函數
-   */
-  const calculateProgress = (counts) => {
-    const targets = {
-      breathing: 3,
-      goodthings: 3,
-      abcd: 3,
-      gratitude: 3,
-      thermometer: 1,
-    };
-    
-    const totalTarget = targets.breathing + targets.goodthings + targets.abcd + targets.gratitude + targets.thermometer;
-    
-    const completed = Math.min(counts.breathing || 0, targets.breathing) +
-                     Math.min(counts.goodthings || 0, targets.goodthings) +
-                     Math.min(counts.abcd || 0, targets.abcd) +
-                     Math.min(counts.gratitude || 0, targets.gratitude) +
-                     Math.min(counts.thermometer || 0, targets.thermometer);
-    
-    const percentage = Math.round((completed / totalTarget) * 100);
-    return Math.min(percentage, 100);
-  };
-
-  /**
    * 載入首頁進度數據
    */
   const loadHomeProgress = async () => {
@@ -108,6 +92,7 @@ const EmotionalResilienceSeries = ({
 
       const categoryStats = stats.categoryStats || [];
 
+      // 讀取各項練習次數
       const breathingStat = categoryStats.find(
         c => c.type === '呼吸穩定力練習' || c.type === 'breathing'
       );
@@ -145,14 +130,19 @@ const EmotionalResilienceSeries = ({
         gratitude: gratitudeCount,
       });
 
-      const currentProgress = calculateProgress({
-        breathing: breathingCount,
-        goodthings: goodthingsCount,
-        thermometer: thermometerCount,
-        abcd: abcdCount,
-        gratitude: gratitudeCount,
-      });
+      // ⭐ 讀取後端計算的計劃進度（基於 13 次目標：3+3+3+3+1）
+      const plan = stats.plans?.['emotional-resilience'];
+      if (plan) {
+        const progress = plan.progress || 0;
 
+        setPlanProgress(progress);
+
+        console.log('📈 [情緒抗壓] 完成度:', progress, '%（基於 13 次目標）');
+      } else {
+        setPlanProgress(0);
+      }
+
+      // 更新各項目標
       setGoals(prev => ({
         ...prev,
         breathing: { ...prev.breathing, current: breathingCount },
@@ -162,12 +152,13 @@ const EmotionalResilienceSeries = ({
         gratitude: { ...prev.gratitude, current: gratitudeCount },
       }));
 
-      if (currentProgress >= 100 && previousProgress < 100) {
+      // 檢查是否達到 100%
+      if (progress >= 100 && previousProgress < 100) {
         setTimeout(() => onShowCompletionModal && onShowCompletionModal(), 500);
       }
 
-      setPreviousProgress(currentProgress);
-      console.log('📊 [計劃系列] 進度數據更新完成，完成度:', currentProgress + '%');
+      setPreviousProgress(progress);
+      console.log('📊 [計劃系列] 進度數據更新完成，完成度:', progress + '%');
     } catch (error) {
       console.error('❌ [計劃系列] 載入進度失敗:', error);
     } finally {
@@ -248,15 +239,6 @@ const EmotionalResilienceSeries = ({
     },
   ];
 
-  // ========== 計算完成度 ==========
-  const progressPercentage = calculateProgress({
-    breathing: goals.breathing.current,
-    goodthings: goals.goodthings.current,
-    abcd: goals.abcd.current,
-    gratitude: goals.gratitude.current,
-    thermometer: goals.thermometer.current,
-  });
-
   // ========== 渲染 ==========
   if (loading && isLoggedIn) {
     return (
@@ -297,7 +279,7 @@ const EmotionalResilienceSeries = ({
 
         {/* 右側：完成度 */}
         <View style={styles.progressInfo}>
-          <Text style={styles.progressNumber}>{progressPercentage}%</Text>
+          <Text style={styles.progressNumber}>{planProgress}%</Text>
           <Text style={styles.progressLabel}>完成度</Text>
         </View>
       </View>
@@ -309,7 +291,7 @@ const EmotionalResilienceSeries = ({
             colors={['#166CB5', '#31C6FE']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
-            style={[styles.progressBarFill, { width: `${progressPercentage}%` }]}
+            style={[styles.progressBarFill, { width: `${planProgress}%` }]}
           />
         </View>
       </View>
@@ -468,9 +450,9 @@ const styles = StyleSheet.create({
 
   planTitleRow: {
     flexDirection: 'row',
-    alignItems: 'center',  // ⭐ 改為 center，讓按鈕和標題垂直居中對齊
+    alignItems: 'center',
     marginBottom: 4,
-    gap: 8,  // ⭐ 添加間距
+    gap: 8,
   },
 
   planUserName: {
@@ -483,7 +465,7 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: '700',
     color: '#333333',
-    flexShrink: 1,  // ⭐ 允許標題在需要時收縮
+    flexShrink: 1,
   },
 
   // ⭐ i 按鈕（在標題右側）
@@ -495,7 +477,7 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     borderRadius: 100,
     gap: 4,
-    flexShrink: 0,  // ⭐ 不允許按鈕收縮
+    flexShrink: 0,
   },
   infoText: {
     fontSize: 10,

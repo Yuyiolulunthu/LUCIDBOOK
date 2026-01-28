@@ -255,51 +255,43 @@ const HomeScreen = ({ navigation }) => {
    */
   const loadPracticeStats = async () => {
     try {
-      console.log('📊 [首頁] 載入練習統計數據...');
+      console.log("📊 [首頁] 載入練習統計數據...");
       
       const response = await ApiService.getPracticeStats();
       
       if (response.success && response.stats) {
         const stats = response.stats;
-        const categoryStats = stats.categoryStats || [];
         
-        // 統計情緒抗壓力計畫的數據
-        const breathingStat = categoryStats.find(
-          c => c.type === '呼吸穩定力練習' || c.type === 'breathing'
-        );
-        const breathingCount = breathingStat?.sessions || 0;
+        // 情緒抗壓力
+        const emotionalPlan = stats.plans?.["emotional-resilience"];
+        const emotionalProgress = emotionalPlan?.progress || 0;
+        const emotionalSessions = emotionalPlan?.totalSessions || 0;
         
-        const goodthingsStat = categoryStats.find(
-          c => c.type === '好事書寫練習' || c.type === '好事書寫' || c.type === 'goodthings'
-        );
-        const goodthingsCount = goodthingsStat?.sessions || 0;
+        // 職場溝通力（只算內耗終止鍵）
+        const workplacePlan = stats.plans?.["workplace-communication"];
+        const workplaceProgress = workplacePlan?.progress || 0; // 最高 25%
+        const workplaceSessions = workplacePlan?.totalSessions || 0; // 實際累計次數
         
-        // 計算總完成度（假設每個模組需要 7 次練習）
-        const totalCompleted = breathingCount + goodthingsCount;
-        const totalRequired = 14; // 2個模組 x 7次
-        const progress = Math.min(Math.round((totalCompleted / totalRequired) * 100), 100);
-        
-        console.log('✅ [首頁] 練習統計:', {
-          breathing: breathingCount,
-          goodthings: goodthingsCount,
-          progress: progress,
+        console.log("✅ [首頁] 職場溝通力:", {
+          progress: workplaceProgress,
+          sessions: workplaceSessions
         });
         
         setPracticeStats({
-          'emotional-resilience': {
+          "emotional-resilience": {
             units: 4,
-            totalSessions: totalCompleted,
-            progress: progress,
+            totalSessions: emotionalSessions,
+            progress: emotionalProgress,
           },
-          'workplace-communication': {
+          "workplace-communication": {
             units: 4,
-            totalSessions: 1,
-            progress: 25,
+            totalSessions: workplaceSessions,
+            progress: workplaceProgress,
           },
         });
       }
     } catch (error) {
-      console.error('❌ [首頁] 載入練習統計失敗:', error);
+      console.error("❌ [首頁] 載入練習統計失敗:", error);
     }
   };
 

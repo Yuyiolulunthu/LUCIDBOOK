@@ -170,8 +170,11 @@ const DailyScreen = ({ navigation, route }) => {
       return isCompleted && practiceDate.getFullYear() === year && practiceDate.getMonth() === month;
     });
 
+    // ✅ 新增職場溝通力篩選
     if (selectedPlan === 'emotional') {
       filtered = filtered.filter(p => isEmotionalPlanPractice(p.practice_type));
+    } else if (selectedPlan === 'workplace') {
+      filtered = filtered.filter(p => p.practice_type?.includes('內耗'));
     }
 
     setDisplayData(filtered);
@@ -226,6 +229,26 @@ const DailyScreen = ({ navigation, route }) => {
 
   const hasRecordOnDate = (day) => {
     return getRecordsForDate(day).length > 0;
+  };
+
+  const getRecordDotColor = (day) => {
+    const records = getRecordsForDate(day);
+    if (records.length === 0) return null;
+    
+    // ✅ 按照完成時間排序，找到當天最早的練習
+    const sortedRecords = records.sort((a, b) => {
+      return new Date(a.completed_at) - new Date(b.completed_at);
+    });
+    
+    const firstRecord = sortedRecords[0];
+    
+    // 如果是內耗練習 → 橘色
+    if (firstRecord.practice_type?.includes('內耗')) {
+      return '#FF8C42';
+    }
+    
+    // 其他 → 藍色（情緒抗壓力）
+    return '#166CB5';
   };
 
   const handleDayClick = (day) => {
@@ -1187,6 +1210,13 @@ const DailyScreen = ({ navigation, route }) => {
                 <Text style={selectedPlan === 'emotional' ? styles.filterPillActiveText : styles.filterPillInactiveText}>情緒抗壓力</Text>
               </View>
             </TouchableOpacity>
+            
+            {/* ⭐ 新增職場溝通力按鈕 */}
+            <TouchableOpacity onPress={() => setSelectedPlan('workplace')} activeOpacity={0.8}>
+              <View style={selectedPlan === 'workplace' ? styles.filterPillWorkplace : styles.filterPillInactive}>
+                <Text style={selectedPlan === 'workplace' ? styles.filterPillWorkplaceText : styles.filterPillInactiveText}>職場溝通力</Text>
+              </View>
+            </TouchableOpacity>
           </View>
         </ScrollView>
 
@@ -1199,6 +1229,8 @@ const DailyScreen = ({ navigation, route }) => {
               {days.map((day, idx) => {
                 if (!day) return <View key={`e-${idx}`} style={styles.calendarDay} />;
                 const hasRecord = hasRecordOnDate(day);
+                const dotColor = getRecordDotColor(day); // ✅ 取得點點顏色
+                
                 return (
                   <TouchableOpacity
                     key={day}
@@ -1209,7 +1241,8 @@ const DailyScreen = ({ navigation, route }) => {
                     <Text style={[styles.calendarDayText, hasRecord && styles.calendarDayTextActive]}>
                       {day}
                     </Text>
-                    {hasRecord && <View style={styles.calendarDot} />}
+                    {/* ✅ 使用動態顏色 */}
+                    {hasRecord && <View style={[styles.calendarDot, { backgroundColor: dotColor }]} />}
                   </TouchableOpacity>
                 );
               })}
@@ -1235,8 +1268,8 @@ const DailyScreen = ({ navigation, route }) => {
                   const formatRecordDuration = (seconds) => {
                     const mins = Math.floor(seconds / 60);
                     const secs = seconds % 60;
-                    if (secs === 0) return `${String(mins).padStart(2, '0')}:00 分鐘`;
-                    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')} 分鐘`;
+                    if (secs === 0) return `${String(mins).padStart(2, '0')}:00 `;
+                    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')} `;
                   };
 
                   return (
@@ -1364,6 +1397,17 @@ const styles = StyleSheet.create({
   filterPillInactive: { paddingHorizontal: 24, paddingVertical: 12, borderRadius: 25, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E7EB' },
   filterPillActiveText: { fontSize: 14, fontWeight: '600', color: '#FFFFFF' },
   filterPillInactiveText: { fontSize: 14, fontWeight: '500', color: '#6B7280' },
+  filterPillWorkplace: { 
+    paddingHorizontal: 24, 
+    paddingVertical: 12, 
+    borderRadius: 25, 
+    backgroundColor: '#FF8C42' 
+  },
+  filterPillWorkplaceText: { 
+    fontSize: 14, 
+    fontWeight: '600', 
+    color: '#FFFFFF' 
+  },
 
   // ✅ 外層白卡（避免原本 contentCard 重複 key）
   contentCardOuter: {
@@ -1410,7 +1454,7 @@ const styles = StyleSheet.create({
   },
   calendarDayText: { fontSize: 15, color: '#6B7280', fontWeight: '500' },
   calendarDayTextActive: { color: '#1F2937', fontWeight: '600' },
-  calendarDot: { width: 5, height: 5, borderRadius: 2.5, backgroundColor: '#166CB5', marginTop: 4 },
+  calendarDot: { width: 5, height: 5, borderRadius: 2.5, marginTop: 4 },
 
   listContainer: { paddingHorizontal: 16, marginTop: 16 },
   recordCard: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 20, marginBottom: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 3 },

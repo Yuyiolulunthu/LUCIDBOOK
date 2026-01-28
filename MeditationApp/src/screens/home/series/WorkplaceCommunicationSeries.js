@@ -1,11 +1,11 @@
 // ==========================================
 // 檔案名稱: src/screens/home/series/WorkplaceCommunicationSeries.js
 // 職場溝通力計劃系列組件
-// 版本: V6.0 - 計畫完成度(A方案)全套修正版
-// 內容包含：
-// 1) 圓環中心顯示「完成 X%」(用後端 plans.progress)
-// 2) 顯示「單元完成數」(4 模組各最多 3 次 → 12)
-// 3) useFocusEffect：從練習頁返回自動刷新
+// 版本: V7.0 - 修正版：統一使用單元完成度
+// 修正內容：
+// 1) 圓環顯示「單元完成度」而非本週分鐘數
+// 2) 目標卡片顯示「已完成單元 / 總單元」
+// 3) 與首頁卡片進度保持一致
 // ==========================================
 
 import React, { useState, useEffect } from 'react';
@@ -30,7 +30,7 @@ import {
   ArrowRight,
 } from 'lucide-react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import ApiService from '../../../services/index'; // ⭐ API Service
+import ApiService from '../../../services/index';
 
 const PracticeModuleCard = ({ module, onStartPractice }) => {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -115,11 +115,13 @@ const WorkplaceCommunicationSeries = ({ navigation, userName }) => {
     { day: '日', duration: 0 },
   ]);
 
-  // ✅ 計畫：以「次數」為主（後端 plans.totalSessions / plans.progress）
-  const [currentProgress, setCurrentProgress] = useState(0); // 已完成次數
-  const [targetProgress] = useState(28); // ✅ 計畫目標：28 次
-  const [planPercent, setPlanPercent] = useState(0); // ✅ 圓環顯示：完成 X%
-  const [moduleCompletedTotal, setModuleCompletedTotal] = useState(0); // ✅ 4模組(各3次) → 12
+  // ⭐ 修正：圓環用單元完成度，本週目標用分鐘數
+  const [completedUnits, setCompletedUnits] = useState(0); // 已完成單元數
+  const [totalUnits] = useState(4); // 總單元數
+  const [planPercent, setPlanPercent] = useState(0); // 圓環百分比（基於單元完成度）
+  const [currentProgress, setCurrentProgress] = useState(0); // 本週累計分鐘數
+  const [targetProgress] = useState(30); // 本週目標 30 分鐘
+  const [moduleCompletedTotal, setModuleCompletedTotal] = useState(0); // 單元完成總數（最多12）
 
   const [practiceModules, setPracticeModules] = useState([
     {
@@ -185,10 +187,10 @@ const WorkplaceCommunicationSeries = ({ navigation, userName }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ⭐ 回到本頁自動刷新（從練習頁返回也會更新）
+  // ⭐ 回到本頁自動刷新
   useFocusEffect(
     React.useCallback(() => {
-      loadStatistics(true); // silent refresh
+      loadStatistics(true);
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
   );
@@ -201,7 +203,6 @@ const WorkplaceCommunicationSeries = ({ navigation, userName }) => {
   };
 
   // ⭐ 載入統計數據
-  // silent=true：不要整頁 Loading，只更新數據（回到頁面更順）
   const loadStatistics = async (silent = false) => {
     try {
       console.log('📊 [職場溝通力] 載入統計數據...');
@@ -212,28 +213,34 @@ const WorkplaceCommunicationSeries = ({ navigation, userName }) => {
       if (response?.success && response?.stats) {
         console.log('✅ [職場溝通力] 統計數據:', response.stats);
 
-        // 1️⃣ 計畫總進度（次數 + 百分比）
+        // ⭐ 修正：圓環用單元完成度，本週目標用分鐘數
         const plan = response.stats?.plans?.['workplace-communication'];
         if (plan) {
-          const totalSessions = plan.totalSessions || 0; // ✅ 後端有
-          const percent = plan.progress || 0; // ✅ 後端有
+          // 1) 圓環進度：使用後端計算的單元完成度百分比
+          const progress = plan.progress || 0; // 已完成單元 / 4
+          const units = plan.completedUnits || 0; // 已完成單元數
 
-          setCurrentProgress(totalSessions);
-          setPlanPercent(percent);
+          setPlanPercent(progress);
+          setCompletedUnits(units);
 
-          console.log('📈 [職場溝通] 已完成次數:', totalSessions);
-          console.log('📈 [職場溝通] 計畫完成度:', percent, '%');
+          // 2) 本週目標：累計分鐘數
+          const weeklyMinutes = plan.weeklyMinutes || 0;
+          setCurrentProgress(weeklyMinutes);
+
+          console.log('📈 [職場溝通] 單元完成度:', progress, '%（', units, '/', totalUnits, '單元）');
+          console.log('📈 [職場溝通] 本週分鐘數:', weeklyMinutes, '/', targetProgress, '分鐘');
         } else {
-          setCurrentProgress(0);
+          setCompletedUnits(0);
           setPlanPercent(0);
+          setCurrentProgress(0);
         }
 
-        // 2️⃣ 更新本週練習數據
+        // 更新本週練習數據
         if (response.stats.weeklyPractices) {
           processWeeklyPractices(response.stats.weeklyPractices);
         }
 
-        // 3️⃣ 更新練習模組進度（同時計算「單元完成總數 / 12」）
+        // 更新練習模組進度
         if (response.stats.categoryStats) {
           updateModuleProgress(response.stats.categoryStats);
         }
@@ -252,7 +259,6 @@ const WorkplaceCommunicationSeries = ({ navigation, userName }) => {
     try {
       const weekData = Array(7).fill(0);
 
-      // 計算本週一的日期
       const today = new Date();
       const currentDay = today.getDay();
       const mondayOffset = currentDay === 0 ? -6 : 1 - currentDay;
@@ -260,18 +266,19 @@ const WorkplaceCommunicationSeries = ({ navigation, userName }) => {
       monday.setDate(today.getDate() + mondayOffset);
       monday.setHours(0, 0, 0, 0);
 
-      weeklyPractices.forEach((practice) => {
-        const practiceDate = new Date(practice.created_at);
+      // ⭐ weeklyPractices 現在是物件格式：{ "2026-01-27": 300, "2026-01-28": 450 }
+      Object.keys(weeklyPractices).forEach((dateStr) => {
+        const practiceDate = new Date(dateStr);
         const daysDiff = Math.floor((practiceDate - monday) / (1000 * 60 * 60 * 24));
         if (daysDiff >= 0 && daysDiff < 7) {
-          weekData[daysDiff] += practice.duration || 0;
+          weekData[daysDiff] = Math.round(weeklyPractices[dateStr] / 60); // 秒轉分鐘
         }
       });
 
       const labels = ['一', '二', '三', '四', '五', '六', '日'];
       const newWeeklyProgress = weekData.map((duration, index) => ({
         day: labels[index],
-        duration: Math.round(duration),
+        duration: duration,
       }));
 
       setWeeklyProgress(newWeeklyProgress);
@@ -281,10 +288,9 @@ const WorkplaceCommunicationSeries = ({ navigation, userName }) => {
     }
   };
 
-  // ⭐ 更新練習模組進度 + 計算完成總數(最多12)
+  // ⭐ 更新練習模組進度
   const updateModuleProgress = (categoryStats) => {
     try {
-      // 先算完成總數
       let completedSum = 0;
 
       setPracticeModules((prevModules) => {
@@ -302,7 +308,7 @@ const WorkplaceCommunicationSeries = ({ navigation, userName }) => {
 
             return {
               ...module,
-              progress: `${completedSessions}/${targetSessions}`,
+              progress: `${sessions}/${targetSessions}`,
             };
           }
 
@@ -319,10 +325,8 @@ const WorkplaceCommunicationSeries = ({ navigation, userName }) => {
     }
   };
 
-  // ✅ 圓形進度：直接用後端算好的 planPercent（有保底）
-  const progressPercentage = Math.min(planPercent, 100);
-
   // 圓形進度條參數
+  const progressPercentage = Math.min(planPercent, 100);
   const size = 140;
   const strokeWidth = 16;
   const radius = (size - strokeWidth) / 2;
@@ -379,7 +383,7 @@ const WorkplaceCommunicationSeries = ({ navigation, userName }) => {
         <Text style={styles.subtitle}>幫助你提升職場溝通效率，建立良好人際關係！</Text>
       </View>
 
-      {/* 計畫目標區域 */}
+      {/* ⭐ 計畫目標區域（改為單元完成度）*/}
       <View style={styles.goalSection}>
         <View style={styles.progressCircleWrapper}>
           <Svg width={size} height={size}>
@@ -413,13 +417,12 @@ const WorkplaceCommunicationSeries = ({ navigation, userName }) => {
         </View>
 
         <View style={styles.goalCard}>
-          <Text style={styles.goalCardTitle}>計畫累積</Text>
+          <Text style={styles.goalCardTitle}>本週目標</Text>
           <View style={styles.goalNumberWrapper}>
             <Text style={styles.goalNumber}>{currentProgress}</Text>
-            <Text style={styles.goalTarget}> / {targetProgress}次</Text>
+            <Text style={styles.goalTarget}> / {targetProgress}分鐘</Text>
           </View>
-          <Text style={styles.goalEncouragement}>每完成一次練習，就完成計畫的一步！</Text>
-          <Text style={styles.goalEncouragement}>單元完成度：{moduleCompletedTotal} / 12</Text>
+          <Text style={styles.goalEncouragement}>每天7分鐘！加油！</Text>
         </View>
       </View>
 
