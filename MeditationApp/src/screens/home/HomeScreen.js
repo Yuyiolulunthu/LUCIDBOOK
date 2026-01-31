@@ -70,7 +70,10 @@ const PlanCard = ({ plan, onPress }) => {
         <View style={styles.planCardFooter}>
           <View style={styles.planCardStat}>
             <Text style={[styles.planCardStatIcon, { color: dotColor }]}>●</Text>
-            <Text style={styles.planCardStatText}>{plan.units}單元</Text>
+            {/* ⭐ 修改：優先使用 unitsDisplay，否則使用 units */}
+            <Text style={styles.planCardStatText}>
+              {plan.unitsDisplay || `${plan.units}單元`}
+            </Text>
           </View>
           <View style={styles.planCardPercentage}>
             <Text style={styles.planCardPercentageIcon}>↗</Text>
@@ -98,7 +101,7 @@ const HomeScreen = ({ navigation }) => {
   // ⭐ 練習統計數據
   const [practiceStats, setPracticeStats] = useState({
     'emotional-resilience': { units: 5, totalSessions: 1, progress: 25 },
-    'workplace-communication': { units: 6, totalSessions: 1, progress: 25 },
+    'workplace-communication': { units: 5, totalSessions: 1, progress: 25 },
   });
 
   // ========== ⭐ 完整系列配置（定義所有可能的計畫）==========
@@ -144,8 +147,9 @@ const HomeScreen = ({ navigation }) => {
       gradientColors: ['#FF8C42', '#FF6B6B'],
       glowColor: 'rgba(255, 140, 66, 0.3)',
       progress: 0,
-      units: 6,
+      units: 5,  
       totalSessions: 1,
+      unitsDisplay: '5單元.1檢測', 
     },
   ];
 
@@ -161,8 +165,8 @@ const HomeScreen = ({ navigation }) => {
       units: practiceStats[plan.id]?.units || plan.units,
       totalSessions: practiceStats[plan.id]?.totalSessions || plan.totalSessions,
       progress: practiceStats[plan.id]?.progress || plan.progress,
+      unitsDisplay: practiceStats[plan.id]?.unitsDisplay || plan.unitsDisplay,  // ⭐ 新增
     }));
-
   // ========== 生命週期 ==========
 
   useEffect(() => {
@@ -269,8 +273,8 @@ const HomeScreen = ({ navigation }) => {
         
         // 職場溝通力（只算內耗終止鍵）
         const workplacePlan = stats.plans?.["workplace-communication"];
-        const workplaceProgress = workplacePlan?.progress || 0; // 最高 25%
-        const workplaceSessions = workplacePlan?.totalSessions || 0; // 實際累計次數
+        const workplaceProgress = workplacePlan?.progress || 0;
+        const workplaceSessions = workplacePlan?.totalSessions || 0;
         
         console.log("✅ [首頁] 職場溝通力:", {
           progress: workplaceProgress,
@@ -284,9 +288,10 @@ const HomeScreen = ({ navigation }) => {
             progress: emotionalProgress,
           },
           "workplace-communication": {
-            units: 6,
+            units: 5,  // ⭐ 改成 5
             totalSessions: workplaceSessions,
             progress: workplaceProgress,
+            unitsDisplay: '5單元.1檢測',  // ⭐ 新增
           },
         });
       }
@@ -347,7 +352,7 @@ const HomeScreen = ({ navigation }) => {
               {user?.name || 'OO'}的練習計畫概覽
             </Text>
             <Text style={styles.welcomeSubtitle}>
-              今天也是訓練心裡韌勁的好日子！
+              今天也是訓練心理韌性的好日子！
             </Text>
           </View>
 
