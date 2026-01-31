@@ -307,6 +307,15 @@ const WorkplaceCommunicationPlanIntroScreen = ({ navigation }) => {
   // ⭐⭐⭐ 修改處：添加導航邏輯
   const handleStartPractice = (practiceId) => {
     console.log('🎯 [職場溝通介紹] 開始練習:', practiceId);
+
+    // ⭐ 新增：心情溫度計特殊處理
+    if (practiceId === 'mood-thermometer') {
+      navigation.navigate('EmotionThermometer', {
+        source: 'workplace-communication',
+        themeColor: 'orange'
+      });
+      return;
+    }
     
     // 找到對應的練習模組
     const practiceModule = practiceModules.find(module => module.id === practiceId);
@@ -468,7 +477,12 @@ const WorkplaceCommunicationPlanIntroScreen = ({ navigation }) => {
           ))}
           
           {/* ⭐ 心情溫度計特殊卡片 */}
-          <MoodThermometerCard module={moodThermometer} />
+          <TouchableOpacity 
+            onPress={() => handleStartPractice('mood-thermometer')}
+            activeOpacity={0.8}
+          >
+            <MoodThermometerCard module={moodThermometer} />
+          </TouchableOpacity>
         </View>
 
         {/* 底部間距 */}

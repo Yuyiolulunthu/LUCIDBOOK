@@ -1,7 +1,7 @@
 // ==========================================
 // 檔案名稱: EmotionThermometer.js
 // 心情溫度計練習 - 完整流程
-// 版本: V1.2 - 修正關閉按鈕導航至主頁
+// 版本: V1.3 - 支援雙主題（情緒抗壓力藍色 vs 職場溝通橘色）
 // ==========================================
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -58,6 +58,11 @@ const RATING_OPTIONS = [
 // ==================== 主組件 ====================
 const EmotionThermometer = ({ navigation, route }) => {
   const [currentScreen, setCurrentScreen] = useState('intro');
+  const { source, themeColor } = route?.params || {};
+  
+  // ⭐ 判斷來源：職場溝通力 or 情緒抗壓力
+  const isWorkplace = source === 'workplace-communication';
+  
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState({});
   const [showInfoModal, setShowInfoModal] = useState(false);
@@ -65,6 +70,17 @@ const EmotionThermometer = ({ navigation, route }) => {
   const [isLoading, setIsLoading] = useState(false);
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  // ⭐ 動態主題配置（根據來源）
+  const themeColors = {
+    gradient: isWorkplace 
+      ? ['#FFF4ED', '#FFE8DB']  // 職場版：橘色漸層
+      : ['#f0f9ff', '#e0f2fe'], // 情緒版：藍色漸層
+    primary: isWorkplace ? '#FF8C42' : '#0ea5e9',
+    secondary: isWorkplace ? '#FF6B35' : '#0284c7',
+    light: isWorkplace ? '#FFF7ED' : '#EFF6FF',
+    accent: isWorkplace ? '#FFE8DB' : '#DBEAFE',
+  };
 
   useEffect(() => {
     StatusBar.setBarStyle('dark-content');
@@ -87,17 +103,23 @@ const EmotionThermometer = ({ navigation, route }) => {
     }
   }, [currentScreen, currentQuestionIndex]);
 
+  // ⭐ 修改：根據來源使用不同 practice_type
   const startPractice = async () => {
     try {
-      const response = await ApiService.startPractice('心情溫度計');
+      const practiceType = isWorkplace 
+        ? '心情溫度計-職場溝通力'  // 職場版
+        : '心情溫度計';            // 情緒抗壓力版
+      
+      const response = await ApiService.startPractice(practiceType);
       const id = response.practiceId || response.practice_id;
-        if (response.success && id) {
+      
+      if (response.success && id) {
         setPracticeId(id);
-        console.log('✅ 練習已開始, ID:', id);
+        console.log('✅ 練習已開始, ID:', id, '| 類型:', practiceType);
         console.log('📋 總頁數:', response.totalPages || response.total_pages);
-        } else {
+      } else {
         console.error('❌ 無法獲取練習 ID:', response);
-        }
+      }
     } catch (error) {
       console.error('❌ 開始練習失敗:', error);
     }
@@ -227,10 +249,7 @@ const EmotionThermometer = ({ navigation, route }) => {
   };
 
   const IntroScreen = () => (
-    <LinearGradient
-      colors={['#f0f9ff', '#e0f2fe']}
-      style={styles.container}
-    >
+    <LinearGradient colors={themeColors.gradient} style={styles.gradientBg}>
       <TouchableOpacity style={styles.closeButton} onPress={handleHomeNavigation}>
         <View style={styles.closeButtonInner}>
           <X size={20} color="#64748b" />
@@ -241,8 +260,8 @@ const EmotionThermometer = ({ navigation, route }) => {
         style={styles.infoButton} 
         onPress={() => setShowInfoModal(true)}
       >
-        <HelpCircle size={16} color="#0ea5e9" />
-        <Text style={styles.infoButtonText}>為什麼要做這個練習?</Text>
+        <HelpCircle size={16} color={themeColors.primary} />
+        <Text style={[styles.infoButtonText, { color: themeColors.primary }]}>為什麼要做這個練習?</Text>
       </TouchableOpacity>
 
       <ScrollView 
@@ -250,7 +269,7 @@ const EmotionThermometer = ({ navigation, route }) => {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.iconContainer}>
-          <Activity size={64} color="#0ea5e9" strokeWidth={2} />
+          <Activity size={64} color={themeColors.primary} strokeWidth={2} />
         </View>
 
         <Text style={styles.title}>情緒檢測</Text>
@@ -260,21 +279,21 @@ const EmotionThermometer = ({ navigation, route }) => {
           <Text style={styles.instructionText}>
             請回想在最近一星期中(包括今天)，以下問題使您感到困擾的程度，根據你的真實感受進行評分。
           </Text>
-          <Text style={styles.instructionNote}>
+          <Text style={[styles.instructionNote, { color: themeColors.primary }]}>
             * 這不是診斷，而是自我照顧的第一步。
           </Text>
         </View>
 
         <TouchableOpacity 
-            style={styles.startButton} 
-            onPress={() => setCurrentScreen('questionnaire')}
-            >
-            <LinearGradient
-                colors={['#0ea5e9', '#0ea5e9']}
-                style={styles.startButtonGradient}
-            >
-                <Text style={styles.startButtonText}>開始檢測</Text>
-            </LinearGradient>
+          style={styles.startButton} 
+          onPress={() => setCurrentScreen('questionnaire')}
+        >
+          <LinearGradient
+            colors={[themeColors.primary, themeColors.primary]}
+            style={styles.startButtonGradient}
+          >
+            <Text style={styles.startButtonText}>開始檢測</Text>
+          </LinearGradient>
         </TouchableOpacity>
       </ScrollView>
 
@@ -288,10 +307,16 @@ const EmotionThermometer = ({ navigation, route }) => {
     const currentAnswer = answers[currentQuestion.id];
 
     return (
-      <View style={[
-        styles.container, 
-        { backgroundColor: isRiskQuestion ? '#1e293b' : '#f8fafc' }
-      ]}>
+      <LinearGradient 
+        colors={
+          isRiskQuestion 
+            ? ['#1e293b', '#1e293b']  // ⭐ 風險題：深色（兩個版本都一樣）
+            : isWorkplace 
+            ? themeColors.gradient  // 職場版：橘色漸層
+            : ['#f8fafc', '#f8fafc']  // 情緒版一般題：淺色
+        }
+        style={styles.container}
+      >
         <View style={styles.questionHeader}>
           <TouchableOpacity onPress={handleBack} style={styles.backButton}>
             <ChevronLeft 
@@ -319,13 +344,13 @@ const EmotionThermometer = ({ navigation, route }) => {
               <View style={[
                 styles.questionTag,
                 { 
-                  backgroundColor: isRiskQuestion ? 'rgba(244, 63, 94, 0.2)' : '#eff6ff',
+                  backgroundColor: isRiskQuestion ? 'rgba(244, 63, 94, 0.2)' : themeColors.light,
                 }
               ]}>
                 {isRiskQuestion && <HeartHandshake size={12} color="#fecaca" />}
                 <Text style={[
                   styles.questionTagText,
-                  { color: isRiskQuestion ? '#fecaca' : '#0ea5e9' }
+                  { color: isRiskQuestion ? '#fecaca' : themeColors.primary }
                 ]}>
                   {currentQuestion.title}
                 </Text>
@@ -390,7 +415,7 @@ const EmotionThermometer = ({ navigation, route }) => {
           <TouchableOpacity 
             style={[
               styles.nextButton,
-              { backgroundColor: isRiskQuestion ? '#fff' : '#0ea5e9' }
+              { backgroundColor: isRiskQuestion ? '#fff' : themeColors.primary }
             ]}
             onPress={() => {
               if (currentQuestionIndex < QUESTIONS.length - 1) {
@@ -406,7 +431,7 @@ const EmotionThermometer = ({ navigation, route }) => {
             />
           </TouchableOpacity>
         )}
-      </View>
+      </LinearGradient>
     );
   };
 
@@ -435,13 +460,13 @@ const EmotionThermometer = ({ navigation, route }) => {
           gradient: ['#f0f9ff', '#fff7ed'],
           textMain: '#1e293b',
           textSub: '#64748b',
-          highlight: '#0ea5e9',
+          highlight: themeColors.primary,
           scoreBg: '#fdfbf4ff',
           mascot: '🌤️',
         };
 
     return (
-      <LinearGradient colors={theme.gradient} style={styles.container}>
+      <LinearGradient colors={themeColors.gradient} style={styles.gradientBg}>
         <ScrollView 
           contentContainerStyle={styles.resultScrollContent}
           showsVerticalScrollIndicator={false}
@@ -498,8 +523,8 @@ const EmotionThermometer = ({ navigation, route }) => {
                     icon={Wind}
                     title="呼吸練習"
                     description="平靜放鬆身心"
-                    color="#0ea5e9"
-                    bgColor="#eff6ff"
+                    color={themeColors.primary}
+                    bgColor={themeColors.light}
                     onPress={() => {
                       navigation.navigate('PracticeNavigator', {
                         practiceType: '呼吸穩定力練習',
@@ -540,16 +565,16 @@ const EmotionThermometer = ({ navigation, route }) => {
               style={styles.completeButton}
               onPress={handleHomeNavigation}
             >
-                <LinearGradient
-                    colors={
-                        isLowScore
-                        ? ['#0d9488', '#0d9488']
-                        : ['#0ea5e9', '#0ea5e9']
-                    }
-                    style={styles.completeButtonGradient}
-                    >
-                    <Text style={styles.completeButtonText}>回到首頁</Text>
-                </LinearGradient>
+              <LinearGradient
+                colors={
+                  isLowScore
+                    ? ['#0d9488', '#0d9488']
+                    : [themeColors.primary, themeColors.primary]
+                }
+                style={styles.completeButtonGradient}
+              >
+                <Text style={styles.completeButtonText}>回到首頁</Text>
+              </LinearGradient>
             </TouchableOpacity>
           </View>
         </ScrollView>
@@ -572,106 +597,105 @@ const EmotionThermometer = ({ navigation, route }) => {
     };
 
     const handleMapSearch = async () => {
-        // ✅ 步驟 1：請求定位權限
-        Alert.alert(
-            '需要您的位置',
-            '我們需要取得您的位置以搜尋附近的心理諮商所',
-            [
-            {
-                text: '取消',
-                style: 'cancel',
-            },
-            {
-                text: '允許',
-                onPress: async () => {
-                try {
-                    // ✅ 步驟 2：嘗試取得當前位置
-                    if (Platform.OS === 'web') {
-                    // Web 版本：使用瀏覽器 Geolocation API
-                    if (navigator.geolocation) {
-                        navigator.geolocation.getCurrentPosition(
-                        (position) => {
-                            const { latitude, longitude } = position.coords;
-                            openGoogleMaps(latitude, longitude);
-                        },
-                        (error) => {
-                            console.error('定位錯誤:', error);
-                            // 定位失敗，使用預設搜尋
-                            openGoogleMapsWithoutLocation();
-                        }
-                        );
-                    } else {
-                        // 瀏覽器不支援定位
-                        openGoogleMapsWithoutLocation();
-                    }
-                    } else {
-                    // 暫時使用不帶定位的搜尋
-                    openGoogleMapsWithoutLocation();
-                    const { status } = await Location.requestForegroundPermissionsAsync();
-                    if (status === 'granted') {
-                        const location = await Location.getCurrentPositionAsync({});
-                        const { latitude, longitude } = location.coords;
+      // ✅ 步驟 1：請求定位權限
+      Alert.alert(
+        '需要您的位置',
+        '我們需要取得您的位置以搜尋附近的心理諮商所',
+        [
+          {
+            text: '取消',
+            style: 'cancel',
+          },
+          {
+            text: '允許',
+            onPress: async () => {
+              try {
+                // ✅ 步驟 2：嘗試取得當前位置
+                if (Platform.OS === 'web') {
+                  // Web 版本：使用瀏覽器 Geolocation API
+                  if (navigator.geolocation) {
+                    navigator.geolocation.getCurrentPosition(
+                      (position) => {
+                        const { latitude, longitude } = position.coords;
                         openGoogleMaps(latitude, longitude);
-                    } else {
+                      },
+                      (error) => {
+                        console.error('定位錯誤:', error);
+                        // 定位失敗，使用預設搜尋
                         openGoogleMapsWithoutLocation();
-                    }
-                    }
-                } catch (error) {
-                    console.error('取得位置失敗:', error);
+                      }
+                    );
+                  } else {
+                    // 瀏覽器不支援定位
                     openGoogleMapsWithoutLocation();
+                  }
+                } else {
+                  // 暫時使用不帶定位的搜尋
+                  openGoogleMapsWithoutLocation();
+                  const { status } = await Location.requestForegroundPermissionsAsync();
+                  if (status === 'granted') {
+                    const location = await Location.getCurrentPositionAsync({});
+                    const { latitude, longitude } = location.coords;
+                    openGoogleMaps(latitude, longitude);
+                  } else {
+                    openGoogleMapsWithoutLocation();
+                  }
                 }
-                },
+              } catch (error) {
+                console.error('取得位置失敗:', error);
+                openGoogleMapsWithoutLocation();
+              }
             },
-            ]
-        );
-        };
+          },
+        ]
+      );
+    };
 
-        // ✅ 輔助函數：使用定位開啟 Google Maps
-        const openGoogleMaps = async (latitude, longitude) => {
-        try {
-            const searchQuery = '心理諮商所';
-            let url;
-            
-            if (Platform.OS === 'ios') {
-                // iOS: 直接使用 Google Maps 網頁版
-                url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(searchQuery)}&center=${latitude},${longitude}`;
-            } else {
-                // Android: 使用 geo URI scheme
-                url = `geo:${latitude},${longitude}?q=${encodeURIComponent(searchQuery)}`;
-            }
-            
-            console.log('🗺️ 開啟 Google Maps:', url);
-            await Linking.openURL(url);
-        } catch (err) {
-            console.error('開啟地圖錯誤:', err);
-            // 最終備用方案
-            try {
-                const fallbackUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent('心理諮商所')}`;
-                await Linking.openURL(fallbackUrl);
-            } catch (backupError) {
-                Alert.alert('錯誤', '無法開啟地圖應用程式');
-            }
+    // ✅ 輔助函數：使用定位開啟 Google Maps
+    const openGoogleMaps = async (latitude, longitude) => {
+      try {
+        const searchQuery = '心理諮商所';
+        let url;
+        
+        if (Platform.OS === 'ios') {
+          // iOS: 直接使用 Google Maps 網頁版
+          url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(searchQuery)}&center=${latitude},${longitude}`;
+        } else {
+          // Android: 使用 geo URI scheme
+          url = `geo:${latitude},${longitude}?q=${encodeURIComponent(searchQuery)}`;
         }
-        };
+        
+        console.log('🗺️ 開啟 Google Maps:', url);
+        await Linking.openURL(url);
+      } catch (err) {
+        console.error('開啟地圖錯誤:', err);
+        // 最終備用方案
+        try {
+          const fallbackUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent('心理諮商所')}`;
+          await Linking.openURL(fallbackUrl);
+        } catch (backupError) {
+          Alert.alert('錯誤', '無法開啟地圖應用程式');
+        }
+      }
+    };
 
-        // ✅ 輔助函數：不使用定位開啟 Google Maps
-        const openGoogleMapsWithoutLocation = async () => {
-        try {
-            const searchQuery = '心理諮商所';
-            // 統一使用 Google Maps 網頁版
-            const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(searchQuery)}`;
-            
-            console.log('🗺️ 開啟 Google Maps（無定位）:', url);
-            await Linking.openURL(url);
-        } catch (err) {
-            console.error('開啟地圖錯誤:', err);
-            Alert.alert('錯誤', '無法開啟地圖應用程式');
-        }
-        };
+    // ✅ 輔助函數：不使用定位開啟 Google Maps
+    const openGoogleMapsWithoutLocation = async () => {
+      try {
+        const searchQuery = '心理諮商所';
+        // 統一使用 Google Maps 網頁版
+        const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(searchQuery)}`;
+        
+        console.log('🗺️ 開啟 Google Maps（無定位）:', url);
+        await Linking.openURL(url);
+      } catch (err) {
+        console.error('開啟地圖錯誤:', err);
+        Alert.alert('錯誤', '無法開啟地圖應用程式');
+      }
+    };
 
     return (
       <View style={styles.safetyContainer}>
-
         <ScrollView 
           contentContainerStyle={styles.safetyScrollContent}
           showsVerticalScrollIndicator={false}
@@ -756,7 +780,7 @@ const EmotionThermometer = ({ navigation, route }) => {
             透過定期追蹤，你可以更敏銳地覺察情緒變化，並在需要時及時採取行動，照顧自己的心理健康。
           </Text>
           <TouchableOpacity 
-            style={styles.modalButton}
+            style={[styles.modalButton, { backgroundColor: themeColors.primary }]}
             onPress={() => setShowInfoModal(false)}
           >
             <Text style={styles.modalButtonText}>了解了</Text>
@@ -838,17 +862,21 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  gradientBg: {
+    flex: 1,
+  },
   scrollContent: {
     flexGrow: 1,
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 24,
-    paddingVertical: 60,
+    paddingTop: 100,  // ⭐ 修改：增加頂部間距
+    paddingBottom: 60,
   },
 
   closeButton: {
     position: 'absolute',
-    top: 48,
+    top: Platform.OS === 'ios' ? 50 : 40,  // ⭐ 修改：調整 iOS/Android 定位
     left: 24,
     zIndex: 20,
   },
@@ -865,7 +893,7 @@ const styles = StyleSheet.create({
 
   infoButton: {
     position: 'absolute',
-    top: 49,
+    top: Platform.OS === 'ios' ? 51 : 41,  // ⭐ 修改：調整 iOS/Android 定位
     right: 24,
     zIndex: 20,
     backgroundColor: '#FFFFFF',
@@ -879,7 +907,6 @@ const styles = StyleSheet.create({
     borderColor: '#dbeafe',
   },
   infoButtonText: {
-    color: '#0ea5e9',
     fontSize: 14,
     fontWeight: '700',
   },
@@ -925,7 +952,6 @@ const styles = StyleSheet.create({
   },
   instructionNote: {
     fontSize: 12,
-    color: '#0ea5e9',
     fontWeight: '500',
     textAlign: 'center',
   },
@@ -955,7 +981,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 24,
-    paddingTop: 48,
+    paddingTop: Platform.OS === 'ios' ? 60 : 50,  // ⭐ 修改：增加頂部間距
     paddingBottom: 16,
   },
   backButton: {
@@ -1054,7 +1080,8 @@ const styles = StyleSheet.create({
   resultScrollContent: {
     flexGrow: 1,
     paddingHorizontal: 16,
-    paddingVertical: 24,
+    paddingTop: Platform.OS === 'ios' ? 80 : 60,  // ⭐ 修改：增加頂部間距
+    paddingBottom: 24,
     justifyContent: 'center',
   },
   resultCard: {
@@ -1212,7 +1239,7 @@ const styles = StyleSheet.create({
   safetyScrollContent: {
     flexGrow: 1,
     paddingHorizontal: 16,
-    paddingTop: 64,
+    paddingTop: Platform.OS === 'ios' ? 80 : 64,  // ⭐ 修改：增加頂部間距
     paddingBottom: 32,
   },
 
@@ -1387,7 +1414,6 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   modalButton: {
-    backgroundColor: '#0ea5e9',
     borderRadius: 12,
     paddingVertical: 12,
     alignItems: 'center',

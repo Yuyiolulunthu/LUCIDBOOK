@@ -72,6 +72,8 @@ const PLAN_CATEGORIES = {
 };
 
 const EMOTIONAL_PLAN_TYPES = ['呼吸', '好事', '思維', '感恩', '心情溫度計', '4-6', '屏息', '感謝信', '如果練習'];
+const WORKPLACE_PLAN_TYPES = [
+  '內耗終止鍵', '內耗覺察', '同理讀心術', '溝通轉譯器', '理智回穩力', '心情溫度計-職場溝通力'];
 
 const DailyScreen = ({ navigation, route }) => {
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -157,7 +159,18 @@ const DailyScreen = ({ navigation, route }) => {
 
   const isEmotionalPlanPractice = (practiceType) => {
     if (!practiceType) return false;
+    
+    // ⭐ 排除職場溝通力的心情溫度計
+    if (practiceType.includes('心情溫度計-職場溝通力')) {
+      return false;
+    }
+    
     return EMOTIONAL_PLAN_TYPES.some(type => practiceType.includes(type));
+  };
+
+  const isWorkplacePlanPractice = (practiceType) => {
+    if (!practiceType) return false;
+    return WORKPLACE_PLAN_TYPES.some(type => practiceType.includes(type));
   };
 
   const filterDataForCurrentMonth = (practices) => {
@@ -170,11 +183,11 @@ const DailyScreen = ({ navigation, route }) => {
       return isCompleted && practiceDate.getFullYear() === year && practiceDate.getMonth() === month;
     });
 
-    // ✅ 新增職場溝通力篩選
+    // ✅ 修改職場溝通力篩選（替換原有的 workplace 判斷）
     if (selectedPlan === 'emotional') {
       filtered = filtered.filter(p => isEmotionalPlanPractice(p.practice_type));
     } else if (selectedPlan === 'workplace') {
-      filtered = filtered.filter(p => p.practice_type?.includes('內耗'));
+      filtered = filtered.filter(p => isWorkplacePlanPractice(p.practice_type));
     }
 
     setDisplayData(filtered);
@@ -235,20 +248,18 @@ const DailyScreen = ({ navigation, route }) => {
     const records = getRecordsForDate(day);
     if (records.length === 0) return null;
     
-    // ✅ 按照完成時間排序，找到當天最早的練習
     const sortedRecords = records.sort((a, b) => {
       return new Date(a.completed_at) - new Date(b.completed_at);
     });
     
     const firstRecord = sortedRecords[0];
     
-    // 如果是內耗練習 → 橘色
-    if (firstRecord.practice_type?.includes('內耗')) {
-      return '#FF8C42';
+    // ⭐ 職場溝通力判斷（包含心情溫度計職場版）
+    if (isWorkplacePlanPractice(firstRecord.practice_type)) {
+      return '#FF8C42';  // 橘色
     }
     
-    // 其他 → 藍色（情緒抗壓力）
-    return '#166CB5';
+    return '#166CB5';  // 藍色
   };
 
   const handleDayClick = (day) => {
@@ -299,6 +310,15 @@ const DailyScreen = ({ navigation, route }) => {
 
   const getPlanName = (type) => {
     return '情緒抗壓力';
+  };
+
+  // ⭐ 新增：處理顯示名稱
+  const getDisplayPracticeName = (practiceType) => {
+    // 兩種心情溫度計都顯示「心情溫度計」
+    if (practiceType?.includes('心情溫度計')) {
+      return '心情溫度計';
+    }
+    return practiceType;
   };
 
   const extractBreathingData = (practice) => {
@@ -633,11 +653,34 @@ const DailyScreen = ({ navigation, route }) => {
           gradient: ['#FF8C42', '#FF6B6B'] 
         };
       }
+      
+      // ⭐ 心情溫度計：根據來源使用不同主題
+      if (isMoodThermometer) {
+        const isWorkplaceMoodThermometer = selectedPractice.practice_type?.includes('職場溝通力');
+        
+        if (isWorkplaceMoodThermometer) {
+          // 職場溝通力版本 → 橘色主題
+          return { 
+            primary: '#FF8C42', 
+            light: '#FFF7ED', 
+            accent: '#FFE8DB', 
+            gradient: ['#FF8C42', '#FF6B6B'] 
+          };
+        }
+        
+        // 情緒抗壓力版本 → 紫色主題
+        return { 
+          primary: '#8B5CF6', 
+          light: '#F5F3FF', 
+          accent: '#EDE9FE', 
+          gradient: ['#8B5CF6', '#A78BFA'] 
+        };
+      }
+      
       if (isCognitive) return { primary: '#3B82F6', light: '#EFF6FF', accent: '#DBEAFE', gradient: ['#3B82F6', '#60A5FA'] };
       if (isGratitude) return { primary: '#EC4899', light: '#FDF2F8', accent: '#FCE7F3', gradient: ['#EC4899', '#F472B6'] };
       if (isBreathing) return { primary: '#10B981', light: '#ECFDF5', accent: '#D1FAE5', gradient: ['#10B981', '#34D399'] };
       if (isGoodThings) return { primary: '#F59E0B', light: '#FFFBEB', accent: '#FEF3C7', gradient: ['#F59E0B', '#FBBF24'] };
-      if (isMoodThermometer) return { primary: '#8B5CF6', light: '#F5F3FF', accent: '#EDE9FE', gradient: ['#8B5CF6', '#A78BFA'] };
       return { primary: '#166CB5', light: '#EBF5FF', accent: '#DBEAFE', gradient: ['#166CB5', '#3B82F6'] };
     };
 
@@ -658,7 +701,14 @@ const DailyScreen = ({ navigation, route }) => {
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.modalScrollContent}>
               <View style={styles.modalHeaderSection}>
                 <Text style={styles.modalTitle}>
-                  {isCognitive ? (selectedPractice.practice_type?.includes('內耗') ? '內耗練習' : '思維調節') : isGratitude ? getGratitudeTitle() : selectedPractice.practice_type}
+                  {isCognitive 
+                    ? (selectedPractice.practice_type?.includes('內耗') ? '內耗練習' : '思維調節') 
+                    : isGratitude 
+                    ? getGratitudeTitle() 
+                    : isMoodThermometer && selectedPractice.practice_type?.includes('職場溝通力')
+                    ? '心情溫度計'  // ⭐ 職場版也只顯示「心情溫度計」
+                    : selectedPractice.practice_type
+                  }
                 </Text>
                 <Text style={styles.modalDate}>{formatModalDate(selectedPractice.completed_at)}</Text>
               </View>
@@ -1091,7 +1141,11 @@ const DailyScreen = ({ navigation, route }) => {
                   <View style={styles.thermometerBarWrapper}>
                     <View style={styles.thermometerBarBg}>
                       <LinearGradient
-                        colors={['#93C5FD', '#A78BFA', '#F472B6']}
+                        colors={
+                          selectedPractice.practice_type?.includes('職場溝通力')
+                            ? ['#dd996f', '#ff3835', '#f97313']  // ⭐ 職場版：橘色系漸層
+                            : ['#93C5FD', '#A78BFA', '#F472B6']  // 情緒版：紫色系漸層
+                        }
                         start={{ x: 0, y: 0 }}
                         end={{ x: 1, y: 0 }}
                         style={[styles.thermometerBarFill, { width: `${Math.min(((emotionThermometerData.totalScore ?? 0) / 20) * 100, 100)}%` }]}
@@ -1275,7 +1329,7 @@ const DailyScreen = ({ navigation, route }) => {
                   return (
                     <TouchableOpacity key={index} style={styles.recordCard} onPress={() => openDetailModal(record)} activeOpacity={0.7}>
                       <View style={styles.recordHeader}><Text style={styles.recordDate}>{formatRecordDate(record.completed_at)}</Text></View>
-                      <Text style={styles.recordTitle}>{record.practice_type}</Text>
+                      <Text style={styles.recordTitle}>{getDisplayPracticeName(record.practice_type)}</Text>
                       <View style={styles.recordFooter}>
                         <View style={styles.recordFooterItem}>
                           <Clock color="#9CA3AF" size={14} strokeWidth={1.5} />
@@ -1284,7 +1338,7 @@ const DailyScreen = ({ navigation, route }) => {
                         <View style={styles.recordFooterItem}>
                           <FileText color="#9CA3AF" size={14} strokeWidth={1.5} />
                           <Text style={styles.recordFooterText}>
-                            {record.practice_type?.includes('內耗') ? '職場溝通力' : planName}
+                            {isWorkplacePlanPractice(record.practice_type) ? '職場溝通力' : planName}
                           </Text>
                         </View>
                       </View>

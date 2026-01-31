@@ -361,6 +361,14 @@ const WorkplaceCommunicationSeries = ({ navigation, userName }) => {
   const handleStartPractice = (practiceId) => {
     console.log('🎯 [職場溝通] 開始練習:', practiceId);
 
+    // ⭐ 新增：心情溫度計特殊處理
+    if (practiceId === 'mood-thermometer') {
+      navigation.navigate('EmotionThermometer', {
+        source: 'workplace-communication',
+        themeColor: 'orange'
+      });
+      return;
+    }
     const practiceModule = practiceModules.find((module) => module.id === practiceId);
 
     if (!practiceModule) {
@@ -494,7 +502,12 @@ const WorkplaceCommunicationSeries = ({ navigation, userName }) => {
         ))}
         
         {/* ⭐ 心情溫度計特殊卡片 */}
-        <MoodThermometerCard module={moodThermometer} />
+        <TouchableOpacity 
+          onPress={() => handleStartPractice('mood-thermometer')}
+          activeOpacity={0.8}
+        >
+          <MoodThermometerCard module={moodThermometer} />
+        </TouchableOpacity>
       </View>
 
       <View style={styles.bottomPadding} />
