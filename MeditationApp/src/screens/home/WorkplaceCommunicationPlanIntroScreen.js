@@ -14,6 +14,8 @@ import {
   StatusBar,
   Image,
   Animated,
+  Thermometer, 
+  RefreshCw, 
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { 
@@ -120,6 +122,23 @@ const PracticeModuleCard = ({ module, onStartPractice }) => {
   );
 };
 
+// ⭐ 心情溫度計卡片組件
+const MoodThermometerCard = ({ module }) => {
+  const Icon = module.icon;
+
+  return (
+    <View style={styles.moodCard}>
+      <View style={[styles.moodIconContainer, { backgroundColor: module.iconBg }]}>
+        <Icon color={module.iconColor} size={24} strokeWidth={2} />
+      </View>
+      <View style={styles.moodContent}>
+        <Text style={styles.moodTitle}>{module.title}</Text>
+        <Text style={styles.moodDescription}>{module.description}</Text>
+      </View>
+    </View>
+  );
+};
+
 // ==========================================
 // 主組件
 // ==========================================
@@ -213,6 +232,30 @@ const WorkplaceCommunicationPlanIntroScreen = ({ navigation }) => {
   // 練習單元
   const practiceModules = [
     {
+      id: 'emotional-resilience',
+      title: '理智回穩力',
+      icon: Snowflake,
+      iconBg: '#FFF5E6',
+      iconColor: '#FF8C42',
+      duration: '4分鐘',
+      progress: '0/3',
+      tags: ['理智斷線', '情緒降溫', '憤怒難耐'],
+      description: '當你覺得憤怒焦慮、理智快要斷掉，或是被激怒，想立刻反擊的時候，先進來靜靜吧',
+      screen: null,
+    },
+    {
+      id: 'internal-observation',
+      title: '內耗覺察',
+      icon: RefreshCw,
+      iconBg: '#F3E8FF',
+      iconColor: '#A855F7',
+      duration: '5分鐘',
+      progress: '0/3',
+      tags: ['焦慮', '自我覺察', '辨識需求'],
+      description: '當他人的反應令你內耗不適,或是懷疑自己被針對,陷入焦慮,那麼這個練習很適合你一探究竟',
+      screen: null,
+    },
+    {
       id: 'stop-internal-friction',
       title: '內耗終止鍵',
       icon: RotateCcw,
@@ -221,8 +264,8 @@ const WorkplaceCommunicationPlanIntroScreen = ({ navigation }) => {
       duration: '5分鐘',
       progress: '0/3',
       tags: ['焦慮', '在乎他人反應', '情緒調節力'],
-      description: '當他人的反應令你內耗不適，或是懷疑自己被針對，陷入焦慮，那麼這個練習很適合你一探究竟',
-      screen: 'InternalConflictPractice', // ⭐ 添加 screen 屬性
+      description: '當他人的反應令你內耗不適,或是懷疑自己被針對,陷入焦慮,那麼這個練習很適合你一探究竟',
+      screen: 'InternalConflictPractice',
     },
     {
       id: 'empathy-mind-reading',
@@ -233,8 +276,8 @@ const WorkplaceCommunicationPlanIntroScreen = ({ navigation }) => {
       duration: '7分鐘',
       progress: '0/3',
       tags: ['關係卡關', '覺得被針對', '同理心', '關係提升'],
-      description: '如果因為他人的反應而感到難受，或是想要敞下敵意，修復與對方的關係，請點擊練習',
-      screen: null, // 暫未開放
+      description: '如果因為他人的反應而感到難受,或是想要放下敵意,修復與對方的關係,請點擊練習',
+      screen: null,
     },
     {
       id: 'communication-translator',
@@ -248,19 +291,18 @@ const WorkplaceCommunicationPlanIntroScreen = ({ navigation }) => {
       description: '覺得委屈卻又不知道如何開口嗎？想提要求卻又怕與人起衝突？來這裡就對了',
       screen: null,
     },
-    {
-      id: 'emotional-resilience',
-      title: '理智回穩力',
-      icon: Snowflake,
-      iconBg: '#DBEAFE',
-      iconColor: '#3B82F6',
-      duration: '4分鐘',
-      progress: '0/3',
-      tags: ['理智斷線', '情緒降溫', '憤怒難耐'],
-      description: '當你覺得情緒焦慮、理智快要斷掉，或是被激怒、想立刻反擊的時候，先進來靜靜吧',
-      screen: null,
-    },
   ];
+
+  // ⭐ 心情溫度計（特殊卡片）
+  const moodThermometer = {
+    id: 'mood-thermometer',
+    title: '心情溫度計',
+    icon: Thermometer,
+    iconBg: '#FEE2E2',
+    iconColor: '#EF4444',
+    description: '用1分鐘快速瞭解自己的情緒狀態',
+  };
+
 
   // ⭐⭐⭐ 修改處：添加導航邏輯
   const handleStartPractice = (practiceId) => {
@@ -424,6 +466,9 @@ const WorkplaceCommunicationPlanIntroScreen = ({ navigation }) => {
               onStartPractice={handleStartPractice}
             />
           ))}
+          
+          {/* ⭐ 心情溫度計特殊卡片 */}
+          <MoodThermometerCard module={moodThermometer} />
         </View>
 
         {/* 底部間距 */}
@@ -692,7 +737,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     padding: 20,
     marginBottom: 20,
-    minHeight: 200,
+    minHeight: 220,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
@@ -832,6 +877,43 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
     color: '#FF8C42',
+  },
+
+  // ⭐ 心情溫度計卡片樣式
+  moodCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  moodIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  moodContent: {
+    flex: 1,
+  },
+  moodTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 4,
+  },
+  moodDescription: {
+    fontSize: 13,
+    color: '#6B7280',
+    lineHeight: 20,
   },
 
   // 底部間距

@@ -97,8 +97,8 @@ const HomeScreen = ({ navigation }) => {
   
   // ⭐ 練習統計數據
   const [practiceStats, setPracticeStats] = useState({
-    'emotional-resilience': { units: 4, totalSessions: 1, progress: 25 },
-    'workplace-communication': { units: 4, totalSessions: 1, progress: 25 },
+    'emotional-resilience': { units: 5, totalSessions: 1, progress: 25 },
+    'workplace-communication': { units: 6, totalSessions: 1, progress: 25 },
   });
 
   // ========== ⭐ 完整系列配置（定義所有可能的計畫）==========
@@ -132,7 +132,7 @@ const HomeScreen = ({ navigation }) => {
       gradientColors: ['#166CB5', '#31C6FE'],
       glowColor: 'rgba(49, 198, 254, 0.3)',
       progress: 0,
-      units: 4,
+      units: 5,
       totalSessions: 1,
     },
     {
@@ -144,7 +144,7 @@ const HomeScreen = ({ navigation }) => {
       gradientColors: ['#FF8C42', '#FF6B6B'],
       glowColor: 'rgba(255, 140, 66, 0.3)',
       progress: 0,
-      units: 4,
+      units: 6,
       totalSessions: 1,
     },
   ];
@@ -279,12 +279,12 @@ const HomeScreen = ({ navigation }) => {
         
         setPracticeStats({
           "emotional-resilience": {
-            units: 4,
+            units: 5,
             totalSessions: emotionalSessions,
             progress: emotionalProgress,
           },
           "workplace-communication": {
-            units: 4,
+            units: 6,
             totalSessions: workplaceSessions,
             progress: workplaceProgress,
           },

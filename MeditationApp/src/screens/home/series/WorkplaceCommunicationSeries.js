@@ -1,11 +1,7 @@
 // ==========================================
 // 檔案名稱: src/screens/home/series/WorkplaceCommunicationSeries.js
 // 職場溝通力計劃系列組件
-// 版本: V7.0 - 修正版：統一使用單元完成度
-// 修正內容：
-// 1) 圓環顯示「單元完成度」而非本週分鐘數
-// 2) 目標卡片顯示「已完成單元 / 總單元」
-// 3) 與首頁卡片進度保持一致
+// 版本: V8.0 - 更新練習單元順序和新增卡片
 // ==========================================
 
 import React, { useState, useEffect } from 'react';
@@ -28,10 +24,34 @@ import {
   Snowflake,
   Clock,
   ArrowRight,
+  Thermometer,
+  RefreshCw,
 } from 'lucide-react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import ApiService from '../../../services/index';
 
+// ==========================================
+// ⭐ 心情溫度計卡片組件（特殊樣式）
+// ==========================================
+const MoodThermometerCard = ({ module }) => {
+  const Icon = module.icon;
+
+  return (
+    <View style={styles.moodCard}>
+      <View style={[styles.moodIconContainer, { backgroundColor: module.iconBg }]}>
+        <Icon color={module.iconColor} size={24} strokeWidth={2} />
+      </View>
+      <View style={styles.moodContent}>
+        <Text style={styles.moodTitle}>{module.title}</Text>
+        <Text style={styles.moodDescription}>{module.description}</Text>
+      </View>
+    </View>
+  );
+};
+
+// ==========================================
+// 練習單元卡片組件
+// ==========================================
 const PracticeModuleCard = ({ module, onStartPractice }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const Icon = module.icon;
@@ -115,15 +135,41 @@ const WorkplaceCommunicationSeries = ({ navigation, userName }) => {
     { day: '日', duration: 0 },
   ]);
 
-  // ⭐ 修正：圓環用單元完成度，本週目標用分鐘數
-  const [completedUnits, setCompletedUnits] = useState(0); // 已完成單元數
-  const [totalUnits] = useState(4); // 總單元數
-  const [planPercent, setPlanPercent] = useState(0); // 圓環百分比（基於單元完成度）
-  const [currentProgress, setCurrentProgress] = useState(0); // 本週累計分鐘數
-  const [targetProgress] = useState(30); // 本週目標 30 分鐘
-  const [moduleCompletedTotal, setModuleCompletedTotal] = useState(0); // 單元完成總數（最多12）
+  const [completedUnits, setCompletedUnits] = useState(0);
+  const [totalUnits] = useState(6);
+  const [planPercent, setPlanPercent] = useState(0);
+  const [currentProgress, setCurrentProgress] = useState(0);
+  const [targetProgress] = useState(30);
+  const [moduleCompletedTotal, setModuleCompletedTotal] = useState(0);
 
+  // ⭐ 更新後的練習模組（新順序）
   const [practiceModules, setPracticeModules] = useState([
+    {
+      id: 'emotional-resilience',
+      title: '理智回穩力',
+      icon: Snowflake,
+      iconBg: '#FFF5E6',
+      iconColor: '#FF8C42',
+      duration: '4分鐘',
+      progress: '0/3',
+      tags: ['理智斷線', '情緒降溫', '憤怒難耐'],
+      description: '當你覺得憤怒焦慮、理智快要斷掉，或是被激怒，想立刻反擊的時候，先進來靜靜吧',
+      screen: null,
+      practiceType: '理智回穩力',
+    },
+    {
+      id: 'internal-observation',
+      title: '內耗覺察',
+      icon: RefreshCw,
+      iconBg: '#F3E8FF',
+      iconColor: '#A855F7',
+      duration: '5分鐘',
+      progress: '0/3',
+      tags: ['焦慮', '自我覺察', '辨識需求'],
+      description: '當他人的反應令你內耗不適,或是懷疑自己被針對,陷入焦慮,那麼這個練習很適合你一探究竟',
+      screen: null,
+      practiceType: '內耗覺察',
+    },
     {
       id: 'stop-internal-friction',
       title: '內耗終止鍵',
@@ -133,8 +179,7 @@ const WorkplaceCommunicationSeries = ({ navigation, userName }) => {
       duration: '5分鐘',
       progress: '0/3',
       tags: ['焦慮', '在乎他人反應', '情緒調節力'],
-      description:
-        '當他人的反應令你內耗不適，或是懷疑自己被針對，陷入焦慮，那麼這個練習很適合你一探究竟',
+      description: '當他人的反應令你內耗不適,或是懷疑自己被針對,陷入焦慮,那麼這個練習很適合你一探究竟',
       screen: 'InternalConflictPractice',
       practiceType: '內耗終止鍵',
     },
@@ -147,8 +192,7 @@ const WorkplaceCommunicationSeries = ({ navigation, userName }) => {
       duration: '7分鐘',
       progress: '0/3',
       tags: ['關係卡關', '覺得被針對', '同理心', '關係提升'],
-      description:
-        '如果因為他人的反應而感到難受，或是想要敞下敵意，修復與對方的關係，請點擊練習',
+      description: '如果因為他人的反應而感到難受,或是想要放下敵意,修復與對方的關係,請點擊練習',
       screen: null,
       practiceType: '同理讀心術',
     },
@@ -165,44 +209,34 @@ const WorkplaceCommunicationSeries = ({ navigation, userName }) => {
       screen: null,
       practiceType: '溝通轉譯器',
     },
-    {
-      id: 'emotional-resilience',
-      title: '理智回穩力',
-      icon: Snowflake,
-      iconBg: '#DBEAFE',
-      iconColor: '#3B82F6',
-      duration: '4分鐘',
-      progress: '0/3',
-      tags: ['理智斷線', '情緒降溫', '憤怒難耐'],
-      description:
-        '當你覺得情緒焦慮、理智快要斷掉，或是被激怒、想立刻反擊的時候，先進來靜靜吧',
-      screen: null,
-      practiceType: '理智回穩力',
-    },
   ]);
 
-  // ⭐ 初次載入
+  // ⭐ 心情溫度計（特殊卡片）
+  const moodThermometer = {
+    id: 'mood-thermometer',
+    title: '心情溫度計',
+    icon: Thermometer,
+    iconBg: '#FEE2E2',
+    iconColor: '#EF4444',
+    description: '用1分鐘快速瞭解自己的情緒狀態',
+  };
+
   useEffect(() => {
     loadStatistics(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ⭐ 回到本頁自動刷新
   useFocusEffect(
     React.useCallback(() => {
       loadStatistics(true);
-      // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
   );
 
-  // ⭐ 下拉刷新
   const onRefresh = async () => {
     setRefreshing(true);
     await loadStatistics(false);
     setRefreshing(false);
   };
 
-  // ⭐ 載入統計數據
   const loadStatistics = async (silent = false) => {
     try {
       console.log('📊 [職場溝通力] 載入統計數據...');
@@ -213,17 +247,14 @@ const WorkplaceCommunicationSeries = ({ navigation, userName }) => {
       if (response?.success && response?.stats) {
         console.log('✅ [職場溝通力] 統計數據:', response.stats);
 
-        // ⭐ 修正：圓環用單元完成度，本週目標用分鐘數
         const plan = response.stats?.plans?.['workplace-communication'];
         if (plan) {
-          // 1) 圓環進度：使用後端計算的單元完成度百分比
-          const progress = plan.progress || 0; // 已完成單元 / 4
-          const units = plan.completedUnits || 0; // 已完成單元數
+          const progress = plan.progress || 0;
+          const units = plan.completedUnits || 0;
 
           setPlanPercent(progress);
           setCompletedUnits(units);
 
-          // 2) 本週目標：累計分鐘數
           const weeklyMinutes = plan.weeklyMinutes || 0;
           setCurrentProgress(weeklyMinutes);
 
@@ -235,12 +266,10 @@ const WorkplaceCommunicationSeries = ({ navigation, userName }) => {
           setCurrentProgress(0);
         }
 
-        // 更新本週練習數據
         if (response.stats.weeklyPractices) {
           processWeeklyPractices(response.stats.weeklyPractices);
         }
 
-        // 更新練習模組進度
         if (response.stats.categoryStats) {
           updateModuleProgress(response.stats.categoryStats);
         }
@@ -254,7 +283,6 @@ const WorkplaceCommunicationSeries = ({ navigation, userName }) => {
     }
   };
 
-  // ⭐ 處理本週練習數據
   const processWeeklyPractices = (weeklyPractices) => {
     try {
       const weekData = Array(7).fill(0);
@@ -266,12 +294,11 @@ const WorkplaceCommunicationSeries = ({ navigation, userName }) => {
       monday.setDate(today.getDate() + mondayOffset);
       monday.setHours(0, 0, 0, 0);
 
-      // ⭐ weeklyPractices 現在是物件格式：{ "2026-01-27": 300, "2026-01-28": 450 }
       Object.keys(weeklyPractices).forEach((dateStr) => {
         const practiceDate = new Date(dateStr);
         const daysDiff = Math.floor((practiceDate - monday) / (1000 * 60 * 60 * 24));
         if (daysDiff >= 0 && daysDiff < 7) {
-          weekData[daysDiff] = Math.round(weeklyPractices[dateStr] / 60); // 秒轉分鐘
+          weekData[daysDiff] = Math.round(weeklyPractices[dateStr] / 60);
         }
       });
 
@@ -288,7 +315,6 @@ const WorkplaceCommunicationSeries = ({ navigation, userName }) => {
     }
   };
 
-  // ⭐ 更新練習模組進度
   const updateModuleProgress = (categoryStats) => {
     try {
       let completedSum = 0;
@@ -325,7 +351,6 @@ const WorkplaceCommunicationSeries = ({ navigation, userName }) => {
     }
   };
 
-  // 圓形進度條參數
   const progressPercentage = Math.min(planPercent, 100);
   const size = 140;
   const strokeWidth = 16;
@@ -333,7 +358,6 @@ const WorkplaceCommunicationSeries = ({ navigation, userName }) => {
   const circumference = radius * 2 * Math.PI;
   const strokeDashoffset = circumference - (circumference * progressPercentage) / 100;
 
-  // 處理練習點擊
   const handleStartPractice = (practiceId) => {
     console.log('🎯 [職場溝通] 開始練習:', practiceId);
 
@@ -360,7 +384,6 @@ const WorkplaceCommunicationSeries = ({ navigation, userName }) => {
     navigation.navigate('WorkplaceCommunicationPlanIntro');
   };
 
-  // ⭐ Loading 畫面
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
@@ -376,14 +399,12 @@ const WorkplaceCommunicationSeries = ({ navigation, userName }) => {
       showsVerticalScrollIndicator={false}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
     >
-      {/* 標題區 */}
       <View style={styles.header}>
         <Text style={styles.companyTitle}>{userName || 'OO'}的</Text>
         <Text style={styles.companyName}>職場溝通力計劃</Text>
         <Text style={styles.subtitle}>幫助你提升職場溝通效率，建立良好人際關係！</Text>
       </View>
 
-      {/* ⭐ 計畫目標區域（改為單元完成度）*/}
       <View style={styles.goalSection}>
         <View style={styles.progressCircleWrapper}>
           <Svg width={size} height={size}>
@@ -426,7 +447,6 @@ const WorkplaceCommunicationSeries = ({ navigation, userName }) => {
         </View>
       </View>
 
-      {/* 本週練習概況 */}
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>本週練習概況</Text>
       </View>
@@ -460,12 +480,10 @@ const WorkplaceCommunicationSeries = ({ navigation, userName }) => {
         </View>
       </View>
 
-      {/* 計劃介紹按鈕 */}
       <TouchableOpacity onPress={handleShowPlanIntro} style={styles.planIntroButton} activeOpacity={0.8}>
         <Text style={styles.planIntroText}>職場溝通力 計劃介紹</Text>
       </TouchableOpacity>
 
-      {/* 練習單元 */}
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>練習單元</Text>
       </View>
@@ -474,6 +492,9 @@ const WorkplaceCommunicationSeries = ({ navigation, userName }) => {
         {practiceModules.map((module) => (
           <PracticeModuleCard key={module.id} module={module} onStartPractice={handleStartPractice} />
         ))}
+        
+        {/* ⭐ 心情溫度計特殊卡片 */}
+        <MoodThermometerCard module={moodThermometer} />
       </View>
 
       <View style={styles.bottomPadding} />
@@ -673,7 +694,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     padding: 20,
     marginBottom: 20,
-    minHeight: 200,
+    minHeight: 210,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
@@ -813,6 +834,42 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
     color: '#FF8C42',
+  },
+  // ⭐ 心情溫度計卡片樣式
+  moodCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  moodIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  moodContent: {
+    flex: 1,
+  },
+  moodTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 4,
+  },
+  moodDescription: {
+    fontSize: 13,
+    color: '#6B7280',
+    lineHeight: 20,
   },
   bottomPadding: {
     height: 40,
