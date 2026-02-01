@@ -1,7 +1,7 @@
 // ==========================================
 // DailyScreen.js
-// 版本: V2.3 - 修正「內耗練習」日記欄位解析與顯示（支援 thoughts / emotionReactions / physicalReactions / needs / moodScore）
-// 更新日期: 2026/01/28
+// 版本: V2.4 - 修復思維調節練習完整顯示（包含後半段欄位）
+// 更新日期: 2026/02/01
 // ==========================================
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -38,6 +38,7 @@ import {
   Target,
   Eye,
   Scale,
+  PenTool,
 } from 'lucide-react-native';
 import ApiService from '../../../api';
 import BottomNavigation from '../../navigation/BottomNavigation';
@@ -85,8 +86,8 @@ const DailyScreen = ({ navigation, route }) => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [hasEnterpriseCode, setHasEnterpriseCode] = useState(false);
   const [detailModalVisible, setDetailModalVisible] = useState(false);
-  const [currentDayRecords, setCurrentDayRecords] = useState([]); // 當天所有記錄
-  const [currentRecordIndex, setCurrentRecordIndex] = useState(0); // 當前顯示索引
+  const [currentDayRecords, setCurrentDayRecords] = useState([]);
+  const [currentRecordIndex, setCurrentRecordIndex] = useState(0);
   const [selectedPractice, setSelectedPractice] = useState(null);
   const [selectedPlan, setSelectedPlan] = useState('all');
   const highlightPracticeId = route?.params?.highlightPracticeId;
@@ -159,12 +160,9 @@ const DailyScreen = ({ navigation, route }) => {
 
   const isEmotionalPlanPractice = (practiceType) => {
     if (!practiceType) return false;
-    
-    // ⭐ 排除職場溝通力的心情溫度計
     if (practiceType.includes('心情溫度計-職場溝通力')) {
       return false;
     }
-    
     return EMOTIONAL_PLAN_TYPES.some(type => practiceType.includes(type));
   };
 
@@ -183,7 +181,6 @@ const DailyScreen = ({ navigation, route }) => {
       return isCompleted && practiceDate.getFullYear() === year && practiceDate.getMonth() === month;
     });
 
-    // ✅ 修改職場溝通力篩選（替換原有的 workplace 判斷）
     if (selectedPlan === 'emotional') {
       filtered = filtered.filter(p => isEmotionalPlanPractice(p.practice_type));
     } else if (selectedPlan === 'workplace') {
@@ -254,12 +251,11 @@ const DailyScreen = ({ navigation, route }) => {
     
     const firstRecord = sortedRecords[0];
     
-    // ⭐ 職場溝通力判斷（包含心情溫度計職場版）
     if (isWorkplacePlanPractice(firstRecord.practice_type)) {
-      return '#FF8C42';  // 橘色
+      return '#FF8C42';
     }
     
-    return '#166CB5';  // 藍色
+    return '#166CB5';
   };
 
   const handleDayClick = (day) => {
@@ -312,9 +308,7 @@ const DailyScreen = ({ navigation, route }) => {
     return '情緒抗壓力';
   };
 
-  // ⭐ 新增：處理顯示名稱
   const getDisplayPracticeName = (practiceType) => {
-    // 兩種心情溫度計都顯示「心情溫度計」
     if (practiceType?.includes('心情溫度計')) {
       return '心情溫度計';
     }
@@ -382,7 +376,7 @@ const DailyScreen = ({ navigation, route }) => {
     return data;
   };
 
-  // ✅✅✅ 修正版：思維調節 / 內耗練習資料解析（支援你的日記 schema）✅✅✅
+  // ✅✅✅ 修正版：思維調節完整欄位解析 ✅✅✅
   const extractCognitiveData = (practice) => {
     let data = {
       event: null,
@@ -391,12 +385,18 @@ const DailyScreen = ({ navigation, route }) => {
       bodyReactions: [],
       behaviors: [],
       emotionIntensity: null,
+      
+      // ✅ 新增：後半段欄位
       newThought: null,
+      newPerspective: null,
+      selectedCard: null,
+      selectedAction: null,
+      customAction: null,
       postScore: null,
+      
       postMood: null,
       hasCustomOptions: false,
       
-      // 內耗日記 schema
       situation: null,
       thoughts: null,
       needs: [],
@@ -407,7 +407,9 @@ const DailyScreen = ({ navigation, route }) => {
       habitPattern: null,         
       empathyPerspective: null,    
       controllable: null,          
-      uncontrollable: null,        
+      uncontrollable: null,     
+      alternativeThinking: null,
+      actionableSteps: null,   
     };
 
     const splitMaybe = (v) => {
@@ -425,32 +427,39 @@ const DailyScreen = ({ navigation, route }) => {
         if (fd) {
           // A：事件 / 情境
           data.event = fd.event || fd.activatingEvent || fd.trigger || fd.situation || null;
-
-          // 內耗日記 schema（保留）
           data.situation = fd.situation || null;
 
-          // B：原本想法（支援 thoughts）
+          // B：原本想法
           data.originalThought =
             fd.originalThought ||
             fd.original_thought ||
             fd.automaticThought ||
             fd.thought ||
-            fd.thoughts || // ✅ 你現在用的 key
+            fd.thoughts ||
             null;
-
           data.thoughts = fd.thoughts || fd.thought || null;
 
-          // 強度 / 轉念後
-          data.emotionIntensity = fd.emotionIntensity || fd.emotion_intensity || fd.intensity || null;
+          // ✅ D：轉念後的觀點（新增）
+          data.newPerspective = fd.newPerspective || fd.new_perspective || null;
           data.newThought = fd.newPerspective || fd.newThought || fd.new_thought || fd.balancedThought || fd.alternativeThought || null;
+          
+          // ✅ 靈感小卡（新增）
+          data.selectedCard = fd.selectedCard || null;
+          
+          // ✅ 微小行動（新增）
+          data.selectedAction = fd.selectedAction || fd.selected_action || null;
+          data.customAction = fd.customAction || fd.custom_action || null;
 
-          // 分數（內耗日記常用 moodScore）
+          // 強度 / 分數
+          data.emotionIntensity = fd.emotionIntensity || fd.emotion_intensity || fd.intensity || null;
+          
+          // ✅ 情緒減緩程度（新增）
           data.postScore = fd.postScore ?? fd.post_score ?? fd.moodScore ?? null;
-          data.moodScore = fd.moodScore ?? null;
+          data.moodScore = fd.moodScore ?? fd.postScore ?? null;
 
           data.postMood = fd.postMood || fd.post_mood || null;
 
-          // 反應資料：fullReactions（最新）
+          // 反應資料：fullReactions
           if (fd.fullReactions) {
             data.emotions = Array.isArray(fd.fullReactions.emotions) ? fd.fullReactions.emotions : [];
             data.bodyReactions = Array.isArray(fd.fullReactions.bodyReactions) ? fd.fullReactions.bodyReactions : [];
@@ -460,21 +469,16 @@ const DailyScreen = ({ navigation, route }) => {
               (fd.customBodyReactions?.length > 0) ||
               (fd.customBehaviors?.length > 0);
           } else {
-            // ✅ 反應資料：支援內耗日記 schema
-            // 情緒：emotionReactions
             if (Array.isArray(fd.emotionReactions)) data.emotions = fd.emotionReactions;
             else if (Array.isArray(fd.emotions)) data.emotions = fd.emotions;
             else if (fd.emotion) data.emotions = Array.isArray(fd.emotion) ? fd.emotion : [fd.emotion];
 
-            // 身體：physicalReactions
             if (Array.isArray(fd.physicalReactions)) data.bodyReactions = fd.physicalReactions;
             else if (Array.isArray(fd.bodyReactions)) data.bodyReactions = fd.bodyReactions;
 
-            // 行為：behaviorReactions
             if (Array.isArray(fd.behaviorReactions)) data.behaviors = fd.behaviorReactions;
             else if (Array.isArray(fd.behaviors)) data.behaviors = fd.behaviors;
 
-            // 自訂（你的 schema 用字串 customEmotions/customPhysical/customBehavior）
             const hasCustomStr =
               (typeof fd.customEmotions === 'string' && fd.customEmotions.trim().length > 0) ||
               (typeof fd.customPhysical === 'string' && fd.customPhysical.trim().length > 0) ||
@@ -488,7 +492,6 @@ const DailyScreen = ({ navigation, route }) => {
             data.hasCustomOptions = hasCustomStr || hasCustomArr;
           }
 
-          // needs：你現在是字串「被認可、界線」
           data.needs = splitMaybe(fd.needs);
 
           data.supportingEvidence = fd.supportingEvidence || null;
@@ -497,8 +500,9 @@ const DailyScreen = ({ navigation, route }) => {
           data.empathyPerspective = fd.empathyPerspective || null;
           data.controllable = fd.controllable || null;
           data.uncontrollable = fd.uncontrollable || null;
+          data.alternativeThinking = fd.alternativeThinking || fd.alternative_thinking || null;
+          data.actionableSteps = fd.actionableSteps || fd.actionable_steps || fd.smallActions || null;
 
-          // 補主要心情
           if (!data.postMood && data.emotions.length > 0) {
             data.postMood = data.emotions[0];
           }
@@ -508,16 +512,7 @@ const DailyScreen = ({ navigation, route }) => {
       }
     }
 
-    console.log('[DailyScreen] 內耗/思維解析結果:', {
-      event: data.event,
-      originalThought: data.originalThought,
-      emotions: data.emotions,
-      bodyReactions: data.bodyReactions,
-      behaviors: data.behaviors,
-      needs: data.needs,
-      moodScore: data.moodScore,
-    });
-
+    console.log('[DailyScreen] 內耗/思維解析結果:', data);
     return data;
   };
 
@@ -589,6 +584,22 @@ const DailyScreen = ({ navigation, route }) => {
     return data;
   };
 
+  // ✅ 取得微小行動文字
+  const getActionText = (selectedAction, customAction) => {
+    if (customAction && customAction.trim()) {
+      return customAction.trim();
+    }
+    
+    const actionMap = {
+      'talk': '找人聊聊',
+      'breathe': '4-6 呼吸',
+      'move': '站起來動一動',
+      'write': '寫下此事我的努力',
+    };
+    
+    return actionMap[selectedAction] || selectedAction || '未記錄';
+  };
+
   const renderDetailModal = () => {
     if (!selectedPractice) return null;
 
@@ -643,8 +654,6 @@ const DailyScreen = ({ navigation, route }) => {
     };
 
     const getThemeColor = () => {
-
-      // ⭐ 內耗練習使用橘色主題
       if (isCognitive && selectedPractice.practice_type?.includes('內耗')) {
         return { 
           primary: '#FF8C42', 
@@ -654,12 +663,10 @@ const DailyScreen = ({ navigation, route }) => {
         };
       }
       
-      // ⭐ 心情溫度計：根據來源使用不同主題
       if (isMoodThermometer) {
         const isWorkplaceMoodThermometer = selectedPractice.practice_type?.includes('職場溝通力');
         
         if (isWorkplaceMoodThermometer) {
-          // 職場溝通力版本 → 橘色主題
           return { 
             primary: '#FF8C42', 
             light: '#FFF7ED', 
@@ -668,7 +675,6 @@ const DailyScreen = ({ navigation, route }) => {
           };
         }
         
-        // 情緒抗壓力版本 → 紫色主題
         return { 
           primary: '#8B5CF6', 
           light: '#F5F3FF', 
@@ -706,7 +712,7 @@ const DailyScreen = ({ navigation, route }) => {
                     : isGratitude 
                     ? getGratitudeTitle() 
                     : isMoodThermometer && selectedPractice.practice_type?.includes('職場溝通力')
-                    ? '心情溫度計'  // ⭐ 職場版也只顯示「心情溫度計」
+                    ? '心情溫度計'
                     : selectedPractice.practice_type
                   }
                 </Text>
@@ -808,10 +814,10 @@ const DailyScreen = ({ navigation, route }) => {
                 </>
               )}
 
-              {/* ========== ✅ 思維調節 / 內耗練習（帶 icon badge 設計） ========== */}
+              {/* ========== ✅ 思維調節完整顯示（包含後半段） ========== */}
               {isCognitive && cognitiveData && (
                 <>
-                  {/* ⭐ 事件（橘色） */}
+                  {/* 事件 */}
                   {(cognitiveData.event || cognitiveData.situation) && (
                     <View style={[styles.abcdCard, { 
                       backgroundColor: theme.light, 
@@ -830,7 +836,7 @@ const DailyScreen = ({ navigation, route }) => {
                     </View>
                   )}
 
-                  {/* ⭐ 原本的想法（紅色） */}
+                  {/* 原本的想法 */}
                   {cognitiveData.originalThought && (
                     <View style={[styles.abcdCard, styles.abcdCardNegative]}>
                       <View style={styles.abcdLabelRow}>
@@ -842,7 +848,7 @@ const DailyScreen = ({ navigation, route }) => {
                       
                       <Text style={styles.abcdContent}>{cognitiveData.originalThought}</Text>
 
-                      {/* 情緒 + 身體 + 行為 + 需求 */}
+                      {/* 情緒反應 */}
                       {(cognitiveData.emotions.length > 0 || 
                         cognitiveData.bodyReactions.length > 0 || 
                         cognitiveData.behaviors.length > 0 ||
@@ -904,7 +910,7 @@ const DailyScreen = ({ navigation, route }) => {
                     </View>
                   )}
 
-                  {/* ⭐ 尋找證據（灰色） */}
+                  {/* 尋找證據 */}
                   {(cognitiveData.supportingEvidence || cognitiveData.opposingEvidence) && (
                     <View style={[styles.abcdCard, { backgroundColor: '#F8FAFC' }]}>
                       <View style={styles.abcdLabelRow}>
@@ -934,7 +940,7 @@ const DailyScreen = ({ navigation, route }) => {
                     </View>
                   )}
 
-                  {/* ⭐ 轉換視角（灰色） */}
+                  {/* 轉換視角 */}
                   {(cognitiveData.habitPattern || cognitiveData.empathyPerspective) && (
                     <View style={[styles.abcdCard, { backgroundColor: '#F8FAFC' }]}>
                       <View style={styles.abcdLabelRow}>
@@ -964,7 +970,7 @@ const DailyScreen = ({ navigation, route }) => {
                     </View>
                   )}
 
-                  {/* ⭐ 專注可控（灰色） */}
+                  {/* 專注可控 */}
                   {(cognitiveData.controllable || cognitiveData.uncontrollable) && (
                     <View style={[styles.abcdCard, { backgroundColor: '#F8FAFC' }]}>
                       <View style={styles.abcdLabelRow}>
@@ -994,8 +1000,64 @@ const DailyScreen = ({ navigation, route }) => {
                     </View>
                   )}
 
-                  {/* ⭐ 練習成效（綠色） */}
-                  {cognitiveData.moodScore !== null && (
+                  {/* 試著換個角度想 */}
+                  {cognitiveData.alternativeThinking && (
+                    <View style={[styles.abcdCard, { backgroundColor: '#F8FAFC' }]}>
+                      <View style={styles.abcdLabelRow}>
+                        <View style={[styles.sectionIconBadge, { backgroundColor: '#E2E8F0' }]}>
+                          <RefreshCw color="#64748B" size={16} strokeWidth={2.5} />
+                        </View>
+                        <Text style={[styles.abcdLabel, { color: '#64748B', fontSize: 15 }]}>試著換個角度想</Text>
+                      </View>
+                      <Text style={styles.abcdContent}>{cognitiveData.alternativeThinking}</Text>
+                    </View>
+                  )}
+
+                  {/* 現在可以做的小行動 */}
+                  {cognitiveData.actionableSteps && (
+                    <View style={[styles.abcdCard, { backgroundColor: '#F8FAFC' }]}>
+                      <View style={styles.abcdLabelRow}>
+                        <View style={[styles.sectionIconBadge, { backgroundColor: '#E2E8F0' }]}>
+                          <Target color="#64748B" size={16} strokeWidth={2.5} />
+                        </View>
+                        <Text style={[styles.abcdLabel, { color: '#64748B', fontSize: 15 }]}>現在可以做的小行動</Text>
+                      </View>
+                      <Text style={styles.abcdContent}>{cognitiveData.actionableSteps}</Text>
+                    </View>
+                  )}
+
+                  {/* ✅ 轉念後的觀點（綠色卡片）*/}
+                  {(cognitiveData.newPerspective || cognitiveData.newThought) && (
+                    <View style={[styles.abcdCard, styles.abcdCardPositive]}>
+                      <View style={styles.abcdLabelRow}>
+                        <View style={[styles.sectionIconBadge, { backgroundColor: '#D1FAE5' }]}>
+                          <Lightbulb color="#10B981" size={16} strokeWidth={2.5} />
+                        </View>
+                        <Text style={[styles.abcdLabel, { color: '#10B981', fontSize: 15 }]}>轉念後的觀點</Text>
+                      </View>
+                      <Text style={styles.abcdContent}>
+                        {cognitiveData.newPerspective || cognitiveData.newThought}
+                      </Text>
+                    </View>
+                  )}
+
+                  {/* ✅ 微小行動（綠色卡片）*/}
+                  {(cognitiveData.selectedAction || cognitiveData.customAction) && (
+                    <View style={[styles.abcdCard, styles.abcdCardPositive]}>
+                      <View style={styles.abcdLabelRow}>
+                        <View style={[styles.sectionIconBadge, { backgroundColor: '#D1FAE5' }]}>
+                          <PenTool color="#10B981" size={16} strokeWidth={2.5} />
+                        </View>
+                        <Text style={[styles.abcdLabel, { color: '#10B981', fontSize: 15 }]}>微小行動</Text>
+                      </View>
+                      <Text style={styles.abcdContent}>
+                        {getActionText(cognitiveData.selectedAction, cognitiveData.customAction)}
+                      </Text>
+                    </View>
+                  )}
+
+                  {/* ✅ 情緒減緩程度（綠色成效卡）*/}
+                  {(cognitiveData.moodScore !== null || cognitiveData.postScore !== null) && (
                     <View style={[styles.resultCard, { 
                       backgroundColor: '#ECFDF5', 
                       borderColor: '#D1FAE5',
@@ -1011,7 +1073,7 @@ const DailyScreen = ({ navigation, route }) => {
                         <Text style={styles.scoreLabel}>情緒減緩程度</Text>
                         <View style={styles.scoreValueBox}>
                           <Text style={[styles.scoreValue, { color: '#10B981' }]}>
-                            {cognitiveData.moodScore}
+                            {cognitiveData.postScore ?? cognitiveData.moodScore}
                           </Text>
                           <Text style={styles.scoreMax}>/10</Text>
                         </View>
@@ -1021,7 +1083,7 @@ const DailyScreen = ({ navigation, route }) => {
                 </>
               )}
 
-              {/* ========== 感恩練習（精緻版）========== */}
+              {/* ========== 感恩練習 ========== */}
               {isGratitude && gratitudeData && (
                 <>
                   {gratitudeData.practiceType === 'diary' && (
@@ -1125,7 +1187,7 @@ const DailyScreen = ({ navigation, route }) => {
                 </>
               )}
 
-              {/* ========== 心情溫度計（精緻版）========== */}
+              {/* ========== 心情溫度計 ========== */}
               {isMoodThermometer && emotionThermometerData && (
                 <View style={[styles.thermometerCard, { backgroundColor: theme.light, borderColor: theme.accent }]}>
                   <View style={styles.resultCardHeader}>
@@ -1143,8 +1205,8 @@ const DailyScreen = ({ navigation, route }) => {
                       <LinearGradient
                         colors={
                           selectedPractice.practice_type?.includes('職場溝通力')
-                            ? ['#dd996f', '#ff3835', '#f97313']  // ⭐ 職場版：橘色系漸層
-                            : ['#93C5FD', '#A78BFA', '#F472B6']  // 情緒版：紫色系漸層
+                            ? ['#dd996f', '#ff3835', '#f97313']
+                            : ['#93C5FD', '#A78BFA', '#F472B6']
                         }
                         start={{ x: 0, y: 0 }}
                         end={{ x: 1, y: 0 }}
@@ -1265,7 +1327,6 @@ const DailyScreen = ({ navigation, route }) => {
               </View>
             </TouchableOpacity>
             
-            {/* ⭐ 新增職場溝通力按鈕 */}
             <TouchableOpacity onPress={() => setSelectedPlan('workplace')} activeOpacity={0.8}>
               <View style={selectedPlan === 'workplace' ? styles.filterPillWorkplace : styles.filterPillInactive}>
                 <Text style={selectedPlan === 'workplace' ? styles.filterPillWorkplaceText : styles.filterPillInactiveText}>職場溝通力</Text>
@@ -1283,7 +1344,7 @@ const DailyScreen = ({ navigation, route }) => {
               {days.map((day, idx) => {
                 if (!day) return <View key={`e-${idx}`} style={styles.calendarDay} />;
                 const hasRecord = hasRecordOnDate(day);
-                const dotColor = getRecordDotColor(day); // ✅ 取得點點顏色
+                const dotColor = getRecordDotColor(day);
                 
                 return (
                   <TouchableOpacity
@@ -1295,7 +1356,6 @@ const DailyScreen = ({ navigation, route }) => {
                     <Text style={[styles.calendarDayText, hasRecord && styles.calendarDayTextActive]}>
                       {day}
                     </Text>
-                    {/* ✅ 使用動態顏色 */}
                     {hasRecord && <View style={[styles.calendarDot, { backgroundColor: dotColor }]} />}
                   </TouchableOpacity>
                 );
@@ -1369,8 +1429,6 @@ const DailyScreen = ({ navigation, route }) => {
   );
 };
 
-// ✅ 小修正：你原本 styles 裡 contentCard 重複定義兩次，會被後者覆蓋。
-// 為避免你 list / empty 區塊被影響，我把「外層白卡」改名 contentCardOuter，其他內文卡維持 contentCard。
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F3F4F6' },
   scrollView: { flex: 1 },
@@ -1463,7 +1521,6 @@ const styles = StyleSheet.create({
     color: '#FFFFFF' 
   },
 
-  // ✅ 外層白卡（避免原本 contentCard 重複 key）
   contentCardOuter: {
     backgroundColor: '#FFFFFF',
     borderRadius: 20,
@@ -1577,7 +1634,6 @@ const styles = StyleSheet.create({
   emotionTagFilled: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 16 },
   emotionTagFilledText: { fontSize: 13, color: '#FFFFFF', fontWeight: '600' },
 
-  // 內文卡（Modal 內）
   contentCard: { borderRadius: 16, padding: 18, marginBottom: 14, borderWidth: 1 },
   contentCardHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 14 },
   contentCardTitle: { fontSize: 14, fontWeight: '600' },
