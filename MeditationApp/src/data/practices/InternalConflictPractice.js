@@ -1,7 +1,14 @@
 // ==========================================
 // 檔案名稱: InternalConflictPractice.js
 // 內耗終止鍵 - CBT練習
-// 版本: V2.0 - 完整版本（按照設計稿實現）
+// 版本: V2.1 - 更新版本（根據1/29設計稿）
+// 更新內容：
+// 1. 新增「記錄統整」頁面
+// 2. 調整順序：評分 → 記錄統整 → 完成
+// 3. 新增退出練習警示框
+// 4. 統一前三頁視覺高度
+// 5. 修正評分頁文字
+// 6. 優化intro頁面排版
 // ==========================================
 
 import React, { useState, useRef, useEffect } from 'react';
@@ -20,6 +27,8 @@ import {
   Platform,
   Dimensions,
   PanResponder,
+  Modal,
+  Image,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
@@ -31,6 +40,7 @@ import {
   ChevronUp,
   Heart,
   Wind,
+  AlertCircle,
 } from 'lucide-react-native';
 import ApiService from '../../../api';
 
@@ -251,6 +261,54 @@ const INITIAL_FORM_DATA = {
   moodScore: 5,
 };
 
+// ==================== 退出警示框組件 ====================
+const ExitWarningModal = ({ visible, onCancel, onConfirm }) => {
+  return (
+    <Modal
+      transparent={true}
+      visible={visible}
+      animationType="fade"
+      onRequestClose={onCancel}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContent}>
+          <View style={styles.modalIconContainer}>
+            <AlertCircle size={48} color="#FF8C42" />
+          </View>
+          
+          <Text style={styles.modalTitle}>確定要離開嗎？</Text>
+          <Text style={styles.modalMessage}>
+            離開後，本次練習的內容將不會被保存
+          </Text>
+
+          <View style={styles.modalButtons}>
+            <TouchableOpacity 
+              style={styles.modalButtonCancel}
+              onPress={onCancel}
+            >
+              <Text style={styles.modalButtonCancelText}>取消</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={styles.modalButtonConfirm}
+              onPress={onConfirm}
+            >
+              <LinearGradient
+                colors={['#FF8C42', '#FF6B6B']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.modalButtonGradient}
+              >
+                <Text style={styles.modalButtonConfirmText}>確定離開</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+};
+
 // ==================== 進度點組件 ====================
 const ProgressDots = ({ currentStep, totalSteps }) => {
   return (
@@ -268,18 +326,12 @@ const ProgressDots = ({ currentStep, totalSteps }) => {
   );
 };
 
-// ==================== 心形握手圖標組件 ====================
-const HeartHandshakeIcon = ({ size = 48, color = '#FF8C42' }) => (
-  <View style={{ width: size, height: size, justifyContent: 'center', alignItems: 'center' }}>
-    <Heart size={size} color={color} />
-  </View>
-);
-
 // ==================== 主組件 ====================
 export default function InternalConflictPractice({ onBack, navigation, onHome }) {
   // 頁面狀態
   const [currentPage, setCurrentPage] = useState('welcome');
   const [formData, setFormData] = useState(INITIAL_FORM_DATA);
+  const [showExitWarning, setShowExitWarning] = useState(false);
 
   // Practice 狀態
   const [practiceId, setPracticeId] = useState(null);
@@ -296,7 +348,6 @@ export default function InternalConflictPractice({ onBack, navigation, onHome })
 
   // 動畫值
   const iconScale = useRef(new Animated.Value(0)).current;
-  const heartBounce = useRef(new Animated.Value(1)).current;
 
   // ==================== 當前步驟計算 ====================
   const pageStepMap = {
@@ -312,7 +363,9 @@ export default function InternalConflictPractice({ onBack, navigation, onHome })
     'perspective': 5,
     'controllable': 6,
     'completion': 7,
-    'assessment': 8,
+    'summary': 8,
+    'assessment': 9,
+    'recommendations': 10,
   };
 
   const getCurrentStep = () => pageStepMap[currentPage] || 0;
@@ -382,7 +435,7 @@ export default function InternalConflictPractice({ onBack, navigation, onHome })
   }, [startTime, isTiming]);
 
   useEffect(() => {
-    if (!practiceId || currentPage === 'assessment') return;
+    if (!practiceId || currentPage === 'assessment' || currentPage === 'summary' || currentPage === 'completion' || currentPage === 'recommendations') return;
     const interval = setInterval(() => {
       saveProgress();
     }, 10000);
@@ -424,9 +477,23 @@ export default function InternalConflictPractice({ onBack, navigation, onHome })
     }
   };
 
+  const handleExitAttempt = () => {
+    // 在練習進行中才顯示警示
+    const inProgressPages = [
+      'situation-write', 'capture-thoughts', 'reactions', 
+      'identify-needs', 'evidence', 'perspective', 'controllable'
+    ];
+    
+    if (inProgressPages.includes(currentPage)) {
+      setShowExitWarning(true);
+    } else {
+      handleBackToHome();
+    }
+  };
+
   const handleBack = () => {
     const backMap = {
-      'welcome': handleBackToHome,
+      'welcome': handleExitAttempt,
       'intro': () => setCurrentPage('welcome'),
       'situation-intro': () => setCurrentPage('intro'),
       'breathing': () => setCurrentPage('situation-intro'),
@@ -438,7 +505,9 @@ export default function InternalConflictPractice({ onBack, navigation, onHome })
       'perspective': () => setCurrentPage('evidence'),
       'controllable': () => setCurrentPage('perspective'),
       'completion': () => setCurrentPage('controllable'),
-      'assessment': () => setCurrentPage('completion'),
+      'summary': () => setCurrentPage('completion'),
+      'assessment': () => setCurrentPage('summary'),
+      'recommendations': () => setCurrentPage('assessment'),
     };
     backMap[currentPage]?.();
   };
@@ -505,7 +574,7 @@ export default function InternalConflictPractice({ onBack, navigation, onHome })
   const renderWelcomePage = () => (
     <View style={styles.fullScreen}>
       <LinearGradient colors={['#FFF4ED', '#FFE8DB']} style={styles.gradientBg}>
-        <TouchableOpacity onPress={handleBack} style={styles.closeButtonAbsolute}>
+        <TouchableOpacity onPress={handleExitAttempt} style={styles.closeButtonAbsolute}>
           <X size={24} color="#FF8C42" />
         </TouchableOpacity>
 
@@ -555,7 +624,7 @@ export default function InternalConflictPractice({ onBack, navigation, onHome })
     </View>
   );
 
-  // 介紹頁
+  // 介紹頁（優化後的排版）
   const renderIntroPage = () => (
     <View style={styles.fullScreen}>
       <LinearGradient colors={['#FFF4ED', '#FFE8DB']} style={styles.gradientBg}>
@@ -563,7 +632,7 @@ export default function InternalConflictPractice({ onBack, navigation, onHome })
           <TouchableOpacity onPress={handleBack} style={styles.backButton}>
             <ArrowLeft size={24} color="#FF8C42" />
           </TouchableOpacity>
-          <TouchableOpacity onPress={handleBackToHome} style={styles.closeButton}>
+          <TouchableOpacity onPress={handleExitAttempt} style={styles.closeButton}>
             <X size={24} color="#FF8C42" />
           </TouchableOpacity>
         </View>
@@ -581,12 +650,15 @@ export default function InternalConflictPractice({ onBack, navigation, onHome })
 
           <View style={styles.stepsDescription}>
             <Text style={styles.stepsIntro}>接下來的練習步驟包含了</Text>
-            <View style={styles.stepsList}>
+            <View style={styles.stepsListOptimized}>
               <Text style={styles.stepHighlight}>情境回想</Text>
-              <Text style={styles.stepHighlight}>捕捉想法</Text>
+              <Text style={styles.stepSeparator}>、</Text>
               <Text style={styles.stepHighlight}>辨識需求</Text>
+              <Text style={styles.stepSeparator}>、</Text>
               <Text style={styles.stepHighlight}>尋找證據</Text>
+              <Text style={styles.stepLineBreak}>{'\n'}</Text>
               <Text style={styles.stepHighlight}>轉換視角</Text>
+              <Text style={styles.stepSeparator}>、</Text>
               <Text style={styles.stepHighlight}>專注可控</Text>
             </View>
             <Text style={[styles.stepsIntro, { marginTop: 16 }]}>
@@ -623,7 +695,7 @@ export default function InternalConflictPractice({ onBack, navigation, onHome })
           <TouchableOpacity onPress={handleBack} style={styles.backButton}>
             <ArrowLeft size={24} color="#FF8C42" />
           </TouchableOpacity>
-          <TouchableOpacity onPress={handleBackToHome} style={styles.closeButton}>
+          <TouchableOpacity onPress={handleExitAttempt} style={styles.closeButton}>
             <X size={24} color="#FF8C42" />
           </TouchableOpacity>
         </View>
@@ -672,7 +744,7 @@ export default function InternalConflictPractice({ onBack, navigation, onHome })
           <TouchableOpacity onPress={handleBack} style={styles.backButton}>
             <ArrowLeft size={24} color="#FF8C42" />
           </TouchableOpacity>
-          <TouchableOpacity onPress={handleBackToHome} style={styles.closeButton}>
+          <TouchableOpacity onPress={handleExitAttempt} style={styles.closeButton}>
             <X size={24} color="#FF8C42" />
           </TouchableOpacity>
         </View>
@@ -723,7 +795,7 @@ export default function InternalConflictPractice({ onBack, navigation, onHome })
                 <TouchableOpacity onPress={handleBack} style={styles.backButton}>
                   <ArrowLeft size={24} color="#FF8C42" />
                 </TouchableOpacity>
-                <TouchableOpacity onPress={handleBackToHome} style={styles.closeButton}>
+                <TouchableOpacity onPress={handleExitAttempt} style={styles.closeButton}>
                   <X size={24} color="#FF8C42" />
                 </TouchableOpacity>
               </View>
@@ -809,7 +881,7 @@ export default function InternalConflictPractice({ onBack, navigation, onHome })
               <TouchableOpacity onPress={handleBack} style={styles.backButton}>
                 <ArrowLeft size={24} color="#FF8C42" />
               </TouchableOpacity>
-              <TouchableOpacity onPress={handleBackToHome} style={styles.closeButton}>
+              <TouchableOpacity onPress={handleExitAttempt} style={styles.closeButton}>
                 <X size={24} color="#FF8C42" />
               </TouchableOpacity>
             </View>
@@ -920,7 +992,7 @@ export default function InternalConflictPractice({ onBack, navigation, onHome })
           <TouchableOpacity onPress={handleBack} style={styles.backButton}>
             <ArrowLeft size={24} color="#FF8C42" />
           </TouchableOpacity>
-          <TouchableOpacity onPress={handleBackToHome} style={styles.closeButton}>
+          <TouchableOpacity onPress={handleExitAttempt} style={styles.closeButton}>
             <X size={24} color="#FF8C42" />
           </TouchableOpacity>
         </View>
@@ -955,9 +1027,6 @@ export default function InternalConflictPractice({ onBack, navigation, onHome })
                   </Text>
                 </TouchableOpacity>
               ))}
-              <TouchableOpacity style={styles.customChip}>
-                <Text style={styles.customChipText}>+ 自訂</Text>
-              </TouchableOpacity>
             </View>
           </View>
 
@@ -982,9 +1051,6 @@ export default function InternalConflictPractice({ onBack, navigation, onHome })
                   </Text>
                 </TouchableOpacity>
               ))}
-              <TouchableOpacity style={styles.customChip}>
-                <Text style={styles.customChipText}>+ 自訂</Text>
-              </TouchableOpacity>
             </View>
           </View>
 
@@ -1009,9 +1075,6 @@ export default function InternalConflictPractice({ onBack, navigation, onHome })
                   </Text>
                 </TouchableOpacity>
               ))}
-              <TouchableOpacity style={styles.customChip}>
-                <Text style={styles.customChipText}>+ 自訂</Text>
-              </TouchableOpacity>
             </View>
           </View>
         </ScrollView>
@@ -1062,7 +1125,7 @@ export default function InternalConflictPractice({ onBack, navigation, onHome })
               <TouchableOpacity onPress={handleBack} style={styles.backButton}>
                 <ArrowLeft size={24} color="#FF8C42" />
               </TouchableOpacity>
-              <TouchableOpacity onPress={handleBackToHome} style={styles.closeButton}>
+              <TouchableOpacity onPress={handleExitAttempt} style={styles.closeButton}>
                 <X size={24} color="#FF8C42" />
               </TouchableOpacity>
             </View>
@@ -1166,7 +1229,7 @@ export default function InternalConflictPractice({ onBack, navigation, onHome })
               <TouchableOpacity onPress={handleBack} style={styles.backButton}>
                 <ArrowLeft size={24} color="#FF8C42" />
               </TouchableOpacity>
-              <TouchableOpacity onPress={handleBackToHome} style={styles.closeButton}>
+              <TouchableOpacity onPress={handleExitAttempt} style={styles.closeButton}>
                 <X size={24} color="#FF8C42" />
               </TouchableOpacity>
             </View>
@@ -1266,7 +1329,7 @@ export default function InternalConflictPractice({ onBack, navigation, onHome })
               <TouchableOpacity onPress={handleBack} style={styles.backButton}>
                 <ArrowLeft size={24} color="#FF8C42" />
               </TouchableOpacity>
-              <TouchableOpacity onPress={handleBackToHome} style={styles.closeButton}>
+              <TouchableOpacity onPress={handleExitAttempt} style={styles.closeButton}>
                 <X size={24} color="#FF8C42" />
               </TouchableOpacity>
             </View>
@@ -1358,7 +1421,7 @@ export default function InternalConflictPractice({ onBack, navigation, onHome })
               <TouchableOpacity onPress={handleBack} style={styles.backButton}>
                 <ArrowLeft size={24} color="#FF8C42" />
               </TouchableOpacity>
-              <TouchableOpacity onPress={handleBackToHome} style={styles.closeButton}>
+              <TouchableOpacity onPress={handleExitAttempt} style={styles.closeButton}>
                 <X size={24} color="#FF8C42" />
               </TouchableOpacity>
             </View>
@@ -1441,60 +1504,250 @@ export default function InternalConflictPractice({ onBack, navigation, onHome })
     </KeyboardAvoidingView>
   );
 
-  // ==================== 完成頁 ====================
-  const renderCompletionPage = () => (
-    <View style={styles.fullScreen}>
-      <LinearGradient colors={['#FFF4ED', '#FFE8DB']} style={styles.gradientBg}>
-        <View style={styles.topButtons}>
-          <TouchableOpacity onPress={handleBack} style={styles.backButton}>
-            <ArrowLeft size={24} color="#FF8C42" />
-          </TouchableOpacity>
-          <TouchableOpacity onPress={handleBackToHome} style={styles.closeButton}>
-            <X size={24} color="#FF8C42" />
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.completionContent}>
-          <Animated.View
-            style={[
-              styles.completionIconContainer,
-              { transform: [{ scale: iconScale }] }
-            ]}
-          >
-            <View style={styles.completionIconCircle}>
-              <Heart size={48} color="#FF8C42" />
-            </View>
-          </Animated.View>
-
-          <Text style={styles.completionTitle}>辛苦了！</Text>
-
-          <Text style={styles.completionSubtitle}>
-            不知道紀錄到這邊{'\n'}
-            是否幫你釐清了一些思緒呢？{'\n'}
-            有沒有感覺平靜一點了呢？
-          </Text>
-
-          <TouchableOpacity
-            style={styles.recordMoodButton}
-            onPress={() => setCurrentPage('assessment')}
-          >
-            <LinearGradient
-              colors={['#FF8C42', '#FF6B6B']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.nextButtonGradient}
-            >
-              <Text style={styles.nextButtonText}>紀錄心情</Text>
-              <ArrowRight size={20} color="#FFFFFF" />
-            </LinearGradient>
-          </TouchableOpacity>
-        </View>
-      </LinearGradient>
-    </View>
-  );
-
-  // ==================== 心情評估頁 ====================
+  // ==================== 心情評估頁（修改後文字）====================
   const renderAssessmentPage = () => {
+    return (
+      <View style={styles.fullScreen}>
+        <LinearGradient colors={['#FFF4ED', '#FFE8DB']} style={styles.gradientBg}>
+          <View style={styles.assessmentContent}>
+            <View style={styles.assessmentCard}>
+              <LinearGradient colors={['#FF8C42', '#FF6B35']} style={styles.assessmentAccentBar} />
+
+              <TouchableOpacity onPress={handleBack} style={styles.assessmentBackButton}>
+                <ArrowLeft size={20} color="#64748b" />
+              </TouchableOpacity>
+
+              <Text style={styles.assessmentTitle}>練習後，心情指數是？</Text>
+
+              <View style={styles.scoreDisplay}>
+                <Text style={styles.scoreNumber}>{formData.moodScore}</Text>
+                <Text style={styles.scoreTotal}>/10</Text>
+              </View>
+
+              <View style={styles.sliderWrapper}>
+                <CustomSlider
+                  value={formData.moodScore}
+                  onValueChange={(value) => setFormData(prev => ({ ...prev, moodScore: value }))}
+                  min={0}
+                  max={10}
+                />
+
+                <View style={styles.sliderLabels}>
+                  <Text style={styles.sliderLabel}>0 (極差)</Text>
+                  <Text style={styles.sliderLabel}>10 (非常好)</Text>
+                </View>
+              </View>
+
+              <TouchableOpacity
+                style={styles.assessmentButton}
+                onPress={() => setCurrentPage('recommendations')}
+              >
+                <LinearGradient colors={['#FF8C42', '#FF6B35']} style={styles.assessmentButtonGradient}>
+                  <Text style={styles.assessmentButtonText}>完成記錄</Text>
+                  <ArrowRight size={20} color="#FFFFFF" />
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </LinearGradient>
+      </View>
+    );
+  };
+
+  // ==================== 新增：記錄統整頁 ====================
+  const renderSummaryPage = () => {
+    return (
+      <View style={styles.fullScreen}>
+        <LinearGradient colors={['#FFF4ED', '#FFE8DB']} style={styles.gradientBg}>
+          <View style={styles.topButtons}>
+            <TouchableOpacity onPress={handleBack} style={styles.backButton}>
+              <ArrowLeft size={24} color="#FF8C42" />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={handleExitAttempt} style={styles.closeButton}>
+              <X size={24} color="#FF8C42" />
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.summaryContainer}>
+            <Text style={styles.summaryTitle}>記錄統整</Text>
+
+            <ScrollView 
+              style={styles.summaryScrollView}
+              contentContainerStyle={styles.summaryScrollContent}
+              showsVerticalScrollIndicator={false}
+            >
+              {/* 情境回想 */}
+              {formData.situation && (
+                <View style={styles.summarySection}>
+                  <Text style={styles.summarySectionTitle}>使用者適當的情境</Text>
+                  <Text style={styles.summarySectionContent}>{formData.situation}</Text>
+                </View>
+              )}
+
+              {/* 捕捉想法 */}
+              {formData.thoughts && (
+                <View style={styles.summarySection}>
+                  <Text style={styles.summarySectionTitle}>使用者的想法</Text>
+                  <Text style={styles.summarySectionContent}>{formData.thoughts}</Text>
+                </View>
+              )}
+
+              {/* 情緒反應 */}
+              {formData.emotionReactions.length > 0 && (
+                <View style={styles.summarySection}>
+                  <Text style={styles.summarySectionTitle}>情緒感受</Text>
+                  <Text style={styles.summarySectionContent}>
+                    {formData.emotionReactions.join('、')}
+                  </Text>
+                </View>
+              )}
+
+              {/* 身體反應 */}
+              {formData.physicalReactions.length > 0 && (
+                <View style={styles.summarySection}>
+                  <Text style={styles.summarySectionTitle}>身體感覺</Text>
+                  <Text style={styles.summarySectionContent}>
+                    {formData.physicalReactions.join('、')}
+                  </Text>
+                </View>
+              )}
+
+              {/* 行為反應 */}
+              {formData.behaviorReactions.length > 0 && (
+                <View style={styles.summarySection}>
+                  <Text style={styles.summarySectionTitle}>行為反應</Text>
+                  <Text style={styles.summarySectionContent}>
+                    {formData.behaviorReactions.join('、')}
+                  </Text>
+                </View>
+              )}
+
+              {/* 辨識需求 */}
+              {formData.needs && (
+                <View style={styles.summarySection}>
+                  <Text style={styles.summarySectionTitle}>辨識需求</Text>
+                  <Text style={styles.summarySectionContent}>{formData.needs}</Text>
+                </View>
+              )}
+
+              {/* 支持證據 */}
+              {formData.supportingEvidence && (
+                <View style={styles.summarySection}>
+                  <Text style={styles.summarySectionTitle}>支持想法的證據</Text>
+                  <Text style={styles.summarySectionContent}>{formData.supportingEvidence}</Text>
+                </View>
+              )}
+
+              {/* 反對證據 */}
+              {formData.opposingEvidence && (
+                <View style={styles.summarySection}>
+                  <Text style={styles.summarySectionTitle}>反對想法的證據</Text>
+                  <Text style={styles.summarySectionContent}>{formData.opposingEvidence}</Text>
+                </View>
+              )}
+
+              {/* 習慣模式 */}
+              {formData.habitPattern && (
+                <View style={styles.summarySection}>
+                  <Text style={styles.summarySectionTitle}>這是習慣還是針對我？</Text>
+                  <Text style={styles.summarySectionContent}>{formData.habitPattern}</Text>
+                </View>
+              )}
+
+              {/* 同理視角 */}
+              {formData.empathyPerspective && (
+                <View style={styles.summarySection}>
+                  <Text style={styles.summarySectionTitle}>如果我是對方</Text>
+                  <Text style={styles.summarySectionContent}>{formData.empathyPerspective}</Text>
+                </View>
+              )}
+
+              {/* 可控部分 */}
+              {formData.controllable && (
+                <View style={styles.summarySection}>
+                  <Text style={styles.summarySectionTitle}>可控的部分</Text>
+                  <Text style={styles.summarySectionContent}>{formData.controllable}</Text>
+                </View>
+              )}
+
+              {/* 不可控部分 */}
+              {formData.uncontrollable && (
+                <View style={styles.summarySection}>
+                  <Text style={styles.summarySectionTitle}>不可控的部分</Text>
+                  <Text style={styles.summarySectionContent}>{formData.uncontrollable}</Text>
+                </View>
+              )}
+            </ScrollView>
+
+            <View style={styles.summaryFooter}>
+              <TouchableOpacity
+                style={styles.summaryButton}
+                onPress={() => setCurrentPage('assessment')}
+              >
+                <LinearGradient
+                  colors={['#FF8C42', '#FF6B6B']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.nextButtonGradient}
+                >
+                  <Text style={styles.nextButtonText}>下一步</Text>
+                  <ArrowRight size={20} color="#FFFFFF" />
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </LinearGradient>
+      </View>
+    );
+  };
+
+  // ==================== 完成頁（修改後內容）====================
+  const renderCompletionPage = () => {
+    return (
+      <View style={styles.fullScreen}>
+        <LinearGradient colors={['#FFF4ED', '#FFE8DB']} style={styles.gradientBg}>
+          <View style={styles.completionContent}>
+            <Animated.View
+              style={[
+                styles.completionIconContainer,
+                { transform: [{ scale: iconScale }] }
+              ]}
+            >
+              <View style={styles.completionIconCircle}>
+                <Heart size={48} color="#FF8C42" />
+              </View>
+            </Animated.View>
+
+            <Text style={styles.completionTitleNew}>辛苦了！</Text>
+
+            <Text style={styles.completionSubtitleNew}>
+              不知道紀錄到這邊{'\n'}
+              是否幫你釐清了一些思緒呢？{'\n'}
+              有沒有感覺平靜一點了呢？
+            </Text>
+
+            <TouchableOpacity
+              style={styles.recordMoodButton}
+              onPress={() => setCurrentPage('summary')}
+            >
+              <LinearGradient
+                colors={['#FF8C42', '#FF6B6B']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.nextButtonGradient}
+              >
+                <Text style={styles.nextButtonText}>記錄心情</Text>
+                <ArrowRight size={20} color="#FFFFFF" />
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+        </LinearGradient>
+      </View>
+    );
+  };
+
+  // ==================== 新增：推薦頁面 ====================
+  const renderRecommendationsPage = () => {
     const handleViewJournal = async () => {
       try {
         await handleComplete();
@@ -1511,43 +1764,68 @@ export default function InternalConflictPractice({ onBack, navigation, onHome })
     return (
       <View style={styles.fullScreen}>
         <LinearGradient colors={['#FFF4ED', '#FFE8DB']} style={styles.gradientBg}>
-          <View style={styles.assessmentContent}>
-            <View style={styles.assessmentCard}>
-              <LinearGradient colors={['#FF8C42', '#FF6B35']} style={styles.assessmentAccentBar} />
+          <View style={styles.recommendationsContainer}>
+            <Text style={styles.recommendationsTitle}>接下來，你可以...</Text>
 
-              <TouchableOpacity onPress={handleBack} style={styles.assessmentBackButton}>
-                <ArrowLeft size={20} color="#64748b" />
-              </TouchableOpacity>
-
-              <Text style={styles.assessmentTitle}>平靜程度</Text>
-
-              <View style={styles.scoreDisplay}>
-                <Text style={styles.scoreNumber}>{formData.moodScore}</Text>
-                <Text style={styles.scoreTotal}>/10</Text>
-              </View>
-
-              <Text style={styles.assessmentSubtitle}>完成練習後，你感覺如何？</Text>
-
-              <View style={styles.sliderWrapper}>
-                <CustomSlider
-                  value={formData.moodScore}
-                  onValueChange={(value) => setFormData(prev => ({ ...prev, moodScore: value }))}
-                  min={0}
-                  max={10}
-                />
-
-                <View style={styles.sliderLabels}>
-                  <Text style={styles.sliderLabel}>0 (仍然焦慮)</Text>
-                  <Text style={styles.sliderLabel}>10 (非常平靜)</Text>
+            <ScrollView 
+              style={styles.recommendationsScrollView}
+              contentContainerStyle={styles.recommendationsScrollContent}
+              showsVerticalScrollIndicator={false}
+            >
+              {/* 找人聊聊 */}
+              <View style={styles.recommendationCard}>
+                <View style={styles.recommendationIconContainer}>
+                  <Text style={styles.recommendationIcon}>💭</Text>
                 </View>
+                <Text style={styles.recommendationTitle}>找人聊聊</Text>
+                <Text style={styles.recommendationDescription}>
+                  與信任的人分享你的感受
+                </Text>
               </View>
 
+              {/* 4-7-8呼吸練習 */}
+              <View style={styles.recommendationCard}>
+                <View style={styles.recommendationIconContainer}>
+                  <Text style={styles.recommendationIcon}>🌬️</Text>
+                </View>
+                <Text style={styles.recommendationTitle}>4-7-8呼吸練習</Text>
+                <Text style={styles.recommendationDescription}>
+                  專注在呼吸，進一步放鬆
+                </Text>
+              </View>
+
+              {/* 演練情緒調整練習 */}
+              <View style={styles.recommendationCard}>
+                <View style={styles.recommendationIconContainer}>
+                  <Text style={styles.recommendationIcon}>⚡</Text>
+                </View>
+                <Text style={styles.recommendationTitle}>演練情緒調整練習</Text>
+                <Text style={styles.recommendationDescription}>
+                  回想當時對話時候發生的事情，想著
+                  若重新來一次，你會想怎麼說呢？是
+                  能為未來類似場景做好準備嗎？讓未
+                  來的你在面對類似場景時能有所參考
+                </Text>
+              </View>
+
+              {/* 圖片區域 */}
+              <View style={styles.recommendationImageContainer}>
+                <Image source={{ uri: 'https://curiouscreate.com/api/asserts/image/InternalConflictPractice_image.jpg' }}style={styles.recommendationImage}resizeMode="cover"/>
+              </View>
+            </ScrollView>
+
+            <View style={styles.recommendationsFooter}>
               <TouchableOpacity
-                style={styles.assessmentButton}
+                style={styles.recommendationsButton}
                 onPress={handleViewJournal}
               >
-                <LinearGradient colors={['#FF8C42', '#FF6B35']} style={styles.assessmentButtonGradient}>
-                  <Text style={styles.assessmentButtonText}>完成</Text>
+                <LinearGradient
+                  colors={['#FF8C42', '#FF6B6B']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.nextButtonGradient}
+                >
+                  <Text style={styles.nextButtonText}>完成練習</Text>
                   <ArrowRight size={20} color="#FFFFFF" />
                 </LinearGradient>
               </TouchableOpacity>
@@ -1563,6 +1841,15 @@ export default function InternalConflictPractice({ onBack, navigation, onHome })
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFF4ED" />
       
+      <ExitWarningModal
+        visible={showExitWarning}
+        onCancel={() => setShowExitWarning(false)}
+        onConfirm={() => {
+          setShowExitWarning(false);
+          handleBackToHome();
+        }}
+      />
+      
       {currentPage === 'welcome' && renderWelcomePage()}
       {currentPage === 'intro' && renderIntroPage()}
       {currentPage === 'situation-intro' && renderSituationIntroPage()}
@@ -1575,7 +1862,9 @@ export default function InternalConflictPractice({ onBack, navigation, onHome })
       {currentPage === 'perspective' && renderPerspectivePage()}
       {currentPage === 'controllable' && renderControllablePage()}
       {currentPage === 'completion' && renderCompletionPage()}
+      {currentPage === 'summary' && renderSummaryPage()}
       {currentPage === 'assessment' && renderAssessmentPage()}
+      {currentPage === 'recommendations' && renderRecommendationsPage()}
     </View>
   );
 }
@@ -1593,6 +1882,79 @@ const styles = StyleSheet.create({
   },
   gradientBg: {
     flex: 1,
+  },
+
+  // ========== Modal 樣式 ==========
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 32,
+  },
+  modalContent: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    padding: 32,
+    alignItems: 'center',
+    width: '100%',
+    maxWidth: 340,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 24,
+    elevation: 8,
+  },
+  modalIconContainer: {
+    marginBottom: 20,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1e293b',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  modalMessage: {
+    fontSize: 15,
+    color: '#64748b',
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: 28,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    width: '100%',
+  },
+  modalButtonCancel: {
+    flex: 1,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#f1f5f9',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalButtonCancelText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#64748b',
+  },
+  modalButtonConfirm: {
+    flex: 1,
+    height: 48,
+    borderRadius: 24,
+    overflow: 'hidden',
+  },
+  modalButtonGradient: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalButtonConfirmText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
 
   // ========== 頂部按鈕 ==========
@@ -1697,7 +2059,7 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
 
-  // ========== 步驟說明 ==========
+  // ========== 步驟說明（優化後）==========
   stepsDescription: {
     alignItems: 'center',
     marginBottom: 40,
@@ -1708,18 +2070,28 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 22,
   },
-  stepsList: {
+  stepsListOptimized: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'center',
-    gap: 8,
+    alignItems: 'center',
     marginTop: 16,
     marginBottom: 8,
+    paddingHorizontal: 20,
   },
   stepHighlight: {
     fontSize: 14,
     fontWeight: '600',
     color: '#FF8C42',
+  },
+  stepSeparator: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FF8C42',
+  },
+  stepLineBreak: {
+    width: '100%',
+    height: 0,
   },
 
   // ========== 頁面標題 ==========
@@ -1981,67 +2353,6 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontWeight: '600',
   },
-  customChip: {
-    backgroundColor: 'rgba(255, 140, 66, 0.05)',
-    borderWidth: 1,
-    borderColor: '#FFE8DB',
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-  },
-  customChipText: {
-    fontSize: 14,
-    color: '#FF8C42',
-  },
-
-  // ========== 完成頁 ==========
-  completionContent: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 32,
-  },
-  completionIconContainer: {
-    marginBottom: 24,
-  },
-  completionIconCircle: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    backgroundColor: '#FFFFFF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#FF8C42',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.2,
-    shadowRadius: 16,
-    elevation: 8,
-  },
-  completionTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#1e293b',
-    marginBottom: 16,
-  },
-  completionSubtitle: {
-    fontSize: 15,
-    color: '#64748b',
-    textAlign: 'center',
-    lineHeight: 24,
-    marginBottom: 40,
-  },
-  recordMoodButton: {
-    width: '100%',
-    maxWidth: 280,
-    height: 56,
-    borderRadius: 28,
-    overflow: 'hidden',
-    shadowColor: '#FF8C42',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
-  },
 
   // ========== 評估頁 ==========
   assessmentContent: {
@@ -2098,7 +2409,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'baseline',
-    marginBottom: 4,
+    marginBottom: 24,
   },
   scoreNumber: {
     fontSize: 56,
@@ -2110,12 +2421,6 @@ const styles = StyleSheet.create({
     color: '#9CA3AF',
     fontWeight: '500',
     marginLeft: 4,
-  },
-  assessmentSubtitle: {
-    fontSize: 14,
-    color: '#6B7280',
-    textAlign: 'center',
-    marginBottom: 32,
   },
   sliderWrapper: {
     marginBottom: 32,
@@ -2154,6 +2459,192 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '700',
     color: '#FFFFFF',
+  },
+
+  // ========== 記錄統整頁 ==========
+  summaryContainer: {
+    flex: 1,
+    paddingTop: 120,
+    paddingHorizontal: 24,
+  },
+  summaryTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#1e293b',
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  summaryScrollView: {
+    flex: 1,
+  },
+  summaryScrollContent: {
+    paddingBottom: 24,
+  },
+  summarySection: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 16,
+    shadowColor: '#FF8C42',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  summarySectionTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#94a3b8',
+    marginBottom: 8,
+  },
+  summarySectionContent: {
+    fontSize: 15,
+    color: '#334155',
+    lineHeight: 22,
+  },
+  summaryFooter: {
+    paddingVertical: 16,
+    paddingBottom: 32,
+  },
+  summaryButton: {
+    width: '100%',
+    height: 56,
+    borderRadius: 28,
+    overflow: 'hidden',
+    shadowColor: '#FF8C42',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+
+  // ========== 完成頁（修改後）==========
+  completionContent: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 32,
+  },
+  completionIconContainer: {
+    marginBottom: 24,
+  },
+  completionIconCircle: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#FF8C42',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.2,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  completionTitleNew: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#1e293b',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  completionSubtitleNew: {
+    fontSize: 15,
+    color: '#64748b',
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: 40,
+  },
+  recordMoodButton: {
+    width: '100%',
+    maxWidth: 280,
+    height: 56,
+    borderRadius: 28,
+    overflow: 'hidden',
+    shadowColor: '#FF8C42',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+
+  // ========== 推薦頁面 ==========
+  recommendationsContainer: {
+    flex: 1,
+    paddingTop: 80,
+    paddingHorizontal: 24,
+  },
+  recommendationsTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#1e293b',
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  recommendationsScrollView: {
+    flex: 1,
+  },
+  recommendationsScrollContent: {
+    paddingBottom: 24,
+  },
+  recommendationCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 16,
+    shadowColor: '#FF8C42',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  recommendationIconContainer: {
+    marginBottom: 12,
+  },
+  recommendationIcon: {
+    fontSize: 32,
+  },
+  recommendationTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1e293b',
+    marginBottom: 8,
+  },
+  recommendationDescription: {
+    fontSize: 14,
+    color: '#64748b',
+    lineHeight: 20,
+  },
+  recommendationImageContainer: {
+    marginTop: 8,
+    marginBottom: 16,
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  recommendationImage: {
+    width: '100%',
+    height: 280,
+    borderRadius: 16,
+  },
+  recommendationsFooter: {
+    paddingVertical: 16,
+    paddingBottom: 32,
+  },
+  recommendationsButton: {
+    width: '100%',
+    height: 56,
+    borderRadius: 28,
+    overflow: 'hidden',
+    shadowColor: '#FF8C42',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
   },
 
   // ========== 底部按鈕 ==========
