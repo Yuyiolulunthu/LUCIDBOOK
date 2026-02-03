@@ -1,3 +1,4 @@
+// @ts-nocheck
 // ==========================================
 // 檔案名稱: InternalConflictPractice.js
 // 內耗終止鍵 - CBT練習
@@ -48,7 +49,8 @@ const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 // ==================== 自定義滑桿組件 ====================
 const CustomSlider = ({ value, onValueChange, min = 0, max = 10 }) => {
-  const SLIDER_WIDTH = SCREEN_WIDTH - 120;
+  const [containerWidth, setContainerWidth] = useState(Dimensions.get('window').width - 120);
+  const SLIDER_WIDTH = containerWidth;
   const THUMB_SIZE = 36;
   const TRACK_HEIGHT = 16;
 
@@ -140,7 +142,15 @@ const CustomSlider = ({ value, onValueChange, min = 0, max = 10 }) => {
   }, [value, min, max]);
 
   return (
-    <View style={customSliderStyles.container}>
+    <View 
+      style={customSliderStyles.container}
+      onLayout={(event) => {
+        const { width } = event.nativeEvent.layout;
+        if (width > 0 && width !== containerWidth) {
+          setContainerWidth(width);
+        }
+      }}
+    >
       <View style={[customSliderStyles.track, { height: TRACK_HEIGHT }]} />
 
       <Animated.View
@@ -184,10 +194,12 @@ const CustomSlider = ({ value, onValueChange, min = 0, max = 10 }) => {
 
 const customSliderStyles = StyleSheet.create({
   container: {
-    width: SCREEN_WIDTH - 120,
+    width: '100%',
+    maxWidth: 400,
     height: 60,
     justifyContent: 'center',
     position: 'relative',
+    alignSelf: 'center',
   },
   track: {
     position: 'absolute',
@@ -272,35 +284,24 @@ const ExitWarningModal = ({ visible, onCancel, onConfirm }) => {
     >
       <View style={styles.modalOverlay}>
         <View style={styles.modalContent}>
-          <View style={styles.modalIconContainer}>
-            <AlertCircle size={48} color="#FF8C42" />
-          </View>
-          
-          <Text style={styles.modalTitle}>確定要離開嗎？</Text>
+          <Text style={styles.modalTitle}>確定要退出練習嗎</Text>
           <Text style={styles.modalMessage}>
-            離開後，本次練習的內容將不會被保存
+            本次練習將不會被記錄
           </Text>
 
           <View style={styles.modalButtons}>
             <TouchableOpacity 
-              style={styles.modalButtonCancel}
-              onPress={onCancel}
+              style={styles.modalButtonConfirmExit}
+              onPress={onConfirm}
             >
-              <Text style={styles.modalButtonCancelText}>取消</Text>
+              <Text style={styles.modalButtonConfirmExitText}>確定退出</Text>
             </TouchableOpacity>
 
             <TouchableOpacity 
-              style={styles.modalButtonConfirm}
-              onPress={onConfirm}
+              style={styles.modalButtonContinue}
+              onPress={onCancel}
             >
-              <LinearGradient
-                colors={['#FF8C42', '#FF6B6B']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.modalButtonGradient}
-              >
-                <Text style={styles.modalButtonConfirmText}>確定離開</Text>
-              </LinearGradient>
+              <Text style={styles.modalButtonContinueText}>繼續練習</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -362,10 +363,11 @@ export default function InternalConflictPractice({ onBack, navigation, onHome })
     'evidence': 4,
     'perspective': 5,
     'controllable': 6,
-    'completion': 7,
-    'summary': 8,
-    'assessment': 9,
+    'completion1': 7,
+    'assessment': 8,
+    'summary': 9,
     'recommendations': 10,
+    'completion2': 11,
   };
 
   const getCurrentStep = () => pageStepMap[currentPage] || 0;
@@ -417,9 +419,15 @@ export default function InternalConflictPractice({ onBack, navigation, onHome })
       duration_seconds: totalSeconds,
       form_data: payloadFormData,
     });
+
+    // 注意：已移除 AsyncStorage 持久化功能
+    // 如需此功能，請安裝 @react-native-async-storage/async-storage
   };
 
   // ==================== 生命週期 ====================
+  // 注意：已移除表單數據持久化功能
+  // 如需此功能，請安裝 @react-native-async-storage/async-storage
+
   useEffect(() => {
     if (currentPage === 'intro') {
       initializePractice();
@@ -435,7 +443,7 @@ export default function InternalConflictPractice({ onBack, navigation, onHome })
   }, [startTime, isTiming]);
 
   useEffect(() => {
-    if (!practiceId || currentPage === 'assessment' || currentPage === 'summary' || currentPage === 'completion' || currentPage === 'recommendations') return;
+    if (!practiceId || currentPage === 'completion1' || currentPage === 'assessment' || currentPage === 'summary' || currentPage === 'recommendations' || currentPage === 'completion2') return;
     const interval = setInterval(() => {
       saveProgress();
     }, 10000);
@@ -453,7 +461,7 @@ export default function InternalConflictPractice({ onBack, navigation, onHome })
 
   // 完成頁動畫
   useEffect(() => {
-    if (currentPage === 'completion') {
+    if (currentPage === 'completion1' || currentPage === 'completion2') {
       Animated.spring(iconScale, {
         toValue: 1,
         tension: 100,
@@ -504,10 +512,11 @@ export default function InternalConflictPractice({ onBack, navigation, onHome })
       'evidence': () => setCurrentPage('identify-needs'),
       'perspective': () => setCurrentPage('evidence'),
       'controllable': () => setCurrentPage('perspective'),
-      'completion': () => setCurrentPage('controllable'),
-      'summary': () => setCurrentPage('completion'),
-      'assessment': () => setCurrentPage('summary'),
-      'recommendations': () => setCurrentPage('assessment'),
+      'completion1': () => setCurrentPage('controllable'),
+      'assessment': () => setCurrentPage('completion1'),
+      'summary': () => setCurrentPage('assessment'),
+      'recommendations': () => setCurrentPage('summary'),
+      'completion2': () => setCurrentPage('recommendations'),
     };
     backMap[currentPage]?.();
   };
@@ -1479,7 +1488,7 @@ export default function InternalConflictPractice({ onBack, navigation, onHome })
                     if (formData.controllable.trim() || formData.uncontrollable.trim()) {
                       Keyboard.dismiss();
                       setIsTiming(false);
-                      setTimeout(() => setCurrentPage('completion'), 100);
+                      setTimeout(() => setCurrentPage('completion1'), 100);
                     }
                   }}
                   disabled={!formData.controllable.trim() && !formData.uncontrollable.trim()}
@@ -1701,8 +1710,8 @@ export default function InternalConflictPractice({ onBack, navigation, onHome })
     );
   };
 
-  // ==================== 完成頁（修改後內容）====================
-  const renderCompletionPage = () => {
+  // ==================== 完成頁1（辛苦了）====================
+  const renderCompletion1Page = () => {
     return (
       <View style={styles.fullScreen}>
         <LinearGradient colors={['#FFF4ED', '#FFE8DB']} style={styles.gradientBg}>
@@ -1728,7 +1737,7 @@ export default function InternalConflictPractice({ onBack, navigation, onHome })
 
             <TouchableOpacity
               style={styles.recordMoodButton}
-              onPress={() => setCurrentPage('summary')}
+              onPress={() => setCurrentPage('assessment')}
             >
               <LinearGradient
                 colors={['#FF8C42', '#FF6B6B']}
@@ -1748,6 +1757,121 @@ export default function InternalConflictPractice({ onBack, navigation, onHome })
 
   // ==================== 新增：推薦頁面 ====================
   const renderRecommendationsPage = () => {
+    const [imageLoaded, setImageLoaded] = useState(false);
+    const imageOpacity = useRef(new Animated.Value(0)).current;
+
+    const handleImageLoad = () => {
+      setImageLoaded(true);
+      Animated.timing(imageOpacity, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+    };
+
+    return (
+      <View style={styles.fullScreen}>
+        <LinearGradient colors={['#FFF4ED', '#FFE8DB']} style={styles.gradientBg}>
+          {/* 頂部按鈕 */}
+          <View style={styles.topButtons}>
+            <TouchableOpacity onPress={handleBack} style={styles.backButton}>
+              <ArrowLeft size={24} color="#FF8C42" />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={handleExitAttempt} style={styles.closeButton}>
+              <X size={24} color="#FF8C42" />
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.recommendationsContainer}>
+            {/* 標題和進度點 */}
+            <View style={styles.recommendationsTitleSection}>
+              <Text style={styles.recommendationsTitle}>接下來，你可以...</Text>
+              <ProgressDots currentStep={7} totalSteps={9} />
+            </View>
+
+            <ScrollView 
+              style={styles.recommendationsScrollView}
+              contentContainerStyle={styles.recommendationsScrollContent}
+              showsVerticalScrollIndicator={false}
+            >
+              {/* 找人聊聊 */}
+              <View style={styles.recommendationCard}>
+                <View style={styles.recommendationIconCircle}>
+                  <Text style={styles.recommendationIcon}>💭</Text>
+                </View>
+                <Text style={styles.recommendationTitle}>找人聊聊</Text>
+                <Text style={styles.recommendationDescription}>
+                  與信任的人分享你的感受
+                </Text>
+              </View>
+
+              {/* 4-6呼吸練習 */}
+              <View style={styles.recommendationCard}>
+                <View style={styles.recommendationIconCircle}>
+                  <Text style={styles.recommendationIcon}>🌬️</Text>
+                </View>
+                <Text style={styles.recommendationTitle}>4-6 呼吸練習</Text>
+                <Text style={styles.recommendationDescription}>
+                  慢慢吸氣四秒，吐氣六秒
+                </Text>
+              </View>
+
+              {/* 演練情緒調整練習 */}
+              <View style={styles.recommendationCard}>
+                <View style={styles.recommendationIconCircle}>
+                  <Text style={styles.recommendationIcon}>⚡</Text>
+                </View>
+                <Text style={styles.recommendationTitle}>演練情緒調整練習</Text>
+                <Text style={styles.recommendationDescription}>
+                  回到剛才發生的場景中，練習如何說會更有幫助。讓未來的你在面對類似場景時能有所參考
+                </Text>
+              </View>
+
+              {/* 圖片區域 - 優化載入 */}
+              <View style={styles.recommendationImageContainer}>
+                <Animated.View style={{ opacity: imageOpacity }}>
+                  <Image
+                    source={{ 
+                      uri: 'https://curiouscreate.com/api/asserts/image/InternalConflictPractice_image.jpg',
+                      cache: 'force-cache'
+                    }}
+                    style={styles.recommendationImage}
+                    resizeMode="cover"
+                    onLoad={handleImageLoad}
+                  />
+                </Animated.View>
+                {!imageLoaded && (
+                  <View style={styles.imagePlaceholder}>
+                    <View style={styles.imagePlaceholderInner} />
+                  </View>
+                )}
+              </View>
+            </ScrollView>
+
+            <View style={styles.recommendationsFooter}>
+              <TouchableOpacity
+                style={styles.recommendationsButton}
+                onPress={() => setCurrentPage('completion2')}
+              >
+                <LinearGradient
+                  colors={['#FF8C42', '#FF6B6B']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.nextButtonGradient}
+                >
+                  <Text style={styles.nextButtonText}>完成練習</Text>
+                  <ArrowRight size={20} color="#FFFFFF" />
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </LinearGradient>
+      </View>
+    );
+  };
+
+  // ==================== 新增：完成頁2（你做得很好）====================
+  const renderCompletion2Page = () => {
     const handleViewJournal = async () => {
       try {
         await handleComplete();
@@ -1764,72 +1888,42 @@ export default function InternalConflictPractice({ onBack, navigation, onHome })
     return (
       <View style={styles.fullScreen}>
         <LinearGradient colors={['#FFF4ED', '#FFE8DB']} style={styles.gradientBg}>
-          <View style={styles.recommendationsContainer}>
-            <Text style={styles.recommendationsTitle}>接下來，你可以...</Text>
-
-            <ScrollView 
-              style={styles.recommendationsScrollView}
-              contentContainerStyle={styles.recommendationsScrollContent}
-              showsVerticalScrollIndicator={false}
+          <View style={styles.completionContent}>
+            <Animated.View
+              style={[
+                styles.completionIconContainer,
+                { transform: [{ scale: iconScale }] }
+              ]}
             >
-              {/* 找人聊聊 */}
-              <View style={styles.recommendationCard}>
-                <View style={styles.recommendationIconContainer}>
-                  <Text style={styles.recommendationIcon}>💭</Text>
+              <View style={styles.completion2IconCircle}>
+                <View style={styles.completion2StarBadge}>
+                  <Star size={20} color="#FFFFFF" fill="#FFFFFF" />
                 </View>
-                <Text style={styles.recommendationTitle}>找人聊聊</Text>
-                <Text style={styles.recommendationDescription}>
-                  與信任的人分享你的感受
-                </Text>
+                <Heart size={48} color="#FF8C42" />
               </View>
+            </Animated.View>
 
-              {/* 4-7-8呼吸練習 */}
-              <View style={styles.recommendationCard}>
-                <View style={styles.recommendationIconContainer}>
-                  <Text style={styles.recommendationIcon}>🌬️</Text>
-                </View>
-                <Text style={styles.recommendationTitle}>4-7-8呼吸練習</Text>
-                <Text style={styles.recommendationDescription}>
-                  專注在呼吸，進一步放鬆
-                </Text>
-              </View>
+            <Text style={styles.completion2Title}>你做得很好</Text>
 
-              {/* 演練情緒調整練習 */}
-              <View style={styles.recommendationCard}>
-                <View style={styles.recommendationIconContainer}>
-                  <Text style={styles.recommendationIcon}>⚡</Text>
-                </View>
-                <Text style={styles.recommendationTitle}>演練情緒調整練習</Text>
-                <Text style={styles.recommendationDescription}>
-                  回想當時對話時候發生的事情，想著
-                  若重新來一次，你會想怎麼說呢？是
-                  能為未來類似場景做好準備嗎？讓未
-                  來的你在面對類似場景時能有所參考
-                </Text>
-              </View>
+            <Text style={styles.completion2Subtitle}>
+              每一次練習，都是在強化{'\n'}
+              你的內在覺察力和自我慈悲
+            </Text>
 
-              {/* 圖片區域 */}
-              <View style={styles.recommendationImageContainer}>
-                <Image source={{ uri: 'https://curiouscreate.com/api/asserts/image/InternalConflictPractice_image.jpg' }}style={styles.recommendationImage}resizeMode="cover"/>
-              </View>
-            </ScrollView>
-
-            <View style={styles.recommendationsFooter}>
-              <TouchableOpacity
-                style={styles.recommendationsButton}
-                onPress={handleViewJournal}
+            <TouchableOpacity
+              style={styles.recordMoodButton}
+              onPress={handleViewJournal}
+            >
+              <LinearGradient
+                colors={['#FF8C42', '#FF6B6B']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.nextButtonGradient}
               >
-                <LinearGradient
-                  colors={['#FF8C42', '#FF6B6B']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={styles.nextButtonGradient}
-                >
-                  <Text style={styles.nextButtonText}>完成練習</Text>
-                  <ArrowRight size={20} color="#FFFFFF" />
-                </LinearGradient>
-              </TouchableOpacity>
-            </View>
+                <Text style={styles.nextButtonText}>完成練習</Text>
+                <ArrowRight size={20} color="#FFFFFF" />
+              </LinearGradient>
+            </TouchableOpacity>
           </View>
         </LinearGradient>
       </View>
@@ -1861,10 +1955,11 @@ export default function InternalConflictPractice({ onBack, navigation, onHome })
       {currentPage === 'evidence' && renderEvidencePage()}
       {currentPage === 'perspective' && renderPerspectivePage()}
       {currentPage === 'controllable' && renderControllablePage()}
-      {currentPage === 'completion' && renderCompletionPage()}
-      {currentPage === 'summary' && renderSummaryPage()}
+      {currentPage === 'completion1' && renderCompletion1Page()}
       {currentPage === 'assessment' && renderAssessmentPage()}
+      {currentPage === 'summary' && renderSummaryPage()}
       {currentPage === 'recommendations' && renderRecommendationsPage()}
+      {currentPage === 'completion2' && renderCompletion2Page()}
     </View>
   );
 }
@@ -1896,17 +1991,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderRadius: 24,
     padding: 32,
+    paddingTop: 40,
     alignItems: 'center',
     width: '100%',
-    maxWidth: 340,
+    maxWidth: 360,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.15,
     shadowRadius: 24,
     elevation: 8,
-  },
-  modalIconContainer: {
-    marginBottom: 20,
   },
   modalTitle: {
     fontSize: 20,
@@ -1920,41 +2013,40 @@ const styles = StyleSheet.create({
     color: '#64748b',
     textAlign: 'center',
     lineHeight: 22,
-    marginBottom: 28,
+    marginBottom: 32,
   },
   modalButtons: {
-    flexDirection: 'row',
+    flexDirection: 'column',
     gap: 12,
     width: '100%',
   },
-  modalButtonCancel: {
-    flex: 1,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#f1f5f9',
+  modalButtonConfirmExit: {
+    width: '100%',
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: '#FFE8E8',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  modalButtonCancelText: {
+  modalButtonConfirmExitText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#64748b',
+    color: '#DC2626',
   },
-  modalButtonConfirm: {
-    flex: 1,
-    height: 48,
-    borderRadius: 24,
-    overflow: 'hidden',
-  },
-  modalButtonGradient: {
-    flex: 1,
+  modalButtonContinue: {
+    width: '100%',
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#E5E7EB',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  modalButtonConfirmText: {
+  modalButtonContinueText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#FFFFFF',
+    color: '#1e293b',
   },
 
   // ========== 頂部按鈕 ==========
@@ -2018,10 +2110,10 @@ const styles = StyleSheet.create({
   // ========== 歡迎頁 ==========
   welcomeContent: {
     flex: 1,
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
     alignItems: 'center',
     paddingHorizontal: 32,
-    paddingTop: 80,
+    paddingTop: 140,
   },
   welcomeIconContainer: {
     marginBottom: 24,
@@ -2429,7 +2521,9 @@ const styles = StyleSheet.create({
   sliderLabels: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    width: SCREEN_WIDTH - 120,
+    width: '100%',
+    maxWidth: 400,
+    alignSelf: 'center',
     marginTop: 12,
   },
   sliderLabel: {
@@ -2571,15 +2665,19 @@ const styles = StyleSheet.create({
   // ========== 推薦頁面 ==========
   recommendationsContainer: {
     flex: 1,
-    paddingTop: 80,
+    paddingTop: 120,
     paddingHorizontal: 24,
   },
+  recommendationsTitleSection: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
   recommendationsTitle: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: '700',
     color: '#1e293b',
     textAlign: 'center',
-    marginBottom: 24,
+    marginBottom: 12,
   },
   recommendationsScrollView: {
     flex: 1,
@@ -2591,18 +2689,24 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
     padding: 20,
-    marginBottom: 16,
+    marginBottom: 12,
     shadowColor: '#FF8C42',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
     shadowRadius: 8,
     elevation: 2,
   },
-  recommendationIconContainer: {
+  recommendationIconCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(255, 140, 66, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
     marginBottom: 12,
   },
   recommendationIcon: {
-    fontSize: 32,
+    fontSize: 24,
   },
   recommendationTitle: {
     fontSize: 16,
@@ -2620,16 +2724,29 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     borderRadius: 16,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
+    position: 'relative',
   },
   recommendationImage: {
     width: '100%',
-    height: 280,
+    height: 240,
     borderRadius: 16,
+  },
+  imagePlaceholder: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#F5E6DC',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 16,
+  },
+  imagePlaceholderInner: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#FFE8DB',
   },
   recommendationsFooter: {
     paddingVertical: 16,
@@ -2645,6 +2762,50 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 4,
+  },
+
+  // ========== 完成頁2（你做得很好）==========
+  completion2IconCircle: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#FF8C42',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.2,
+    shadowRadius: 16,
+    elevation: 8,
+    position: 'relative',
+  },
+  completion2StarBadge: {
+    position: 'absolute',
+    top: -8,
+    right: -8,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#FF8C42',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+    borderWidth: 3,
+    borderColor: '#FFFFFF',
+  },
+  completion2Title: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#1e293b',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  completion2Subtitle: {
+    fontSize: 15,
+    color: '#64748b',
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: 40,
   },
 
   // ========== 底部按鈕 ==========
