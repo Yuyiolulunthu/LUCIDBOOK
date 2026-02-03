@@ -36,6 +36,7 @@ import EmotionThermometer from './src/data/practices/EmotionThermometer';
 import CognitiveReframingPractice from './src/data/practices/CognitiveReframingPractice';
 import GratitudePractice from './src/data/practices/GratitudePractice';
 import InternalConflictPractice from './src/data/practices/InternalConflictPractice'; // ⭐ 新增
+import EmpathyPractice  from './src/data/practices/EmpathyPractice';
 
 // 訓練計畫相關頁面
 import TrainingPlanDetailScreen from './src/screens/practice/training/TrainingPlanDetailScreen';
@@ -226,6 +227,14 @@ const App = () => {
           options={{ animation: 'slide_from_bottom' }}
         />
         
+        {/* ⭐⭐⭐ 新增：同理心練習 */}
+        <Stack.Screen 
+          name="EmpathyPractice" 
+          component={EmpathyPractice}
+          options={{ animation: 'slide_from_bottom' }}
+        />
+
+
         {/* ========== 訓練計畫相關頁面 ========== */}
         <Stack.Screen name="TrainingPlanDetail" component={TrainingPlanDetailScreen} />
         <Stack.Screen name="TrainingPlanProgress" component={TrainingPlanProgressScreen} />

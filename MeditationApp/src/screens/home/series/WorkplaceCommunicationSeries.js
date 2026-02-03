@@ -29,6 +29,7 @@ import {
 } from 'lucide-react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import ApiService from '../../../services/index';
+import EmpathyPractice from '../../../data/practices/EmpathyPractice';
 
 // ==========================================
 // ⭐ 心情溫度計卡片組件（特殊樣式）
@@ -193,7 +194,7 @@ const WorkplaceCommunicationSeries = ({ navigation, userName }) => {
       progress: '0/3',
       tags: ['關係卡關', '覺得被針對', '同理心', '關係提升'],
       description: '如果因為他人的反應而感到難受,或是想要放下敵意,修復與對方的關係,請點擊練習',
-      screen: null,
+      screen: 'EmpathyPractice',
       practiceType: '同理讀心術',
     },
     {
