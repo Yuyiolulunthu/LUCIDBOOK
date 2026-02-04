@@ -2,11 +2,12 @@
 // ==========================================
 // 檔案名稱: EmpathyPractice.js
 // 同理讀心術 - CBT與同理心練習
-// 版本: V3.8 - 滑桿閉包修正版
+// 版本: V3.9 - 完整修正版
 // 修正內容：
-// 1. [Critical Fix] 修正 CustomSlider 的 PanResponder 閉包問題，解決滑桿互相連動/重置 bug
-// 2. [Best Practice] 將 setFormData 全面改為 Functional Update (prev => ...)，防止資料覆蓋
-// 3. [UX] 保持所有 Header 的退出(X)按鈕功能
+// 1. [UI] 添加"情境回想"和"你很厲害"鼓勵頁面
+// 2. [UI] 完善理解需求、考量限制、同理翻譯頁面細節
+// 3. [Asset] 更新圖片URL
+// 4. [Critical] 保留所有原有功能，修正 Hooks 順序問題
 // ==========================================
 
 import React, { useState, useRef, useEffect } from 'react';
@@ -80,24 +81,18 @@ const CustomSlider = ({ value, onValueChange, min = 0, max = 10 }) => {
   const THUMB_SIZE = 36;
   const TRACK_HEIGHT = 16;
 
-  // 動畫位置
   const position = useRef(
     new Animated.Value(((value - min) / (max - min)) * SLIDER_WIDTH)
   ).current;
 
-  // 狀態追蹤
   const isDragging = useRef(false);
   const startPosition = useRef(0);
-  
-  // 關鍵修正 1: 使用 ref 追蹤最新的 callback 與 value，避開閉包陷阱
   const onValueChangeRef = useRef(onValueChange);
   const valueRef = useRef(value);
 
-  // 隨時更新 Ref
   useEffect(() => { onValueChangeRef.current = onValueChange; }, [onValueChange]);
   useEffect(() => { valueRef.current = value; }, [value]);
 
-  // 當外部 value 改變（且非拖曳中），更新滑塊位置
   useEffect(() => {
     if (!isDragging.current) {
       Animated.timing(position, {
@@ -109,43 +104,28 @@ const CustomSlider = ({ value, onValueChange, min = 0, max = 10 }) => {
   }, [value, min, max, SLIDER_WIDTH]);
 
   const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
-
-  const posToValue = (pos) => {
-    const raw = (pos / SLIDER_WIDTH) * (max - min) + min;
-    return Math.round(raw);
-  };
-
+  const posToValue = (pos) => Math.round((pos / SLIDER_WIDTH) * (max - min) + min);
   const valueToPos = (v) => ((v - min) / (max - min)) * SLIDER_WIDTH;
 
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
-
       onPanResponderGrant: () => {
         isDragging.current = true;
         // @ts-ignore
         startPosition.current = position._value;
       },
-
       onPanResponderMove: (_, gestureState) => {
         let newPos = startPosition.current + gestureState.dx;
         newPos = clamp(newPos, 0, SLIDER_WIDTH);
-
         position.setValue(newPos);
         const newValue = posToValue(newPos);
-
-        // 關鍵修正 2: 使用 Ref 判斷與呼叫，確保拿到最新的值與函數
-        if (newValue !== valueRef.current) {
-          // 只更新 Ref，讓外部 State 決定是否重繪
-          if (onValueChangeRef.current) {
-            onValueChangeRef.current(newValue);
-          }
+        if (newValue !== valueRef.current && onValueChangeRef.current) {
+          onValueChangeRef.current(newValue);
         }
       },
-
       onPanResponderRelease: () => {
-        // 放開時，吸附到最新的 valueRef 位置
         const snapPos = valueToPos(valueRef.current);
         Animated.spring(position, {
           toValue: snapPos,
@@ -156,7 +136,6 @@ const CustomSlider = ({ value, onValueChange, min = 0, max = 10 }) => {
           isDragging.current = false;
         });
       },
-
       onPanResponderTerminate: () => {
         const snapPos = valueToPos(valueRef.current);
         Animated.spring(position, {
@@ -182,7 +161,6 @@ const CustomSlider = ({ value, onValueChange, min = 0, max = 10 }) => {
       }}
     >
       <View style={[sliderStyles.track, { height: TRACK_HEIGHT }]} />
-
       <Animated.View
         style={[
           sliderStyles.fill,
@@ -196,7 +174,6 @@ const CustomSlider = ({ value, onValueChange, min = 0, max = 10 }) => {
           },
         ]}
       />
-
       <Animated.View
         {...panResponder.panHandlers}
         style={[
@@ -234,7 +211,10 @@ const FactStep = ({ data, onChange, onNext, onBack, onExit }) => (
           <Text style={styles.instrText}>
             回想一個最近讓你覺得{"\n"}<Text style={{color:'#FF8C42'}}>不舒服或難以理解的對話</Text>
           </Text>
-          <Text style={styles.subInstr}>試著用客觀的角度描寫發生了什麼，先不要加入形容詞與評價。</Text>
+          <Text style={styles.subInstr}>
+            試著用<Text style={{color: '#FF8C42', fontWeight: '700'}}>客觀的角度</Text>描寫發生了什麼事，{"\n"}
+            先不要加入形容詞與評價。
+          </Text>
           <View style={styles.inputCard}>
             <TextInput 
               multiline 
@@ -248,7 +228,9 @@ const FactStep = ({ data, onChange, onNext, onBack, onExit }) => (
           </View>
           <View style={styles.exampleBox}>
             <Star size={14} color="#fbbf24" fill="#fbbf24" />
-            <Text style={styles.exampleText}>例如：「同事說：『我現在很忙，沒事不要一直打擾。』」</Text>
+            <Text style={styles.exampleText}>
+              例如：「同事說：『我現在很忙，沒事不要一直打擾。』」
+            </Text>
           </View>
         </ScrollView>
         <View style={styles.footer}>
@@ -280,7 +262,10 @@ const EmotionsStep = ({ selectedEmotions, onToggle, onNext, onBack, onExit }) =>
       <Header onBack={onBack} title="辨識情緒" onExit={onExit} />
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <ProgressDots currentStep={1} totalSteps={5} />
-        <Text style={styles.instrText}>試著從<Text style={{color:'#FF8C42'}}>對方的立場</Text>選出{"\n"}1~3 個最接近的情緒</Text>
+        <Text style={styles.instrText}>
+          試著從<Text style={{color:'#FF8C42', fontWeight: '700'}}>對方的立場</Text>{"\n"}
+          選出 1~3 個最接近的情緒
+        </Text>
         {Object.entries(cats).map(([name, list]) => (
           <View key={name} style={{marginTop: 20}}>
             <Text style={styles.catTitle}>{name}</Text>
@@ -307,22 +292,6 @@ const EmotionsStep = ({ selectedEmotions, onToggle, onNext, onBack, onExit }) =>
   );
 };
 
-const GenericInputPage = ({ title, hint, value, onChange, onNext, onBack, onExit, step }) => (
-  <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{flex: 1}}>
-    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-      <LinearGradient colors={['#FFF4ED', '#FFE8DB']} style={styles.fullScreen}>
-        <Header onBack={onBack} title={title} onExit={onExit} />
-        <ScrollView contentContainerStyle={styles.scrollContent}>
-          <ProgressDots currentStep={step} totalSteps={5} />
-          <Text style={styles.instrText}>{hint}</Text>
-          <View style={styles.inputCard}><TextInput multiline style={styles.textArea} value={value} onChangeText={onChange} placeholder="寫下你的觀察..." placeholderTextColor="#cbd5e1" textAlignVertical="top" /></View>
-        </ScrollView>
-        <View style={styles.footer}><TouchableOpacity style={styles.primaryBtn} onPress={onNext}><LinearGradient colors={['#FF8C42', '#FF6B6B']} style={styles.btnGrad}><Text style={styles.btnText}>下一步</Text></LinearGradient></TouchableOpacity></View>
-      </LinearGradient>
-    </TouchableWithoutFeedback>
-  </KeyboardAvoidingView>
-);
-
 const TranslationStep = ({ situation, emotion, translation, onChange, onNext, onBack, onExit }) => {
   const applyFormula = () => {
     const emoText = emotion || '(情緒)';
@@ -336,7 +305,15 @@ const TranslationStep = ({ situation, emotion, translation, onChange, onNext, on
           <Header onBack={onBack} title="同理翻譯" onExit={onExit} />
           <ScrollView contentContainerStyle={styles.scrollContent}>
             <ProgressDots currentStep={4} totalSteps={5} />
-            <Text style={styles.instrText}>試著把對方的言行{"\n"}翻譯成感受與需求</Text>
+            <Text style={styles.instrText}>試著把對方的言行翻譯成感受與需求</Text>
+            <Text style={styles.subInstr}>
+              試著用『他/她』告訴句子的開頭{"\n"}
+              這能幫助你保持客觀距離
+            </Text>
+            <Text style={styles.subInstr}>
+              即便你不同意他的表達方式{"\n"}
+              你也可以試著理解他的「感受」與其的
+            </Text>
             <View style={styles.quoteBox}>
               <Info size={16} color="#FF8C42" />
               <View style={{flex:1}}>
@@ -374,7 +351,7 @@ const TranslationStep = ({ situation, emotion, translation, onChange, onNext, on
   );
 };
 
-// 11. 評分頁面
+// 評分頁面
 const AssessmentStep = ({ moodScore, onMoodChange, understandingScore, onUndChange, onNext, onBack, onExit }) => (
   <LinearGradient colors={['#FFF4ED', '#FFE8DB']} style={styles.fullScreen}>
     <Header onBack={onBack} onExit={onExit} />
@@ -382,7 +359,6 @@ const AssessmentStep = ({ moodScore, onMoodChange, understandingScore, onUndChan
       <View style={styles.assessmentCard}>
         <Text style={styles.assessTitle}>練習後的狀態核對</Text>
         
-        {/* 滑桿 1 */}
         <Text style={styles.sliderLabel}>原本情緒張力的改善程度？</Text>
         <View style={styles.scoreRow}>
           <Text style={styles.scoreNum}>{moodScore}</Text>
@@ -396,7 +372,6 @@ const AssessmentStep = ({ moodScore, onMoodChange, understandingScore, onUndChan
 
         <View style={{height: 32}} />
 
-        {/* 滑桿 2 */}
         <Text style={styles.sliderLabel}>對對方與情境的了解程度？</Text>
         <View style={styles.scoreRow}>
           <Text style={styles.scoreNum}>{understandingScore}</Text>
@@ -443,6 +418,258 @@ const SummaryStep = ({ formData, onNext, onBack, onExit }) => (
       </TouchableOpacity>
     </View>
   </LinearGradient>
+);
+
+// ==================== 新增頁面 ====================
+
+const SituationRecallPage = ({ onNext, onBack, onExit }) => (
+  <LinearGradient colors={['#FFF4ED', '#FFE8DB']} style={styles.fullScreen}>
+    <Header onBack={onBack} onExit={onExit} />
+    <View style={styles.centerContent}>
+      <View style={[styles.iconCircle, {backgroundColor:'rgba(255,140,66,0.1)'}]}>
+        <Heart size={48} color="#FF8C42" />
+      </View>
+      <ProgressDots currentStep={2} totalSteps={3} />
+      <Text style={styles.welcomeTitle}>情境回想</Text>
+      <Text style={styles.welcomeDesc}>
+        請先想出一個最近讓你感到{"\n"}
+        <Text style={{color: '#FF8C42', fontWeight: '700'}}>『不舒服或難以理解』</Text>
+        {"\n"}的互動場景
+      </Text>
+      <TouchableOpacity style={styles.primaryBtn} onPress={onNext}>
+        <LinearGradient colors={['#FF8C42', '#FF6B6B']} style={styles.btnGrad}>
+          <Text style={styles.btnText}>下一頁</Text>
+        </LinearGradient>
+      </TouchableOpacity>
+    </View>
+  </LinearGradient>
+);
+
+const EncouragementPage = ({ onNext, onBack, onExit }) => (
+  <LinearGradient colors={['#FFF4ED', '#FFE8DB']} style={styles.fullScreen}>
+    <Header onBack={onBack} onExit={onExit} />
+    <View style={styles.centerContent}>
+      <View style={styles.iconCircle}>
+        <Heart size={48} color="#FF8C42" />
+      </View>
+      <Text style={styles.encouragementTitle}>你很厲害！</Text>
+      <Text style={styles.encouragementDesc}>
+        你願意不帶批判，嘗試站在對方的角度思考，{"\n"}
+        而這正是同理能力的展現。
+      </Text>
+      <Text style={styles.encouragementDesc2}>
+        同理不代表同意或認同對方的想法，{"\n"}
+        而是理解對方的感受與需求，{"\n"}
+        進而決定你打算如何應對。
+      </Text>
+      <TouchableOpacity style={[styles.primaryBtn, {marginTop: 32}]} onPress={onNext}>
+        <LinearGradient colors={['#FF8C42', '#FF6B6B']} style={styles.btnGrad}>
+          <Text style={styles.btnText}>下一步</Text>
+        </LinearGradient>
+      </TouchableOpacity>
+    </View>
+  </LinearGradient>
+);
+
+const NeedsStepDetailed = ({ value, onChange, onNext, onBack, onExit }) => (
+  <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{flex: 1}}>
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+      <LinearGradient colors={['#FFF4ED', '#FFE8DB']} style={styles.fullScreen}>
+        <Header onBack={onBack} title="理解需求" onExit={onExit} />
+        <ScrollView contentContainerStyle={[styles.scrollContent, {paddingBottom: 220}]} showsVerticalScrollIndicator={true}>
+          <ProgressDots currentStep={2} totalSteps={5} />
+          <Text style={styles.instrText}>對方真正在意的重點{"\n"}是什麼需求或期待沒有被滿足呢？</Text>
+          
+          <View style={styles.inputCard}>
+            <TextInput 
+              multiline 
+              style={styles.textArea} 
+              value={value} 
+              onChangeText={onChange} 
+              placeholder="對方在意的點是..." 
+              placeholderTextColor="#cbd5e1" 
+              textAlignVertical="top" 
+            />
+          </View>
+
+          <View style={styles.exampleBox}>
+            <Star size={14} color="#fbbf24" fill="#fbbf24" />
+            <Text style={styles.exampleText}>
+              例如：{"\n"}
+              (1) 他可能需要安穩的空間來處理壓力{"\n"}
+              (2) 另一半可能需要安全感、想要被安慰
+            </Text>
+          </View>
+
+          <Text style={styles.commonCluesTitle}>常見端倪</Text>
+          
+          <View style={styles.clueSection}>
+            <Text style={styles.clueSectionTitle}>• 智慧模式</Text>
+            <Text style={styles.clueSectionText}>
+              這是他長期以來應對外界的習慣嗎？（例如：選擇讓力壓抑起來、習慣先指責別人以保護自己）。
+            </Text>
+          </View>
+
+          <View style={styles.clueSection}>
+            <Text style={styles.clueSectionTitle}>• 身心狀態</Text>
+            <Text style={styles.clueSectionText}>
+              他當時的身體狀況或睡眠狀況嗎？（例如：睡眠不足、焦慮主管系、正好感冒不適造成的焦慮中）。
+            </Text>
+          </View>
+
+          <View style={styles.clueSection}>
+            <Text style={styles.clueSectionTitle}>• 角色壓力</Text>
+            <Text style={styles.clueSectionText}>
+              身為那個角色（上司、父母、伴侶），他是否正承受某些形象的壓力或責任？
+            </Text>
+          </View>
+
+          <TouchableOpacity style={styles.clueExpandBox}>
+            <Text style={styles.clueExpandIcon}>○</Text>
+            <Text style={styles.clueExpandText}>發現更多端倪（點擊輸入額外線）</Text>
+          </TouchableOpacity>
+
+          <View style={styles.reflectionBox}>
+            <Text style={styles.reflectionIcon}>👤</Text>
+            <Text style={styles.reflectionText}>
+              如果我是他，在同樣的處境或壓力漩渦中，我可能會覺得...
+            </Text>
+          </View>
+
+          <View style={styles.reflectionBox}>
+            <Text style={styles.reflectionIcon}>🌿</Text>
+            <Text style={styles.reflectionText}>
+              我發現，他的反應可能不完全反因為我，而是因為...
+            </Text>
+          </View>
+
+          <View style={styles.reflectionBox}>
+            <Text style={styles.reflectionIcon}>💭</Text>
+            <Text style={styles.reflectionText}>
+              根據過往經驗，他好像會在極度焦慮或的時候，會用...
+            </Text>
+          </View>
+
+          <View style={styles.tagRow}>
+            <TouchableOpacity style={styles.tagBtn}><Text style={styles.tagText}>+ 被理解</Text></TouchableOpacity>
+            <TouchableOpacity style={styles.tagBtn}><Text style={styles.tagText}>+ 被尊重</Text></TouchableOpacity>
+            <TouchableOpacity style={styles.tagBtn}><Text style={styles.tagText}>+ 安全感</Text></TouchableOpacity>
+          </View>
+
+          <View style={styles.tagRow}>
+            <TouchableOpacity style={styles.tagBtn}><Text style={styles.tagText}>+ 效率與節奏</Text></TouchableOpacity>
+            <TouchableOpacity style={styles.tagBtn}><Text style={styles.tagText}>+ 空間與自由</Text></TouchableOpacity>
+          </View>
+
+          <View style={styles.tagRow}>
+            <TouchableOpacity style={styles.tagBtn}><Text style={styles.tagText}>+ 認同與價值</Text></TouchableOpacity>
+            <TouchableOpacity style={styles.tagBtn}><Text style={styles.tagText}>+ 連結與親密</Text></TouchableOpacity>
+          </View>
+        </ScrollView>
+        <View style={styles.footer}>
+          <TouchableOpacity style={styles.primaryBtn} onPress={onNext}>
+            <LinearGradient colors={['#FF8C42', '#FF6B6B']} style={styles.btnGrad}>
+              <Text style={styles.btnText}>下一步</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
+      </LinearGradient>
+    </TouchableWithoutFeedback>
+  </KeyboardAvoidingView>
+);
+
+const LimitationsStepDetailed = ({ value, onChange, onNext, onBack, onExit }) => (
+  <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{flex: 1}}>
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+      <LinearGradient colors={['#FFF4ED', '#FFE8DB']} style={styles.fullScreen}>
+        <Header onBack={onBack} title="考量限制" onExit={onExit} />
+        <ScrollView contentContainerStyle={[styles.scrollContent, {paddingBottom: 220}]} showsVerticalScrollIndicator={true}>
+          <ProgressDots currentStep={3} totalSteps={5} />
+          <Text style={styles.instrText}>
+            他的表達方式或許受到某些情境壓力影響{"\n"}
+            或許一些話會想表{"\n"}
+            如果這句話不是在計對我{"\n"}
+            還會有哪些可能性
+          </Text>
+          
+          <View style={styles.inputCard}>
+            <TextInput 
+              multiline 
+              style={styles.textArea} 
+              value={value} 
+              onChangeText={onChange} 
+              placeholder="他會這麼說或許是因為..." 
+              placeholderTextColor="#cbd5e1" 
+              textAlignVertical="top" 
+            />
+          </View>
+
+          <Text style={styles.commonCluesTitle}>常見提示</Text>
+          
+          <View style={styles.clueSection}>
+            <Text style={styles.clueSectionTitle}>• 智慧模式</Text>
+            <Text style={styles.clueSectionText}>
+              這是他長期以來應對外界的習慣嗎？（例如：選擇讓力壓抑起來、習慣先指責別人以保護自己）。
+            </Text>
+          </View>
+
+          <View style={styles.clueSection}>
+            <Text style={styles.clueSectionTitle}>• 身心狀態</Text>
+            <Text style={styles.clueSectionText}>
+              他當時的身體狀況或睡眠狀況嗎？（例如：睡眠不足、焦慮主管系、正好感冒不適造成的焦慮中）。
+            </Text>
+          </View>
+
+          <View style={styles.clueSection}>
+            <Text style={styles.clueSectionTitle}>• 角色壓力</Text>
+            <Text style={styles.clueSectionText}>
+              身為那個角色（上司、父母、伴侶），他是否正承受某些形象的壓力或責任？
+            </Text>
+          </View>
+        </ScrollView>
+        <View style={styles.footer}>
+          <Text style={styles.footerHint}>如果都很確信了，可以先完成</Text>
+          <TouchableOpacity style={styles.primaryBtn} onPress={onNext}>
+            <LinearGradient colors={['#FF8C42', '#FF6B6B']} style={styles.btnGrad}>
+              <Text style={styles.btnText}>下一步</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
+      </LinearGradient>
+    </TouchableWithoutFeedback>
+  </KeyboardAvoidingView>
+);
+
+const GenericInputPage = ({ title, hint, value, onChange, onNext, onBack, onExit, step }) => (
+  <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{flex: 1}}>
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+      <LinearGradient colors={['#FFF4ED', '#FFE8DB']} style={styles.fullScreen}>
+        <Header onBack={onBack} title={title} onExit={onExit} />
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+          <ProgressDots currentStep={step} totalSteps={5} />
+          <Text style={styles.instrText}>{hint}</Text>
+          <View style={styles.inputCard}>
+            <TextInput 
+              multiline 
+              style={styles.textArea} 
+              value={value} 
+              onChangeText={onChange} 
+              placeholder="寫下你的觀察..." 
+              placeholderTextColor="#cbd5e1" 
+              textAlignVertical="top" 
+            />
+          </View>
+        </ScrollView>
+        <View style={styles.footer}>
+          <TouchableOpacity style={styles.primaryBtn} onPress={onNext}>
+            <LinearGradient colors={['#FF8C42', '#FF6B6B']} style={styles.btnGrad}>
+              <Text style={styles.btnText}>下一步</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
+      </LinearGradient>
+    </TouchableWithoutFeedback>
+  </KeyboardAvoidingView>
 );
 
 // ==================== 主組件 (Controller) ====================
@@ -492,7 +719,7 @@ export default function EmpathyPractice({ onBack, navigation, onHome }) {
       }, 10000);
       return () => clearInterval(saver);
     }
-  }, [practiceId, formData, elapsedTime]);
+  }, [practiceId, formData, elapsedTime, currentPage]);
 
   const handleComplete = async () => {
     try {
@@ -520,7 +747,6 @@ export default function EmpathyPractice({ onBack, navigation, onHome }) {
 
   const handleExit = () => setShowExitWarning(true);
 
-  // 關鍵修正：使用 Functional Update 防止狀態覆蓋
   const updateForm = (key, value) => {
     setFormData(prev => ({ ...prev, [key]: value }));
   };
@@ -530,21 +756,25 @@ export default function EmpathyPractice({ onBack, navigation, onHome }) {
       case 'welcome':
         return <WelcomePage onNext={() => setCurrentPage('intro')} onExit={handleExit} />;
       case 'intro':
-        return <IntroPage onNext={() => setCurrentPage('breathing')} onBack={() => setCurrentPage('welcome')} onExit={handleExit} />;
+        return <IntroPage onNext={() => setCurrentPage('situation-recall')} onBack={() => setCurrentPage('welcome')} onExit={handleExit} />;
+      case 'situation-recall':
+        return <SituationRecallPage onNext={() => setCurrentPage('breathing')} onBack={() => setCurrentPage('intro')} onExit={handleExit} />;
       case 'breathing':
-        return <BreathingPage onNext={() => setCurrentPage('fact')} onBack={() => setCurrentPage('intro')} onExit={handleExit} />;
+        return <BreathingPage onNext={() => setCurrentPage('fact')} onBack={() => setCurrentPage('situation-recall')} onExit={handleExit} />;
       case 'fact':
         return <FactStep data={formData.situation} onChange={(v) => updateForm('situation', v)} onNext={() => setCurrentPage('emotions')} onBack={() => setCurrentPage('breathing')} onExit={handleExit} />;
       case 'emotions':
         return <EmotionsStep selectedEmotions={formData.emotions} onToggle={(emo) => setFormData(p => ({...p, emotions: p.emotions.includes(emo) ? p.emotions.filter(e=>e!==emo) : [...p.emotions, emo].slice(0,3)}))} onNext={() => setCurrentPage('needs')} onBack={() => setCurrentPage('fact')} onExit={handleExit} />;
       case 'needs':
-        return <GenericInputPage title="理解需求" step={2} hint="對方真正在意的是什麼需求？" value={formData.needs} onChange={(v) => updateForm('needs', v)} onNext={() => setCurrentPage('limitations')} onBack={() => setCurrentPage('emotions')} onExit={handleExit} />;
+        return <NeedsStepDetailed value={formData.needs} onChange={(v) => updateForm('needs', v)} onNext={() => setCurrentPage('limitations')} onBack={() => setCurrentPage('emotions')} onExit={handleExit} />;
       case 'limitations':
-        return <GenericInputPage title="考量限制" step={3} hint="對方的表達可能受壓力影響嗎？" value={formData.limitations} onChange={(v) => updateForm('limitations', v)} onNext={() => setCurrentPage('translation')} onBack={() => setCurrentPage('needs')} onExit={handleExit} />;
+        return <LimitationsStepDetailed value={formData.limitations} onChange={(v) => updateForm('limitations', v)} onNext={() => setCurrentPage('translation')} onBack={() => setCurrentPage('needs')} onExit={handleExit} />;
       case 'translation':
-        return <TranslationStep situation={formData.situation} emotion={formData.emotions[0]} translation={formData.translation} onChange={(v) => updateForm('translation', v)} onNext={() => setCurrentPage('assessment')} onBack={() => setCurrentPage('limitations')} onExit={handleExit} />;
+        return <TranslationStep situation={formData.situation} emotion={formData.emotions[0]} translation={formData.translation} onChange={(v) => updateForm('translation', v)} onNext={() => setCurrentPage('encouragement')} onBack={() => setCurrentPage('limitations')} onExit={handleExit} />;
+      case 'encouragement':
+        return <EncouragementPage onNext={() => setCurrentPage('assessment')} onBack={() => setCurrentPage('translation')} onExit={handleExit} />;
       case 'assessment':
-        return <AssessmentStep moodScore={formData.moodScore} onMoodChange={(v) => updateForm('moodScore', v)} understandingScore={formData.understandingScore} onUndChange={(v) => updateForm('understandingScore', v)} onNext={() => setCurrentPage('summary')} onBack={() => setCurrentPage('translation')} onExit={handleExit} />;
+        return <AssessmentStep moodScore={formData.moodScore} onMoodChange={(v) => updateForm('moodScore', v)} understandingScore={formData.understandingScore} onUndChange={(v) => updateForm('understandingScore', v)} onNext={() => setCurrentPage('summary')} onBack={() => setCurrentPage('encouragement')} onExit={handleExit} />;
       case 'summary':
         return <SummaryStep formData={formData} onNext={() => setCurrentPage('recommendations')} onBack={() => setCurrentPage('assessment')} onExit={handleExit} />;
       case 'recommendations':
@@ -577,7 +807,7 @@ const WelcomePage = ({ onNext, onExit }) => (
       <ProgressDots currentStep={0} totalSteps={3} />
       <Text style={styles.welcomeTitle}>哈囉！{"\n"}歡迎來到同理讀心術</Text>
       <Text style={styles.welcomeDesc}>
-        無法清晰表達的需求，往往是人際衝突的來源。{"\n"}
+        無法清晰表達的需求，往往是人際衝突的來源。{"\n\n"}
         透過這個練習，我們將能解讀對方話語中的真實感受與需求。
       </Text>
       <TouchableOpacity style={styles.primaryBtn} onPress={onNext}>
@@ -598,9 +828,16 @@ const IntroPage = ({ onNext, onBack, onExit }) => (
       <ProgressDots currentStep={1} totalSteps={3} />
       <Text style={styles.welcomeTitle}>接下來我們一起{"\n"}走過這些練習步驟</Text>
       <View style={styles.stepList}>
-        <Text style={styles.stepHighlight}>還原事實 • 辨識情緒 • 理解需求{"\n"}考量限制 • 同理翻譯</Text>
+        <Text style={styles.stepHighlight}>
+          還原事實 • 辨識情緒 • 理解需求{"\n"}
+          考量限制 • 同理翻譯
+        </Text>
       </View>
-      <TouchableOpacity style={styles.primaryBtn} onPress={onNext}><LinearGradient colors={['#FF8C42', '#FF6B6B']} style={styles.btnGrad}><Text style={styles.btnText}>下一頁</Text></LinearGradient></TouchableOpacity>
+      <TouchableOpacity style={styles.primaryBtn} onPress={onNext}>
+        <LinearGradient colors={['#FF8C42', '#FF6B6B']} style={styles.btnGrad}>
+          <Text style={styles.btnText}>下一頁</Text>
+        </LinearGradient>
+      </TouchableOpacity>
     </View>
   </LinearGradient>
 );
@@ -609,11 +846,21 @@ const BreathingPage = ({ onNext, onBack, onExit }) => (
   <LinearGradient colors={['#FFF4ED', '#FFE8DB']} style={styles.fullScreen}>
     <Header onBack={onBack} onExit={onExit} />
     <View style={styles.centerContent}>
-      <View style={[styles.iconCircle, {backgroundColor:'rgba(255,140,66,0.1)'}]}><Wind size={48} color="#FF8C42" /></View>
-      <ProgressDots currentStep={2} totalSteps={3} />
+      <View style={[styles.iconCircle, {backgroundColor:'rgba(255,140,66,0.1)'}]}>
+        <Wind size={48} color="#FF8C42" />
+      </View>
       <Text style={styles.welcomeTitle}>深呼吸 放鬆</Text>
-      <Text style={styles.welcomeDesc}>吸氣4秒，閉氣4秒，呼氣6秒。{"\n"}讓理性腦回歸主宰。</Text>
-      <TouchableOpacity style={styles.primaryBtn} onPress={onNext}><LinearGradient colors={['#FF8C42', '#FF6B6B']} style={styles.btnGrad}><Text style={styles.btnText}>開始練習</Text></LinearGradient></TouchableOpacity>
+      <Text style={styles.welcomeDesc}>
+        進行3-5次腹式呼吸{"\n"}
+        吸氣4秒，閉氣4秒，呼氣6秒{"\n"}
+        讓理性腦回歸主宰{"\n"}
+        幫助後面的練習更加順利
+      </Text>
+      <TouchableOpacity style={styles.primaryBtn} onPress={onNext}>
+        <LinearGradient colors={['#FF8C42', '#FF6B6B']} style={styles.btnGrad}>
+          <Text style={styles.btnText}>開始練習</Text>
+        </LinearGradient>
+      </TouchableOpacity>
     </View>
   </LinearGradient>
 );
@@ -622,12 +869,60 @@ const RecPage = ({ onNext, onBack, onExit }) => (
   <LinearGradient colors={['#FFF4ED', '#FFE8DB']} style={styles.fullScreen}>
     <Header onBack={onBack} title="推薦建議" onExit={onExit} />
     <ScrollView contentContainerStyle={styles.scrollContent}>
+      <ProgressDots currentStep={6} totalSteps={7} />
       <Text style={styles.pageTitle}>接下來，你可以...</Text>
-      <View style={styles.recItem}><MessageCircle color="#FF8C42" /><View style={{flex:1}}><Text style={styles.recT}>找人聊聊</Text><Text style={styles.recD}>詢問對方當天是否壓力很大？</Text></View></View>
-      <View style={styles.recItem}><ShieldCheck color="#FF8C42" /><View style={{flex:1}}><Text style={styles.recT}>設定界線</Text><Text style={styles.recD}>試著告訴他：「我理解你當下很忙，但你那天說話的語氣讓我有點難過。」</Text></View></View>
-      <Image source={{uri:'https://curiouscreate.com/api/asserts/image/InternalConflictPractice_image.jpg'}} style={styles.recImg} />
+      
+      <View style={styles.recItem}>
+        <View style={styles.recIconCircle}>
+          <MessageCircle color="#FF8C42" size={20} />
+        </View>
+        <View style={{flex:1}}>
+          <Text style={styles.recT}>找人聊聊</Text>
+          <Text style={styles.recD}>
+            找個時機和他問他：「你那天是不是壓力太大？我很關心的容易度，想協在意工作進度呢？」
+          </Text>
+        </View>
+      </View>
+
+      <View style={styles.recItem}>
+        <View style={styles.recIconCircle}>
+          <ShieldCheck color="#FF8C42" size={20} />
+        </View>
+        <View style={{flex:1}}>
+          <Text style={styles.recT}>設定界線</Text>
+          <Text style={styles.recD}>
+            嘗試理解他的壓力來源，但若你感到受傷，試著告訴他：「我理解你當下很忙，但你那天說話的語氣讓我有點難過。」
+          </Text>
+        </View>
+      </View>
+
+      <View style={styles.recItem}>
+        <View style={styles.recIconCircle}>
+          <Wind color="#FF8C42" size={20} />
+        </View>
+        <View style={{flex:1}}>
+          <Text style={styles.recT}>4-6 呼吸練習</Text>
+          <Text style={styles.recD}>
+            如果進度壓力讓你持續焦慮，充滿壓力，{"\n"}
+            建議找你信任的人協助，獲得幫助
+          </Text>
+        </View>
+      </View>
+
+      <Image 
+        source={{uri:'https://curiouscreate.com/api/asserts/image/EmpathyPractice_image.jpg'}} 
+        style={styles.recImg} 
+        resizeMode="cover"
+      />
     </ScrollView>
-    <View style={styles.footer}><TouchableOpacity style={styles.primaryBtn} onPress={onNext}><LinearGradient colors={['#FF8C42', '#FF6B6B']} style={styles.btnGrad}><Text style={styles.btnText}>完成練習</Text></LinearGradient></TouchableOpacity></View>
+    <View style={styles.footer}>
+      <TouchableOpacity style={styles.primaryBtn} onPress={onNext}>
+        <LinearGradient colors={['#FF8C42', '#FF6B6B']} style={styles.btnGrad}>
+          <Text style={styles.btnText}>完成練習</Text>
+          <ArrowRight size={20} color="#fff" />
+        </LinearGradient>
+      </TouchableOpacity>
+    </View>
   </LinearGradient>
 );
 
@@ -637,12 +932,15 @@ const FinalPage = ({ onComplete, iconScale }) => (
       <Animated.View style={[styles.finalIcon, {transform:[{scale: iconScale}]}]}>
         <View style={styles.iconCircle}>
           <Heart size={48} color="#FF8C42" />
-          <View style={styles.starBadge}><Star size={16} color="#fff" fill="#fff" /></View>
+          <View style={styles.starBadge}>
+            <Star size={16} color="#fff" fill="#fff" />
+          </View>
         </View>
       </Animated.View>
       <Text style={styles.finalTitle}>你做得很好</Text>
       <Text style={styles.finalDesc}>
-        每一次練習都讓你對溝通情境有更強的同理，{"\n"}也讓你具備選擇更適當溝通策略的能力。
+        每一次練習都讓你對溝通情境有更強的同理，{"\n"}
+        也讓你具備選擇更適當溝通策略的能力。
       </Text>
       <TouchableOpacity style={[styles.primaryBtn, {marginTop: 40}]} onPress={onComplete}>
         <LinearGradient colors={['#FF8C42', '#FF6B6B']} style={styles.btnGrad}>
@@ -655,102 +953,590 @@ const FinalPage = ({ onComplete, iconScale }) => (
 
 const ExitWarningModal = ({ visible, onCancel, onConfirm }) => (
   <Modal transparent visible={visible} animationType="fade">
-    <View style={styles.modalBg}><View style={styles.modalBox}>
-      <Text style={styles.modalT}>確定要退出練習嗎</Text>
-      <Text style={styles.modalM}>本次練習將不會被記錄</Text>
-      <TouchableOpacity style={styles.modalExit} onPress={onConfirm}><Text style={{color:'#DC2626', fontWeight:'700'}}>確定退出</Text></TouchableOpacity>
-      <TouchableOpacity style={styles.modalStay} onPress={onCancel}><Text style={{fontWeight:'700'}}>繼續練習</Text></TouchableOpacity>
-    </View></View>
+    <View style={styles.modalBg}>
+      <View style={styles.modalBox}>
+        <Text style={styles.modalT}>確定要退出練習嗎</Text>
+        <Text style={styles.modalM}>本次練習將不會被記錄</Text>
+        <TouchableOpacity style={styles.modalExit} onPress={onConfirm}>
+          <Text style={{color:'#DC2626', fontWeight:'700'}}>確定退出</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.modalStay} onPress={onCancel}>
+          <Text style={{fontWeight:'700'}}>繼續練習</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
   </Modal>
 );
 
 // ==================== 樣式定義 ====================
 const styles = StyleSheet.create({
   fullScreen: { flex: 1 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems:'center', paddingTop: 60, paddingHorizontal: 20, zIndex:10 },
-  headerTitle: { fontSize: 18, fontWeight: '700', color: '#1e293b' },
-  navBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOffset: {width:0,height:2}, shadowOpacity:0.05, elevation:2 },
+  header: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems:'center', 
+    paddingTop: 60, 
+    paddingHorizontal: 20, 
+    zIndex:10 
+  },
+  headerTitle: { 
+    fontSize: 18, 
+    fontWeight: '700', 
+    color: '#1e293b' 
+  },
+  navBtn: { 
+    width: 40, 
+    height: 40, 
+    borderRadius: 20, 
+    backgroundColor: '#fff', 
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    shadowColor: '#000', 
+    shadowOffset: {width:0,height:2}, 
+    shadowOpacity:0.05, 
+    elevation:2 
+  },
   
-  centerContent: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 40 },
-  welcomeContent: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32 },
+  centerContent: { 
+    flex: 1, 
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    paddingHorizontal: 40 
+  },
+  welcomeContent: { 
+    flex: 1, 
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    paddingHorizontal: 32 
+  },
   
-  iconCircle: { width: 96, height: 96, borderRadius: 48, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center', elevation: 8, shadowColor: '#FF8C42', shadowOffset: {width:0,height:4}, shadowOpacity:0.2, marginBottom: 24 },
-  welcomeTitle: { fontSize: 24, fontWeight: '700', color: '#1e293b', textAlign: 'center', marginBottom: 16 },
-  welcomeDesc: { fontSize: 15, color: '#64748b', textAlign: 'center', lineHeight: 24, marginBottom: 32 },
+  iconCircle: { 
+    width: 96, 
+    height: 96, 
+    borderRadius: 48, 
+    backgroundColor: '#fff', 
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    elevation: 8, 
+    shadowColor: '#FF8C42', 
+    shadowOffset: {width:0,height:4}, 
+    shadowOpacity:0.2, 
+    marginBottom: 24 
+  },
+  welcomeTitle: { 
+    fontSize: 24, 
+    fontWeight: '700', 
+    color: '#1e293b', 
+    textAlign: 'center', 
+    marginBottom: 16 
+  },
+  welcomeDesc: { 
+    fontSize: 15, 
+    color: '#64748b', 
+    textAlign: 'center', 
+    lineHeight: 24, 
+    marginBottom: 32 
+  },
   
-  primaryBtn: { width: '100%', height: 56, borderRadius: 28, overflow: 'hidden', shadowColor: '#FF8C42', shadowOffset: {width:0,height:4}, shadowOpacity:0.3, elevation: 4 },
-  btnGrad: { flex: 1, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8 },
-  btnText: { color: '#fff', fontSize: 17, fontWeight: '700' },
+  encouragementTitle: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: '#1e293b',
+    textAlign: 'center',
+    marginBottom: 20,
+    marginTop: 16,
+  },
+  encouragementDesc: {
+    fontSize: 15,
+    color: '#64748b',
+    textAlign: 'center',
+    lineHeight: 24,
+    marginBottom: 16,
+    paddingHorizontal: 20,
+  },
+  encouragementDesc2: {
+    fontSize: 15,
+    color: '#64748b',
+    textAlign: 'center',
+    lineHeight: 24,
+    paddingHorizontal: 20,
+  },
   
-  scrollContent: { paddingHorizontal: 24, paddingTop: 10, paddingBottom: 140 },
-  pageTitle: { fontSize: 22, fontWeight: '700', color: '#1e293b', textAlign: 'center', marginBottom: 20 },
-  instrText: { fontSize: 16, fontWeight: '700', color:'#1e293b', textAlign: 'center', marginBottom: 12, lineHeight: 24 },
-  subInstr: { fontSize: 14, color: '#64748b', textAlign: 'center', marginBottom: 20 },
+  primaryBtn: { 
+    width: '100%', 
+    height: 56, 
+    borderRadius: 28, 
+    overflow: 'hidden', 
+    shadowColor: '#FF8C42', 
+    shadowOffset: {width:0,height:4}, 
+    shadowOpacity:0.3, 
+    elevation: 4 
+  },
+  btnGrad: { 
+    flex: 1, 
+    flexDirection: 'row', 
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    gap: 8 
+  },
+  btnText: { 
+    color: '#fff', 
+    fontSize: 17, 
+    fontWeight: '700' 
+  },
   
-  inputCard: { backgroundColor: '#fff', borderRadius: 20, padding: 20, minHeight: 180, elevation: 3, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: {width:0, height:4} },
-  textArea: { fontSize: 16, color: '#334155', lineHeight: 24, flex:1 },
+  scrollContent: { 
+    paddingHorizontal: 24, 
+    paddingTop: 10, 
+    paddingBottom: 140 
+  },
+  pageTitle: { 
+    fontSize: 22, 
+    fontWeight: '700', 
+    color: '#1e293b', 
+    textAlign: 'center', 
+    marginBottom: 24,
+    marginTop: 8,
+  },
+  instrText: { 
+    fontSize: 16, 
+    fontWeight: '700', 
+    color:'#1e293b', 
+    textAlign: 'center', 
+    marginBottom: 12, 
+    lineHeight: 24 
+  },
+  subInstr: { 
+    fontSize: 14, 
+    color: '#64748b', 
+    textAlign: 'center', 
+    marginBottom: 20 
+  },
   
-  exampleBox: { flexDirection: 'row', gap: 8, marginTop: 16, paddingHorizontal: 4 },
-  exampleText: { flex: 1, fontSize: 13, color: '#64748b', lineHeight: 18 },
+  inputCard: { 
+    backgroundColor: '#fff', 
+    borderRadius: 20, 
+    padding: 20, 
+    minHeight: 180, 
+    elevation: 3, 
+    shadowColor: '#000', 
+    shadowOpacity: 0.05, 
+    shadowRadius: 10, 
+    shadowOffset: {width:0, height:4} 
+  },
+  textArea: { 
+    fontSize: 16, 
+    color: '#334155', 
+    lineHeight: 24, 
+    flex:1 
+  },
   
-  footer: { position: 'absolute', bottom: 40, left: 0, right: 0, paddingHorizontal: 24 },
-  closeBtnAbs: { position: 'absolute', top: 60, right: 20, width: 40, height: 40, backgroundColor: '#fff', borderRadius: 20, justifyContent: 'center', alignItems: 'center', zIndex: 10 },
+  exampleBox: { 
+    flexDirection: 'row', 
+    gap: 8, 
+    marginTop: 16, 
+    paddingHorizontal: 4 
+  },
+  exampleText: { 
+    flex: 1, 
+    fontSize: 13, 
+    color: '#64748b', 
+    lineHeight: 18 
+  },
   
-  progressDotsContainer: { flexDirection: 'row', justifyContent: 'center', gap: 8, marginBottom: 24 },
-  dot: { width: 8, height: 8, borderRadius: 4 },
-  dotActive: { backgroundColor: '#FF8C42' },
-  dotInactive: { backgroundColor: '#E5E7EB' },
+  footer: { 
+    position: 'absolute', 
+    bottom: 40, 
+    left: 0, 
+    right: 0, 
+    paddingHorizontal: 24 
+  },
+  closeBtnAbs: { 
+    position: 'absolute', 
+    top: 60, 
+    right: 20, 
+    width: 40, 
+    height: 40, 
+    backgroundColor: '#fff', 
+    borderRadius: 20, 
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    zIndex: 10 
+  },
   
-  chipGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  chip: { backgroundColor: '#fff', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 20, borderWidth: 1.5, borderColor: '#e2e8f0' },
-  chipActive: { backgroundColor: '#FF8C42', borderColor: '#FF8C42' },
-  chipText: { color: '#64748b', fontSize: 14 },
-  chipTextActive: { color: '#fff', fontWeight: '700' },
-  catTitle: { fontSize: 14, color: '#94a3b8', marginBottom: 10, fontWeight:'600' },
+  progressDotsContainer: { 
+    flexDirection: 'row', 
+    justifyContent: 'center', 
+    gap: 8, 
+    marginBottom: 24 
+  },
+  dot: { 
+    width: 8, 
+    height: 8, 
+    borderRadius: 4 
+  },
+  dotActive: { 
+    backgroundColor: '#FF8C42' 
+  },
+  dotInactive: { 
+    backgroundColor: '#E5E7EB' 
+  },
   
-  quoteBox: { flexDirection:'row', gap:10, backgroundColor: 'rgba(255,140,66,0.05)', padding: 16, borderRadius: 12, marginBottom: 16, borderWidth: 1, borderColor: '#FFE8DB' },
-  quoteLabel: { fontSize: 12, color: '#FF8C42', fontWeight: '700' },
-  quoteText: { fontSize: 14, color: '#64748b', marginTop: 4, fontStyle: 'italic' },
+  chipGrid: { 
+    flexDirection: 'row', 
+    flexWrap: 'wrap', 
+    gap: 10 
+  },
+  chip: { 
+    backgroundColor: '#fff', 
+    paddingHorizontal: 16, 
+    paddingVertical: 10, 
+    borderRadius: 20, 
+    borderWidth: 1.5, 
+    borderColor: '#e2e8f0' 
+  },
+  chipActive: { 
+    backgroundColor: '#FF8C42', 
+    borderColor: '#FF8C42' 
+  },
+  chipText: { 
+    color: '#64748b', 
+    fontSize: 14 
+  },
+  chipTextActive: { 
+    color: '#fff', 
+    fontWeight: '700' 
+  },
+  catTitle: { 
+    fontSize: 14, 
+    color: '#94a3b8', 
+    marginBottom: 10, 
+    fontWeight:'600' 
+  },
   
-  formulaHint: { fontSize: 14, fontWeight: '700', color: '#FF8C42', marginTop: 24, marginBottom: 12 },
-  formulaCard: { backgroundColor: '#fff', padding: 16, borderRadius: 12, borderWidth: 1, borderColor: '#FFE8DB', shadowColor: '#FF8C42', shadowOpacity: 0.1, elevation: 2 },
-  formulaType: { fontSize: 12, fontWeight: '800', color: '#FF8C42' },
-  formulaMain: { fontSize: 14, color: '#64748b', marginTop: 6 },
+  quoteBox: { 
+    flexDirection:'row', 
+    gap:10, 
+    backgroundColor: 'rgba(255,140,66,0.05)', 
+    padding: 16, 
+    borderRadius: 12, 
+    marginBottom: 16, 
+    borderWidth: 1, 
+    borderColor: '#FFE8DB' 
+  },
+  quoteLabel: { 
+    fontSize: 12, 
+    color: '#FF8C42', 
+    fontWeight: '700' 
+  },
+  quoteText: { 
+    fontSize: 14, 
+    color: '#64748b', 
+    marginTop: 4, 
+    fontStyle: 'italic' 
+  },
   
-  assessmentCard: { backgroundColor: '#fff', borderRadius: 28, padding: 28, width: '100%', elevation: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.1, shadowRadius: 20 },
-  assessTitle: { fontSize: 20, fontWeight: '700', textAlign: 'center', marginBottom: 30, color:'#1e293b' },
-  sliderLabel: { fontSize: 15, fontWeight: '700', color: '#334155', marginBottom: 8 },
-  scoreRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'baseline', marginBottom: 10 },
-  scoreNum: { fontSize: 48, fontWeight: '800', color: '#FF6B35' },
-  scoreMax: { fontSize: 18, color: '#94a3b8', marginLeft: 4 },
-  sliderLabels: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 },
-  sliderLabelSmall: { fontSize: 12, color: '#94a3b8' },
+  formulaHint: { 
+    fontSize: 14, 
+    fontWeight: '700', 
+    color: '#FF8C42', 
+    marginTop: 24, 
+    marginBottom: 12 
+  },
+  formulaCard: { 
+    backgroundColor: '#fff', 
+    padding: 16, 
+    borderRadius: 12, 
+    borderWidth: 1, 
+    borderColor: '#FFE8DB', 
+    shadowColor: '#FF8C42', 
+    shadowOpacity: 0.1, 
+    elevation: 2 
+  },
+  formulaType: { 
+    fontSize: 12, 
+    fontWeight: '800', 
+    color: '#FF8C42' 
+  },
+  formulaMain: { 
+    fontSize: 14, 
+    color: '#64748b', 
+    marginTop: 6 
+  },
+  
+  commonCluesTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#FF8C42',
+    marginTop: 24,
+    marginBottom: 12,
+  },
 
-  sumCard: { backgroundColor: '#fff', padding: 16, borderRadius: 16, marginBottom: 12, elevation: 2 },
-  sumL: { fontSize: 13, color: '#94a3b8', marginBottom: 4, fontWeight:'600' },
-  sumV: { fontSize: 15, color: '#334155', lineHeight: 22 },
+  clueSection: {
+    marginBottom: 16,
+  },
+  clueSectionTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#1e293b',
+    marginBottom: 6,
+  },
+  clueSectionText: {
+    fontSize: 13,
+    color: '#64748b',
+    lineHeight: 20,
+  },
+
+  clueExpandBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    marginTop: 8,
+    marginBottom: 16,
+  },
+  clueExpandIcon: {
+    fontSize: 16,
+    color: '#FF8C42',
+  },
+  clueExpandText: {
+    fontSize: 13,
+    color: '#64748b',
+  },
+
+  reflectionBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    backgroundColor: '#fff',
+    padding: 14,
+    borderRadius: 12,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#f1f5f9',
+  },
+  reflectionIcon: {
+    fontSize: 18,
+  },
+  reflectionText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#64748b',
+    lineHeight: 20,
+  },
+
+  tagRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 8,
+  },
+  tagBtn: {
+    backgroundColor: '#fff',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  tagText: {
+    fontSize: 13,
+    color: '#64748b',
+  },
+
+  footerHint: {
+    fontSize: 12,
+    color: '#94a3b8',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
   
-  recItem: { flexDirection: 'row', gap: 12, backgroundColor: '#fff', padding: 16, borderRadius: 16, marginBottom: 12, elevation: 2 },
-  recT: { fontSize: 16, fontWeight: '700', color:'#1e293b' },
-  recD: { fontSize: 14, color: '#64748b', marginTop: 4 },
-  recImg: { width: '100%', height: 200, borderRadius: 16, marginTop: 12 },
+  assessmentCard: { 
+    backgroundColor: '#fff', 
+    borderRadius: 28, 
+    padding: 28, 
+    width: '100%', 
+    elevation: 12, 
+    shadowColor: '#000', 
+    shadowOffset: { width: 0, height: 8 }, 
+    shadowOpacity: 0.1, 
+    shadowRadius: 20 
+  },
+  assessTitle: { 
+    fontSize: 20, 
+    fontWeight: '700', 
+    textAlign: 'center', 
+    marginBottom: 30, 
+    color:'#1e293b' 
+  },
+  sliderLabel: { 
+    fontSize: 15, 
+    fontWeight: '700', 
+    color: '#334155', 
+    marginBottom: 8 
+  },
+  scoreRow: { 
+    flexDirection: 'row', 
+    justifyContent: 'center', 
+    alignItems: 'baseline', 
+    marginBottom: 10 
+  },
+  scoreNum: { 
+    fontSize: 48, 
+    fontWeight: '800', 
+    color: '#FF6B35' 
+  },
+  scoreMax: { 
+    fontSize: 18, 
+    color: '#94a3b8', 
+    marginLeft: 4 
+  },
+  sliderLabels: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    marginTop: 8 
+  },
+  sliderLabelSmall: { 
+    fontSize: 12, 
+    color: '#94a3b8' 
+  },
+
+  sumCard: { 
+    backgroundColor: '#fff', 
+    padding: 16, 
+    borderRadius: 16, 
+    marginBottom: 12, 
+    elevation: 2 
+  },
+  sumL: { 
+    fontSize: 13, 
+    color: '#94a3b8', 
+    marginBottom: 4, 
+    fontWeight:'600' 
+  },
+  sumV: { 
+    fontSize: 15, 
+    color: '#334155', 
+    lineHeight: 22 
+  },
   
-  modalBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 32 },
-  modalBox: { backgroundColor: '#fff', borderRadius: 24, padding: 32, alignItems: 'center' },
-  modalT: { fontSize: 20, fontWeight: '700', marginBottom: 10 },
-  modalM: { color: '#64748b', marginBottom: 30 },
-  modalExit: { backgroundColor: '#FFE8E8', width: '100%', height: 52, borderRadius: 26, justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
-  modalStay: { width: '100%', height: 52, borderRadius: 26, justifyContent: 'center', alignItems: 'center', borderWidth: 1.5, borderColor: '#e2e8f0' },
+  recItem: { 
+    flexDirection: 'row', 
+    gap: 12, 
+    backgroundColor: '#fff', 
+    padding: 16, 
+    borderRadius: 16, 
+    marginBottom: 12, 
+    elevation: 2,
+    alignItems: 'flex-start',
+  },
+  recIconCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,140,66,0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  recT: { 
+    fontSize: 16, 
+    fontWeight: '700', 
+    color:'#1e293b' 
+  },
+  recD: { 
+    fontSize: 14, 
+    color: '#64748b', 
+    marginTop: 4,
+    lineHeight: 20,
+  },
+  recImg: { 
+    width: '100%', 
+    height: 200, 
+    borderRadius: 16, 
+    marginTop: 12 
+  },
   
-  stepHighlight: { fontSize: 15, fontWeight: '600', color: '#FF8C42', textAlign: 'center', lineHeight: 28, marginBottom: 30 },
-  stepList: { marginBottom: 32 },
-  finalIcon: { marginBottom: 24 },
-  finalTitle: { fontSize: 24, fontWeight: '700', color: '#1e293b', marginBottom: 16 },
-  finalDesc: { fontSize: 15, color: '#64748b', textAlign: 'center', lineHeight: 24, paddingHorizontal: 10 },
-  starBadge: { position:'absolute', top:-6, right:-6, backgroundColor:'#FF8C42', width:32, height:32, borderRadius:16, justifyContent:'center', alignItems:'center', borderWidth:3, borderColor:'#fff' },
+  modalBg: { 
+    flex: 1, 
+    backgroundColor: 'rgba(0,0,0,0.5)', 
+    justifyContent: 'center', 
+    padding: 32 
+  },
+  modalBox: { 
+    backgroundColor: '#fff', 
+    borderRadius: 24, 
+    padding: 32, 
+    alignItems: 'center' 
+  },
+  modalT: { 
+    fontSize: 20, 
+    fontWeight: '700', 
+    marginBottom: 10 
+  },
+  modalM: { 
+    color: '#64748b', 
+    marginBottom: 30 
+  },
+  modalExit: { 
+    backgroundColor: '#FFE8E8', 
+    width: '100%', 
+    height: 52, 
+    borderRadius: 26, 
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    marginBottom: 12 
+  },
+  modalStay: { 
+    width: '100%', 
+    height: 52, 
+    borderRadius: 26, 
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    borderWidth: 1.5, 
+    borderColor: '#e2e8f0' 
+  },
+  
+  stepHighlight: { 
+    fontSize: 15, 
+    fontWeight: '600', 
+    color: '#FF8C42', 
+    textAlign: 'center', 
+    lineHeight: 28, 
+    marginBottom: 30 
+  },
+  stepList: { 
+    marginBottom: 32 
+  },
+  finalIcon: { 
+    marginBottom: 24 
+  },
+  finalTitle: { 
+    fontSize: 24, 
+    fontWeight: '700', 
+    color: '#1e293b', 
+    marginBottom: 16 
+  },
+  finalDesc: { 
+    fontSize: 15, 
+    color: '#64748b', 
+    textAlign: 'center', 
+    lineHeight: 24, 
+    paddingHorizontal: 10 
+  },
+  starBadge: { 
+    position:'absolute', 
+    top:-6, 
+    right:-6, 
+    backgroundColor:'#FF8C42', 
+    width:32, 
+    height:32, 
+    borderRadius:16, 
+    justifyContent:'center', 
+    alignItems:'center', 
+    borderWidth:3, 
+    borderColor:'#fff' 
+  },
 });
 
-// ==================== 滑桿樣式 ====================
 const sliderStyles = StyleSheet.create({
   container: {
     width: '100%',
