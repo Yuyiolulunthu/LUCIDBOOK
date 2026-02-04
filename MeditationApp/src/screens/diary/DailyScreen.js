@@ -1,7 +1,7 @@
 // ==========================================
 // DailyScreen.js
-// 版本: V2.4 - 修復思維調節練習完整顯示（包含後半段欄位）
-// 更新日期: 2026/02/01
+// 版本: V2.5 - 新增同理讀心術支持，完整顯示內耗與思維調節練習
+// 更新日期: 2026/02/04
 // ==========================================
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -299,6 +299,7 @@ const DailyScreen = ({ navigation, route }) => {
     if (name.includes('好事') || name.includes('感恩書寫')) return 'good-things';
     if (name.includes('呼吸') || name.includes('4-6') || name.includes('屏息')) return 'breathing';
     if (name.includes('思維') || name.includes('調節') || name.includes('認知') || name.includes('內耗')) return 'cognitive';
+    if (name.includes('同理讀心術')) return 'empathy';
     if (name.includes('感恩') || name.includes('感謝信') || name.includes('如果練習')) return 'gratitude';
     if (name.includes('心情溫度計')) return 'thermometer';
     return 'other';
@@ -569,6 +570,43 @@ const DailyScreen = ({ navigation, route }) => {
     return data;
   };
 
+  // ✅ 新增：同理讀心術數據提取
+  const extractEmpathyData = (practice) => {
+    let data = {
+      situation: null,
+      emotions: [],
+      needs: null,
+      limitations: null,
+      translation: null,
+      moodScore: null,
+    };
+
+    if (practice.form_data) {
+      try {
+        const fd = typeof practice.form_data === 'string' ? JSON.parse(practice.form_data) : practice.form_data;
+        if (fd) {
+          data.situation = fd.situation || fd.event || null;
+          
+          if (Array.isArray(fd.emotions)) {
+            data.emotions = fd.emotions;
+          } else if (fd.emotion) {
+            data.emotions = Array.isArray(fd.emotion) ? fd.emotion : [fd.emotion];
+          }
+          
+          data.needs = fd.needs || fd.otherNeeds || null;
+          data.limitations = fd.limitations || fd.otherLimitations || null;
+          data.translation = fd.translation || fd.empathyTranslation || null;
+          data.moodScore = fd.moodScore ?? fd.postScore ?? fd.post_score ?? null;
+        }
+      } catch (e) {
+        console.warn('[DailyScreen] 解析同理讀心術 form_data 失敗:', e);
+      }
+    }
+
+    console.log('[DailyScreen] 同理讀心術解析結果:', data);
+    return data;
+  };
+
   const extractEmotionThermometerData = (practice) => {
     let data = { scores: null, totalScore: null, riskScore: null };
     if (practice.form_data) {
@@ -612,12 +650,14 @@ const DailyScreen = ({ navigation, route }) => {
     const isCognitive = practiceType === 'cognitive';
     const isGratitude = practiceType === 'gratitude';
     const isMoodThermometer = practiceType === 'thermometer';
+    const isEmpathy = practiceType === 'empathy';
 
     const breathingData = isBreathing ? extractBreathingData(selectedPractice) : null;
     const goodThingData = isGoodThings ? extractGoodThingData(selectedPractice) : null;
     const cognitiveData = isCognitive ? extractCognitiveData(selectedPractice) : null;
     const gratitudeData = isGratitude ? extractGratitudeData(selectedPractice) : null;
     const emotionThermometerData = isMoodThermometer ? extractEmotionThermometerData(selectedPractice) : null;
+    const empathyData = isEmpathy ? extractEmpathyData(selectedPractice) : null;
 
     const formatModalDate = (dateStr) => {
       const date = new Date(dateStr);
@@ -660,6 +700,16 @@ const DailyScreen = ({ navigation, route }) => {
           light: '#FFF4ED', 
           accent: '#FFE8DB', 
           gradient: ['#FF8C42', '#FF6B6B'] 
+        };
+      }
+      
+      // ✅ 同理讀心術使用粉色系
+      if (isEmpathy) {
+        return { 
+          primary: '#EC4899', 
+          light: '#FDF2F8', 
+          accent: '#FCE7F3', 
+          gradient: ['#EC4899', '#F472B6'] 
         };
       }
       
@@ -713,6 +763,8 @@ const DailyScreen = ({ navigation, route }) => {
                     ? getGratitudeTitle() 
                     : isMoodThermometer && selectedPractice.practice_type?.includes('職場溝通力')
                     ? '心情溫度計'
+                    : isEmpathy
+                    ? '同理讀心術'
                     : selectedPractice.practice_type
                   }
                 </Text>
@@ -727,7 +779,7 @@ const DailyScreen = ({ navigation, route }) => {
                 <View style={styles.modalMetaTagGray}>
                   <FileText color="#64748B" size={12} strokeWidth={2} />
                   <Text style={styles.modalMetaTextGray}>
-                    {selectedPractice.practice_type?.includes('內耗') ? '職場溝通力' : '情緒抗壓力'}
+                    {selectedPractice.practice_type?.includes('內耗') || isEmpathy ? '職場溝通力' : '情緒抗壓力'}
                   </Text>
                 </View>
               </View>
@@ -1219,6 +1271,104 @@ const DailyScreen = ({ navigation, route }) => {
                     </View>
                   </View>
                 </View>
+              )}
+
+              {/* ========== ✅ 同理讀心術 ========== */}
+              {isEmpathy && empathyData && (
+                <>
+                  {/* 情境 */}
+                  {empathyData.situation && (
+                    <View style={[styles.abcdCard, { 
+                      backgroundColor: theme.light, 
+                      borderLeftWidth: 4, 
+                      borderLeftColor: theme.primary 
+                    }]}>
+                      <View style={styles.abcdLabelRow}>
+                        <View style={[styles.sectionIconBadge, { backgroundColor: theme.accent }]}>
+                          <AlertCircle color={theme.primary} size={16} strokeWidth={2.5} />
+                        </View>
+                        <Text style={[styles.abcdLabel, { color: theme.primary, fontSize: 15 }]}>情境</Text>
+                      </View>
+                      <Text style={styles.abcdContent}>{empathyData.situation}</Text>
+                    </View>
+                  )}
+
+                  {/* 辨識情緒 */}
+                  {empathyData.emotions.length > 0 && (
+                    <View style={styles.sectionCard}>
+                      <Text style={styles.sectionLabel}>辨識情緒</Text>
+                      <View style={styles.tagsRow}>
+                        {empathyData.emotions.map((e, i) => (
+                          <View key={i} style={[styles.emotionTagFilled, { backgroundColor: theme.primary }]}>
+                            <Text style={styles.emotionTagFilledText}>{e}</Text>
+                          </View>
+                        ))}
+                      </View>
+                    </View>
+                  )}
+
+                  {/* 理解需求 */}
+                  {empathyData.needs && (
+                    <View style={[styles.abcdCard, { backgroundColor: '#F8FAFC' }]}>
+                      <View style={styles.abcdLabelRow}>
+                        <View style={[styles.sectionIconBadge, { backgroundColor: '#E2E8F0' }]}>
+                          <Heart color="#64748B" size={16} strokeWidth={2.5} />
+                        </View>
+                        <Text style={[styles.abcdLabel, { color: '#64748B', fontSize: 15 }]}>理解需求</Text>
+                      </View>
+                      <Text style={styles.abcdContent}>{empathyData.needs}</Text>
+                    </View>
+                  )}
+
+                  {/* 考量限制 */}
+                  {empathyData.limitations && (
+                    <View style={[styles.abcdCard, { backgroundColor: '#F8FAFC' }]}>
+                      <View style={styles.abcdLabelRow}>
+                        <View style={[styles.sectionIconBadge, { backgroundColor: '#E2E8F0' }]}>
+                          <Scale color="#64748B" size={16} strokeWidth={2.5} />
+                        </View>
+                        <Text style={[styles.abcdLabel, { color: '#64748B', fontSize: 15 }]}>考量限制</Text>
+                      </View>
+                      <Text style={styles.abcdContent}>{empathyData.limitations}</Text>
+                    </View>
+                  )}
+
+                  {/* 同理翻譯（綠色成功卡）*/}
+                  {empathyData.translation && (
+                    <View style={[styles.abcdCard, styles.abcdCardPositive]}>
+                      <View style={styles.abcdLabelRow}>
+                        <View style={[styles.sectionIconBadge, { backgroundColor: '#D1FAE5' }]}>
+                          <Lightbulb color="#10B981" size={16} strokeWidth={2.5} />
+                        </View>
+                        <Text style={[styles.abcdLabel, { color: '#10B981', fontSize: 15 }]}>同理翻譯</Text>
+                      </View>
+                      <Text style={styles.abcdContent}>{empathyData.translation}</Text>
+                    </View>
+                  )}
+
+                  {/* 張力改善程度 */}
+                  {empathyData.moodScore !== null && (
+                    <View style={[styles.resultCard, { 
+                      backgroundColor: '#ECFDF5', 
+                      borderColor: '#D1FAE5',
+                      marginTop: 8
+                    }]}>
+                      <View style={styles.resultCardHeader}>
+                        <View style={[styles.resultIconBadge, { backgroundColor: '#D1FAE5' }]}>
+                          <TrendingUp color="#10B981" size={14} />
+                        </View>
+                        <Text style={[styles.resultCardTitle, { color: '#10B981' }]}>練習成效</Text>
+                      </View>
+                      <View style={styles.scoreDisplayRow}>
+                        <Text style={styles.scoreLabel}>張力改善程度</Text>
+                        <View style={styles.scoreValueBox}>
+                          <Text style={[styles.scoreValue, { color: '#10B981' }]}>{empathyData.moodScore}</Text>
+                          <Text style={styles.scoreMax}>/10</Text>
+                        </View>
+                      </View>
+                    </View>
+                  )}
+                </>
               )}
 
               {currentDayRecords.length > 1 && (
