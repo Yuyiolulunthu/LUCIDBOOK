@@ -758,7 +758,7 @@ const DailyScreen = ({ navigation, route }) => {
               <View style={styles.modalHeaderSection}>
                 <Text style={styles.modalTitle}>
                   {isCognitive 
-                    ? (selectedPractice.practice_type?.includes('內耗') ? '內耗練習' : '思維調節') 
+                    ? (selectedPractice.practice_type?.includes('內耗') ? '內耗終止鍵' : '思維調節') 
                     : isGratitude 
                     ? getGratitudeTitle() 
                     : isMoodThermometer && selectedPractice.practice_type?.includes('職場溝通力')

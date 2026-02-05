@@ -14,8 +14,6 @@ import {
   StatusBar,
   Image,
   Animated,
-  Thermometer, 
-  RefreshCw, 
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { 
@@ -25,6 +23,8 @@ import {
   Clock, 
   RotateCw,
   ArrowRight,
+  Thermometer, 
+  RefreshCw, 
 } from 'lucide-react-native';
 import {
   RotateCcw,

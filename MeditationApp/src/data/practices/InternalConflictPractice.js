@@ -424,6 +424,10 @@ export default function InternalConflictPractice({ onBack, navigation, onHome })
     // 如需此功能，請安裝 @react-native-async-storage/async-storage
   };
 
+  // ✅ 新增：圖片載入狀態（提升到頂層）
+  const [imageLoaded, setImageLoaded] = useState(false);
+  const imageOpacity = useRef(new Animated.Value(0)).current;
+
   // ==================== 生命週期 ====================
   // 注意：已移除表單數據持久化功能
   // 如需此功能，請安裝 @react-native-async-storage/async-storage
@@ -1757,8 +1761,6 @@ export default function InternalConflictPractice({ onBack, navigation, onHome })
 
   // ==================== 新增：推薦頁面 ====================
   const renderRecommendationsPage = () => {
-    const [imageLoaded, setImageLoaded] = useState(false);
-    const imageOpacity = useRef(new Animated.Value(0)).current;
 
     const handleImageLoad = () => {
       setImageLoaded(true);
