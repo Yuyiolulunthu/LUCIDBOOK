@@ -210,7 +210,7 @@ const FactStep = ({ data, onChange, onNext, onBack, onExit }) => (
       <LinearGradient colors={['#FFF4ED', '#FFE8DB']} style={styles.fullScreen}>
         <Header onBack={onBack} title="還原事實" onExit={onExit} />
         <ScrollView contentContainerStyle={styles.scrollContent}>
-          <ProgressDots currentStep={0} totalSteps={5} />
+          <ProgressDots currentStep={0} totalSteps={7} />
           <Text style={styles.instrText}>
             回想一個最近讓你覺得{"\n"}<Text style={{color:'#FF8C42'}}>不舒服或難以理解的對話</Text>
           </Text>
@@ -252,7 +252,10 @@ const FactStep = ({ data, onChange, onNext, onBack, onExit }) => (
   </KeyboardAvoidingView>
 );
 
-const EmotionsStep = ({ selectedEmotions, onToggle, onNext, onBack, onExit }) => {
+const EmotionsStep = ({ selectedEmotions, customEmotions, onToggle, onAddCustom, onNext, onBack, onExit }) => {
+  const [showCustomInput, setShowCustomInput] = useState(false);
+  const [customText, setCustomText] = useState('');
+
   const cats = {
     '壓力類': ['焦慮', '緊繃', '疲憊', '不知所措', '煩躁'],
     '脆弱類': ['受傷', '委屈', '害怕', '尷尬', '丟臉'],
@@ -260,37 +263,108 @@ const EmotionsStep = ({ selectedEmotions, onToggle, onNext, onBack, onExit }) =>
     '失落類': ['失望', '灰心', '孤單', '不被理解', '無助']
   };
 
+  const handleAddCustom = () => {
+    const trimmed = customText.trim();
+    if (trimmed && onAddCustom) {
+      onAddCustom(trimmed);
+      setCustomText('');
+      setShowCustomInput(false);
+    }
+  };
+
   return (
     <LinearGradient colors={['#FFF4ED', '#FFE8DB']} style={styles.fullScreen}>
       <Header onBack={onBack} title="辨識情緒" onExit={onExit} />
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        <ProgressDots currentStep={1} totalSteps={5} />
+        <ProgressDots currentStep={1} totalSteps={7} />
         <Text style={styles.instrText}>
           試著從<Text style={{color:'#FF8C42', fontWeight: '700'}}>對方的立場</Text>{"\n"}
           選出 1~3 個最接近的情緒
         </Text>
-        {Object.entries(cats).map(([name, list]) => (
-          <View key={name} style={{marginTop: 20}}>
-            <Text style={styles.catTitle}>{name}</Text>
-            <View style={styles.chipGrid}>{list.map(emo => (
+
+        {/* 白色卡片包裹所有情緒選項 */}
+        <View style={styles.emotionCard}>
+          {Object.entries(cats).map(([name, list]) => (
+            <View key={name} style={styles.emotionCatSection}>
+              <Text style={styles.catTitle}>{name}</Text>
+              <View style={styles.chipGrid}>{list.map(emo => (
+                <TouchableOpacity 
+                  key={emo} 
+                  style={[styles.chip, selectedEmotions.includes(emo) && styles.chipActive]} 
+                  onPress={() => onToggle(emo)}
+                >
+                  <Text style={[styles.chipText, selectedEmotions.includes(emo) && styles.chipTextActive]}>{emo}</Text>
+                </TouchableOpacity>
+              ))}</View>
+            </View>
+          ))}
+
+          {/* 其他 + 自訂 */}
+          <View style={styles.emotionCatSection}>
+            <Text style={styles.catTitle}>其他</Text>
+            <View style={styles.chipGrid}>
+              {(customEmotions || []).map(emo => (
+                <TouchableOpacity 
+                  key={emo} 
+                  style={[styles.chip, selectedEmotions.includes(emo) && styles.chipActive]} 
+                  onPress={() => onToggle(emo)}
+                >
+                  <Text style={[styles.chipText, selectedEmotions.includes(emo) && styles.chipTextActive]}>{emo}</Text>
+                </TouchableOpacity>
+              ))}
               <TouchableOpacity 
-                key={emo} 
-                style={[styles.chip, selectedEmotions.includes(emo) && styles.chipActive]} 
-                onPress={() => onToggle(emo)}
+                style={styles.chipCustom} 
+                onPress={() => setShowCustomInput(true)}
               >
-                <Text style={[styles.chipText, selectedEmotions.includes(emo) && styles.chipTextActive]}>{emo}</Text>
+                <Text style={styles.chipCustomText}>+ 自訂</Text>
               </TouchableOpacity>
-            ))}</View>
+            </View>
           </View>
-        ))}
+        </View>
       </ScrollView>
+
       <View style={styles.footer}>
         <TouchableOpacity style={styles.primaryBtn} onPress={onNext}>
           <LinearGradient colors={['#FF8C42', '#FF6B6B']} style={styles.btnGrad}>
             <Text style={styles.btnText}>下一步</Text>
+            <ArrowRight size={20} color="#fff" />
           </LinearGradient>
         </TouchableOpacity>
       </View>
+
+      {/* 自訂情緒 Modal */}
+      <Modal transparent visible={showCustomInput} animationType="fade">
+        <TouchableWithoutFeedback onPress={() => setShowCustomInput(false)}>
+          <View style={styles.modalBg}>
+            <TouchableWithoutFeedback onPress={() => {}}>
+              <View style={styles.customModal}>
+                <Text style={styles.customModalTitle}>自訂情緒</Text>
+                <TextInput
+                  style={styles.customModalInput}
+                  placeholder="輸入你的情緒詞彙..."
+                  placeholderTextColor="#cbd5e1"
+                  value={customText}
+                  onChangeText={setCustomText}
+                  autoFocus
+                  maxLength={10}
+                />
+                <View style={styles.customModalBtns}>
+                  <TouchableOpacity style={styles.customModalCancel} onPress={() => { setCustomText(''); setShowCustomInput(false); }}>
+                    <Text style={{color: '#64748b', fontWeight: '600'}}>取消</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={[styles.customModalConfirm, !customText.trim() && {opacity: 0.4}]} 
+                    onPress={handleAddCustom}
+                    disabled={!customText.trim()}
+                  >
+                    <Text style={{color: '#fff', fontWeight: '700'}}>新增</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
     </LinearGradient>
   );
 };
@@ -307,7 +381,7 @@ const TranslationStep = ({ situation, emotion, translation, onChange, onNext, on
         <LinearGradient colors={['#FFF4ED', '#FFE8DB']} style={styles.fullScreen}>
           <Header onBack={onBack} title="同理翻譯" onExit={onExit} />
           <ScrollView contentContainerStyle={styles.scrollContent}>
-            <ProgressDots currentStep={4} totalSteps={5} />
+            <ProgressDots currentStep={4} totalSteps={7} />
             <Text style={styles.instrText}>試著把對方的言行翻譯成感受與需求</Text>
             <Text style={styles.subInstr}>
               試著用『他/她』告訴句子的開頭{"\n"}
@@ -359,6 +433,7 @@ const AssessmentStep = ({ moodScore, onMoodChange, understandingScore, onUndChan
   <LinearGradient colors={['#FFF4ED', '#FFE8DB']} style={styles.fullScreen}>
     <Header onBack={onBack} onExit={onExit} />
     <View style={styles.centerContent}>
+      <ProgressDots currentStep={6} totalSteps={7} />
       <View style={styles.assessmentCard}>
         <Text style={styles.assessTitle}>練習後的狀態核對</Text>
         
@@ -401,6 +476,7 @@ const SummaryStep = ({ formData, onNext, onBack, onExit }) => (
   <LinearGradient colors={['#FFF4ED', '#FFE8DB']} style={styles.fullScreen}>
     <Header onBack={onBack} title="記錄統整" onExit={onExit} />
     <ScrollView contentContainerStyle={styles.scrollContent}>
+      <ProgressDots currentStep={5} totalSteps={7} />
       {[
         {l:'還原事實', v:formData.situation},
         {l:'辨識情緒', v:formData.emotions.join('、')},
@@ -437,11 +513,7 @@ const IntroLayout = ({ children, iconComponent, currentStep, totalSteps, onExit,
     <View style={styles.fullScreen}>
       {/* 固定高度的 icon + dots 區域 */}
       <View style={styles.introFixedTop}>
-        <View
-          style={styles.iconCircle}
-          needsOffscreenAlphaCompositing={Platform.OS === 'android'}
-          renderToHardwareTextureAndroid={Platform.OS === 'android'}
-        >
+        <View style={styles.iconCircle}>
           {iconComponent}
         </View>
         <ProgressDots currentStep={currentStep} totalSteps={totalSteps} />
@@ -459,11 +531,7 @@ const SituationRecallPage = ({ onNext, onBack, onExit }) => (
     <Header onBack={onBack} onExit={onExit} />
     <View style={styles.fullScreen}>
       <View style={styles.introFixedTopWithHeader}>
-        <View
-          style={[styles.iconCircle, {backgroundColor:'rgba(255,140,66,0.1)'}]}
-          needsOffscreenAlphaCompositing={Platform.OS === 'android'}
-          renderToHardwareTextureAndroid={Platform.OS === 'android'}
-        >
+        <View style={styles.iconCircle}>
           <Heart size={48} color="#FF8C42" />
         </View>
         <ProgressDots currentStep={2} totalSteps={3} />
@@ -489,11 +557,7 @@ const EncouragementPage = ({ onNext, onBack, onExit }) => (
   <LinearGradient colors={['#FFF4ED', '#FFE8DB']} style={styles.fullScreen}>
     <Header onBack={onBack} onExit={onExit} />
     <View style={styles.centerContent}>
-      <View
-        style={styles.iconCircle}
-        needsOffscreenAlphaCompositing={Platform.OS === 'android'}
-        renderToHardwareTextureAndroid={Platform.OS === 'android'}
-      >
+      <View style={styles.iconCircle}>
         <Heart size={48} color="#FF8C42" />
       </View>
       <Text style={styles.encouragementTitle}>你很厲害！</Text>
@@ -535,7 +599,7 @@ const NeedsStepDetailed = ({ value, onChange, onNext, onBack, onExit }) => {
         <LinearGradient colors={['#FFF4ED', '#FFE8DB']} style={styles.fullScreen}>
           <Header onBack={onBack} title="理解需求" onExit={onExit} />
           <ScrollView contentContainerStyle={[styles.scrollContent, {paddingBottom: 220}]} showsVerticalScrollIndicator={true}>
-            <ProgressDots currentStep={2} totalSteps={5} />
+            <ProgressDots currentStep={2} totalSteps={7} />
             <Text style={styles.instrText}>對方真正在意的重點{"\n"}是什麼需求或期待沒有被滿足呢？</Text>
             
             <View style={styles.inputCard}>
@@ -643,7 +707,7 @@ const LimitationsStepDetailed = ({ value, onChange, onNext, onSkip, onBack, onEx
       <LinearGradient colors={['#FFF4ED', '#FFE8DB']} style={styles.fullScreen}>
         <Header onBack={onBack} title="考量限制" onExit={onExit} />
         <ScrollView contentContainerStyle={[styles.scrollContent, {paddingBottom: 220}]} showsVerticalScrollIndicator={true}>
-          <ProgressDots currentStep={3} totalSteps={5} />
+          <ProgressDots currentStep={3} totalSteps={7} />
           <Text style={styles.instrText}>
             他的表達方式或許受到某些情境壓力影響{"\n"}
             或許一些話會想表{"\n"}
@@ -706,7 +770,7 @@ const LimitationsStepDetailed = ({ value, onChange, onNext, onSkip, onBack, onEx
 export default function EmpathyPractice({ onBack, navigation, onHome }) {
   const [currentPage, setCurrentPage] = useState('welcome');
   const [formData, setFormData] = useState({
-    situation: '', emotions: [], needs: '', limitations: '', translation: '', moodScore: 5, understandingScore: 5
+    situation: '', emotions: [], customEmotions: [], needs: '', limitations: '', translation: '', moodScore: 5, understandingScore: 5
   });
   
   const [showExitWarning, setShowExitWarning] = useState(false);
@@ -811,7 +875,12 @@ export default function EmpathyPractice({ onBack, navigation, onHome }) {
       case 'fact':
         return <FactStep data={formData.situation} onChange={(v) => updateForm('situation', v)} onNext={() => setCurrentPage('emotions')} onBack={() => setCurrentPage('breathing')} onExit={handleExit} />;
       case 'emotions':
-        return <EmotionsStep selectedEmotions={formData.emotions} onToggle={(emo) => setFormData(p => ({...p, emotions: p.emotions.includes(emo) ? p.emotions.filter(e=>e!==emo) : [...p.emotions, emo].slice(0,3)}))} onNext={() => setCurrentPage('needs')} onBack={() => setCurrentPage('fact')} onExit={handleExit} />;
+        return <EmotionsStep 
+          selectedEmotions={formData.emotions} 
+          customEmotions={formData.customEmotions}
+          onToggle={(emo) => setFormData(p => ({...p, emotions: p.emotions.includes(emo) ? p.emotions.filter(e=>e!==emo) : [...p.emotions, emo].slice(0,3)}))} 
+          onAddCustom={(emo) => setFormData(p => ({...p, customEmotions: [...p.customEmotions, emo]}))}
+          onNext={() => setCurrentPage('needs')} onBack={() => setCurrentPage('fact')} onExit={handleExit} />;
       case 'needs':
         return <NeedsStepDetailed value={formData.needs} onChange={(v) => updateForm('needs', v)} onNext={() => setCurrentPage('limitations')} onBack={() => setCurrentPage('emotions')} onExit={handleExit} />;
       case 'limitations':
@@ -870,11 +939,7 @@ const WelcomePage = ({ onNext, onExit }) => (
     </TouchableOpacity>
     <View style={styles.fullScreen}>
       <View style={styles.introFixedTop}>
-        <View
-          style={styles.iconCircle}
-          needsOffscreenAlphaCompositing={Platform.OS === 'android'}
-          renderToHardwareTextureAndroid={Platform.OS === 'android'}
-        >
+        <View style={styles.iconCircle}>
           <Heart size={48} color="#FF8C42" />
         </View>
         <ProgressDots currentStep={0} totalSteps={3} />
@@ -882,8 +947,14 @@ const WelcomePage = ({ onNext, onExit }) => (
       <View style={styles.introContentArea}>
         <Text style={styles.welcomeTitle}>哈囉！{"\n"}歡迎來到同理讀心術</Text>
         <Text style={styles.welcomeDesc}>
-          無法清晰表達的需求，往往是人際衝突的來源。{"\n\n"}
-          透過這個練習，我們將能解讀對方話語中的真實感受與需求。
+          無法清晰表達的需求{"\n"}
+          往往是人際衝突的來源{"\n\n"}
+          透過這個練習{"\n"}
+          我們將能了解對方話語中的{"\n"}
+          真實感受與需求{"\n\n"}
+          幫助我們放下敵對感{"\n"}
+          用更彈性的視角與對方連結{"\n"}
+          協助我們的表達更順暢
         </Text>
         <TouchableOpacity style={styles.primaryBtn} onPress={onNext}>
           <LinearGradient colors={['#FF8C42', '#FF6B6B']} style={styles.btnGrad}>
@@ -902,23 +973,33 @@ const IntroPage = ({ onNext, onBack, onExit }) => (
     <Header onBack={onBack} onExit={onExit} />
     <View style={styles.fullScreen}>
       <View style={styles.introFixedTopWithHeader}>
-        <View
-          style={styles.iconCircle}
-          needsOffscreenAlphaCompositing={Platform.OS === 'android'}
-          renderToHardwareTextureAndroid={Platform.OS === 'android'}
-        >
+        <View style={styles.iconCircle}>
           <Heart size={48} color="#FF8C42" />
         </View>
         <ProgressDots currentStep={1} totalSteps={3} />
       </View>
       <View style={styles.introContentArea}>
         <Text style={styles.welcomeTitle}>接下來我們一起{"\n"}走過這些練習步驟</Text>
-        <View style={styles.stepList}>
-          <Text style={styles.stepHighlight}>
-            還原事實 • 辨識情緒 • 理解需求{"\n"}
-            考量限制 • 同理翻譯
-          </Text>
+        <Text style={[styles.welcomeDesc, {marginBottom: 16}]}>
+          接下來，我們將透過六個步驟
+        </Text>
+        <View style={styles.stepTagsRow}>
+          <Text style={styles.stepTag}>情境回想</Text>
+          <Text style={styles.stepTag}>還原事實</Text>
+          <Text style={styles.stepTag}>辨識情緒</Text>
         </View>
+        <View style={[styles.stepTagsRow, {marginBottom: 16}]}>
+          <Text style={styles.stepTag}>理解需求</Text>
+          <Text style={styles.stepTag}>考量限制</Text>
+          <Text style={styles.stepTag}>同理翻譯</Text>
+        </View>
+        <Text style={styles.welcomeDesc}>
+          拆解那段困擾你的話語{"\n"}
+          這能幫助你跳脫情緒內耗{"\n"}
+          以客觀視角{"\n"}
+          聽懂對方話語背後的真實意圖{"\n"}
+          重新找回溝通主導權
+        </Text>
         <TouchableOpacity style={styles.primaryBtn} onPress={onNext}>
           <LinearGradient colors={['#FF8C42', '#FF6B6B']} style={styles.btnGrad}>
             <Text style={styles.btnText}>下一頁</Text>
@@ -933,11 +1014,7 @@ const BreathingPage = ({ onNext, onBack, onExit }) => (
   <LinearGradient colors={['#FFF4ED', '#FFE8DB']} style={styles.fullScreen}>
     <Header onBack={onBack} onExit={onExit} />
     <View style={styles.centerContent}>
-      <View
-        style={[styles.iconCircle, {backgroundColor:'rgba(255,140,66,0.1)'}]}
-        needsOffscreenAlphaCompositing={Platform.OS === 'android'}
-        renderToHardwareTextureAndroid={Platform.OS === 'android'}
-      >
+      <View style={styles.iconCircle}>
         <Wind size={48} color="#FF8C42" />
       </View>
       <Text style={styles.welcomeTitle}>深呼吸 放鬆</Text>
@@ -1323,7 +1400,7 @@ const styles = StyleSheet.create({
     gap: 10 
   },
   chip: { 
-    backgroundColor: '#fff', 
+    backgroundColor: '#f8fafc', 
     paddingHorizontal: 16, 
     paddingVertical: 10, 
     borderRadius: 20, 
@@ -1347,6 +1424,82 @@ const styles = StyleSheet.create({
     color: '#94a3b8', 
     marginBottom: 10, 
     fontWeight:'600' 
+  },
+
+  // 辨識情緒 - 白色卡片
+  emotionCard: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 20,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    shadowOffset: {width: 0, height: 4},
+  },
+  emotionCatSection: {
+    marginBottom: 18,
+  },
+
+  // 自訂 chip
+  chipCustom: {
+    backgroundColor: '#fff',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: '#e2e8f0',
+    borderStyle: 'dashed',
+  },
+  chipCustomText: {
+    color: '#94a3b8',
+    fontSize: 14,
+  },
+
+  // 自訂情緒 Modal
+  customModal: {
+    backgroundColor: '#fff',
+    borderRadius: 24,
+    padding: 28,
+    width: '100%',
+  },
+  customModalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1e293b',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  customModalInput: {
+    backgroundColor: '#f8fafc',
+    borderRadius: 14,
+    padding: 14,
+    fontSize: 16,
+    color: '#334155',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    marginBottom: 20,
+  },
+  customModalBtns: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  customModalCancel: {
+    flex: 1,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: '#e2e8f0',
+  },
+  customModalConfirm: {
+    flex: 1,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#FF8C42',
   },
   
   quoteBox: { 
@@ -1642,6 +1795,17 @@ const styles = StyleSheet.create({
   },
   stepList: { 
     marginBottom: 32 
+  },
+  stepTagsRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 12,
+    marginBottom: 6,
+  },
+  stepTag: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#FF8C42',
   },
   finalIcon: { 
     marginBottom: 24 
