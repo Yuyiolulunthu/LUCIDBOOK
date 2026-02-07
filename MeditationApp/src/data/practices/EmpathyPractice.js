@@ -2,15 +2,18 @@
 // ==========================================
 // 檔案名稱: EmpathyPractice.js
 // 同理讀心術 - CBT與同理心練習
-// 版本: V3.9 - 完整修正版
+// 版本: V4.0 - 全面修正版
 // 修正內容：
-// 1. [UI] 添加"情境回想"和"你很厲害"鼓勵頁面
-// 2. [UI] 完善理解需求、考量限制、同理翻譯頁面細節
-// 3. [Asset] 更新圖片URL
-// 4. [Critical] 保留所有原有功能，修正 Hooks 順序問題
+// 1. [Fix] 考量限制頁P8 新增「跳過」按鈕（僅P8可跳過）
+// 2. [Fix] 按【確定退出】無法退出 — 加入 fallback 邏輯
+// 3. [Fix] 理解需求頁P7 書寫靈感標籤可點擊插入文字
+// 4. [Fix] 順序調整：先紀錄統整(日記) → 再狀態核對(心情拉桿)
+// 5. [Fix] 點點數量(頁數)修正：引導頁4點、練習頁5點
+// 6. [Fix] Android icon 切痕問題 — needsOffscreenAlphaCompositing
+// 7. [Fix] 前三頁愛心圓圈與三個點固定在相同高度
 // ==========================================
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -60,7 +63,7 @@ const Header = ({ onBack, title, onExit }) => (
   </View>
 );
 
-const ProgressDots = ({ currentStep, totalSteps = 6 }) => (
+const ProgressDots = ({ currentStep, totalSteps = 5 }) => (
   <View style={styles.progressDotsContainer}>
     {[...Array(totalSteps)].map((_, index) => (
       <View
@@ -385,7 +388,7 @@ const AssessmentStep = ({ moodScore, onMoodChange, understandingScore, onUndChan
 
         <TouchableOpacity style={[styles.primaryBtn, {marginTop: 32}]} onPress={onNext}>
           <LinearGradient colors={['#FF8C42', '#FF6B6B']} style={styles.btnGrad}>
-            <Text style={styles.btnText}>查看總結</Text>
+            <Text style={styles.btnText}>下一步</Text>
           </LinearGradient>
         </TouchableOpacity>
       </View>
@@ -393,6 +396,7 @@ const AssessmentStep = ({ moodScore, onMoodChange, understandingScore, onUndChan
   </LinearGradient>
 );
 
+// [Fix #6] 紀錄統整 → 下一步文字改為「下一步」（接狀態核對）
 const SummaryStep = ({ formData, onNext, onBack, onExit }) => (
   <LinearGradient colors={['#FFF4ED', '#FFE8DB']} style={styles.fullScreen}>
     <Header onBack={onBack} title="記錄統整" onExit={onExit} />
@@ -420,27 +424,63 @@ const SummaryStep = ({ formData, onNext, onBack, onExit }) => (
   </LinearGradient>
 );
 
-// ==================== 新增頁面 ====================
+// ==================== 新增/修正頁面 ====================
+
+// [Fix #9] 前三頁共用的固定高度佈局 — icon 和 dots 固定位置
+const IntroLayout = ({ children, iconComponent, currentStep, totalSteps, onExit, showCloseBtn }) => (
+  <LinearGradient colors={['#FFF4ED', '#FFE8DB']} style={styles.fullScreen}>
+    {showCloseBtn && (
+      <TouchableOpacity style={styles.closeBtnAbs} onPress={onExit}>
+        <X size={24} color="#FF8C42" />
+      </TouchableOpacity>
+    )}
+    <View style={styles.fullScreen}>
+      {/* 固定高度的 icon + dots 區域 */}
+      <View style={styles.introFixedTop}>
+        <View
+          style={styles.iconCircle}
+          needsOffscreenAlphaCompositing={Platform.OS === 'android'}
+          renderToHardwareTextureAndroid={Platform.OS === 'android'}
+        >
+          {iconComponent}
+        </View>
+        <ProgressDots currentStep={currentStep} totalSteps={totalSteps} />
+      </View>
+      {/* 彈性內容區 */}
+      <View style={styles.introContentArea}>
+        {children}
+      </View>
+    </View>
+  </LinearGradient>
+);
 
 const SituationRecallPage = ({ onNext, onBack, onExit }) => (
   <LinearGradient colors={['#FFF4ED', '#FFE8DB']} style={styles.fullScreen}>
     <Header onBack={onBack} onExit={onExit} />
-    <View style={styles.centerContent}>
-      <View style={[styles.iconCircle, {backgroundColor:'rgba(255,140,66,0.1)'}]}>
-        <Heart size={48} color="#FF8C42" />
+    <View style={styles.fullScreen}>
+      <View style={styles.introFixedTopWithHeader}>
+        <View
+          style={[styles.iconCircle, {backgroundColor:'rgba(255,140,66,0.1)'}]}
+          needsOffscreenAlphaCompositing={Platform.OS === 'android'}
+          renderToHardwareTextureAndroid={Platform.OS === 'android'}
+        >
+          <Heart size={48} color="#FF8C42" />
+        </View>
+        <ProgressDots currentStep={2} totalSteps={3} />
       </View>
-      <ProgressDots currentStep={2} totalSteps={3} />
-      <Text style={styles.welcomeTitle}>情境回想</Text>
-      <Text style={styles.welcomeDesc}>
-        請先想出一個最近讓你感到{"\n"}
-        <Text style={{color: '#FF8C42', fontWeight: '700'}}>『不舒服或難以理解』</Text>
-        {"\n"}的互動場景
-      </Text>
-      <TouchableOpacity style={styles.primaryBtn} onPress={onNext}>
-        <LinearGradient colors={['#FF8C42', '#FF6B6B']} style={styles.btnGrad}>
-          <Text style={styles.btnText}>下一頁</Text>
-        </LinearGradient>
-      </TouchableOpacity>
+      <View style={styles.introContentArea}>
+        <Text style={styles.welcomeTitle}>情境回想</Text>
+        <Text style={styles.welcomeDesc}>
+          請先想出一個最近讓你感到{"\n"}
+          <Text style={{color: '#FF8C42', fontWeight: '700'}}>『不舒服或難以理解』</Text>
+          {"\n"}的互動場景
+        </Text>
+        <TouchableOpacity style={styles.primaryBtn} onPress={onNext}>
+          <LinearGradient colors={['#FF8C42', '#FF6B6B']} style={styles.btnGrad}>
+            <Text style={styles.btnText}>下一頁</Text>
+          </LinearGradient>
+        </TouchableOpacity>
+      </View>
     </View>
   </LinearGradient>
 );
@@ -449,7 +489,11 @@ const EncouragementPage = ({ onNext, onBack, onExit }) => (
   <LinearGradient colors={['#FFF4ED', '#FFE8DB']} style={styles.fullScreen}>
     <Header onBack={onBack} onExit={onExit} />
     <View style={styles.centerContent}>
-      <View style={styles.iconCircle}>
+      <View
+        style={styles.iconCircle}
+        needsOffscreenAlphaCompositing={Platform.OS === 'android'}
+        renderToHardwareTextureAndroid={Platform.OS === 'android'}
+      >
         <Heart size={48} color="#FF8C42" />
       </View>
       <Text style={styles.encouragementTitle}>你很厲害！</Text>
@@ -471,114 +515,129 @@ const EncouragementPage = ({ onNext, onBack, onExit }) => (
   </LinearGradient>
 );
 
-const NeedsStepDetailed = ({ value, onChange, onNext, onBack, onExit }) => (
-  <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{flex: 1}}>
-    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-      <LinearGradient colors={['#FFF4ED', '#FFE8DB']} style={styles.fullScreen}>
-        <Header onBack={onBack} title="理解需求" onExit={onExit} />
-        <ScrollView contentContainerStyle={[styles.scrollContent, {paddingBottom: 220}]} showsVerticalScrollIndicator={true}>
-          <ProgressDots currentStep={2} totalSteps={5} />
-          <Text style={styles.instrText}>對方真正在意的重點{"\n"}是什麼需求或期待沒有被滿足呢？</Text>
-          
-          <View style={styles.inputCard}>
-            <TextInput 
-              multiline 
-              style={styles.textArea} 
-              value={value} 
-              onChangeText={onChange} 
-              placeholder="對方在意的點是..." 
-              placeholderTextColor="#cbd5e1" 
-              textAlignVertical="top" 
-            />
+// [Fix #5] 理解需求頁 — 書寫靈感標籤可點擊插入
+const NeedsStepDetailed = ({ value, onChange, onNext, onBack, onExit }) => {
+  const handleTagPress = useCallback((tag) => {
+    const current = value || '';
+    const newVal = current ? `${current}\n• ${tag}` : `• ${tag}`;
+    onChange(newVal);
+  }, [value, onChange]);
+
+  const handleReflectionPress = useCallback((template) => {
+    const current = value || '';
+    const newVal = current ? `${current}\n${template}` : template;
+    onChange(newVal);
+  }, [value, onChange]);
+
+  return (
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{flex: 1}}>
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <LinearGradient colors={['#FFF4ED', '#FFE8DB']} style={styles.fullScreen}>
+          <Header onBack={onBack} title="理解需求" onExit={onExit} />
+          <ScrollView contentContainerStyle={[styles.scrollContent, {paddingBottom: 220}]} showsVerticalScrollIndicator={true}>
+            <ProgressDots currentStep={2} totalSteps={5} />
+            <Text style={styles.instrText}>對方真正在意的重點{"\n"}是什麼需求或期待沒有被滿足呢？</Text>
+            
+            <View style={styles.inputCard}>
+              <TextInput 
+                multiline 
+                style={styles.textArea} 
+                value={value} 
+                onChangeText={onChange} 
+                placeholder="對方在意的點是..." 
+                placeholderTextColor="#cbd5e1" 
+                textAlignVertical="top" 
+              />
+            </View>
+
+            <View style={styles.exampleBox}>
+              <Star size={14} color="#fbbf24" fill="#fbbf24" />
+              <Text style={styles.exampleText}>
+                例如：{"\n"}
+                (1) 他可能需要安穩的空間來處理壓力{"\n"}
+                (2) 另一半可能需要安全感、想要被安慰
+              </Text>
+            </View>
+
+            <Text style={styles.commonCluesTitle}>常見端倪</Text>
+            
+            <View style={styles.clueSection}>
+              <Text style={styles.clueSectionTitle}>• 智慧模式</Text>
+              <Text style={styles.clueSectionText}>
+                這是他長期以來應對外界的習慣嗎？（例如：選擇讓力壓抑起來、習慣先指責別人以保護自己）。
+              </Text>
+            </View>
+
+            <View style={styles.clueSection}>
+              <Text style={styles.clueSectionTitle}>• 身心狀態</Text>
+              <Text style={styles.clueSectionText}>
+                他當時的身體狀況或睡眠狀況嗎？（例如：睡眠不足、焦慮主管系、正好感冒不適造成的焦慮中）。
+              </Text>
+            </View>
+
+            <View style={styles.clueSection}>
+              <Text style={styles.clueSectionTitle}>• 角色壓力</Text>
+              <Text style={styles.clueSectionText}>
+                身為那個角色（上司、父母、伴侶），他是否正承受某些形象的壓力或責任？
+              </Text>
+            </View>
+
+            {/* [Fix #5] 書寫靈感 — 點擊插入文字到輸入框 */}
+            <Text style={styles.inspirationTitle}>💡 書寫靈感（點擊插入）</Text>
+
+            <TouchableOpacity style={styles.reflectionBox} onPress={() => handleReflectionPress('如果我是他，在同樣的處境或壓力漩渦中，我可能會覺得...')}>
+              <Text style={styles.reflectionIcon}>👤</Text>
+              <Text style={styles.reflectionText}>
+                如果我是他，在同樣的處境或壓力漩渦中，我可能會覺得...
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.reflectionBox} onPress={() => handleReflectionPress('我發現，他的反應可能不完全是因為我，而是因為...')}>
+              <Text style={styles.reflectionIcon}>🌿</Text>
+              <Text style={styles.reflectionText}>
+                我發現，他的反應可能不完全是因為我，而是因為...
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.reflectionBox} onPress={() => handleReflectionPress('根據過往經驗，他好像會在極度焦慮的時候，會用...')}>
+              <Text style={styles.reflectionIcon}>💭</Text>
+              <Text style={styles.reflectionText}>
+                根據過往經驗，他好像會在極度焦慮的時候，會用...
+              </Text>
+            </TouchableOpacity>
+
+            <Text style={styles.tagSectionTitle}>快速標記需求</Text>
+            <View style={styles.tagRow}>
+              <TouchableOpacity style={styles.tagBtn} onPress={() => handleTagPress('被理解')}><Text style={styles.tagText}>+ 被理解</Text></TouchableOpacity>
+              <TouchableOpacity style={styles.tagBtn} onPress={() => handleTagPress('被尊重')}><Text style={styles.tagText}>+ 被尊重</Text></TouchableOpacity>
+              <TouchableOpacity style={styles.tagBtn} onPress={() => handleTagPress('安全感')}><Text style={styles.tagText}>+ 安全感</Text></TouchableOpacity>
+            </View>
+
+            <View style={styles.tagRow}>
+              <TouchableOpacity style={styles.tagBtn} onPress={() => handleTagPress('效率與節奏')}><Text style={styles.tagText}>+ 效率與節奏</Text></TouchableOpacity>
+              <TouchableOpacity style={styles.tagBtn} onPress={() => handleTagPress('空間與自由')}><Text style={styles.tagText}>+ 空間與自由</Text></TouchableOpacity>
+            </View>
+
+            <View style={styles.tagRow}>
+              <TouchableOpacity style={styles.tagBtn} onPress={() => handleTagPress('認同與價值')}><Text style={styles.tagText}>+ 認同與價值</Text></TouchableOpacity>
+              <TouchableOpacity style={styles.tagBtn} onPress={() => handleTagPress('連結與親密')}><Text style={styles.tagText}>+ 連結與親密</Text></TouchableOpacity>
+            </View>
+          </ScrollView>
+          <View style={styles.footer}>
+            <TouchableOpacity style={styles.primaryBtn} onPress={onNext}>
+              <LinearGradient colors={['#FF8C42', '#FF6B6B']} style={styles.btnGrad}>
+                <Text style={styles.btnText}>下一步</Text>
+              </LinearGradient>
+            </TouchableOpacity>
           </View>
+        </LinearGradient>
+      </TouchableWithoutFeedback>
+    </KeyboardAvoidingView>
+  );
+};
 
-          <View style={styles.exampleBox}>
-            <Star size={14} color="#fbbf24" fill="#fbbf24" />
-            <Text style={styles.exampleText}>
-              例如：{"\n"}
-              (1) 他可能需要安穩的空間來處理壓力{"\n"}
-              (2) 另一半可能需要安全感、想要被安慰
-            </Text>
-          </View>
-
-          <Text style={styles.commonCluesTitle}>常見端倪</Text>
-          
-          <View style={styles.clueSection}>
-            <Text style={styles.clueSectionTitle}>• 智慧模式</Text>
-            <Text style={styles.clueSectionText}>
-              這是他長期以來應對外界的習慣嗎？（例如：選擇讓力壓抑起來、習慣先指責別人以保護自己）。
-            </Text>
-          </View>
-
-          <View style={styles.clueSection}>
-            <Text style={styles.clueSectionTitle}>• 身心狀態</Text>
-            <Text style={styles.clueSectionText}>
-              他當時的身體狀況或睡眠狀況嗎？（例如：睡眠不足、焦慮主管系、正好感冒不適造成的焦慮中）。
-            </Text>
-          </View>
-
-          <View style={styles.clueSection}>
-            <Text style={styles.clueSectionTitle}>• 角色壓力</Text>
-            <Text style={styles.clueSectionText}>
-              身為那個角色（上司、父母、伴侶），他是否正承受某些形象的壓力或責任？
-            </Text>
-          </View>
-
-          <TouchableOpacity style={styles.clueExpandBox}>
-            <Text style={styles.clueExpandIcon}>○</Text>
-            <Text style={styles.clueExpandText}>發現更多端倪（點擊輸入額外線）</Text>
-          </TouchableOpacity>
-
-          <View style={styles.reflectionBox}>
-            <Text style={styles.reflectionIcon}>👤</Text>
-            <Text style={styles.reflectionText}>
-              如果我是他，在同樣的處境或壓力漩渦中，我可能會覺得...
-            </Text>
-          </View>
-
-          <View style={styles.reflectionBox}>
-            <Text style={styles.reflectionIcon}>🌿</Text>
-            <Text style={styles.reflectionText}>
-              我發現，他的反應可能不完全反因為我，而是因為...
-            </Text>
-          </View>
-
-          <View style={styles.reflectionBox}>
-            <Text style={styles.reflectionIcon}>💭</Text>
-            <Text style={styles.reflectionText}>
-              根據過往經驗，他好像會在極度焦慮或的時候，會用...
-            </Text>
-          </View>
-
-          <View style={styles.tagRow}>
-            <TouchableOpacity style={styles.tagBtn}><Text style={styles.tagText}>+ 被理解</Text></TouchableOpacity>
-            <TouchableOpacity style={styles.tagBtn}><Text style={styles.tagText}>+ 被尊重</Text></TouchableOpacity>
-            <TouchableOpacity style={styles.tagBtn}><Text style={styles.tagText}>+ 安全感</Text></TouchableOpacity>
-          </View>
-
-          <View style={styles.tagRow}>
-            <TouchableOpacity style={styles.tagBtn}><Text style={styles.tagText}>+ 效率與節奏</Text></TouchableOpacity>
-            <TouchableOpacity style={styles.tagBtn}><Text style={styles.tagText}>+ 空間與自由</Text></TouchableOpacity>
-          </View>
-
-          <View style={styles.tagRow}>
-            <TouchableOpacity style={styles.tagBtn}><Text style={styles.tagText}>+ 認同與價值</Text></TouchableOpacity>
-            <TouchableOpacity style={styles.tagBtn}><Text style={styles.tagText}>+ 連結與親密</Text></TouchableOpacity>
-          </View>
-        </ScrollView>
-        <View style={styles.footer}>
-          <TouchableOpacity style={styles.primaryBtn} onPress={onNext}>
-            <LinearGradient colors={['#FF8C42', '#FF6B6B']} style={styles.btnGrad}>
-              <Text style={styles.btnText}>下一步</Text>
-            </LinearGradient>
-          </TouchableOpacity>
-        </View>
-      </LinearGradient>
-    </TouchableWithoutFeedback>
-  </KeyboardAvoidingView>
-);
-
-const LimitationsStepDetailed = ({ value, onChange, onNext, onBack, onExit }) => (
+// [Fix #1] 考量限制頁 — 新增「跳過」按鈕（僅此頁可跳過）
+const LimitationsStepDetailed = ({ value, onChange, onNext, onSkip, onBack, onExit }) => (
   <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{flex: 1}}>
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
       <LinearGradient colors={['#FFF4ED', '#FFE8DB']} style={styles.fullScreen}>
@@ -588,7 +647,7 @@ const LimitationsStepDetailed = ({ value, onChange, onNext, onBack, onExit }) =>
           <Text style={styles.instrText}>
             他的表達方式或許受到某些情境壓力影響{"\n"}
             或許一些話會想表{"\n"}
-            如果這句話不是在計對我{"\n"}
+            如果這句話不是在針對我{"\n"}
             還會有哪些可能性
           </Text>
           
@@ -628,39 +687,10 @@ const LimitationsStepDetailed = ({ value, onChange, onNext, onBack, onExit }) =>
           </View>
         </ScrollView>
         <View style={styles.footer}>
-          <Text style={styles.footerHint}>如果都很確信了，可以先完成</Text>
-          <TouchableOpacity style={styles.primaryBtn} onPress={onNext}>
-            <LinearGradient colors={['#FF8C42', '#FF6B6B']} style={styles.btnGrad}>
-              <Text style={styles.btnText}>下一步</Text>
-            </LinearGradient>
+          {/* [Fix #1] 跳過按鈕 — 僅限考量限制頁 */}
+          <TouchableOpacity style={styles.skipBtn} onPress={onSkip}>
+            <Text style={styles.skipBtnText}>跳過此步驟</Text>
           </TouchableOpacity>
-        </View>
-      </LinearGradient>
-    </TouchableWithoutFeedback>
-  </KeyboardAvoidingView>
-);
-
-const GenericInputPage = ({ title, hint, value, onChange, onNext, onBack, onExit, step }) => (
-  <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{flex: 1}}>
-    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-      <LinearGradient colors={['#FFF4ED', '#FFE8DB']} style={styles.fullScreen}>
-        <Header onBack={onBack} title={title} onExit={onExit} />
-        <ScrollView contentContainerStyle={styles.scrollContent}>
-          <ProgressDots currentStep={step} totalSteps={5} />
-          <Text style={styles.instrText}>{hint}</Text>
-          <View style={styles.inputCard}>
-            <TextInput 
-              multiline 
-              style={styles.textArea} 
-              value={value} 
-              onChangeText={onChange} 
-              placeholder="寫下你的觀察..." 
-              placeholderTextColor="#cbd5e1" 
-              textAlignVertical="top" 
-            />
-          </View>
-        </ScrollView>
-        <View style={styles.footer}>
           <TouchableOpacity style={styles.primaryBtn} onPress={onNext}>
             <LinearGradient colors={['#FF8C42', '#FF6B6B']} style={styles.btnGrad}>
               <Text style={styles.btnText}>下一步</Text>
@@ -747,6 +777,23 @@ export default function EmpathyPractice({ onBack, navigation, onHome }) {
 
   const handleExit = () => setShowExitWarning(true);
 
+  // [Fix #4] 確定退出 — 加入 fallback 邏輯
+  const handleConfirmExit = useCallback(() => {
+    setShowExitWarning(false);
+    setIsTiming(false);
+    if (onHome) {
+      onHome();
+    } else if (onBack) {
+      onBack();
+    } else if (navigation) {
+      try {
+        navigation.navigate('MainTabs', { screen: 'Daily' });
+      } catch (_e) {
+        navigation.goBack();
+      }
+    }
+  }, [onHome, onBack, navigation]);
+
   const updateForm = (key, value) => {
     setFormData(prev => ({ ...prev, [key]: value }));
   };
@@ -768,17 +815,29 @@ export default function EmpathyPractice({ onBack, navigation, onHome }) {
       case 'needs':
         return <NeedsStepDetailed value={formData.needs} onChange={(v) => updateForm('needs', v)} onNext={() => setCurrentPage('limitations')} onBack={() => setCurrentPage('emotions')} onExit={handleExit} />;
       case 'limitations':
-        return <LimitationsStepDetailed value={formData.limitations} onChange={(v) => updateForm('limitations', v)} onNext={() => setCurrentPage('translation')} onBack={() => setCurrentPage('needs')} onExit={handleExit} />;
+        return (
+          <LimitationsStepDetailed 
+            value={formData.limitations} 
+            onChange={(v) => updateForm('limitations', v)} 
+            onNext={() => setCurrentPage('translation')} 
+            onSkip={() => setCurrentPage('translation')}  // [Fix #1] 跳過直接到下一步
+            onBack={() => setCurrentPage('needs')} 
+            onExit={handleExit} 
+          />
+        );
       case 'translation':
         return <TranslationStep situation={formData.situation} emotion={formData.emotions[0]} translation={formData.translation} onChange={(v) => updateForm('translation', v)} onNext={() => setCurrentPage('encouragement')} onBack={() => setCurrentPage('limitations')} onExit={handleExit} />;
       case 'encouragement':
-        return <EncouragementPage onNext={() => setCurrentPage('assessment')} onBack={() => setCurrentPage('translation')} onExit={handleExit} />;
-      case 'assessment':
-        return <AssessmentStep moodScore={formData.moodScore} onMoodChange={(v) => updateForm('moodScore', v)} understandingScore={formData.understandingScore} onUndChange={(v) => updateForm('understandingScore', v)} onNext={() => setCurrentPage('summary')} onBack={() => setCurrentPage('encouragement')} onExit={handleExit} />;
+        // [Fix #6] encouragement → summary（先紀錄統整）
+        return <EncouragementPage onNext={() => setCurrentPage('summary')} onBack={() => setCurrentPage('translation')} onExit={handleExit} />;
       case 'summary':
-        return <SummaryStep formData={formData} onNext={() => setCurrentPage('recommendations')} onBack={() => setCurrentPage('assessment')} onExit={handleExit} />;
+        // [Fix #6] summary → assessment（再狀態核對）
+        return <SummaryStep formData={formData} onNext={() => setCurrentPage('assessment')} onBack={() => setCurrentPage('encouragement')} onExit={handleExit} />;
+      case 'assessment':
+        // [Fix #6] assessment → recommendations
+        return <AssessmentStep moodScore={formData.moodScore} onMoodChange={(v) => updateForm('moodScore', v)} understandingScore={formData.understandingScore} onUndChange={(v) => updateForm('understandingScore', v)} onNext={() => setCurrentPage('recommendations')} onBack={() => setCurrentPage('summary')} onExit={handleExit} />;
       case 'recommendations':
-        return <RecPage onNext={() => setCurrentPage('final')} onBack={() => setCurrentPage('summary')} onExit={handleExit} />;
+        return <RecPage onNext={() => setCurrentPage('final')} onBack={() => setCurrentPage('assessment')} onExit={handleExit} />;
       case 'final':
         return <FinalPage onComplete={handleComplete} iconScale={iconScale} />;
       default:
@@ -787,57 +846,85 @@ export default function EmpathyPractice({ onBack, navigation, onHome }) {
   };
 
   return (
-    <Animated.View style={{flex: 1, opacity: fadeAnim}}>
+    // [Fix #8] Android icon 切痕修正
+    <Animated.View 
+      style={{flex: 1, opacity: fadeAnim}} 
+      needsOffscreenAlphaCompositing={Platform.OS === 'android'}
+      renderToHardwareTextureAndroid={Platform.OS === 'android'}
+    >
       <StatusBar barStyle="dark-content" />
       {renderContent()}
-      <ExitWarningModal visible={showExitWarning} onCancel={() => setShowExitWarning(false)} onConfirm={onHome} />
+      {/* [Fix #4] 使用 handleConfirmExit 取代 onHome */}
+      <ExitWarningModal visible={showExitWarning} onCancel={() => setShowExitWarning(false)} onConfirm={handleConfirmExit} />
     </Animated.View>
   );
 }
 
 // ==================== 靜態頁面組件 ====================
 
+// [Fix #9] WelcomePage — 固定 icon+dots 高度
 const WelcomePage = ({ onNext, onExit }) => (
   <LinearGradient colors={['#FFF4ED', '#FFE8DB']} style={styles.fullScreen}>
     <TouchableOpacity style={styles.closeBtnAbs} onPress={onExit}>
       <X size={24} color="#FF8C42" />
     </TouchableOpacity>
-    <View style={styles.welcomeContent}>
-      <View style={styles.iconCircle}><Heart size={48} color="#FF8C42" /></View>
-      <ProgressDots currentStep={0} totalSteps={3} />
-      <Text style={styles.welcomeTitle}>哈囉！{"\n"}歡迎來到同理讀心術</Text>
-      <Text style={styles.welcomeDesc}>
-        無法清晰表達的需求，往往是人際衝突的來源。{"\n\n"}
-        透過這個練習，我們將能解讀對方話語中的真實感受與需求。
-      </Text>
-      <TouchableOpacity style={styles.primaryBtn} onPress={onNext}>
-        <LinearGradient colors={['#FF8C42', '#FF6B6B']} style={styles.btnGrad}>
-          <Text style={styles.btnText}>下一頁</Text>
-          <ArrowRight size={20} color="#fff" />
-        </LinearGradient>
-      </TouchableOpacity>
+    <View style={styles.fullScreen}>
+      <View style={styles.introFixedTop}>
+        <View
+          style={styles.iconCircle}
+          needsOffscreenAlphaCompositing={Platform.OS === 'android'}
+          renderToHardwareTextureAndroid={Platform.OS === 'android'}
+        >
+          <Heart size={48} color="#FF8C42" />
+        </View>
+        <ProgressDots currentStep={0} totalSteps={3} />
+      </View>
+      <View style={styles.introContentArea}>
+        <Text style={styles.welcomeTitle}>哈囉！{"\n"}歡迎來到同理讀心術</Text>
+        <Text style={styles.welcomeDesc}>
+          無法清晰表達的需求，往往是人際衝突的來源。{"\n\n"}
+          透過這個練習，我們將能解讀對方話語中的真實感受與需求。
+        </Text>
+        <TouchableOpacity style={styles.primaryBtn} onPress={onNext}>
+          <LinearGradient colors={['#FF8C42', '#FF6B6B']} style={styles.btnGrad}>
+            <Text style={styles.btnText}>下一頁</Text>
+            <ArrowRight size={20} color="#fff" />
+          </LinearGradient>
+        </TouchableOpacity>
+      </View>
     </View>
   </LinearGradient>
 );
 
+// [Fix #9] IntroPage — 固定 icon+dots 高度
 const IntroPage = ({ onNext, onBack, onExit }) => (
   <LinearGradient colors={['#FFF4ED', '#FFE8DB']} style={styles.fullScreen}>
     <Header onBack={onBack} onExit={onExit} />
-    <View style={styles.centerContent}>
-      <View style={styles.iconCircle}><Heart size={48} color="#FF8C42" /></View>
-      <ProgressDots currentStep={1} totalSteps={3} />
-      <Text style={styles.welcomeTitle}>接下來我們一起{"\n"}走過這些練習步驟</Text>
-      <View style={styles.stepList}>
-        <Text style={styles.stepHighlight}>
-          還原事實 • 辨識情緒 • 理解需求{"\n"}
-          考量限制 • 同理翻譯
-        </Text>
+    <View style={styles.fullScreen}>
+      <View style={styles.introFixedTopWithHeader}>
+        <View
+          style={styles.iconCircle}
+          needsOffscreenAlphaCompositing={Platform.OS === 'android'}
+          renderToHardwareTextureAndroid={Platform.OS === 'android'}
+        >
+          <Heart size={48} color="#FF8C42" />
+        </View>
+        <ProgressDots currentStep={1} totalSteps={3} />
       </View>
-      <TouchableOpacity style={styles.primaryBtn} onPress={onNext}>
-        <LinearGradient colors={['#FF8C42', '#FF6B6B']} style={styles.btnGrad}>
-          <Text style={styles.btnText}>下一頁</Text>
-        </LinearGradient>
-      </TouchableOpacity>
+      <View style={styles.introContentArea}>
+        <Text style={styles.welcomeTitle}>接下來我們一起{"\n"}走過這些練習步驟</Text>
+        <View style={styles.stepList}>
+          <Text style={styles.stepHighlight}>
+            還原事實 • 辨識情緒 • 理解需求{"\n"}
+            考量限制 • 同理翻譯
+          </Text>
+        </View>
+        <TouchableOpacity style={styles.primaryBtn} onPress={onNext}>
+          <LinearGradient colors={['#FF8C42', '#FF6B6B']} style={styles.btnGrad}>
+            <Text style={styles.btnText}>下一頁</Text>
+          </LinearGradient>
+        </TouchableOpacity>
+      </View>
     </View>
   </LinearGradient>
 );
@@ -846,7 +933,11 @@ const BreathingPage = ({ onNext, onBack, onExit }) => (
   <LinearGradient colors={['#FFF4ED', '#FFE8DB']} style={styles.fullScreen}>
     <Header onBack={onBack} onExit={onExit} />
     <View style={styles.centerContent}>
-      <View style={[styles.iconCircle, {backgroundColor:'rgba(255,140,66,0.1)'}]}>
+      <View
+        style={[styles.iconCircle, {backgroundColor:'rgba(255,140,66,0.1)'}]}
+        needsOffscreenAlphaCompositing={Platform.OS === 'android'}
+        renderToHardwareTextureAndroid={Platform.OS === 'android'}
+      >
         <Wind size={48} color="#FF8C42" />
       </View>
       <Text style={styles.welcomeTitle}>深呼吸 放鬆</Text>
@@ -869,7 +960,6 @@ const RecPage = ({ onNext, onBack, onExit }) => (
   <LinearGradient colors={['#FFF4ED', '#FFE8DB']} style={styles.fullScreen}>
     <Header onBack={onBack} title="推薦建議" onExit={onExit} />
     <ScrollView contentContainerStyle={styles.scrollContent}>
-      <ProgressDots currentStep={6} totalSteps={7} />
       <Text style={styles.pageTitle}>接下來，你可以...</Text>
       
       <View style={styles.recItem}>
@@ -929,7 +1019,11 @@ const RecPage = ({ onNext, onBack, onExit }) => (
 const FinalPage = ({ onComplete, iconScale }) => (
   <LinearGradient colors={['#FFF4ED', '#FFE8DB']} style={styles.fullScreen}>
     <View style={styles.centerContent}>
-      <Animated.View style={[styles.finalIcon, {transform:[{scale: iconScale}]}]}>
+      <Animated.View
+        style={[styles.finalIcon, {transform:[{scale: iconScale}]}]}
+        needsOffscreenAlphaCompositing={Platform.OS === 'android'}
+        renderToHardwareTextureAndroid={Platform.OS === 'android'}
+      >
         <View style={styles.iconCircle}>
           <Heart size={48} color="#FF8C42" />
           <View style={styles.starBadge}>
@@ -1003,6 +1097,30 @@ const styles = StyleSheet.create({
     alignItems: 'center', 
     paddingHorizontal: 40 
   },
+
+  // [Fix #9] 前三頁（含 breathing）固定 icon+dots 區域 — 無 Header 版
+  introFixedTop: {
+    alignItems: 'center',
+    paddingTop: 120,
+    paddingBottom: 8,
+  },
+
+  // [Fix #9] 有 Header 的版本（intro, situation-recall, breathing 有 header）
+  introFixedTopWithHeader: {
+    alignItems: 'center',
+    paddingTop: 24,
+    paddingBottom: 8,
+  },
+
+  // [Fix #9] 內容區：填滿剩餘空間、垂直居中
+  introContentArea: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 32,
+    paddingBottom: 60,
+  },
+
   welcomeContent: { 
     flex: 1, 
     justifyContent: 'center', 
@@ -1021,7 +1139,9 @@ const styles = StyleSheet.create({
     shadowColor: '#FF8C42', 
     shadowOffset: {width:0,height:4}, 
     shadowOpacity:0.2, 
-    marginBottom: 24 
+    marginBottom: 24,
+    // [Fix #8] Android 防止切痕
+    overflow: 'visible',
   },
   welcomeTitle: { 
     fontSize: 24, 
@@ -1083,6 +1203,21 @@ const styles = StyleSheet.create({
     color: '#fff', 
     fontSize: 17, 
     fontWeight: '700' 
+  },
+
+  // [Fix #1] 跳過按鈕樣式
+  skipBtn: {
+    width: '100%',
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  skipBtnText: {
+    fontSize: 15,
+    color: '#94a3b8',
+    fontWeight: '600',
+    textDecorationLine: 'underline',
   },
   
   scrollContent: { 
@@ -1287,21 +1422,13 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
 
-  clueExpandBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingVertical: 12,
-    marginTop: 8,
-    marginBottom: 16,
-  },
-  clueExpandIcon: {
-    fontSize: 16,
+  // [Fix #5] 書寫靈感標題
+  inspirationTitle: {
+    fontSize: 15,
+    fontWeight: '700',
     color: '#FF8C42',
-  },
-  clueExpandText: {
-    fontSize: 13,
-    color: '#64748b',
+    marginTop: 24,
+    marginBottom: 12,
   },
 
   reflectionBox: {
@@ -1325,10 +1452,20 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
 
+  // [Fix #5] 標籤區標題
+  tagSectionTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#94a3b8',
+    marginTop: 16,
+    marginBottom: 10,
+  },
+
   tagRow: {
     flexDirection: 'row',
     gap: 8,
     marginBottom: 8,
+    flexWrap: 'wrap',
   },
   tagBtn: {
     backgroundColor: '#fff',
