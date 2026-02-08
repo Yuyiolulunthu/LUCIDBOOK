@@ -300,6 +300,7 @@ const DailyScreen = ({ navigation, route }) => {
     if (name.includes('呼吸') || name.includes('4-6') || name.includes('屏息')) return 'breathing';
     if (name.includes('思維') || name.includes('調節') || name.includes('認知') || name.includes('內耗')) return 'cognitive';
     if (name.includes('同理讀心術')) return 'empathy';
+    if (name.includes('溝通轉譯器')) return 'communication';
     if (name.includes('感恩') || name.includes('感謝信') || name.includes('如果練習')) return 'gratitude';
     if (name.includes('心情溫度計')) return 'thermometer';
     return 'other';
@@ -607,6 +608,54 @@ const DailyScreen = ({ navigation, route }) => {
     return data;
   };
 
+  const extractCommunicationData = (practice) => {
+    let data = {
+      facts: null,        // ✅ 新增
+      situation: null,
+      emotions: [],
+      needs: null,
+      request: null,      // ✅ 修正
+      limitations: null,
+      translation: null,
+      moodScore: null,
+    };
+
+    if (practice.form_data) {
+      try {
+        const fd = typeof practice.form_data === 'string' 
+          ? JSON.parse(practice.form_data) 
+          : practice.form_data;
+        
+        if (fd) {
+          // ✅ 新增facts欄位
+          data.facts = fd.facts || fd.fact || null;
+          
+          data.situation = fd.situation || fd.event || null;
+          
+          if (Array.isArray(fd.emotions)) {
+            data.emotions = fd.emotions;
+          } else if (fd.emotion) {
+            data.emotions = Array.isArray(fd.emotion) ? fd.emotion : [fd.emotion];
+          }
+          
+          data.needs = fd.needs || fd.need || null;
+          
+          // ✅ 修正request欄位
+          data.request = fd.request || null;
+          
+          data.limitations = fd.limitations || fd.otherLimitations || null;
+          data.translation = fd.translation || fd.translatedMessage || fd.translated_message || fd.finalMessage || null;
+          data.moodScore = fd.moodScore ?? fd.postScore ?? fd.post_score ?? null;
+        }
+      } catch (e) {
+        console.warn('[DailyScreen] 解析溝通轉譯器 form_data 失敗:', e);
+      }
+    }
+
+    console.log('[DailyScreen] 溝通轉譯器解析結果:', data);
+    return data;
+  };
+
   const extractEmotionThermometerData = (practice) => {
     let data = { scores: null, totalScore: null, riskScore: null };
     if (practice.form_data) {
@@ -651,6 +700,7 @@ const DailyScreen = ({ navigation, route }) => {
     const isGratitude = practiceType === 'gratitude';
     const isMoodThermometer = practiceType === 'thermometer';
     const isEmpathy = practiceType === 'empathy';
+    const isCommunication = practiceType === 'communication';
 
     const breathingData = isBreathing ? extractBreathingData(selectedPractice) : null;
     const goodThingData = isGoodThings ? extractGoodThingData(selectedPractice) : null;
@@ -658,6 +708,7 @@ const DailyScreen = ({ navigation, route }) => {
     const gratitudeData = isGratitude ? extractGratitudeData(selectedPractice) : null;
     const emotionThermometerData = isMoodThermometer ? extractEmotionThermometerData(selectedPractice) : null;
     const empathyData = isEmpathy ? extractEmpathyData(selectedPractice) : null;
+    const communicationData = isCommunication ? extractCommunicationData(selectedPractice) : null;
 
     const formatModalDate = (dateStr) => {
       const date = new Date(dateStr);
@@ -710,6 +761,15 @@ const DailyScreen = ({ navigation, route }) => {
           light: '#FDF2F8', 
           accent: '#FCE7F3', 
           gradient: ['#EC4899', '#F472B6'] 
+        };
+      }
+
+      if (isCommunication) {
+        return { 
+          primary: '#F59E0B', 
+          light: '#FFFBEB', 
+          accent: '#FEF3C7', 
+          gradient: ['#F59E0B', '#FBBF24'] 
         };
       }
       
@@ -779,7 +839,9 @@ const DailyScreen = ({ navigation, route }) => {
                 <View style={styles.modalMetaTagGray}>
                   <FileText color="#64748B" size={12} strokeWidth={2} />
                   <Text style={styles.modalMetaTextGray}>
-                    {selectedPractice.practice_type?.includes('內耗') || isEmpathy ? '職場溝通力' : '情緒抗壓力'}
+                    {selectedPractice.practice_type?.includes('內耗') || isEmpathy || isCommunication
+                      ? '職場溝通力' 
+                      : '情緒抗壓力'}
                   </Text>
                 </View>
               </View>
@@ -1363,6 +1425,120 @@ const DailyScreen = ({ navigation, route }) => {
                         <Text style={styles.scoreLabel}>張力改善程度</Text>
                         <View style={styles.scoreValueBox}>
                           <Text style={[styles.scoreValue, { color: '#10B981' }]}>{empathyData.moodScore}</Text>
+                          <Text style={styles.scoreMax}>/10</Text>
+                        </View>
+                      </View>
+                    </View>
+                  )}
+                </>
+              )}
+
+              {/* ========== 溝通轉譯器 ========== */}
+              {isCommunication && communicationData && (
+                <>
+                  {/* ✅ 新增：客觀描述 */}
+                  {communicationData.facts && (
+                    <View style={[styles.abcdCard, { 
+                      backgroundColor: theme.light, 
+                      borderLeftWidth: 4, 
+                      borderLeftColor: theme.primary 
+                    }]}>
+                      <View style={styles.abcdLabelRow}>
+                        <View style={[styles.sectionIconBadge, { backgroundColor: theme.accent }]}>
+                          <AlertCircle color={theme.primary} size={16} strokeWidth={2.5} />
+                        </View>
+                        <Text style={[styles.abcdLabel, { color: theme.primary, fontSize: 15 }]}>客觀描述</Text>
+                      </View>
+                      <Text style={styles.abcdContent}>{communicationData.facts}</Text>
+                    </View>
+                  )}
+
+                  {/* 情境（如果沒有facts才顯示situation） */}
+                  {!communicationData.facts && communicationData.situation && (
+                    <View style={[styles.abcdCard, { 
+                      backgroundColor: theme.light, 
+                      borderLeftWidth: 4, 
+                      borderLeftColor: theme.primary 
+                    }]}>
+                      <View style={styles.abcdLabelRow}>
+                        <View style={[styles.sectionIconBadge, { backgroundColor: theme.accent }]}>
+                          <AlertCircle color={theme.primary} size={16} strokeWidth={2.5} />
+                        </View>
+                        <Text style={[styles.abcdLabel, { color: theme.primary, fontSize: 15 }]}>情境</Text>
+                      </View>
+                      <Text style={styles.abcdContent}>{communicationData.situation}</Text>
+                    </View>
+                  )}
+
+                  {/* 辨識感受 */}
+                  {communicationData.emotions.length > 0 && (
+                    <View style={styles.sectionCard}>
+                      <Text style={styles.sectionLabel}>辨識感受</Text>
+                      <View style={styles.tagsRow}>
+                        {communicationData.emotions.map((e, i) => (
+                          <View key={i} style={[styles.emotionTagFilled, { backgroundColor: theme.primary }]}>
+                            <Text style={styles.emotionTagFilledText}>{e}</Text>
+                          </View>
+                        ))}
+                      </View>
+                    </View>
+                  )}
+
+                  {/* 理解需求 */}
+                  {communicationData.needs && (
+                    <View style={[styles.abcdCard, { backgroundColor: '#F8FAFC' }]}>
+                      <View style={styles.abcdLabelRow}>
+                        <View style={[styles.sectionIconBadge, { backgroundColor: '#E2E8F0' }]}>
+                          <Heart color="#64748B" size={16} strokeWidth={2.5} />
+                        </View>
+                        <Text style={[styles.abcdLabel, { color: '#64748B', fontSize: 15 }]}>理解需求</Text>
+                      </View>
+                      <Text style={styles.abcdContent}>{communicationData.needs}</Text>
+                    </View>
+                  )}
+
+                  {/* ✅ 新增：提出請求 */}
+                  {communicationData.request && (
+                    <View style={[styles.abcdCard, { backgroundColor: '#F8FAFC' }]}>
+                      <View style={styles.abcdLabelRow}>
+                        <View style={[styles.sectionIconBadge, { backgroundColor: '#E2E8F0' }]}>
+                          <Scale color="#64748B" size={16} strokeWidth={2.5} />
+                        </View>
+                        <Text style={[styles.abcdLabel, { color: '#64748B', fontSize: 15 }]}>提出請求</Text>
+                      </View>
+                      <Text style={styles.abcdContent}>{communicationData.request}</Text>
+                    </View>
+                  )}
+
+                  {communicationData.translation && (
+                    <View style={[styles.abcdCard, styles.abcdCardPositive]}>
+                      <View style={styles.abcdLabelRow}>
+                        <View style={[styles.sectionIconBadge, { backgroundColor: '#D1FAE5' }]}>
+                          <Lightbulb color="#10B981" size={16} strokeWidth={2.5} />
+                        </View>
+                        <Text style={[styles.abcdLabel, { color: '#10B981', fontSize: 15 }]}>翻譯後的訊息</Text>
+                      </View>
+                      <Text style={styles.abcdContent}>{communicationData.translation}</Text>
+                    </View>
+                  )}
+
+                  {/* 溝通效果 */}
+                  {communicationData.moodScore !== null && (
+                    <View style={[styles.resultCard, { 
+                      backgroundColor: '#ECFDF5', 
+                      borderColor: '#D1FAE5',
+                      marginTop: 8
+                    }]}>
+                      <View style={styles.resultCardHeader}>
+                        <View style={[styles.resultIconBadge, { backgroundColor: '#D1FAE5' }]}>
+                          <TrendingUp color="#10B981" size={14} />
+                        </View>
+                        <Text style={[styles.resultCardTitle, { color: '#10B981' }]}>練習成效</Text>
+                      </View>
+                      <View style={styles.scoreDisplayRow}>
+                        <Text style={styles.scoreLabel}>溝通效果</Text>
+                        <View style={styles.scoreValueBox}>
+                          <Text style={[styles.scoreValue, { color: '#10B981' }]}>{communicationData.moodScore}</Text>
                           <Text style={styles.scoreMax}>/10</Text>
                         </View>
                       </View>

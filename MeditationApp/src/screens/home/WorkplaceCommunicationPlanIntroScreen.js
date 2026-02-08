@@ -289,7 +289,7 @@ const WorkplaceCommunicationPlanIntroScreen = ({ navigation }) => {
       progress: '0/3',
       tags: ['委屈', '非暴力溝通', '開不了口', '怕衝突'],
       description: '覺得委屈卻又不知道如何開口嗎？想提要求卻又怕與人起衝突？來這裡就對了',
-      screen: null,
+      screen: 'CommunicationTranslatorPractice',
     },
   ];
 

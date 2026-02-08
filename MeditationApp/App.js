@@ -37,6 +37,7 @@ import CognitiveReframingPractice from './src/data/practices/CognitiveReframingP
 import GratitudePractice from './src/data/practices/GratitudePractice';
 import InternalConflictPractice from './src/data/practices/InternalConflictPractice'; // ⭐ 新增
 import EmpathyPractice  from './src/data/practices/EmpathyPractice';
+import CommunicationTranslatorPractice  from './src/data/practices/CommunicationTranslatorPractice';
 
 // 訓練計畫相關頁面
 import TrainingPlanDetailScreen from './src/screens/practice/training/TrainingPlanDetailScreen';
@@ -234,6 +235,11 @@ const App = () => {
           options={{ animation: 'slide_from_bottom' }}
         />
 
+        <Stack.Screen 
+          name="CommunicationTranslatorPractice" 
+          component={CommunicationTranslatorPractice}
+          options={{ animation: 'slide_from_bottom' }}
+        />
 
         {/* ========== 訓練計畫相關頁面 ========== */}
         <Stack.Screen name="TrainingPlanDetail" component={TrainingPlanDetailScreen} />
