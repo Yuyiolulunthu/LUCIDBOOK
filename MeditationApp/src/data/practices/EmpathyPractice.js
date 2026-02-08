@@ -370,9 +370,14 @@ const EmotionsStep = ({ selectedEmotions, customEmotions, onToggle, onAddCustom,
 };
 
 const TranslationStep = ({ situation, emotion, translation, onChange, onNext, onBack, onExit }) => {
-  const applyFormula = () => {
-    const emoText = emotion || '(情緒)';
-    onChange(`他當時可能感到${emoText}，是因為他在意(需求)。`);
+  const emoText = emotion || '(情緒)';
+
+  const applyCausal = () => {
+    onChange(`他當時可能感到${emoText}，是因為他很在意(需求)。`);
+  };
+
+  const applyExpectation = () => {
+    onChange(`他當時可能感到${emoText}，想要(需求或期待)。`);
   };
 
   return (
@@ -380,24 +385,30 @@ const TranslationStep = ({ situation, emotion, translation, onChange, onNext, on
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <LinearGradient colors={['#FFF4ED', '#FFE8DB']} style={styles.fullScreen}>
           <Header onBack={onBack} title="同理翻譯" onExit={onExit} />
-          <ScrollView contentContainerStyle={styles.scrollContent}>
+          <ScrollView contentContainerStyle={[styles.scrollContent, {paddingBottom: 160}]}>
             <ProgressDots currentStep={4} totalSteps={7} />
             <Text style={styles.instrText}>試著把對方的言行翻譯成感受與需求</Text>
             <Text style={styles.subInstr}>
-              試著用『他/她』告訴句子的開頭{"\n"}
+              試著用「他/她」當作句子的開頭{"\n"}
               這能幫助你保持客觀距離
             </Text>
             <Text style={styles.subInstr}>
-              即便你不同意他的表達方式{"\n"}
-              你也可以試著理解他的「感受」與其的
+              即使你不同意他的表達方式{"\n"}
+              你也可以試著理解他的「感受」是真的
             </Text>
+
+            {/* 對方原話 + 同理翻譯範例 */}
             <View style={styles.quoteBox}>
-              <Info size={16} color="#FF8C42" />
+              <Info size={16} color="#FF8C42" style={{marginTop: 2}} />
               <View style={{flex:1}}>
                 <Text style={styles.quoteLabel}>對方的原話：</Text>
-                <Text style={styles.quoteText}>「{situation || '...' }」</Text>
+                <Text style={styles.quoteText}>「{situation || '你可不可以不要一直打來吵我？'}」</Text>
+                <Text style={[styles.quoteLabel, {marginTop: 10}]}>同理翻譯：</Text>
+                <Text style={styles.quoteText}>「對方當時可能感到焦慮，想要馬上回到自己的空間」</Text>
               </View>
             </View>
+
+            {/* 輸入框 */}
             <View style={styles.inputCard}>
               <TextInput 
                 multiline 
@@ -409,16 +420,32 @@ const TranslationStep = ({ situation, emotion, translation, onChange, onNext, on
                 textAlignVertical="top" 
               />
             </View>
+
+            {/* 翻譯公式 */}
             <Text style={styles.formulaHint}>✨ 翻譯公式 (點擊套用)</Text>
-            <TouchableOpacity style={styles.formulaCard} onPress={applyFormula}>
-              <Text style={styles.formulaType}>因果句型</Text>
-              <Text style={styles.formulaMain}>「他當時可能感到(情緒)，是因為他在意(需求)。」</Text>
+
+            <TouchableOpacity style={styles.formulaCard} onPress={applyCausal}>
+              <View style={styles.formulaHeader}>
+                <Text style={styles.formulaSparkle}>✨</Text>
+                <Text style={styles.formulaType}>因果句型</Text>
+              </View>
+              <Text style={styles.formulaMain}>「他當時可能感到 (情緒)，是因為他很在意 (需求)。」</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={[styles.formulaCard, styles.formulaCardPurple]} onPress={applyExpectation}>
+              <View style={styles.formulaHeader}>
+                <Text style={styles.formulaSparkle}>✨</Text>
+                <Text style={styles.formulaTypePurple}>期待句型</Text>
+              </View>
+              <Text style={styles.formulaMain}>「他當時可能感到 (情緒)，想要 (需求或期待)。」</Text>
             </TouchableOpacity>
           </ScrollView>
+
           <View style={styles.footer}>
             <TouchableOpacity style={styles.primaryBtn} onPress={onNext}>
               <LinearGradient colors={['#FF8C42', '#FF6B6B']} style={styles.btnGrad}>
                 <Text style={styles.btnText}>下一步</Text>
+                <ArrowRight size={20} color="#fff" />
               </LinearGradient>
             </TouchableOpacity>
           </View>
@@ -579,26 +606,24 @@ const EncouragementPage = ({ onNext, onBack, onExit }) => (
   </LinearGradient>
 );
 
-// [Fix #5] 理解需求頁 — 書寫靈感標籤可點擊插入
+// 理解需求頁 — 按照設計稿
 const NeedsStepDetailed = ({ value, onChange, onNext, onBack, onExit }) => {
+  const [showInspiration, setShowInspiration] = useState(false);
+
   const handleTagPress = useCallback((tag) => {
     const current = value || '';
     const newVal = current ? `${current}\n• ${tag}` : `• ${tag}`;
     onChange(newVal);
   }, [value, onChange]);
 
-  const handleReflectionPress = useCallback((template) => {
-    const current = value || '';
-    const newVal = current ? `${current}\n${template}` : template;
-    onChange(newVal);
-  }, [value, onChange]);
+  const hasContent = value && value.trim().length > 0;
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{flex: 1}}>
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <LinearGradient colors={['#FFF4ED', '#FFE8DB']} style={styles.fullScreen}>
           <Header onBack={onBack} title="理解需求" onExit={onExit} />
-          <ScrollView contentContainerStyle={[styles.scrollContent, {paddingBottom: 220}]} showsVerticalScrollIndicator={true}>
+          <ScrollView contentContainerStyle={[styles.scrollContent, {paddingBottom: 160}]} showsVerticalScrollIndicator={true}>
             <ProgressDots currentStep={2} totalSteps={7} />
             <Text style={styles.instrText}>對方真正在意的重點{"\n"}是什麼需求或期待沒有被滿足呢？</Text>
             
@@ -618,41 +643,148 @@ const NeedsStepDetailed = ({ value, onChange, onNext, onBack, onExit }) => {
               <Star size={14} color="#fbbf24" fill="#fbbf24" />
               <Text style={styles.exampleText}>
                 例如：{"\n"}
-                (1) 他可能需要安穩的空間來處理壓力{"\n"}
-                (2) 另一半可能需要安全感、想要被安慰
+                (1) 他可能需要安靜的空間來處理壓力{"\n"}
+                (2) 另一半可能需要安全感，想要被安慰
               </Text>
             </View>
 
-            <Text style={styles.commonCluesTitle}>常見端倪</Text>
+            {/* 書寫靈感 — 可收合展開 */}
+            <TouchableOpacity 
+              style={styles.inspirationToggle} 
+              onPress={() => setShowInspiration(!showInspiration)}
+            >
+              <Text style={styles.inspirationToggleIcon}>{showInspiration ? '∧' : '∨'}</Text>
+              <Text style={styles.inspirationToggleText}>書寫靈感</Text>
+            </TouchableOpacity>
+
+            {showInspiration && (
+              <View style={styles.inspirationContent}>
+                <View style={styles.tagRow}>
+                  <TouchableOpacity style={styles.tagBtn} onPress={() => handleTagPress('被理解')}><Text style={styles.tagText}>+ 被理解</Text></TouchableOpacity>
+                  <TouchableOpacity style={styles.tagBtn} onPress={() => handleTagPress('被尊重')}><Text style={styles.tagText}>+ 被尊重</Text></TouchableOpacity>
+                  <TouchableOpacity style={styles.tagBtn} onPress={() => handleTagPress('安全感')}><Text style={styles.tagText}>+ 安全感</Text></TouchableOpacity>
+                </View>
+                <View style={styles.tagRow}>
+                  <TouchableOpacity style={styles.tagBtn} onPress={() => handleTagPress('效率與節奏')}><Text style={styles.tagText}>+ 效率與節奏</Text></TouchableOpacity>
+                  <TouchableOpacity style={styles.tagBtn} onPress={() => handleTagPress('空間與自由')}><Text style={styles.tagText}>+ 空間與自由</Text></TouchableOpacity>
+                </View>
+                <View style={styles.tagRow}>
+                  <TouchableOpacity style={styles.tagBtn} onPress={() => handleTagPress('認同與價值')}><Text style={styles.tagText}>+ 認同與價值</Text></TouchableOpacity>
+                  <TouchableOpacity style={styles.tagBtn} onPress={() => handleTagPress('連結與親密')}><Text style={styles.tagText}>+ 連結與親密</Text></TouchableOpacity>
+                </View>
+              </View>
+            )}
+          </ScrollView>
+          <View style={styles.footer}>
+            <TouchableOpacity 
+              disabled={!hasContent} 
+              style={[styles.primaryBtn, !hasContent && {opacity: 0.5}]} 
+              onPress={onNext}
+            >
+              <LinearGradient colors={['#FF8C42', '#FF6B6B']} style={styles.btnGrad}>
+                <Text style={styles.btnText}>下一步</Text>
+                <ArrowRight size={20} color="#fff" />
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+        </LinearGradient>
+      </TouchableWithoutFeedback>
+    </KeyboardAvoidingView>
+  );
+};
+
+// 考量限制頁 — 按照設計稿
+const LimitationsStepDetailed = ({ value, onChange, onNext, onSkip, onBack, onExit }) => {
+  const [showHints, setShowHints] = useState(false);
+
+  const handleReflectionPress = useCallback((template) => {
+    const current = value || '';
+    const newVal = current ? `${current}\n${template}` : template;
+    onChange(newVal);
+  }, [value, onChange]);
+
+  return (
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{flex: 1}}>
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <LinearGradient colors={['#FFF4ED', '#FFE8DB']} style={styles.fullScreen}>
+          {/* 自訂 Header：左箭頭 + 標題 + 跳過 + X */}
+          <View style={styles.header}>
+            <TouchableOpacity onPress={onBack} style={styles.navBtn}>
+              <ArrowLeft size={24} color="#FF8C42" />
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>考量限制</Text>
+            <View style={styles.headerRight}>
+              <TouchableOpacity onPress={onSkip} style={styles.skipHeaderBtn}>
+                <Text style={styles.skipHeaderText}>跳過</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={onExit} style={styles.navBtn}>
+                <X size={24} color="#FF8C42" />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          <ScrollView contentContainerStyle={[styles.scrollContent, {paddingBottom: 180}]} showsVerticalScrollIndicator={true}>
+            <ProgressDots currentStep={3} totalSteps={7} />
+            <Text style={styles.instrText}>
+              他的表達方式或許深受習慣與壓力影響{"\n"}
+              我們一起試著思考{"\n"}
+              如果這句話不是在針對我{"\n"}
+              還會有哪些可能性
+            </Text>
             
-            <View style={styles.clueSection}>
-              <Text style={styles.clueSectionTitle}>• 智慧模式</Text>
-              <Text style={styles.clueSectionText}>
-                這是他長期以來應對外界的習慣嗎？（例如：選擇讓力壓抑起來、習慣先指責別人以保護自己）。
-              </Text>
+            <View style={styles.inputCard}>
+              <TextInput 
+                multiline 
+                style={styles.textArea} 
+                value={value} 
+                onChangeText={onChange} 
+                placeholder="他會這麼說或許是因為..." 
+                placeholderTextColor="#cbd5e1" 
+                textAlignVertical="top" 
+              />
             </View>
 
-            <View style={styles.clueSection}>
-              <Text style={styles.clueSectionTitle}>• 身心狀態</Text>
-              <Text style={styles.clueSectionText}>
-                他當時的身體狀況或睡眠狀況嗎？（例如：睡眠不足、焦慮主管系、正好感冒不適造成的焦慮中）。
-              </Text>
-            </View>
+            {/* 靈感提示 — 可收合展開 */}
+            <TouchableOpacity 
+              style={styles.inspirationToggle} 
+              onPress={() => setShowHints(!showHints)}
+            >
+              <Text style={styles.inspirationToggleIcon}>{showHints ? '∧' : '∨'}</Text>
+              <Text style={styles.inspirationToggleText}>靈感提示</Text>
+            </TouchableOpacity>
 
-            <View style={styles.clueSection}>
-              <Text style={styles.clueSectionTitle}>• 角色壓力</Text>
-              <Text style={styles.clueSectionText}>
-                身為那個角色（上司、父母、伴侶），他是否正承受某些形象的壓力或責任？
-              </Text>
-            </View>
+            {showHints && (
+              <View style={styles.inspirationContent}>
+                <View style={styles.clueSection}>
+                  <Text style={styles.clueSectionTitleOrange}>• 習慣模式</Text>
+                  <Text style={styles.clueSectionText}>
+                    這是他長期以來應對壓力的習慣嗎？（例如：遇到壓力就想躲起來、習慣先指責別人以保護自己）。
+                  </Text>
+                </View>
 
-            {/* [Fix #5] 書寫靈感 — 點擊插入文字到輸入框 */}
-            <Text style={styles.inspirationTitle}>💡 書寫靈感（點擊插入）</Text>
+                <View style={styles.clueSection}>
+                  <Text style={styles.clueSectionTitleOrange}>• 身心狀態</Text>
+                  <Text style={styles.clueSectionText}>
+                    他當時的身體狀況或環境如何？（例如：睡眠不足、剛被主管罵、正好處於趕進度的焦慮中）。
+                  </Text>
+                </View>
 
-            <TouchableOpacity style={styles.reflectionBox} onPress={() => handleReflectionPress('如果我是他，在同樣的處境或壓力漩渦中，我可能會覺得...')}>
+                <View style={styles.clueSection}>
+                  <Text style={styles.clueSectionTitleOrange}>• 角色壓力</Text>
+                  <Text style={styles.clueSectionText}>
+                    身為那個角色（上司、父母、伴侶），他是否正承受著某些我沒看見的負擔？
+                  </Text>
+                </View>
+              </View>
+            )}
+
+            {/* 換位思考練習 */}
+            <Text style={styles.reflectionSectionTitle}>換位思考練習（點擊加入輸入框）</Text>
+
+            <TouchableOpacity style={styles.reflectionBox} onPress={() => handleReflectionPress('如果我是他，在同樣的壓力或情境下，我可能會覺得...')}>
               <Text style={styles.reflectionIcon}>👤</Text>
               <Text style={styles.reflectionText}>
-                如果我是他，在同樣的處境或壓力漩渦中，我可能會覺得...
+                如果我是他，在同樣的壓力或情境下，我可能會覺得...
               </Text>
             </TouchableOpacity>
 
@@ -663,108 +795,28 @@ const NeedsStepDetailed = ({ value, onChange, onNext, onBack, onExit }) => {
               </Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.reflectionBox} onPress={() => handleReflectionPress('根據過往經驗，他好像會在極度焦慮的時候，會用...')}>
+            <TouchableOpacity style={styles.reflectionBox} onPress={() => handleReflectionPress('根據過往經驗，他好像會在極度繁忙的時候，會有...')}>
               <Text style={styles.reflectionIcon}>💭</Text>
               <Text style={styles.reflectionText}>
-                根據過往經驗，他好像會在極度焦慮的時候，會用...
+                根據過往經驗，他好像會在極度繁忙的時候，會有...
               </Text>
             </TouchableOpacity>
-
-            <Text style={styles.tagSectionTitle}>快速標記需求</Text>
-            <View style={styles.tagRow}>
-              <TouchableOpacity style={styles.tagBtn} onPress={() => handleTagPress('被理解')}><Text style={styles.tagText}>+ 被理解</Text></TouchableOpacity>
-              <TouchableOpacity style={styles.tagBtn} onPress={() => handleTagPress('被尊重')}><Text style={styles.tagText}>+ 被尊重</Text></TouchableOpacity>
-              <TouchableOpacity style={styles.tagBtn} onPress={() => handleTagPress('安全感')}><Text style={styles.tagText}>+ 安全感</Text></TouchableOpacity>
-            </View>
-
-            <View style={styles.tagRow}>
-              <TouchableOpacity style={styles.tagBtn} onPress={() => handleTagPress('效率與節奏')}><Text style={styles.tagText}>+ 效率與節奏</Text></TouchableOpacity>
-              <TouchableOpacity style={styles.tagBtn} onPress={() => handleTagPress('空間與自由')}><Text style={styles.tagText}>+ 空間與自由</Text></TouchableOpacity>
-            </View>
-
-            <View style={styles.tagRow}>
-              <TouchableOpacity style={styles.tagBtn} onPress={() => handleTagPress('認同與價值')}><Text style={styles.tagText}>+ 認同與價值</Text></TouchableOpacity>
-              <TouchableOpacity style={styles.tagBtn} onPress={() => handleTagPress('連結與親密')}><Text style={styles.tagText}>+ 連結與親密</Text></TouchableOpacity>
-            </View>
           </ScrollView>
+
           <View style={styles.footer}>
             <TouchableOpacity style={styles.primaryBtn} onPress={onNext}>
               <LinearGradient colors={['#FF8C42', '#FF6B6B']} style={styles.btnGrad}>
                 <Text style={styles.btnText}>下一步</Text>
+                <ArrowRight size={20} color="#fff" />
               </LinearGradient>
             </TouchableOpacity>
+            <Text style={styles.footerHint}>如果暫時想不到，可以先跳過</Text>
           </View>
         </LinearGradient>
       </TouchableWithoutFeedback>
     </KeyboardAvoidingView>
   );
 };
-
-// [Fix #1] 考量限制頁 — 新增「跳過」按鈕（僅此頁可跳過）
-const LimitationsStepDetailed = ({ value, onChange, onNext, onSkip, onBack, onExit }) => (
-  <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{flex: 1}}>
-    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-      <LinearGradient colors={['#FFF4ED', '#FFE8DB']} style={styles.fullScreen}>
-        <Header onBack={onBack} title="考量限制" onExit={onExit} />
-        <ScrollView contentContainerStyle={[styles.scrollContent, {paddingBottom: 220}]} showsVerticalScrollIndicator={true}>
-          <ProgressDots currentStep={3} totalSteps={7} />
-          <Text style={styles.instrText}>
-            他的表達方式或許受到某些情境壓力影響{"\n"}
-            或許一些話會想表{"\n"}
-            如果這句話不是在針對我{"\n"}
-            還會有哪些可能性
-          </Text>
-          
-          <View style={styles.inputCard}>
-            <TextInput 
-              multiline 
-              style={styles.textArea} 
-              value={value} 
-              onChangeText={onChange} 
-              placeholder="他會這麼說或許是因為..." 
-              placeholderTextColor="#cbd5e1" 
-              textAlignVertical="top" 
-            />
-          </View>
-
-          <Text style={styles.commonCluesTitle}>常見提示</Text>
-          
-          <View style={styles.clueSection}>
-            <Text style={styles.clueSectionTitle}>• 智慧模式</Text>
-            <Text style={styles.clueSectionText}>
-              這是他長期以來應對外界的習慣嗎？（例如：選擇讓力壓抑起來、習慣先指責別人以保護自己）。
-            </Text>
-          </View>
-
-          <View style={styles.clueSection}>
-            <Text style={styles.clueSectionTitle}>• 身心狀態</Text>
-            <Text style={styles.clueSectionText}>
-              他當時的身體狀況或睡眠狀況嗎？（例如：睡眠不足、焦慮主管系、正好感冒不適造成的焦慮中）。
-            </Text>
-          </View>
-
-          <View style={styles.clueSection}>
-            <Text style={styles.clueSectionTitle}>• 角色壓力</Text>
-            <Text style={styles.clueSectionText}>
-              身為那個角色（上司、父母、伴侶），他是否正承受某些形象的壓力或責任？
-            </Text>
-          </View>
-        </ScrollView>
-        <View style={styles.footer}>
-          {/* [Fix #1] 跳過按鈕 — 僅限考量限制頁 */}
-          <TouchableOpacity style={styles.skipBtn} onPress={onSkip}>
-            <Text style={styles.skipBtnText}>跳過此步驟</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.primaryBtn} onPress={onNext}>
-            <LinearGradient colors={['#FF8C42', '#FF6B6B']} style={styles.btnGrad}>
-              <Text style={styles.btnText}>下一步</Text>
-            </LinearGradient>
-          </TouchableOpacity>
-        </View>
-      </LinearGradient>
-    </TouchableWithoutFeedback>
-  </KeyboardAvoidingView>
-);
 
 // ==================== 主組件 (Controller) ====================
 export default function EmpathyPractice({ onBack, navigation, onHome }) {
@@ -1155,6 +1207,20 @@ const styles = StyleSheet.create({
     fontWeight: '700', 
     color: '#1e293b' 
   },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  skipHeaderBtn: {
+    paddingHorizontal: 4,
+    paddingVertical: 4,
+  },
+  skipHeaderText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FF8C42',
+  },
   navBtn: { 
     width: 40, 
     height: 40, 
@@ -1539,12 +1605,31 @@ const styles = StyleSheet.create({
     borderColor: '#FFE8DB', 
     shadowColor: '#FF8C42', 
     shadowOpacity: 0.1, 
-    elevation: 2 
+    elevation: 2,
+    marginBottom: 12,
+  },
+  formulaCardPurple: {
+    borderColor: '#E8D5F5',
+    shadowColor: '#9B59B6',
+  },
+  formulaHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 6,
+  },
+  formulaSparkle: {
+    fontSize: 14,
   },
   formulaType: { 
-    fontSize: 12, 
+    fontSize: 14, 
     fontWeight: '800', 
     color: '#FF8C42' 
+  },
+  formulaTypePurple: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#9B59B6',
   },
   formulaMain: { 
     fontSize: 14, 
@@ -1569,19 +1654,47 @@ const styles = StyleSheet.create({
     color: '#1e293b',
     marginBottom: 6,
   },
+  clueSectionTitleOrange: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#FF8C42',
+    marginBottom: 6,
+  },
   clueSectionText: {
     fontSize: 13,
     color: '#64748b',
     lineHeight: 20,
   },
 
-  // [Fix #5] 書寫靈感標題
-  inspirationTitle: {
+  reflectionSectionTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#94a3b8',
+    marginTop: 20,
+    marginBottom: 12,
+  },
+
+  // 書寫靈感 - 可收合展開
+  inspirationToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 20,
+    marginBottom: 8,
+  },
+  inspirationToggleIcon: {
+    fontSize: 14,
+    color: '#FF8C42',
+    fontWeight: '700',
+  },
+  inspirationToggleText: {
     fontSize: 15,
     fontWeight: '700',
     color: '#FF8C42',
-    marginTop: 24,
-    marginBottom: 12,
+  },
+  inspirationContent: {
+    marginTop: 8,
   },
 
   reflectionBox: {
