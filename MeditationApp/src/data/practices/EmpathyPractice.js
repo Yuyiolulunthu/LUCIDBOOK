@@ -597,7 +597,7 @@ const EncouragementPage = ({ onNext, onBack, onExit }) => (
       </View>
       <Text style={styles.encouragementTitle}>你很厲害！</Text>
       <Text style={styles.encouragementDesc}>
-        你願意不帶批判 嘗試站在對方的角度思考{"\n"}
+        你願意不帶批判，嘗試站在對方的角度思考，{"\n"}
         而這正是同理能力的展現。
       </Text>
       <Text style={styles.encouragementDesc2}>
@@ -1099,11 +1099,12 @@ const RecPage = ({ onNext, onBack, onExit }) => (
     <ScrollView contentContainerStyle={styles.scrollContent}>
       <Text style={styles.recPageTitle}>接下來，你可以...</Text>
       <ProgressDots currentStep={6} totalSteps={7} />
+
+      {/* 分隔線 */}
+      <View style={styles.recDivider} />
       
-      <View style={styles.recItem}>
-        <View style={styles.recIconCircle}>
-          <MessageCircle color="#FF8C42" size={20} />
-        </View>
+      <View style={styles.recItemFlat}>
+        <MessageCircle color="#94a3b8" size={22} style={styles.recIconFlat} />
         <View style={{flex:1}}>
           <Text style={styles.recT}>找人聊聊</Text>
           <Text style={styles.recD}>
@@ -1112,10 +1113,8 @@ const RecPage = ({ onNext, onBack, onExit }) => (
         </View>
       </View>
 
-      <View style={styles.recItem}>
-        <View style={styles.recIconCircle}>
-          <ShieldCheck color="#FF8C42" size={20} />
-        </View>
+      <View style={styles.recItemFlat}>
+        <ShieldCheck color="#94a3b8" size={22} style={styles.recIconFlat} />
         <View style={{flex:1}}>
           <Text style={styles.recT}>設定界線</Text>
           <Text style={styles.recD}>
@@ -1124,10 +1123,8 @@ const RecPage = ({ onNext, onBack, onExit }) => (
         </View>
       </View>
 
-      <View style={styles.recItem}>
-        <View style={styles.recIconCircle}>
-          <Wind color="#FF8C42" size={20} />
-        </View>
+      <View style={styles.recItemFlat}>
+        <Wind color="#94a3b8" size={22} style={styles.recIconFlat} />
         <View style={{flex:1}}>
           <Text style={styles.recT}>4-6 呼吸練習</Text>
           <Text style={styles.recD}>
@@ -1838,6 +1835,21 @@ const styles = StyleSheet.create({
     lineHeight: 22 
   },
   
+  recDivider: {
+    height: 1,
+    backgroundColor: '#e2e8f0',
+    marginTop: 4,
+    marginBottom: 20,
+  },
+  recItemFlat: { 
+    flexDirection: 'row', 
+    gap: 14, 
+    paddingVertical: 12,
+    alignItems: 'flex-start',
+  },
+  recIconFlat: {
+    marginTop: 2,
+  },
   recItem: { 
     flexDirection: 'row', 
     gap: 12, 
@@ -1859,13 +1871,13 @@ const styles = StyleSheet.create({
   recT: { 
     fontSize: 16, 
     fontWeight: '700', 
-    color:'#1e293b' 
+    color:'#1e293b',
+    marginBottom: 4,
   },
   recD: { 
     fontSize: 14, 
     color: '#64748b', 
-    marginTop: 4,
-    lineHeight: 20,
+    lineHeight: 22,
   },
   recImg: { 
     width: '100%', 
