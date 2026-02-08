@@ -306,7 +306,7 @@ const AccountScreen = ({ navigation, route }) => {
                     <Text style={styles.userName}>{user.name}</Text>
                   </View>
                   <Text style={styles.userSubtitle}>
-                    持續練習第 {getDaysJoined()} 天
+                    加入路晰書的第 {getDaysJoined()} 天
                   </Text>
                   <View style={styles.userDetails}>
                     {getDisplayCompany() && (
@@ -366,7 +366,7 @@ const AccountScreen = ({ navigation, route }) => {
                   <Text style={styles.userName}>{user.name}</Text>
                 </View>
                 <Text style={styles.userSubtitle}>
-                  持續練習第 {getDaysJoined()} 天
+                  加入路晰書的第 {getDaysJoined()} 天
                 </Text>
 
                 <View style={styles.userDetails}>
