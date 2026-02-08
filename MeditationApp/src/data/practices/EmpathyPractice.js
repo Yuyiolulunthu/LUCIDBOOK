@@ -324,7 +324,11 @@ const EmotionsStep = ({ selectedEmotions, customEmotions, onToggle, onAddCustom,
       </ScrollView>
 
       <View style={styles.footer}>
-        <TouchableOpacity style={styles.primaryBtn} onPress={onNext}>
+        <TouchableOpacity 
+          disabled={selectedEmotions.length === 0} 
+          style={[styles.primaryBtn, selectedEmotions.length === 0 && {opacity: 0.5}]} 
+          onPress={onNext}
+        >
           <LinearGradient colors={['#FF8C42', '#FF6B6B']} style={styles.btnGrad}>
             <Text style={styles.btnText}>下一步</Text>
             <ArrowRight size={20} color="#fff" />
@@ -442,7 +446,11 @@ const TranslationStep = ({ situation, emotion, translation, onChange, onNext, on
           </ScrollView>
 
           <View style={styles.footer}>
-            <TouchableOpacity style={styles.primaryBtn} onPress={onNext}>
+            <TouchableOpacity 
+              disabled={!translation || !translation.trim()} 
+              style={[styles.primaryBtn, (!translation || !translation.trim()) && {opacity: 0.5}]} 
+              onPress={onNext}
+            >
               <LinearGradient colors={['#FF8C42', '#FF6B6B']} style={styles.btnGrad}>
                 <Text style={styles.btnText}>下一步</Text>
                 <ArrowRight size={20} color="#fff" />
@@ -589,7 +597,7 @@ const EncouragementPage = ({ onNext, onBack, onExit }) => (
       </View>
       <Text style={styles.encouragementTitle}>你很厲害！</Text>
       <Text style={styles.encouragementDesc}>
-        你願意不帶批判，嘗試站在對方的角度思考，{"\n"}
+        你願意不帶批判 嘗試站在對方的角度思考{"\n"}
         而這正是同理能力的展現。
       </Text>
       <Text style={styles.encouragementDesc2}>
@@ -1087,9 +1095,10 @@ const BreathingPage = ({ onNext, onBack, onExit }) => (
 
 const RecPage = ({ onNext, onBack, onExit }) => (
   <LinearGradient colors={['#FFF4ED', '#FFE8DB']} style={styles.fullScreen}>
-    <Header onBack={onBack} title="推薦建議" onExit={onExit} />
+    <Header onBack={onBack} onExit={onExit} />
     <ScrollView contentContainerStyle={styles.scrollContent}>
-      <Text style={styles.pageTitle}>接下來，你可以...</Text>
+      <Text style={styles.recPageTitle}>接下來，你可以...</Text>
+      <ProgressDots currentStep={6} totalSteps={7} />
       
       <View style={styles.recItem}>
         <View style={styles.recIconCircle}>
@@ -1098,7 +1107,7 @@ const RecPage = ({ onNext, onBack, onExit }) => (
         <View style={{flex:1}}>
           <Text style={styles.recT}>找人聊聊</Text>
           <Text style={styles.recD}>
-            找個時機和他問他：「你那天是不是壓力太大？我很關心的容易度，想協在意工作進度呢？」
+            找個時機問問他：「你那天是不是壓力很大？我看你好像很累，是因為在意工作進度嗎？」
           </Text>
         </View>
       </View>
@@ -1110,7 +1119,7 @@ const RecPage = ({ onNext, onBack, onExit }) => (
         <View style={{flex:1}}>
           <Text style={styles.recT}>設定界線</Text>
           <Text style={styles.recD}>
-            嘗試理解他的壓力來源，但若你感到受傷，試著告訴他：「我理解你當下很忙，但你那天說話的語氣讓我有點難過。」
+            雖然理解他的需求，但我們感到受傷。試著告訴他：「我理解你當下很忙，但你那天說話的語氣讓我有點難過。」
           </Text>
         </View>
       </View>
@@ -1122,8 +1131,7 @@ const RecPage = ({ onNext, onBack, onExit }) => (
         <View style={{flex:1}}>
           <Text style={styles.recT}>4-6 呼吸練習</Text>
           <Text style={styles.recD}>
-            如果進度壓力讓你持續焦慮，充滿壓力，{"\n"}
-            建議找你信任的人協助，獲得幫助
+            如果還是覺得胸口悶悶的，先調節生理反應。慢慢吸氣四秒，吐氣六秒。
           </Text>
         </View>
       </View>
@@ -1375,6 +1383,14 @@ const styles = StyleSheet.create({
     textAlign: 'center', 
     marginBottom: 24,
     marginTop: 8,
+  },
+  recPageTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#1e293b',
+    textAlign: 'center',
+    marginBottom: 16,
+    marginTop: 4,
   },
   instrText: { 
     fontSize: 16, 
