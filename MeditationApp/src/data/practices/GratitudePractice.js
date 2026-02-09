@@ -1,10 +1,10 @@
 // ==========================================
 // 檔案名稱: GratitudePractice.js
 // 感恩練習 - 三種子練習模式
-// 版本: V1.1 - 修正滑動問題 + 中途退出保留紀錄
+// 版本: V1.3 - 內建 PracticeStorage
 // ==========================================
 
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -40,8 +40,54 @@ import {
   Send,
 } from 'lucide-react-native';
 import ApiService from '../../../api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+
+// ==================== 本地存儲工具 ====================
+const PracticeStorage = {
+  async saveDraft(practiceData) {
+    try {
+      const data = { ...practiceData, savedAt: new Date().toISOString() };
+      await AsyncStorage.setItem('@gratitude_practice_draft', JSON.stringify(data));
+      console.log('練習草稿已保存');
+      return true;
+    } catch (error) {
+      console.error('保存練習草稿失敗:', error);
+      return false;
+    }
+  },
+
+  async getDraft() {
+    try {
+      const data = await AsyncStorage.getItem('@gratitude_practice_draft');
+      if (!data) return null;
+      const draft = JSON.parse(data);
+      const savedTime = new Date(draft.savedAt).getTime();
+      const now = Date.now();
+      const hoursPassed = (now - savedTime) / (1000 * 60 * 60);
+      if (hoursPassed > 24) {
+        await this.clearDraft();
+        return null;
+      }
+      return draft;
+    } catch (error) {
+      console.error('讀取練習草稿失敗:', error);
+      return null;
+    }
+  },
+
+  async clearDraft() {
+    try {
+      await AsyncStorage.removeItem('@gratitude_practice_draft');
+      console.log('練習草稿已清除');
+      return true;
+    } catch (error) {
+      console.error('清除練習草稿失敗:', error);
+      return false;
+    }
+  },
+};
 
 // ==================== 自定義滑杆組件 ====================
 const CustomSlider = ({ value, onValueChange, min = 0, max = 10 }) => {
@@ -417,7 +463,7 @@ const InfoModal = ({ visible, onClose, type }) => {
 
 // ==================== 主組件 ====================
 export default function GratitudePractice({ onBack, navigation, onHome }) {
-  // 頁面狀態:menu, diary-intro, diary-write, diary-feeling, letter-intro, letter-recipient, letter-message, if-intro, if-imagine, if-appreciate, assessment, completion
+  // 頁面狀態
   const [currentPage, setCurrentPage] = useState('menu');
   const [formData, setFormData] = useState(INITIAL_FORM_DATA);
   const [showInfoModal, setShowInfoModal] = useState(false);
@@ -493,21 +539,6 @@ export default function GratitudePractice({ onBack, navigation, onHome }) {
     }
   };
 
-  const saveProgress = async () => {
-    if (!practiceId) return;
-    try {
-      await ApiService.updatePracticeProgress(
-        practiceId,
-        getCurrentStep(),
-        totalSteps,
-        formData,
-        elapsedTime
-      );
-    } catch (err) {
-      console.log('儲存進度失敗:', err);
-    }
-  };
-
   const handleComplete = async () => {
     let totalSeconds = elapsedTime || 60;
 
@@ -522,17 +553,28 @@ export default function GratitudePractice({ onBack, navigation, onHome }) {
       timestamp: Date.now(),
     };
 
-    await ApiService.completePractice(practiceId, {
-      practice_type: practiceTypeMap[formData.practiceType] || '感恩練習',
-      duration: Math.max(1, Math.ceil(totalSeconds / 60)),
-      duration_seconds: totalSeconds,
-      form_data: payloadFormData,
-    });
+    try {
+      await ApiService.completePractice(practiceId, {
+        practice_type: practiceTypeMap[formData.practiceType] || '感恩練習',
+        duration: Math.max(1, Math.ceil(totalSeconds / 60)),
+        duration_seconds: totalSeconds,
+        form_data: payloadFormData,
+      });
+
+      // 完成後清除本地草稿
+      await PracticeStorage.clearDraft();
+      console.log('練習完成，本地草稿已清除');
+    } catch (error) {
+      console.error('完成練習失敗:', error);
+      throw error;
+    }
   };
 
   // 恢復練習
   const restorePractice = async () => {
     if (!savedPractice) return;
+    
+    console.log('恢復練習:', savedPractice);
     
     setFormData(savedPractice.formData);
     setPracticeId(savedPractice.practiceId);
@@ -540,55 +582,96 @@ export default function GratitudePractice({ onBack, navigation, onHome }) {
     setStartTime(Date.now());
     setIsTiming(true);
     
-    // 根據練習類型和步驟跳轉到對應頁面
-    const { practiceType, currentStep } = savedPractice;
-    
-    if (practiceType === PRACTICE_TYPES.DIARY) {
-      if (currentStep >= 2) setCurrentPage('diary-feeling');
-      else if (currentStep >= 1) setCurrentPage('diary-write');
-      else setCurrentPage('diary-intro');
-    } else if (practiceType === PRACTICE_TYPES.LETTER) {
-      if (currentStep >= 2) setCurrentPage('letter-message');
-      else if (currentStep >= 1) setCurrentPage('letter-recipient');
-      else setCurrentPage('letter-intro');
-    } else if (practiceType === PRACTICE_TYPES.IF) {
-      if (currentStep >= 2) setCurrentPage('if-appreciate');
-      else if (currentStep >= 1) setCurrentPage('if-imagine');
-      else setCurrentPage('if-intro');
+    if (savedPractice.currentPage && savedPractice.currentPage !== 'menu') {
+      setCurrentPage(savedPractice.currentPage);
+    } else {
+      const { practiceType, currentStep } = savedPractice;
+      
+      if (practiceType === PRACTICE_TYPES.DIARY) {
+        if (currentStep >= 2) setCurrentPage('diary-feeling');
+        else if (currentStep >= 1) setCurrentPage('diary-write');
+        else setCurrentPage('diary-intro');
+      } else if (practiceType === PRACTICE_TYPES.LETTER) {
+        if (currentStep >= 2) setCurrentPage('letter-message');
+        else if (currentStep >= 1) setCurrentPage('letter-recipient');
+        else setCurrentPage('letter-intro');
+      } else if (practiceType === PRACTICE_TYPES.IF) {
+        if (currentStep >= 2) setCurrentPage('if-appreciate');
+        else if (currentStep >= 1) setCurrentPage('if-imagine');
+        else setCurrentPage('if-intro');
+      }
     }
     
     setShowRestoreModal(false);
   };
 
-  // 放棄恢復，開始新練習
-  const discardSavedPractice = () => {
+  // 放棄恢復
+  const discardSavedPractice = async () => {
+    await PracticeStorage.clearDraft();
     setSavedPractice(null);
     setShowRestoreModal(false);
   };
 
   // ==================== 生命週期 ====================
-  // 檢查未完成的練習
+  // 檢查本地草稿
   useEffect(() => {
-    const checkUnfinishedPractice = async () => {
+    const checkLocalDraft = async () => {
       try {
-        const response = await ApiService.getUnfinishedPractice();
-        if (response?.practice) {
-          setSavedPractice({
-            practiceId: response.practice.id,
-            practiceType: response.practice.type,
-            formData: response.practice.formData || INITIAL_FORM_DATA,
-            currentStep: response.practice.currentStep || 0,
-            elapsedTime: response.practice.elapsedTime || 0,
-          });
+        const draft = await PracticeStorage.getDraft();
+        if (draft) {
+          console.log('發現未完成的練習:', draft);
+          setSavedPractice(draft);
           setShowRestoreModal(true);
         }
       } catch (error) {
-        console.log('檢查未完成練習失敗:', error);
+        console.log('檢查本地草稿失敗:', error);
       }
     };
     
-    checkUnfinishedPractice();
+    checkLocalDraft();
   }, []);
+
+  // 自動保存到本地
+  useEffect(() => {
+    if (!practiceId || currentPage === 'menu' || currentPage === 'completion') {
+      return;
+    }
+
+    const autoSave = async () => {
+      const draftData = {
+        practiceId,
+        practiceType: formData.practiceType,
+        currentPage,
+        currentStep: getCurrentStep(),
+        formData,
+        elapsedTime,
+        savedAt: new Date().toISOString(),
+      };
+
+      await PracticeStorage.saveDraft(draftData);
+    };
+
+    autoSave();
+    const interval = setInterval(autoSave, 10000);
+    return () => clearInterval(interval);
+  }, [practiceId, currentPage, formData, elapsedTime]);
+
+  // 組件卸載時保存
+  useEffect(() => {
+    return () => {
+      if (practiceId && currentPage !== 'completion' && currentPage !== 'menu') {
+        PracticeStorage.saveDraft({
+          practiceId,
+          practiceType: formData.practiceType,
+          currentPage,
+          currentStep: getCurrentStep(),
+          formData,
+          elapsedTime,
+          savedAt: new Date().toISOString(),
+        });
+      }
+    };
+  }, [practiceId, currentPage, formData, elapsedTime]);
 
   // 選單頁面動畫
   useEffect(() => {
@@ -615,28 +698,6 @@ export default function GratitudePractice({ onBack, navigation, onHome }) {
 
     return () => clearInterval(timer);
   }, [startTime, isTiming]);
-
-  // 定期保存進度
-  useEffect(() => {
-    if (!practiceId) return;
-    if (currentPage === 'completion') return;
-
-    const interval = setInterval(() => {
-      saveProgress();
-    }, 10000);
-
-    return () => clearInterval(interval);
-  }, [practiceId, currentPage, formData, elapsedTime]);
-
-  // 組件卸載時保存進度
-  useEffect(() => {
-    return () => {
-      // 如果有正在進行的練習且未完成，保存進度
-      if (practiceId && currentPage !== 'completion' && currentPage !== 'menu') {
-        saveProgress();
-      }
-    };
-  }, [practiceId, currentPage, formData, elapsedTime]);
 
   // 鍵盤監聽
   useEffect(() => {
@@ -672,8 +733,21 @@ export default function GratitudePractice({ onBack, navigation, onHome }) {
   }, [currentPage]);
 
   // ==================== 操作函數 ====================
-  const handleBackToHome = () => {
-    // 返回主頁的統一方法
+  const handleBackToHome = async () => {
+    // 如果在練習過程中返回，保存草稿
+    if (practiceId && currentPage !== 'completion' && currentPage !== 'menu') {
+      await PracticeStorage.saveDraft({
+        practiceId,
+        practiceType: formData.practiceType,
+        currentPage,
+        currentStep: getCurrentStep(),
+        formData,
+        elapsedTime,
+        savedAt: new Date().toISOString(),
+      });
+      console.log('返回前已保存草稿');
+    }
+
     if (onHome) {
       onHome();
     } else if (navigation) {
@@ -740,6 +814,21 @@ export default function GratitudePractice({ onBack, navigation, onHome }) {
       return '感恩練習';
     };
 
+    const getTimeSince = () => {
+      if (!savedPractice?.savedAt) return '';
+      
+      const savedTime = new Date(savedPractice.savedAt);
+      const now = new Date();
+      const diffMs = now - savedTime;
+      const diffMins = Math.floor(diffMs / (1000 * 60));
+      const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+      
+      if (diffMins < 1) return '剛剛';
+      else if (diffMins < 60) return `${diffMins} 分鐘前`;
+      else if (diffHours < 24) return `${diffHours} 小時前`;
+      else return '昨天';
+    };
+
     return (
       <Modal
         visible={showRestoreModal}
@@ -760,7 +849,7 @@ export default function GratitudePractice({ onBack, navigation, onHome }) {
 
             <View style={styles.modalBody}>
               <Text style={styles.restoreModalText}>
-                你有一個尚未完成的{getPracticeTypeName()}，要繼續完成嗎？
+                你有一個{getTimeSince()}保存的{getPracticeTypeName()}，要繼續完成嗎？
               </Text>
             </View>
 
@@ -825,12 +914,10 @@ export default function GratitudePractice({ onBack, navigation, onHome }) {
           colors={['#f0f9ff', '#e0f2fe']}
           style={styles.gradientBg}
         >
-          {/* 返回按鈕 */}
           <TouchableOpacity onPress={handleBack} style={styles.menuBackButton}>
             <ChevronLeft size={24} color="#64748b" />
           </TouchableOpacity>
 
-          {/* 說明按鈕 */}
           <TouchableOpacity onPress={() => showInfo('main')} style={styles.infoButton}>
             <HelpCircle size={16} color="#0ea5e9" />
             <Text style={styles.infoButtonText}>為什麼要練習感恩?</Text>
@@ -985,7 +1072,6 @@ export default function GratitudePractice({ onBack, navigation, onHome }) {
                   />
                 </View>
 
-                {/* 書寫提示 */}
                 <View style={styles.tipsSection}>
                   <TouchableOpacity onPress={() => setShowTips(!showTips)} style={styles.tipsToggle}>
                     {showTips ? <ChevronUp size={16} color="#0ea5e9" /> : <ChevronDown size={16} color="#0ea5e9" />}
@@ -1004,7 +1090,6 @@ export default function GratitudePractice({ onBack, navigation, onHome }) {
                   )}
                 </View>
 
-                {/* 參考範例 */}
                 <View style={styles.examplesSection}>
                   <TouchableOpacity onPress={() => setShowExamples(!showExamples)} style={styles.examplesToggle}>
                     <Lightbulb size={16} color="#0ea5e9" />
@@ -1749,7 +1834,6 @@ export default function GratitudePractice({ onBack, navigation, onHome }) {
 
   // ==================== 完成頁 ====================
   const renderCompletionPage = () => {
-    // 星星流星动画(优化后的 Android 兼容版本)
     const StarConfetti = ({ index }) => {
       const animatedValue = useRef(new Animated.Value(0)).current;
       
@@ -1870,7 +1954,6 @@ export default function GratitudePractice({ onBack, navigation, onHome }) {
       <View style={styles.fullScreen}>
         <LinearGradient colors={['#f0f9ff', '#e0f2fe']} style={styles.gradientBg}>
           <View style={styles.completionContent}>
-            {/* 星星动画容器 */}
             <View 
               style={{
                 position: 'absolute',
@@ -1886,7 +1969,6 @@ export default function GratitudePractice({ onBack, navigation, onHome }) {
               ))}
             </View>
 
-            {/* 中心圖標 */}
             <Animated.View
               style={[
                 styles.completionIconContainer,
@@ -1913,7 +1995,6 @@ export default function GratitudePractice({ onBack, navigation, onHome }) {
             <Text style={styles.completionTitle}>太棒了!</Text>
             <Text style={styles.completionSubtitle}>你已完成今日的感恩儀式</Text>
 
-            {/* 連續練習天數 */}
             <View style={styles.streakCard}>
               <View style={styles.streakHeader}>
                 <Star size={16} color="#fbbf24" fill="#fbbf24" />
@@ -1925,7 +2006,6 @@ export default function GratitudePractice({ onBack, navigation, onHome }) {
               </View>
             </View>
 
-            {/* 查看日記按鈕 */}
             <TouchableOpacity style={styles.viewJournalButton} onPress={handleViewJournal}>
               <Text style={styles.viewJournalText}>查看日記</Text>
               <ArrowRight size={16} color="#0ea5e9" />
@@ -1941,27 +2021,22 @@ export default function GratitudePractice({ onBack, navigation, onHome }) {
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#f0f9ff" />
       
-      {/* 恢復練習彈窗 */}
       <RestoreModal />
       
       {currentPage === 'menu' && renderMenuPage()}
       
-      {/* 感恩日記 */}
       {currentPage === 'diary-intro' && renderDiaryIntro()}
       {currentPage === 'diary-write' && renderDiaryWrite()}
       {currentPage === 'diary-feeling' && renderDiaryFeeling()}
       
-      {/* 迷你感謝信 */}
       {currentPage === 'letter-intro' && renderLetterIntro()}
       {currentPage === 'letter-recipient' && renderLetterRecipient()}
       {currentPage === 'letter-message' && renderLetterMessage()}
       
-      {/* 如果練習 */}
       {currentPage === 'if-intro' && renderIfIntro()}
       {currentPage === 'if-imagine' && renderIfImagine()}
       {currentPage === 'if-appreciate' && renderIfAppreciate()}
       
-      {/* 共用頁面 */}
       {currentPage === 'assessment' && renderAssessmentPage()}
       {currentPage === 'completion' && renderCompletionPage()}
     </View>
