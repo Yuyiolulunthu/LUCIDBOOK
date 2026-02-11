@@ -406,7 +406,7 @@ const TranslationStep = ({ situation, emotion, translation, onChange, onNext, on
               <Info size={16} color="#FF8C42" style={{marginTop: 2}} />
               <View style={{flex:1}}>
                 <Text style={styles.quoteLabel}>對方的原話：</Text>
-                <Text style={styles.quoteText}>「{situation || '你可不可以不要一直打來吵我？'}」</Text>
+                <Text style={styles.quoteText}>「你可不可以不要一直打來吵我？」</Text>
                 <Text style={[styles.quoteLabel, {marginTop: 10}]}>同理翻譯：</Text>
                 <Text style={styles.quoteText}>「對方當時可能感到焦慮，想要馬上回到自己的空間」</Text>
               </View>
@@ -597,13 +597,13 @@ const EncouragementPage = ({ onNext, onBack, onExit }) => (
       </View>
       <Text style={styles.encouragementTitle}>你很厲害！</Text>
       <Text style={styles.encouragementDesc}>
-        你願意不帶批判，嘗試站在對方的角度思考，{"\n"}
-        而這正是同理能力的展現。
+        你願意不帶批判 嘗試站在對方的角度思考{"\n"}
+        而這正是同理能力的展現
       </Text>
       <Text style={styles.encouragementDesc2}>
-        同理不代表同意或認同對方的想法，{"\n"}
-        而是理解對方的感受與需求，{"\n"}
-        進而決定你打算如何應對。
+        同理不代表同意或認同對方的想法{"\n"}
+        而是理解對方的感受與需求{"\n"}
+        進而決定你打算如何應對
       </Text>
       <TouchableOpacity style={[styles.primaryBtn, {marginTop: 32}]} onPress={onNext}>
         <LinearGradient colors={['#FF8C42', '#FF6B6B']} style={styles.btnGrad}>
