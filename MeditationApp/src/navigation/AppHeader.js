@@ -63,11 +63,11 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   logo: {
-    width: 28,
+    width: 39,
     height: 28,
   },
   logoText: {
-    fontSize: 15,
+    fontSize: 11,
     fontWeight: '500',
     color: '#FFFFFF',
     letterSpacing: 2,
